@@ -1,0 +1,156 @@
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:bluey/bluey.dart';
+import 'package:bluey_platform_interface/bluey_platform_interface.dart'
+    as platform;
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('Bluey.connect', () {
+    late MockBlueyPlatform mockPlatform;
+    late Bluey bluey;
+
+    setUp(() {
+      mockPlatform = MockBlueyPlatform();
+      platform.BlueyPlatform.instance = mockPlatform;
+      bluey = Bluey();
+    });
+
+    tearDown(() async {
+      await bluey.dispose();
+      mockPlatform.dispose();
+    });
+
+    test('returns a Connection object', () async {
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        rssi: -60,
+        advertisement: Advertisement.empty(),
+      );
+
+      final connection = await bluey.connect(device);
+
+      expect(connection, isA<Connection>());
+      expect(connection.deviceId, equals(device.id));
+    });
+
+    test('connection starts in connecting state', () async {
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        rssi: -60,
+        advertisement: Advertisement.empty(),
+      );
+
+      final connection = await bluey.connect(device);
+
+      // Initially connecting
+      expect(connection.state, equals(ConnectionState.connecting));
+    });
+
+    test('connection state changes are emitted', () async {
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        rssi: -60,
+        advertisement: Advertisement.empty(),
+      );
+
+      final connection = await bluey.connect(device);
+      final states = <ConnectionState>[];
+      final subscription = connection.stateChanges.listen(states.add);
+
+      mockPlatform.emitConnectionState(
+        device.id.toString(),
+        platform.PlatformConnectionState.connected,
+      );
+
+      await Future.delayed(Duration(milliseconds: 10));
+      await subscription.cancel();
+
+      expect(states, contains(ConnectionState.connected));
+    });
+
+    test('disconnect closes the connection', () async {
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        rssi: -60,
+        advertisement: Advertisement.empty(),
+      );
+
+      final connection = await bluey.connect(device);
+      await connection.disconnect();
+
+      expect(connection.state, equals(ConnectionState.disconnected));
+    });
+  });
+}
+
+/// Mock platform for testing
+class MockBlueyPlatform extends platform.BlueyPlatform {
+  platform.BluetoothState mockState = platform.BluetoothState.on;
+  final Map<String, StreamController<platform.PlatformConnectionState>>
+      _connectionControllers = {};
+  final _stateController =
+      StreamController<platform.BluetoothState>.broadcast();
+
+  @override
+  platform.Capabilities get capabilities => platform.Capabilities.android;
+
+  @override
+  Stream<platform.BluetoothState> get stateStream => _stateController.stream;
+
+  @override
+  Future<platform.BluetoothState> getState() async => mockState;
+
+  @override
+  Future<bool> requestEnable() async => true;
+
+  @override
+  Future<void> openSettings() async {}
+
+  @override
+  Stream<platform.PlatformDevice> scan(platform.PlatformScanConfig config) =>
+      Stream.empty();
+
+  @override
+  Future<void> stopScan() async {}
+
+  @override
+  Future<String> connect(
+      String deviceId, platform.PlatformConnectConfig config) async {
+    _connectionControllers[deviceId] =
+        StreamController<platform.PlatformConnectionState>.broadcast();
+    // Emit connecting state immediately
+    _connectionControllers[deviceId]
+        ?.add(platform.PlatformConnectionState.connecting);
+    return deviceId;
+  }
+
+  @override
+  Future<void> disconnect(String deviceId) async {
+    _connectionControllers[deviceId]
+        ?.add(platform.PlatformConnectionState.disconnecting);
+    _connectionControllers[deviceId]
+        ?.add(platform.PlatformConnectionState.disconnected);
+    await _connectionControllers[deviceId]?.close();
+    _connectionControllers.remove(deviceId);
+  }
+
+  @override
+  Stream<platform.PlatformConnectionState> connectionStateStream(
+      String deviceId) {
+    return _connectionControllers[deviceId]?.stream ??
+        Stream.error(StateError('Not connected'));
+  }
+
+  void emitConnectionState(
+      String deviceId, platform.PlatformConnectionState state) {
+    _connectionControllers[deviceId]?.add(state);
+  }
+
+  void dispose() {
+    _stateController.close();
+    for (final controller in _connectionControllers.values) {
+      controller.close();
+    }
+  }
+}

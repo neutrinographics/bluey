@@ -139,20 +139,24 @@ bluey.scan(config).listen(
 ### Connecting to Device
 
 ```dart
-final config = PlatformConnectConfig(
-  timeoutMs: 10000,
-  mtu: 512,
-);
+import 'package:bluey/bluey.dart';
 
-final connectionId = await bluey.connect(device.id, config);
+final bluey = Bluey();
 
-// Listen to connection state
-bluey.connectionStateStream(connectionId).listen((state) {
+// Connect to a device (returns a Connection object)
+final connection = await bluey.connect(device);
+
+// Listen to connection state changes
+connection.stateChanges.listen((state) {
   print('Connection state: $state');
 });
 
+// Access GATT services (once connected)
+final services = await connection.services;
+final service = connection.service(UUID('0000180d-0000-1000-8000-00805f9b34fb'));
+
 // Disconnect when done
-await bluey.disconnect(device.id);
+await connection.disconnect();
 ```
 
 ## 🛠️ Implementation Details

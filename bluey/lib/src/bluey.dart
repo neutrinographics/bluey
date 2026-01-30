@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
+import 'bluey_connection.dart';
+import 'connection.dart';
 import 'connection_state.dart';
 import 'device.dart';
 import 'exceptions.dart';
@@ -177,9 +179,9 @@ class Bluey {
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
   ///
-  /// Returns a stream of connection state changes.
+  /// Returns a [Connection] for GATT operations.
   /// Throws [ConnectionException] if connection fails.
-  Future<Stream<ConnectionState>> connect(
+  Future<Connection> connect(
     Device device, {
     Duration? timeout,
   }) async {
@@ -191,19 +193,12 @@ class Bluey {
     try {
       final connectionId =
           await _platform.connect(device.id.toString(), config);
-      return _platform
-          .connectionStateStream(connectionId)
-          .map(_mapConnectionState)
-          .handleError((error) => throw _wrapError(error));
-    } catch (e) {
-      throw _wrapError(e);
-    }
-  }
 
-  /// Disconnect from a device.
-  Future<void> disconnect(Device device) async {
-    try {
-      await _platform.disconnect(device.id.toString());
+      return BlueyConnection(
+        platformInstance: _platform,
+        connectionId: connectionId,
+        deviceId: device.id,
+      );
     } catch (e) {
       throw _wrapError(e);
     }

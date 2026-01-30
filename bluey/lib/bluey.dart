@@ -12,6 +12,9 @@ export 'src/uuid.dart';
 export 'src/device.dart';
 export 'src/characteristic_properties.dart';
 
+// Scanning
+export 'src/scan.dart';
+
 // GATT interfaces
 export 'src/gatt.dart';
 export 'src/connection.dart';

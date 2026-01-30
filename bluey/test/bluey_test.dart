@@ -281,19 +281,20 @@ void main() {
     });
 
     group('connect', () {
-      test('returns connection state stream', () async {
+      test('returns Connection object', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
           rssi: -60,
           advertisement: Advertisement.empty(),
         );
 
-        final stateStream = await bluey.connect(device);
+        final connection = await bluey.connect(device);
 
-        expect(stateStream, isA<Stream<ConnectionState>>());
+        expect(connection, isA<Connection>());
+        expect(connection.deviceId, equals(device.id));
       });
 
-      test('maps connection states correctly', () async {
+      test('connection emits state changes', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
           rssi: -60,
@@ -301,8 +302,8 @@ void main() {
         );
 
         final states = <ConnectionState>[];
-        final stateStream = await bluey.connect(device);
-        final subscription = stateStream.listen(states.add);
+        final connection = await bluey.connect(device);
+        final subscription = connection.stateChanges.listen(states.add);
 
         mockPlatform.emitConnectionState(
           device.id.toString(),
@@ -322,18 +323,19 @@ void main() {
     });
 
     group('disconnect', () {
-      test('disconnects from device', () async {
+      test('disconnects from device via Connection', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
           rssi: -60,
           advertisement: Advertisement.empty(),
         );
 
-        // First connect
-        await bluey.connect(device);
+        // Connect and get Connection object
+        final connection = await bluey.connect(device);
 
-        // Then disconnect
-        await expectLater(bluey.disconnect(device), completes);
+        // Disconnect via Connection
+        await expectLater(connection.disconnect(), completes);
+        expect(connection.state, equals(ConnectionState.disconnected));
       });
     });
 
