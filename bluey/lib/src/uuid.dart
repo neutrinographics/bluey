@@ -87,15 +87,4 @@ class UUID {
         '${clean.substring(16, 20)}-'
         '${clean.substring(20, 32)}';
   }
-
-  // Well-known service UUIDs
-
-  /// Heart Rate Service (0x180D)
-  static final heartRate = UUID.short(0x180D);
-
-  /// Battery Service (0x180F)
-  static final battery = UUID.short(0x180F);
-
-  /// Device Information Service (0x180A)
-  static final deviceInformation = UUID.short(0x180A);
 }

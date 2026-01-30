@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/uuid.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 
 void main() {
   group('UUID', () {
@@ -91,17 +92,17 @@ void main() {
       });
     });
 
-    group('Well-known UUIDs', () {
+    group('Well-known UUIDs (via Services class)', () {
       test('heart rate service', () {
-        expect(UUID.heartRate, equals(UUID.short(0x180D)));
+        expect(Services.heartRate, equals(UUID.short(0x180D)));
       });
 
       test('battery service', () {
-        expect(UUID.battery, equals(UUID.short(0x180F)));
+        expect(Services.battery, equals(UUID.short(0x180F)));
       });
 
       test('device information service', () {
-        expect(UUID.deviceInformation, equals(UUID.short(0x180A)));
+        expect(Services.deviceInformation, equals(UUID.short(0x180A)));
       });
     });
   });

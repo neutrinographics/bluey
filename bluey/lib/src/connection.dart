@@ -18,7 +18,7 @@ export 'connection_state.dart';
 /// final connection = await bluey.connect(device);
 ///
 /// // Get heart rate service
-/// final heartRateService = connection.service(UUID.heartRate);
+/// final heartRateService = connection.service(Services.heartRate);
 ///
 /// // Read heart rate measurement
 /// final hrChar = heartRateService.characteristic(UUID.short(0x2A37));

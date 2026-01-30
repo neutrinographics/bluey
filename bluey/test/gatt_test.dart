@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock implementations for testing the interfaces
@@ -267,8 +268,8 @@ void main() {
 
   group('RemoteService', () {
     test('has uuid', () {
-      final service = MockRemoteService(uuid: UUID.heartRate);
-      expect(service.uuid, equals(UUID.heartRate));
+      final service = MockRemoteService(uuid: Services.heartRate);
+      expect(service.uuid, equals(Services.heartRate));
     });
 
     test('can find characteristic by UUID', () {
@@ -277,7 +278,7 @@ void main() {
         properties: const CharacteristicProperties(canNotify: true),
       );
       final service = MockRemoteService(
-        uuid: UUID.heartRate,
+        uuid: Services.heartRate,
         characteristics: [heartRateMeasurement],
       );
 
@@ -287,7 +288,7 @@ void main() {
 
     test('throws when characteristic not found', () {
       final service = MockRemoteService(
-        uuid: UUID.heartRate,
+        uuid: Services.heartRate,
         characteristics: [],
       );
 
@@ -307,7 +308,7 @@ void main() {
         properties: const CharacteristicProperties(canRead: true),
       );
       final service = MockRemoteService(
-        uuid: UUID.heartRate,
+        uuid: Services.heartRate,
         characteristics: [char1, char2],
       );
 
@@ -315,14 +316,14 @@ void main() {
     });
 
     test('has included services list', () {
-      final includedService = MockRemoteService(uuid: UUID.battery);
+      final includedService = MockRemoteService(uuid: Services.battery);
       final service = MockRemoteService(
-        uuid: UUID.heartRate,
+        uuid: Services.heartRate,
         includedServices: [includedService],
       );
 
       expect(service.includedServices, hasLength(1));
-      expect(service.includedServices.first.uuid, equals(UUID.battery));
+      expect(service.includedServices.first.uuid, equals(Services.battery));
     });
   });
 }

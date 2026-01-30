@@ -2,15 +2,16 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/device.dart';
 import 'package:bluey/src/uuid.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 
 void main() {
   group('Advertisement', () {
     group('Construction', () {
       test('creates with all fields', () {
         final advertisement = Advertisement(
-          serviceUuids: [UUID.heartRate, UUID.battery],
+          serviceUuids: [Services.heartRate, Services.battery],
           serviceData: {
-            UUID.heartRate: Uint8List.fromList([1, 2, 3])
+            Services.heartRate: Uint8List.fromList([1, 2, 3])
           },
           manufacturerData:
               ManufacturerData(0x004C, Uint8List.fromList([10, 20])),
@@ -53,12 +54,12 @@ void main() {
     group('Immutability', () {
       test('serviceUuids list is unmodifiable', () {
         final advertisement = Advertisement(
-          serviceUuids: [UUID.heartRate],
+          serviceUuids: [Services.heartRate],
           serviceData: {},
           isConnectable: true,
         );
 
-        expect(() => advertisement.serviceUuids.add(UUID.battery),
+        expect(() => advertisement.serviceUuids.add(Services.battery),
             throwsUnsupportedError);
       });
 
@@ -66,13 +67,13 @@ void main() {
         final advertisement = Advertisement(
           serviceUuids: [],
           serviceData: {
-            UUID.heartRate: Uint8List.fromList([1, 2])
+            Services.heartRate: Uint8List.fromList([1, 2])
           },
           isConnectable: true,
         );
 
         expect(
-            () => advertisement.serviceData[UUID.battery] =
+            () => advertisement.serviceData[Services.battery] =
                 Uint8List.fromList([3, 4]),
             throwsUnsupportedError);
       });
@@ -81,13 +82,13 @@ void main() {
     group('Equality', () {
       test('equal advertisements have same hashCode', () {
         final ad1 = Advertisement(
-          serviceUuids: [UUID.heartRate],
+          serviceUuids: [Services.heartRate],
           serviceData: {},
           isConnectable: true,
         );
 
         final ad2 = Advertisement(
-          serviceUuids: [UUID.heartRate],
+          serviceUuids: [Services.heartRate],
           serviceData: {},
           isConnectable: true,
         );
@@ -98,13 +99,13 @@ void main() {
 
       test('different advertisements are not equal', () {
         final ad1 = Advertisement(
-          serviceUuids: [UUID.heartRate],
+          serviceUuids: [Services.heartRate],
           serviceData: {},
           isConnectable: true,
         );
 
         final ad2 = Advertisement(
-          serviceUuids: [UUID.battery],
+          serviceUuids: [Services.battery],
           serviceData: {},
           isConnectable: true,
         );
@@ -147,7 +148,7 @@ void main() {
   group('Device', () {
     final testUuid = UUID.short(0x1234);
     final testAdvertisement = Advertisement(
-      serviceUuids: [UUID.heartRate],
+      serviceUuids: [Services.heartRate],
       serviceData: {},
       isConnectable: true,
     );

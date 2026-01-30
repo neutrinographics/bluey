@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock implementation for testing the interface
@@ -160,8 +161,8 @@ void main() {
         connection = MockConnection(
           deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
           services: [
-            MockRemoteServiceMinimal(UUID.heartRate),
-            MockRemoteServiceMinimal(UUID.battery),
+            MockRemoteServiceMinimal(Services.heartRate),
+            MockRemoteServiceMinimal(Services.battery),
           ],
         );
 
@@ -172,16 +173,16 @@ void main() {
       test('service() finds by UUID', () {
         connection = MockConnection(
           deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          services: [MockRemoteServiceMinimal(UUID.heartRate)],
+          services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 
-        final svc = connection.service(UUID.heartRate);
-        expect(svc.uuid, equals(UUID.heartRate));
+        final svc = connection.service(Services.heartRate);
+        expect(svc.uuid, equals(Services.heartRate));
       });
 
       test('service() throws when not found', () {
         expect(
-          () => connection.service(UUID.heartRate),
+          () => connection.service(Services.heartRate),
           throwsA(isA<ServiceNotFoundException>()),
         );
       });
@@ -189,14 +190,14 @@ void main() {
       test('hasService() returns true when found', () async {
         connection = MockConnection(
           deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          services: [MockRemoteServiceMinimal(UUID.heartRate)],
+          services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 
-        expect(await connection.hasService(UUID.heartRate), isTrue);
+        expect(await connection.hasService(Services.heartRate), isTrue);
       });
 
       test('hasService() returns false when not found', () async {
-        expect(await connection.hasService(UUID.heartRate), isFalse);
+        expect(await connection.hasService(Services.heartRate), isFalse);
       });
     });
 

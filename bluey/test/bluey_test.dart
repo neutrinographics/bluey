@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
@@ -269,14 +270,14 @@ void main() {
 
         final serviceUuids = devices.first.advertisement.serviceUuids;
         expect(serviceUuids, hasLength(2));
-        expect(serviceUuids[0], equals(UUID.heartRate));
-        expect(serviceUuids[1], equals(UUID.battery));
+        expect(serviceUuids[0], equals(Services.heartRate));
+        expect(serviceUuids[1], equals(Services.battery));
       });
 
       test('applies service UUID filter', () async {
         mockPlatform.mockDevices = [];
 
-        bluey.scan(services: [UUID.heartRate]);
+        bluey.scan(services: [Services.heartRate]);
 
         // We can't easily verify the filter was applied in our mock,
         // but we verify the scan runs without error

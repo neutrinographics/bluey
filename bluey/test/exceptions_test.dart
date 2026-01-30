@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/exceptions.dart';
 import 'package:bluey/src/uuid.dart';
+import 'package:bluey/src/well_known_uuids.dart';
 
 void main() {
   group('BlueyException', () {
@@ -66,7 +67,7 @@ void main() {
 
   group('GATT Exceptions', () {
     test('ServiceNotFoundException', () {
-      final serviceUuid = UUID.heartRate;
+      final serviceUuid = Services.heartRate;
       final exception = ServiceNotFoundException(serviceUuid);
 
       expect(exception.serviceUuid, equals(serviceUuid));
