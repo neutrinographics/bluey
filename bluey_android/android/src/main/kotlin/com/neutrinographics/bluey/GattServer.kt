@@ -258,6 +258,17 @@ class GattServer(
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
+                    // Ignore connections that happen before we've added any services
+                    // These are stale connections from central role operations
+                    if (gattServer?.services?.isEmpty() != false) {
+                        try {
+                            gattServer?.cancelConnection(device)
+                        } catch (e: SecurityException) {
+                            // Ignore
+                        }
+                        return
+                    }
+
                     connectedCentrals[deviceId] = device
                     centralMtus[deviceId] = DEFAULT_MTU
 
@@ -272,6 +283,9 @@ class GattServer(
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
+                    // Only notify if we were tracking this central
+                    if (!connectedCentrals.containsKey(deviceId)) return
+
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
