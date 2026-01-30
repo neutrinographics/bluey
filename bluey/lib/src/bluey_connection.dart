@@ -146,6 +146,7 @@ class BlueyConnection implements Connection {
       platform: _platform,
       connectionId: _connectionId,
       uuid: UUID(ps.uuid),
+      isPrimary: ps.isPrimary,
       characteristics:
           ps.characteristics.map((pc) => _mapCharacteristic(pc)).toList(),
       includedServices:
@@ -185,6 +186,9 @@ class BlueyRemoteService implements RemoteService {
   final UUID uuid;
 
   @override
+  final bool isPrimary;
+
+  @override
   final List<RemoteCharacteristic> characteristics;
 
   @override
@@ -194,6 +198,7 @@ class BlueyRemoteService implements RemoteService {
     required platform.BlueyPlatform platform,
     required String connectionId,
     required this.uuid,
+    required this.isPrimary,
     required this.characteristics,
     required this.includedServices,
   });

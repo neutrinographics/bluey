@@ -85,6 +85,9 @@ class MockRemoteService implements RemoteService {
   final UUID uuid;
 
   @override
+  final bool isPrimary;
+
+  @override
   final List<RemoteCharacteristic> characteristics;
 
   @override
@@ -92,6 +95,7 @@ class MockRemoteService implements RemoteService {
 
   MockRemoteService({
     required this.uuid,
+    this.isPrimary = true,
     this.characteristics = const [],
     this.includedServices = const [],
   });

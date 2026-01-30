@@ -78,6 +78,12 @@ abstract class RemoteService {
   /// The UUID of this service.
   UUID get uuid;
 
+  /// Whether this is a primary service.
+  ///
+  /// Primary services are the main services exposed by a device.
+  /// Secondary services are included by primary services.
+  bool get isPrimary;
+
   /// Get a characteristic by UUID.
   ///
   /// Throws [CharacteristicNotFoundException] if the characteristic is not found.
