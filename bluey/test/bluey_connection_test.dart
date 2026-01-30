@@ -7,7 +7,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 /// Mock platform for testing BlueyConnection.
-class MockBlueyPlatform extends platform.BlueyPlatform {
+final class MockBlueyPlatform extends platform.BlueyPlatform {
+  MockBlueyPlatform() : super.impl();
   // Services to return from discoverServices
   List<platform.PlatformService> mockServices = [];
 

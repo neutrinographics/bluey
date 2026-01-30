@@ -85,7 +85,8 @@ void main() {
 }
 
 /// Mock platform for testing
-class MockBlueyPlatform extends platform.BlueyPlatform {
+final class MockBlueyPlatform extends platform.BlueyPlatform {
+  MockBlueyPlatform() : super.impl();
   platform.BluetoothState mockState = platform.BluetoothState.on;
   final Map<String, StreamController<platform.PlatformConnectionState>>
   _connectionControllers = {};

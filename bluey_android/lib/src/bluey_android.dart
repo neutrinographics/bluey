@@ -4,7 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'messages.g.dart';
 
 /// Android implementation of [BlueyPlatform].
-class BlueyAndroid extends BlueyPlatform {
+final class BlueyAndroid extends BlueyPlatform {
   /// Registers this class as the default instance of [BlueyPlatform].
   static void registerWith() {
     BlueyPlatform.instance = BlueyAndroid();
@@ -32,7 +32,17 @@ class BlueyAndroid extends BlueyPlatform {
   final StreamController<PlatformWriteRequest> _writeRequestsController =
       StreamController<PlatformWriteRequest>.broadcast();
 
-  BlueyAndroid() {
+  bool _isInitialized = false;
+
+  BlueyAndroid() : super.impl();
+
+  /// Lazily initializes the Flutter API setup.
+  /// This is deferred because the Flutter binding may not be ready
+  /// when registerWith() is called during plugin registration.
+  void _ensureInitialized() {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
     // Set up the Flutter API to receive callbacks from platform
     BlueyFlutterApi.setUp(_flutterApi);
 
@@ -128,26 +138,33 @@ class BlueyAndroid extends BlueyPlatform {
   Capabilities get capabilities => Capabilities.android;
 
   @override
-  Stream<BluetoothState> get stateStream => _stateController.stream;
+  Stream<BluetoothState> get stateStream {
+    _ensureInitialized();
+    return _stateController.stream;
+  }
 
   @override
   Future<BluetoothState> getState() async {
+    _ensureInitialized();
     final state = await _hostApi.getState();
     return _mapBluetoothState(state);
   }
 
   @override
   Future<bool> requestEnable() async {
+    _ensureInitialized();
     return await _hostApi.requestEnable();
   }
 
   @override
   Future<void> openSettings() async {
+    _ensureInitialized();
     await _hostApi.openSettings();
   }
 
   @override
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
+    _ensureInitialized();
     final dto = ScanConfigDto(
       serviceUuids: config.serviceUuids,
       timeoutMs: config.timeoutMs,
@@ -161,11 +178,13 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    _ensureInitialized();
     await _hostApi.stopScan();
   }
 
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    _ensureInitialized();
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
 
     // Create connection state controller for this device
@@ -181,6 +200,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> disconnect(String deviceId) async {
+    _ensureInitialized();
     await _hostApi.disconnect(deviceId);
 
     // Clean up connection state controller
@@ -194,6 +214,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
+    _ensureInitialized();
     final controller = _connectionStateControllers[deviceId];
     if (controller == null) {
       return Stream.error(StateError('Device not connected: $deviceId'));
@@ -205,6 +226,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<List<PlatformService>> discoverServices(String deviceId) async {
+    _ensureInitialized();
     final services = await _hostApi.discoverServices(deviceId);
     return services.map(_mapService).toList();
   }
@@ -214,6 +236,7 @@ class BlueyAndroid extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
   ) async {
+    _ensureInitialized();
     return await _hostApi.readCharacteristic(deviceId, characteristicUuid);
   }
 
@@ -224,6 +247,7 @@ class BlueyAndroid extends BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
+    _ensureInitialized();
     await _hostApi.writeCharacteristic(
       deviceId,
       characteristicUuid,
@@ -238,11 +262,13 @@ class BlueyAndroid extends BlueyPlatform {
     String characteristicUuid,
     bool enable,
   ) async {
+    _ensureInitialized();
     await _hostApi.setNotification(deviceId, characteristicUuid, enable);
   }
 
   @override
   Stream<PlatformNotification> notificationStream(String deviceId) {
+    _ensureInitialized();
     final controller = _notificationControllers[deviceId];
     if (controller == null) {
       return Stream.error(StateError('Device not connected: $deviceId'));
@@ -255,6 +281,7 @@ class BlueyAndroid extends BlueyPlatform {
     String deviceId,
     String descriptorUuid,
   ) async {
+    _ensureInitialized();
     return await _hostApi.readDescriptor(deviceId, descriptorUuid);
   }
 
@@ -264,16 +291,19 @@ class BlueyAndroid extends BlueyPlatform {
     String descriptorUuid,
     Uint8List value,
   ) async {
+    _ensureInitialized();
     await _hostApi.writeDescriptor(deviceId, descriptorUuid, value);
   }
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async {
+    _ensureInitialized();
     return await _hostApi.requestMtu(deviceId, mtu);
   }
 
   @override
   Future<int> readRssi(String deviceId) async {
+    _ensureInitialized();
     return await _hostApi.readRssi(deviceId);
   }
 
@@ -281,17 +311,20 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> addService(PlatformLocalService service) async {
+    _ensureInitialized();
     final dto = _mapLocalServiceToDto(service);
     await _hostApi.addService(dto);
   }
 
   @override
   Future<void> removeService(String serviceUuid) async {
+    _ensureInitialized();
     await _hostApi.removeService(serviceUuid);
   }
 
   @override
   Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
+    _ensureInitialized();
     final dto = AdvertiseConfigDto(
       name: config.name,
       serviceUuids: config.serviceUuids,
@@ -304,6 +337,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> stopAdvertising() async {
+    _ensureInitialized();
     await _hostApi.stopAdvertising();
   }
 
@@ -312,6 +346,7 @@ class BlueyAndroid extends BlueyPlatform {
     String characteristicUuid,
     Uint8List value,
   ) async {
+    _ensureInitialized();
     await _hostApi.notifyCharacteristic(characteristicUuid, value);
   }
 
@@ -321,24 +356,33 @@ class BlueyAndroid extends BlueyPlatform {
     String characteristicUuid,
     Uint8List value,
   ) async {
+    _ensureInitialized();
     await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
   }
 
   @override
-  Stream<PlatformCentral> get centralConnections =>
-      _centralConnectionsController.stream;
+  Stream<PlatformCentral> get centralConnections {
+    _ensureInitialized();
+    return _centralConnectionsController.stream;
+  }
 
   @override
-  Stream<String> get centralDisconnections =>
-      _centralDisconnectionsController.stream;
+  Stream<String> get centralDisconnections {
+    _ensureInitialized();
+    return _centralDisconnectionsController.stream;
+  }
 
   @override
-  Stream<PlatformReadRequest> get readRequests =>
-      _readRequestsController.stream;
+  Stream<PlatformReadRequest> get readRequests {
+    _ensureInitialized();
+    return _readRequestsController.stream;
+  }
 
   @override
-  Stream<PlatformWriteRequest> get writeRequests =>
-      _writeRequestsController.stream;
+  Stream<PlatformWriteRequest> get writeRequests {
+    _ensureInitialized();
+    return _writeRequestsController.stream;
+  }
 
   @override
   Future<void> respondToReadRequest(
@@ -346,6 +390,7 @@ class BlueyAndroid extends BlueyPlatform {
     PlatformGattStatus status,
     Uint8List? value,
   ) async {
+    _ensureInitialized();
     await _hostApi.respondToReadRequest(
       requestId,
       _mapGattStatusToDto(status),
@@ -358,6 +403,7 @@ class BlueyAndroid extends BlueyPlatform {
     int requestId,
     PlatformGattStatus status,
   ) async {
+    _ensureInitialized();
     await _hostApi.respondToWriteRequest(
       requestId,
       _mapGattStatusToDto(status),
@@ -366,6 +412,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> disconnectCentral(String centralId) async {
+    _ensureInitialized();
     await _hostApi.disconnectCentral(centralId);
   }
 

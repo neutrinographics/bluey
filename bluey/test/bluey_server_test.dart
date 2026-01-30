@@ -8,7 +8,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 /// Mock platform implementation for testing Server functionality.
-class MockBlueyPlatform extends platform.BlueyPlatform {
+final class MockBlueyPlatform extends platform.BlueyPlatform {
+  MockBlueyPlatform() : super.impl();
   platform.BluetoothState mockState = platform.BluetoothState.on;
 
   // Server mock state
@@ -563,7 +564,7 @@ void main() {
 }
 
 /// A platform that does not support advertising.
-class _NonAdvertisingPlatform extends MockBlueyPlatform {
+final class _NonAdvertisingPlatform extends MockBlueyPlatform {
   @override
   platform.Capabilities get capabilities => const platform.Capabilities(
     canScan: true,

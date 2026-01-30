@@ -186,20 +186,30 @@ class PlatformDevice {
 ///
 /// This follows the Clean Architecture pattern. Each platform
 /// (Android, iOS, etc.) implements this interface.
-abstract class BlueyPlatform extends PlatformInterface {
-  BlueyPlatform() : super(token: _token);
-
+abstract base class BlueyPlatform extends PlatformInterface {
   static final Object _token = Object();
 
-  static BlueyPlatform _instance = _PlaceholderPlatform();
+  /// Constructs a [BlueyPlatform].
+  BlueyPlatform.impl() : super(token: _token);
+
+  static BlueyPlatform? _instance;
 
   /// The default instance of [BlueyPlatform] to use.
-  static BlueyPlatform get instance => _instance;
+  static BlueyPlatform get instance {
+    final instance = _instance;
+    if (instance == null) {
+      throw UnimplementedError(
+        'bluey is not implemented on this platform. '
+        'Did you forget to add bluey_android or bluey_ios to your dependencies?',
+      );
+    }
+    return instance;
+  }
 
   /// Platform-specific implementations should set this with their own
   /// instance when they register themselves.
   static set instance(BlueyPlatform instance) {
-    PlatformInterface.verify(instance, _token);
+    PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }
 
@@ -475,162 +485,4 @@ enum PlatformGattStatus {
   insufficientAuthentication,
   insufficientEncryption,
   requestNotSupported,
-}
-
-/// Placeholder implementation that throws on all operations.
-/// This is used until a real platform implementation is registered.
-class _PlaceholderPlatform extends BlueyPlatform {
-  @override
-  Capabilities get capabilities => const Capabilities();
-
-  @override
-  Stream<BluetoothState> get stateStream =>
-      throw UnimplementedError(
-        'No platform implementation registered. '
-        'Did you forget to add bluey_android or bluey_ios to your dependencies?',
-      );
-
-  @override
-  Future<BluetoothState> getState() =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<bool> requestEnable() =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> openSettings() =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformDevice> scan(PlatformScanConfig config) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> stopScan() =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<String> connect(String deviceId, PlatformConnectConfig config) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> disconnect(String deviceId) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformConnectionState> connectionStateStream(String deviceId) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<List<PlatformService>> discoverServices(String deviceId) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<Uint8List> readCharacteristic(
-    String deviceId,
-    String characteristicUuid,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> writeCharacteristic(
-    String deviceId,
-    String characteristicUuid,
-    Uint8List value,
-    bool withResponse,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> setNotification(
-    String deviceId,
-    String characteristicUuid,
-    bool enable,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformNotification> notificationStream(String deviceId) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> writeDescriptor(
-    String deviceId,
-    String descriptorUuid,
-    Uint8List value,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<int> requestMtu(String deviceId, int mtu) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<int> readRssi(String deviceId) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  // === Server (Peripheral) Operations ===
-
-  @override
-  Future<void> addService(PlatformLocalService service) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> removeService(String serviceUuid) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> startAdvertising(PlatformAdvertiseConfig config) =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> stopAdvertising() =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> notifyCharacteristicTo(
-    String centralId,
-    String characteristicUuid,
-    Uint8List value,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformCentral> get centralConnections =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<String> get centralDisconnections =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformReadRequest> get readRequests =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Stream<PlatformWriteRequest> get writeRequests =>
-      throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> respondToReadRequest(
-    int requestId,
-    PlatformGattStatus status,
-    Uint8List? value,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> respondToWriteRequest(
-    int requestId,
-    PlatformGattStatus status,
-  ) => throw UnimplementedError('No platform implementation registered.');
-
-  @override
-  Future<void> disconnectCentral(String centralId) =>
-      throw UnimplementedError('No platform implementation registered.');
 }

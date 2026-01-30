@@ -7,7 +7,9 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 /// Mock platform implementation for testing.
-class MockBlueyPlatform extends platform.BlueyPlatform {
+final class MockBlueyPlatform extends platform.BlueyPlatform {
+  MockBlueyPlatform() : super.impl();
+
   platform.BluetoothState mockState = platform.BluetoothState.on;
   List<platform.PlatformDevice> mockDevices = [];
   bool requestEnableResult = true;

@@ -6,7 +6,10 @@ import 'package:bluey_platform_interface/src/capabilities.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 /// Mock platform implementation for testing
-class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
+final class MockBlueyPlatform extends BlueyPlatform
+    with MockPlatformInterfaceMixin {
+  MockBlueyPlatform() : super.impl();
+
   @override
   Capabilities get capabilities => Capabilities.android;
 
@@ -51,18 +54,24 @@ class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
 
   @override
   Future<Uint8List> readCharacteristic(
-          String deviceId, String characteristicUuid) =>
-      throw UnimplementedError();
+    String deviceId,
+    String characteristicUuid,
+  ) => throw UnimplementedError();
 
   @override
-  Future<void> writeCharacteristic(String deviceId, String characteristicUuid,
-          Uint8List value, bool withResponse) =>
-      throw UnimplementedError();
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> setNotification(
-          String deviceId, String characteristicUuid, bool enable) =>
-      throw UnimplementedError();
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) => throw UnimplementedError();
 
   @override
   Stream<PlatformNotification> notificationStream(String deviceId) =>
@@ -74,8 +83,10 @@ class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
 
   @override
   Future<void> writeDescriptor(
-          String deviceId, String descriptorUuid, Uint8List value) =>
-      throw UnimplementedError();
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) =>
@@ -101,13 +112,16 @@ class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
 
   @override
   Future<void> notifyCharacteristic(
-          String characteristicUuid, Uint8List value) =>
-      throw UnimplementedError();
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> notifyCharacteristicTo(
-          String centralId, String characteristicUuid, Uint8List value) =>
-      throw UnimplementedError();
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Stream<PlatformCentral> get centralConnections => throw UnimplementedError();
@@ -123,13 +137,16 @@ class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
 
   @override
   Future<void> respondToReadRequest(
-          int requestId, PlatformGattStatus status, Uint8List? value) =>
-      throw UnimplementedError();
+    int requestId,
+    PlatformGattStatus status,
+    Uint8List? value,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> respondToWriteRequest(
-          int requestId, PlatformGattStatus status) =>
-      throw UnimplementedError();
+    int requestId,
+    PlatformGattStatus status,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> disconnectCentral(String centralId) =>
@@ -147,8 +164,10 @@ void main() {
 
     test('instance must be a BlueyPlatform', () {
       // The verify method throws AssertionError, but the cast throws TypeError first
-      expect(() => BlueyPlatform.instance = Object() as BlueyPlatform,
-          throwsA(anything)); // Just verify it throws
+      expect(
+        () => BlueyPlatform.instance = Object() as BlueyPlatform,
+        throwsA(anything),
+      ); // Just verify it throws
     });
 
     test('mock implementation has correct capabilities', () {
@@ -187,10 +206,7 @@ void main() {
     });
 
     test('creates with empty filters', () {
-      const config = PlatformScanConfig(
-        serviceUuids: [],
-        timeoutMs: null,
-      );
+      const config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
 
       expect(config.serviceUuids, isEmpty);
       expect(config.timeoutMs, isNull);
@@ -199,20 +215,14 @@ void main() {
 
   group('PlatformConnectConfig', () {
     test('creates with all fields', () {
-      const config = PlatformConnectConfig(
-        timeoutMs: 10000,
-        mtu: 512,
-      );
+      const config = PlatformConnectConfig(timeoutMs: 10000, mtu: 512);
 
       expect(config.timeoutMs, equals(10000));
       expect(config.mtu, equals(512));
     });
 
     test('creates with defaults', () {
-      const config = PlatformConnectConfig(
-        timeoutMs: null,
-        mtu: null,
-      );
+      const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
 
       expect(config.timeoutMs, isNull);
       expect(config.mtu, isNull);
@@ -256,14 +266,22 @@ void main() {
 
   group('PlatformConnectionState', () {
     test('has all required states', () {
-      expect(PlatformConnectionState.values,
-          contains(PlatformConnectionState.disconnected));
-      expect(PlatformConnectionState.values,
-          contains(PlatformConnectionState.connecting));
-      expect(PlatformConnectionState.values,
-          contains(PlatformConnectionState.connected));
-      expect(PlatformConnectionState.values,
-          contains(PlatformConnectionState.disconnecting));
+      expect(
+        PlatformConnectionState.values,
+        contains(PlatformConnectionState.disconnected),
+      );
+      expect(
+        PlatformConnectionState.values,
+        contains(PlatformConnectionState.connecting),
+      );
+      expect(
+        PlatformConnectionState.values,
+        contains(PlatformConnectionState.connected),
+      );
+      expect(
+        PlatformConnectionState.values,
+        contains(PlatformConnectionState.disconnecting),
+      );
     });
   });
 }
