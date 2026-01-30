@@ -4,6 +4,9 @@
 /// Domain-Driven Design and Clean Architecture principles.
 library bluey;
 
+// Main entry point
+export 'src/bluey.dart';
+
 // Core value objects
 export 'src/uuid.dart';
 export 'src/device.dart';

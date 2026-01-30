@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  bluey_platform_interface:
+    path: ../bluey_platform_interface
 
 dev_dependencies:
   flutter_test:
