@@ -38,10 +38,13 @@ class Advertiser(
     }
 
     fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
+        android.util.Log.d("Bluey", "startAdvertising: checking permissions")
         if (!hasRequiredPermissions()) {
-            callback(Result.failure(SecurityException("Missing required permissions")))
+            android.util.Log.e("Bluey", "startAdvertising: BLUETOOTH_ADVERTISE permission not granted")
+            callback(Result.failure(SecurityException("Missing required permissions: BLUETOOTH_ADVERTISE")))
             return
         }
+        android.util.Log.d("Bluey", "startAdvertising: permissions OK")
 
         if (isAdvertising) {
             callback(Result.success(Unit))
