@@ -2025,8 +2025,11 @@ class _CharacteristicScreenState extends State<CharacteristicScreen> {
 
 ## Implementation Roadmap
 
-### Phase 1: Core Foundation ✅ COMPLETE
+### Phase 1: Core Domain 🚧 IN PROGRESS
 
+Complete the entire domain layer before platform implementations.
+
+**Foundation (Complete):**
 - [x] Define public API interfaces (Bluey facade class)
 - [x] Implement UUID class with full test coverage
 - [x] Implement Device entity and Advertisement/ManufacturerData value objects
@@ -2034,45 +2037,85 @@ class _CharacteristicScreenState extends State<CharacteristicScreen> {
 - [x] Set up platform interface package (BlueyPlatform, Capabilities, DTOs)
 - [x] Define Pigeon API contracts
 
-**Test Coverage:** 94 unit tests passing (74 domain, 20 platform interface)
+**GATT Client Domain (Complete):**
+- [x] ConnectionState enum with isActive, isConnected getters
+- [x] BluetoothState enum with isReady, canBeEnabled getters
+- [x] CharacteristicProperties value object with fromFlags
+- [x] Connection abstract class (aggregate root)
+- [x] RemoteService, RemoteCharacteristic, RemoteDescriptor interfaces
+- [x] ScanStream abstract class and ScanMode enum
+- [x] Bluey facade with scan/connect/state/currentState
 
-### Phase 2: Android Implementation 🚧 IN PROGRESS
+**Server Domain (Peripheral Role):**
+- [ ] Server abstract class (aggregate root for peripheral role)
+- [ ] Central class (connected central device)
+- [ ] LocalService, LocalCharacteristic, LocalDescriptor classes
+- [ ] GattPermission enum
+- [ ] ReadHandler/WriteHandler typedefs
+- [ ] Well-known UUIDs (Services, Characteristics, Descriptors classes)
 
+**Test Coverage:** 156 unit tests passing
+
+### Phase 2: Android Implementation
+
+Complete Android platform with full GATT client and server support.
+
+**Setup (Complete):**
 - [x] Set up bluey_android package with Pigeon code generation
 - [x] Implement BlueyAndroid platform class (Dart side)
 - [x] Implement BlueyPlugin (Kotlin - FlutterPlugin, ActivityAware)
+
+**Scanning & Connection (Complete):**
 - [x] Implement Scanner (Kotlin - BluetoothLeScanner integration)
 - [x] Implement ConnectionManager (Kotlin - BluetoothGatt integration)
+
+**GATT Client:**
 - [ ] Implement Bluetooth state monitoring (BroadcastReceiver)
-- [ ] Implement GATT client operations (read/write/notify)
+- [ ] Implement service discovery
+- [ ] Implement characteristic read/write
+- [ ] Implement notifications/indications
+- [ ] Implement descriptor read/write
+- [ ] Implement MTU negotiation
+- [ ] Implement RSSI reading
+
+**Server (Peripheral Role):**
+- [ ] Implement BluetoothGattServer integration
+- [ ] Implement advertising (BluetoothLeAdvertiser)
+- [ ] Implement read/write request handling
+- [ ] Implement notification sending
+
+**Testing:**
+- [ ] Unit tests for all components
 - [ ] Integration tests on real devices
 
-**Test Coverage:** 2 unit tests passing
+### Phase 3: Example App
 
-### Phase 3: iOS Implementation
+Validate the Android implementation with a complete example app.
+
+- [x] Create example app scaffold (bluey/example)
+- [ ] Implement scanner screen with device list
+- [ ] Implement connection screen with state display
+- [ ] Implement GATT explorer (services/characteristics/descriptors)
+- [ ] Implement characteristic read/write UI
+- [ ] Implement notification subscription UI
+- [ ] Implement server demo (advertising as peripheral)
+- [ ] Material Design 3 theming
+
+### Phase 4: iOS Implementation
+
+Mirror the Android implementation for iOS.
 
 - [ ] Set up bluey_ios package with Pigeon code generation
 - [ ] Implement BlueyIOS platform class (Dart side)
 - [ ] Implement Swift plugin (CBCentralManager integration)
 - [ ] Implement scanning
 - [ ] Implement connection management
-- [ ] Implement GATT client operations
-- [ ] Implement notification handling
+- [ ] Implement GATT client operations (read/write/notify)
+- [ ] Implement CBPeripheralManager for server role
 - [ ] Integration tests on real devices
 
-### Phase 4: Server (Peripheral) Role
+### Phase 5: Documentation & Release
 
-- [ ] Implement Android server (BluetoothGattServer)
-- [ ] Implement iOS server (CBPeripheralManager)
-- [ ] Implement notification flow control
-- [ ] Integration tests (device-to-device)
-
-### Phase 5: Example App & Documentation
-
-- [x] Create example app scaffold (bluey/example)
-- [ ] Implement scanner screen
-- [ ] Implement connection screen
-- [ ] Implement GATT explorer
 - [ ] Comprehensive API documentation
 - [ ] Migration guide from bluetooth_low_energy
 - [ ] Performance optimization
