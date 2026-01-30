@@ -21,7 +21,9 @@ class BlueyConnection implements Connection {
   @override
   final UUID deviceId;
 
-  ConnectionState _state = ConnectionState.connecting;
+  ConnectionState _state =
+      ConnectionState
+          .connected; // Start as connected since we're created after successful connection
   int _mtu = 23; // Default BLE MTU
 
   final StreamController<ConnectionState> _stateController =
@@ -39,19 +41,20 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
-  })  : _platform = platformInstance,
-        _connectionId = connectionId {
+  }) : _platform = platformInstance,
+       _connectionId = connectionId {
     // Subscribe to platform connection state changes
-    _platformStateSubscription =
-        _platform.connectionStateStream(_connectionId).listen(
-      (platformState) {
-        _state = _mapConnectionState(platformState);
-        _stateController.add(_state);
-      },
-      onError: (error) {
-        _stateController.addError(error);
-      },
-    );
+    _platformStateSubscription = _platform
+        .connectionStateStream(_connectionId)
+        .listen(
+          (platformState) {
+            _state = _mapConnectionState(platformState);
+            _stateController.add(_state);
+          },
+          onError: (error) {
+            _stateController.addError(error);
+          },
+        );
   }
 
   @override
@@ -128,7 +131,8 @@ class BlueyConnection implements Connection {
   }
 
   ConnectionState _mapConnectionState(
-      platform.PlatformConnectionState platformState) {
+    platform.PlatformConnectionState platformState,
+  ) {
     switch (platformState) {
       case platform.PlatformConnectionState.disconnected:
         return ConnectionState.disconnected;
@@ -155,7 +159,8 @@ class BlueyConnection implements Connection {
   }
 
   BlueyRemoteCharacteristic _mapCharacteristic(
-      platform.PlatformCharacteristic pc) {
+    platform.PlatformCharacteristic pc,
+  ) {
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
@@ -237,8 +242,8 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     required this.descriptors,
-  })  : _platform = platform,
-        _connectionId = connectionId;
+  }) : _platform = platform,
+       _connectionId = connectionId;
 
   @override
   Future<Uint8List> read() async {
@@ -288,16 +293,19 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // Subscribe to platform notifications
     _notificationSubscription = _platform
         .notificationStream(_connectionId)
-        .where((n) =>
-            n.characteristicUuid.toLowerCase() == uuid.toString().toLowerCase())
+        .where(
+          (n) =>
+              n.characteristicUuid.toLowerCase() ==
+              uuid.toString().toLowerCase(),
+        )
         .listen(
-      (notification) {
-        _notificationController?.add(notification.value);
-      },
-      onError: (error) {
-        _notificationController?.addError(error);
-      },
-    );
+          (notification) {
+            _notificationController?.add(notification.value);
+          },
+          onError: (error) {
+            _notificationController?.addError(error);
+          },
+        );
   }
 
   void _onLastCancel() {
@@ -332,8 +340,8 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     required platform.BlueyPlatform platform,
     required String connectionId,
     required this.uuid,
-  })  : _platform = platform,
-        _connectionId = connectionId;
+  }) : _platform = platform,
+       _connectionId = connectionId;
 
   @override
   Future<Uint8List> read() async {

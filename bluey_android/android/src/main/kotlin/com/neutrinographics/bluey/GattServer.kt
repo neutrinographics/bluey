@@ -14,6 +14,8 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import java.util.UUID
 
@@ -31,6 +33,7 @@ class GattServer(
 ) {
     private var activity: Activity? = null
     private var gattServer: BluetoothGattServer? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     // Track connected centrals
     private val connectedCentrals = mutableMapOf<String, BluetoothDevice>()
@@ -262,7 +265,10 @@ class GattServer(
                         id = deviceId,
                         mtu = DEFAULT_MTU.toLong()
                     )
-                    flutterApi.onCentralConnected(central) {}
+                    // Must dispatch to main thread for Flutter platform channel
+                    handler.post {
+                        flutterApi.onCentralConnected(central) {}
+                    }
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
@@ -272,7 +278,10 @@ class GattServer(
                     // Remove from all subscriptions
                     subscriptions.values.forEach { it.remove(deviceId) }
 
-                    flutterApi.onCentralDisconnected(deviceId) {}
+                    // Must dispatch to main thread for Flutter platform channel
+                    handler.post {
+                        flutterApi.onCentralDisconnected(deviceId) {}
+                    }
                 }
             }
         }
@@ -302,7 +311,10 @@ class GattServer(
                 characteristicUuid = characteristic.uuid.toString(),
                 offset = offset.toLong()
             )
-            flutterApi.onReadRequest(request) {}
+            // Must dispatch to main thread for Flutter platform channel
+            handler.post {
+                flutterApi.onReadRequest(request) {}
+            }
 
             // Auto-respond with success for now (simplified implementation)
             // A production version would wait for respondToReadRequest
@@ -336,7 +348,10 @@ class GattServer(
                 offset = offset.toLong(),
                 responseNeeded = responseNeeded
             )
-            flutterApi.onWriteRequest(request) {}
+            // Must dispatch to main thread for Flutter platform channel
+            handler.post {
+                flutterApi.onWriteRequest(request) {}
+            }
 
             // Auto-respond if needed (simplified implementation)
             if (responseNeeded) {
@@ -393,10 +408,16 @@ class GattServer(
 
                 if (isSubscribing) {
                     subscriptions.getOrPut(characteristicUuid) { mutableSetOf() }.add(centralId)
-                    flutterApi.onCharacteristicSubscribed(centralId, characteristicUuid) {}
+                    // Must dispatch to main thread for Flutter platform channel
+                    handler.post {
+                        flutterApi.onCharacteristicSubscribed(centralId, characteristicUuid) {}
+                    }
                 } else if (isUnsubscribing) {
                     subscriptions[characteristicUuid]?.remove(centralId)
-                    flutterApi.onCharacteristicUnsubscribed(centralId, characteristicUuid) {}
+                    // Must dispatch to main thread for Flutter platform channel
+                    handler.post {
+                        flutterApi.onCharacteristicUnsubscribed(centralId, characteristicUuid) {}
+                    }
                 }
             }
 

@@ -81,8 +81,10 @@ class Scanner(
             }
 
             override fun onScanFailed(errorCode: Int) {
-                // Notify scan complete on failure
-                flutterApi.onScanComplete {}
+                // Must dispatch to main thread for Flutter platform channel
+                handler.post {
+                    flutterApi.onScanComplete {}
+                }
             }
         }
 
@@ -94,6 +96,7 @@ class Scanner(
             config.timeoutMs?.let { timeout ->
                 scanTimeoutRunnable = Runnable {
                     stopScanInternal()
+                    // Already on main thread via handler
                     flutterApi.onScanComplete {}
                 }
                 handler.postDelayed(scanTimeoutRunnable!!, timeout.toLong())
@@ -109,6 +112,7 @@ class Scanner(
 
     fun stopScan(callback: (Result<Unit>) -> Unit) {
         stopScanInternal()
+        // Already on main thread when called from plugin
         flutterApi.onScanComplete {}
         callback(Result.success(Unit))
     }
@@ -181,8 +185,10 @@ class Scanner(
             manufacturerData = manufacturerData
         )
 
-        // Notify Flutter
-        flutterApi.onDeviceDiscovered(deviceDto) {}
+        // Must dispatch to main thread for Flutter platform channel
+        handler.post {
+            flutterApi.onDeviceDiscovered(deviceDto) {}
+        }
     }
 
     private fun hasRequiredPermissions(): Boolean {

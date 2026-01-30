@@ -35,6 +35,7 @@ class ConnectionManager(
     private val handler = Handler(Looper.getMainLooper())
 
     // Pending operation callbacks - GATT operations are async
+    private val pendingConnections = mutableMapOf<String, (Result<String>) -> Unit>()
     private val pendingServiceDiscovery = mutableMapOf<String, (Result<List<ServiceDto>>) -> Unit>()
     private val pendingReads = mutableMapOf<String, (Result<ByteArray>) -> Unit>()
     private val pendingWrites = mutableMapOf<String, (Result<Unit>) -> Unit>()
@@ -99,25 +100,30 @@ class ConnectionManager(
 
             if (gatt != null) {
                 connections[deviceId] = gatt
+                // Store callback to be called when connection is established
+                pendingConnections[deviceId] = callback
 
                 // Set timeout if specified
                 config.timeoutMs?.let { timeout ->
                     handler.postDelayed({
-                        // If still connecting after timeout, disconnect
-                        if (connections.containsKey(deviceId)) {
-                            val currentGatt = connections[deviceId]
+                        // If still connecting after timeout, fail the connection
+                        val pendingCallback = pendingConnections.remove(deviceId)
+                        if (pendingCallback != null) {
+                            val currentGatt = connections.remove(deviceId)
                             if (currentGatt != null) {
                                 try {
                                     currentGatt.disconnect()
+                                    currentGatt.close()
                                 } catch (e: SecurityException) {
                                     // Permission revoked
                                 }
                             }
+                            notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
+                            pendingCallback(Result.failure(IllegalStateException("Connection timeout")))
                         }
                     }, timeout)
                 }
-
-                callback(Result.success(deviceId))
+                // Don't call callback here - wait for onConnectionStateChange
             } else {
                 notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
                 callback(Result.failure(IllegalStateException("Failed to create GATT connection")))
@@ -448,6 +454,7 @@ class ConnectionManager(
         connections.clear()
 
         // Clear all pending callbacks
+        pendingConnections.clear()
         pendingServiceDiscovery.clear()
         pendingReads.clear()
         pendingWrites.clear()
@@ -460,13 +467,32 @@ class ConnectionManager(
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+                android.util.Log.d(
+                    "Bluey",
+                    "onConnectionStateChange: deviceId=$deviceId, status=$status, newState=$newState"
+                )
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTING -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTING)
                     }
 
                     BluetoothProfile.STATE_CONNECTED -> {
+                        android.util.Log.d(
+                            "Bluey",
+                            "STATE_CONNECTED: pendingConnections contains $deviceId = ${
+                                pendingConnections.containsKey(deviceId)
+                            }"
+                        )
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
+                        // Connection successful - invoke pending callback on main thread
+                        val pendingCallback = pendingConnections.remove(deviceId)
+                        android.util.Log.d("Bluey", "STATE_CONNECTED: pendingCallback = $pendingCallback")
+                        if (pendingCallback != null) {
+                            handler.post {
+                                android.util.Log.d("Bluey", "STATE_CONNECTED: invoking callback with success")
+                                pendingCallback.invoke(Result.success(deviceId))
+                            }
+                        }
                     }
 
                     BluetoothProfile.STATE_DISCONNECTING -> {
@@ -475,6 +501,18 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
+                        // Connection failed or disconnected - invoke pending callback with error if present
+                        val pendingCallback = pendingConnections.remove(deviceId)
+                        if (pendingCallback != null) {
+                            val errorMessage = if (status != BluetoothGatt.GATT_SUCCESS) {
+                                "Connection failed with status: $status"
+                            } else {
+                                "Connection failed"
+                            }
+                            handler.post {
+                                pendingCallback.invoke(Result.failure(IllegalStateException(errorMessage)))
+                            }
+                        }
                         // Clean up
                         connections.remove(deviceId)
                         try {
@@ -487,12 +525,18 @@ class ConnectionManager(
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                android.util.Log.d("Bluey", "onServicesDiscovered: status=$status, services=${gatt.services?.size}")
                 val callback = pendingServiceDiscovery.remove(deviceId)
+                android.util.Log.d("Bluey", "onServicesDiscovered: callback=$callback")
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(mapServices(gatt.services)))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(mapServices(gatt.services))
                     } else {
-                        callback(Result.failure(IllegalStateException("Service discovery failed with status: $status")))
+                        Result.failure(IllegalStateException("Service discovery failed with status: $status"))
+                    }
+                    handler.post {
+                        android.util.Log.d("Bluey", "onServicesDiscovered: invoking callback")
+                        callback(result)
                     }
                 }
             }
@@ -506,11 +550,12 @@ class ConnectionManager(
                 val key = "$deviceId:${characteristic.uuid}"
                 val callback = pendingReads.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(value))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(value)
                     } else {
-                        callback(Result.failure(IllegalStateException("Read failed with status: $status")))
+                        Result.failure(IllegalStateException("Read failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
@@ -524,11 +569,12 @@ class ConnectionManager(
                 val key = "$deviceId:${characteristic.uuid}"
                 val callback = pendingReads.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(characteristic.value ?: ByteArray(0)))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(characteristic.value ?: ByteArray(0))
                     } else {
-                        callback(Result.failure(IllegalStateException("Read failed with status: $status")))
+                        Result.failure(IllegalStateException("Read failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
@@ -540,11 +586,12 @@ class ConnectionManager(
                 val key = "$deviceId:${characteristic.uuid}"
                 val callback = pendingWrites.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(Unit))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(Unit)
                     } else {
-                        callback(Result.failure(IllegalStateException("Write failed with status: $status")))
+                        Result.failure(IllegalStateException("Write failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
@@ -558,7 +605,10 @@ class ConnectionManager(
                     characteristicUuid = characteristic.uuid.toString(),
                     value = value
                 )
-                flutterApi.onNotification(event) {}
+                // Must dispatch to main thread for Flutter platform channel
+                handler.post {
+                    flutterApi.onNotification(event) {}
+                }
             }
 
             @Deprecated("Deprecated in Java")
@@ -572,7 +622,10 @@ class ConnectionManager(
                     characteristicUuid = characteristic.uuid.toString(),
                     value = characteristic.value ?: ByteArray(0)
                 )
-                flutterApi.onNotification(event) {}
+                // Must dispatch to main thread for Flutter platform channel
+                handler.post {
+                    flutterApi.onNotification(event) {}
+                }
             }
 
             override fun onDescriptorRead(
@@ -584,11 +637,12 @@ class ConnectionManager(
                 val key = "$deviceId:${descriptor.uuid}"
                 val callback = pendingDescriptorReads.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(value))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(value)
                     } else {
-                        callback(Result.failure(IllegalStateException("Descriptor read failed with status: $status")))
+                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
@@ -602,11 +656,12 @@ class ConnectionManager(
                 val key = "$deviceId:${descriptor.uuid}"
                 val callback = pendingDescriptorReads.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(descriptor.value ?: ByteArray(0)))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(descriptor.value ?: ByteArray(0))
                     } else {
-                        callback(Result.failure(IllegalStateException("Descriptor read failed with status: $status")))
+                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
@@ -618,37 +673,43 @@ class ConnectionManager(
                 val key = "$deviceId:${descriptor.uuid}"
                 val callback = pendingDescriptorWrites.remove(key)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(Unit))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(Unit)
                     } else {
-                        callback(Result.failure(IllegalStateException("Descriptor write failed with status: $status")))
+                        Result.failure(IllegalStateException("Descriptor write failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 val callback = pendingMtuRequests.remove(deviceId)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(mtu.toLong()))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(mtu.toLong())
                     } else {
-                        callback(Result.failure(IllegalStateException("MTU request failed with status: $status")))
+                        Result.failure(IllegalStateException("MTU request failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
 
                 // Also notify Flutter of MTU change
                 val event = MtuChangedEventDto(deviceId = deviceId, mtu = mtu.toLong())
-                flutterApi.onMtuChanged(event) {}
+                // Must dispatch to main thread for Flutter platform channel
+                handler.post {
+                    flutterApi.onMtuChanged(event) {}
+                }
             }
 
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
                 val callback = pendingRssiReads.remove(deviceId)
                 if (callback != null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        callback(Result.success(rssi.toLong()))
+                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(rssi.toLong())
                     } else {
-                        callback(Result.failure(IllegalStateException("RSSI read failed with status: $status")))
+                        Result.failure(IllegalStateException("RSSI read failed with status: $status"))
                     }
+                    handler.post { callback(result) }
                 }
             }
         }
@@ -659,7 +720,10 @@ class ConnectionManager(
             deviceId = deviceId,
             state = state
         )
-        flutterApi.onConnectionStateChanged(event) {}
+        // Must dispatch to main thread for Flutter platform channel
+        handler.post {
+            flutterApi.onConnectionStateChanged(event) {}
+        }
     }
 
     private fun findCharacteristic(gatt: BluetoothGatt, uuid: String): BluetoothGattCharacteristic? {
