@@ -4,10 +4,12 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import 'bluey_connection.dart';
+import 'bluey_server.dart';
 import 'connection.dart';
 import 'connection_state.dart';
 import 'device.dart';
 import 'exceptions.dart';
+import 'server.dart';
 import 'uuid.dart';
 
 export 'connection_state.dart';
@@ -213,6 +215,29 @@ class Bluey {
     } catch (e) {
       throw _wrapError(e);
     }
+  }
+
+  /// Create a GATT server for peripheral role.
+  ///
+  /// Returns a [Server] for advertising services and handling requests
+  /// from central devices.
+  ///
+  /// Returns null on platforms that don't support peripheral role.
+  /// Check [capabilities.canAdvertise] before calling.
+  ///
+  /// Example:
+  /// ```dart
+  /// final server = bluey.server();
+  /// if (server != null) {
+  ///   server.addService(myService);
+  ///   await server.startAdvertising(name: 'My Device');
+  /// }
+  /// ```
+  Server? server() {
+    if (!_platform.capabilities.canAdvertise) {
+      return null;
+    }
+    return BlueyServer(_platform);
   }
 
   /// Release all resources.

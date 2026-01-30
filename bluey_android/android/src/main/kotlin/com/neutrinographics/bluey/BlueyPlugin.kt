@@ -35,6 +35,8 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
 
     private var scanner: Scanner? = null
     private var connectionManager: ConnectionManager? = null
+    private var gattServer: GattServer? = null
+    private var advertiser: Advertiser? = null
 
     // Bluetooth state receiver
     private var bluetoothStateReceiver: BroadcastReceiver? = null
@@ -65,6 +67,17 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
             flutterApi = flutterApi!!
         )
 
+        gattServer = GattServer(
+            context = context!!,
+            bluetoothManager = bluetoothManager,
+            flutterApi = flutterApi!!
+        )
+
+        advertiser = Advertiser(
+            context = context!!,
+            bluetoothAdapter = bluetoothAdapter
+        )
+
         // Start monitoring Bluetooth state
         startBluetoothStateMonitoring()
     }
@@ -78,9 +91,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
         // Clean up
         scanner?.cleanup()
         connectionManager?.cleanup()
+        gattServer?.cleanup()
+        advertiser?.cleanup()
 
         scanner = null
         connectionManager = null
+        gattServer = null
+        advertiser = null
         context = null
         flutterApi = null
     }
@@ -91,6 +108,8 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
         activity = binding.activity
         scanner?.setActivity(activity)
         connectionManager?.setActivity(activity)
+        gattServer?.setActivity(activity)
+        advertiser?.setActivity(activity)
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -101,12 +120,16 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
         activity = binding.activity
         scanner?.setActivity(activity)
         connectionManager?.setActivity(activity)
+        gattServer?.setActivity(activity)
+        advertiser?.setActivity(activity)
     }
 
     override fun onDetachedFromActivity() {
         activity = null
         scanner?.setActivity(null)
         connectionManager?.setActivity(null)
+        gattServer?.setActivity(null)
+        advertiser?.setActivity(null)
     }
 
     // BlueyHostApi implementation
@@ -263,6 +286,80 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
     override fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
         connectionManager?.readRssi(deviceId, callback) ?: callback(
             Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    // Server (Peripheral) operations
+
+    override fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
+        gattServer?.addService(service, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun removeService(serviceUuid: String, callback: (Result<Unit>) -> Unit) {
+        gattServer?.removeService(serviceUuid, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
+        advertiser?.startAdvertising(config, callback) ?: callback(
+            Result.failure(IllegalStateException("Advertiser not initialized"))
+        )
+    }
+
+    override fun stopAdvertising(callback: (Result<Unit>) -> Unit) {
+        advertiser?.stopAdvertising(callback) ?: callback(
+            Result.failure(IllegalStateException("Advertiser not initialized"))
+        )
+    }
+
+    override fun notifyCharacteristic(
+        characteristicUuid: String,
+        value: ByteArray,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        gattServer?.notifyCharacteristic(characteristicUuid, value, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun notifyCharacteristicTo(
+        centralId: String,
+        characteristicUuid: String,
+        value: ByteArray,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        gattServer?.notifyCharacteristicTo(centralId, characteristicUuid, value, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun respondToReadRequest(
+        requestId: Long,
+        status: GattStatusDto,
+        value: ByteArray?,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        gattServer?.respondToReadRequest(requestId, status, value, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun respondToWriteRequest(
+        requestId: Long,
+        status: GattStatusDto,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        gattServer?.respondToWriteRequest(requestId, status, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
+        )
+    }
+
+    override fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
+        gattServer?.disconnectCentral(centralId, callback) ?: callback(
+            Result.failure(IllegalStateException("GattServer not initialized"))
         )
     }
 

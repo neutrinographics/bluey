@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey_platform_interface/src/platform_interface.dart';
 import 'package:bluey_platform_interface/src/capabilities.dart';
@@ -40,6 +42,97 @@ class MockBlueyPlatform extends BlueyPlatform with MockPlatformInterfaceMixin {
 
   @override
   Stream<PlatformConnectionState> connectionStateStream(String deviceId) =>
+      throw UnimplementedError();
+
+  // GATT Client operations
+  @override
+  Future<List<PlatformService>> discoverServices(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> readCharacteristic(
+          String deviceId, String characteristicUuid) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> writeCharacteristic(String deviceId, String characteristicUuid,
+          Uint8List value, bool withResponse) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> setNotification(
+          String deviceId, String characteristicUuid, bool enable) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<PlatformNotification> notificationStream(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> writeDescriptor(
+          String deviceId, String descriptorUuid, Uint8List value) =>
+      throw UnimplementedError();
+
+  @override
+  Future<int> requestMtu(String deviceId, int mtu) =>
+      throw UnimplementedError();
+
+  @override
+  Future<int> readRssi(String deviceId) => throw UnimplementedError();
+
+  // Server (Peripheral) operations
+  @override
+  Future<void> addService(PlatformLocalService service) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> removeService(String serviceUuid) => throw UnimplementedError();
+
+  @override
+  Future<void> startAdvertising(PlatformAdvertiseConfig config) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> stopAdvertising() => throw UnimplementedError();
+
+  @override
+  Future<void> notifyCharacteristic(
+          String characteristicUuid, Uint8List value) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> notifyCharacteristicTo(
+          String centralId, String characteristicUuid, Uint8List value) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<PlatformCentral> get centralConnections => throw UnimplementedError();
+
+  @override
+  Stream<String> get centralDisconnections => throw UnimplementedError();
+
+  @override
+  Stream<PlatformReadRequest> get readRequests => throw UnimplementedError();
+
+  @override
+  Stream<PlatformWriteRequest> get writeRequests => throw UnimplementedError();
+
+  @override
+  Future<void> respondToReadRequest(
+          int requestId, PlatformGattStatus status, Uint8List? value) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> respondToWriteRequest(
+          int requestId, PlatformGattStatus status) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> disconnectCentral(String centralId) =>
       throw UnimplementedError();
 }
 

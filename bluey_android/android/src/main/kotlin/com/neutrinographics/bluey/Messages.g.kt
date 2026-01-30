@@ -78,6 +78,38 @@ enum class ConnectionStateDto(val raw: Int) {
   }
 }
 
+/** GATT permission flags (DTO for platform channel). */
+enum class GattPermissionDto(val raw: Int) {
+  READ(0),
+  READ_ENCRYPTED(1),
+  WRITE(2),
+  WRITE_ENCRYPTED(3);
+
+  companion object {
+    fun ofRaw(raw: Int): GattPermissionDto? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
+/** GATT status code for responses (DTO for platform channel). */
+enum class GattStatusDto(val raw: Int) {
+  SUCCESS(0),
+  READ_NOT_PERMITTED(1),
+  WRITE_NOT_PERMITTED(2),
+  INVALID_OFFSET(3),
+  INVALID_ATTRIBUTE_LENGTH(4),
+  INSUFFICIENT_AUTHENTICATION(5),
+  INSUFFICIENT_ENCRYPTION(6),
+  REQUEST_NOT_SUPPORTED(7);
+
+  companion object {
+    fun ofRaw(raw: Int): GattStatusDto? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /**
  * Scan configuration (DTO for platform channel).
  *
@@ -367,6 +399,223 @@ data class MtuChangedEventDto (
     )
   }
 }
+
+/**
+ * A local descriptor for GATT server (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LocalDescriptorDto (
+  val uuid: String,
+  val permissions: List<GattPermissionDto>,
+  val value: ByteArray? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LocalDescriptorDto {
+      val uuid = pigeonVar_list[0] as String
+      val permissions = pigeonVar_list[1] as List<GattPermissionDto>
+      val value = pigeonVar_list[2] as ByteArray?
+      return LocalDescriptorDto(uuid, permissions, value)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      uuid,
+      permissions,
+      value,
+    )
+  }
+}
+
+/**
+ * A local characteristic for GATT server (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LocalCharacteristicDto (
+  val uuid: String,
+  val properties: CharacteristicPropertiesDto,
+  val permissions: List<GattPermissionDto>,
+  val descriptors: List<LocalDescriptorDto>
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LocalCharacteristicDto {
+      val uuid = pigeonVar_list[0] as String
+      val properties = pigeonVar_list[1] as CharacteristicPropertiesDto
+      val permissions = pigeonVar_list[2] as List<GattPermissionDto>
+      val descriptors = pigeonVar_list[3] as List<LocalDescriptorDto>
+      return LocalCharacteristicDto(uuid, properties, permissions, descriptors)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      uuid,
+      properties,
+      permissions,
+      descriptors,
+    )
+  }
+}
+
+/**
+ * A local service for GATT server (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LocalServiceDto (
+  val uuid: String,
+  val isPrimary: Boolean,
+  val characteristics: List<LocalCharacteristicDto>,
+  val includedServices: List<LocalServiceDto>
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LocalServiceDto {
+      val uuid = pigeonVar_list[0] as String
+      val isPrimary = pigeonVar_list[1] as Boolean
+      val characteristics = pigeonVar_list[2] as List<LocalCharacteristicDto>
+      val includedServices = pigeonVar_list[3] as List<LocalServiceDto>
+      return LocalServiceDto(uuid, isPrimary, characteristics, includedServices)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      uuid,
+      isPrimary,
+      characteristics,
+      includedServices,
+    )
+  }
+}
+
+/**
+ * Advertising configuration (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class AdvertiseConfigDto (
+  val name: String? = null,
+  val serviceUuids: List<String>,
+  val manufacturerDataCompanyId: Long? = null,
+  val manufacturerData: ByteArray? = null,
+  val timeoutMs: Long? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AdvertiseConfigDto {
+      val name = pigeonVar_list[0] as String?
+      val serviceUuids = pigeonVar_list[1] as List<String>
+      val manufacturerDataCompanyId = pigeonVar_list[2] as Long?
+      val manufacturerData = pigeonVar_list[3] as ByteArray?
+      val timeoutMs = pigeonVar_list[4] as Long?
+      return AdvertiseConfigDto(name, serviceUuids, manufacturerDataCompanyId, manufacturerData, timeoutMs)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      name,
+      serviceUuids,
+      manufacturerDataCompanyId,
+      manufacturerData,
+      timeoutMs,
+    )
+  }
+}
+
+/**
+ * A connected central device (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class CentralDto (
+  val id: String,
+  val mtu: Long
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): CentralDto {
+      val id = pigeonVar_list[0] as String
+      val mtu = pigeonVar_list[1] as Long
+      return CentralDto(id, mtu)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      id,
+      mtu,
+    )
+  }
+}
+
+/**
+ * Read request from a central (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class ReadRequestDto (
+  val requestId: Long,
+  val centralId: String,
+  val characteristicUuid: String,
+  val offset: Long
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): ReadRequestDto {
+      val requestId = pigeonVar_list[0] as Long
+      val centralId = pigeonVar_list[1] as String
+      val characteristicUuid = pigeonVar_list[2] as String
+      val offset = pigeonVar_list[3] as Long
+      return ReadRequestDto(requestId, centralId, characteristicUuid, offset)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      requestId,
+      centralId,
+      characteristicUuid,
+      offset,
+    )
+  }
+}
+
+/**
+ * Write request from a central (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class WriteRequestDto (
+  val requestId: Long,
+  val centralId: String,
+  val characteristicUuid: String,
+  val value: ByteArray,
+  val offset: Long,
+  val responseNeeded: Boolean
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): WriteRequestDto {
+      val requestId = pigeonVar_list[0] as Long
+      val centralId = pigeonVar_list[1] as String
+      val characteristicUuid = pigeonVar_list[2] as String
+      val value = pigeonVar_list[3] as ByteArray
+      val offset = pigeonVar_list[4] as Long
+      val responseNeeded = pigeonVar_list[5] as Boolean
+      return WriteRequestDto(requestId, centralId, characteristicUuid, value, offset, responseNeeded)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      requestId,
+      centralId,
+      characteristicUuid,
+      value,
+      offset,
+      responseNeeded,
+    )
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -381,53 +630,98 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         }
       }
       131.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          ScanConfigDto.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          GattPermissionDto.ofRaw(it.toInt())
         }
       }
       132.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectConfigDto.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          GattStatusDto.ofRaw(it.toInt())
         }
       }
       133.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DeviceDto.fromList(it)
+          ScanConfigDto.fromList(it)
         }
       }
       134.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectionStateEventDto.fromList(it)
+          ConnectConfigDto.fromList(it)
         }
       }
       135.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicPropertiesDto.fromList(it)
+          DeviceDto.fromList(it)
         }
       }
       136.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DescriptorDto.fromList(it)
+          ConnectionStateEventDto.fromList(it)
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicDto.fromList(it)
+          CharacteristicPropertiesDto.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ServiceDto.fromList(it)
+          DescriptorDto.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          NotificationEventDto.fromList(it)
+          CharacteristicDto.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
+          ServiceDto.fromList(it)
+        }
+      }
+      141.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          NotificationEventDto.fromList(it)
+        }
+      }
+      142.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
           MtuChangedEventDto.fromList(it)
+        }
+      }
+      143.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          LocalDescriptorDto.fromList(it)
+        }
+      }
+      144.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          LocalCharacteristicDto.fromList(it)
+        }
+      }
+      145.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          LocalServiceDto.fromList(it)
+        }
+      }
+      146.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdvertiseConfigDto.fromList(it)
+        }
+      }
+      147.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          CentralDto.fromList(it)
+        }
+      }
+      148.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          ReadRequestDto.fromList(it)
+        }
+      }
+      149.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WriteRequestDto.fromList(it)
         }
       }
       else -> super.readValueOfType(type, buffer)
@@ -443,44 +737,80 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(130)
         writeValue(stream, value.raw)
       }
-      is ScanConfigDto -> {
+      is GattPermissionDto -> {
         stream.write(131)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is ConnectConfigDto -> {
+      is GattStatusDto -> {
         stream.write(132)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is DeviceDto -> {
+      is ScanConfigDto -> {
         stream.write(133)
         writeValue(stream, value.toList())
       }
-      is ConnectionStateEventDto -> {
+      is ConnectConfigDto -> {
         stream.write(134)
         writeValue(stream, value.toList())
       }
-      is CharacteristicPropertiesDto -> {
+      is DeviceDto -> {
         stream.write(135)
         writeValue(stream, value.toList())
       }
-      is DescriptorDto -> {
+      is ConnectionStateEventDto -> {
         stream.write(136)
         writeValue(stream, value.toList())
       }
-      is CharacteristicDto -> {
+      is CharacteristicPropertiesDto -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is ServiceDto -> {
+      is DescriptorDto -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is NotificationEventDto -> {
+      is CharacteristicDto -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is MtuChangedEventDto -> {
+      is ServiceDto -> {
         stream.write(140)
+        writeValue(stream, value.toList())
+      }
+      is NotificationEventDto -> {
+        stream.write(141)
+        writeValue(stream, value.toList())
+      }
+      is MtuChangedEventDto -> {
+        stream.write(142)
+        writeValue(stream, value.toList())
+      }
+      is LocalDescriptorDto -> {
+        stream.write(143)
+        writeValue(stream, value.toList())
+      }
+      is LocalCharacteristicDto -> {
+        stream.write(144)
+        writeValue(stream, value.toList())
+      }
+      is LocalServiceDto -> {
+        stream.write(145)
+        writeValue(stream, value.toList())
+      }
+      is AdvertiseConfigDto -> {
+        stream.write(146)
+        writeValue(stream, value.toList())
+      }
+      is CentralDto -> {
+        stream.write(147)
+        writeValue(stream, value.toList())
+      }
+      is ReadRequestDto -> {
+        stream.write(148)
+        writeValue(stream, value.toList())
+      }
+      is WriteRequestDto -> {
+        stream.write(149)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -537,6 +867,24 @@ interface BlueyHostApi {
   fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit)
   /** Read the current RSSI for a connected device. */
   fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit)
+  /** Add a service to the GATT server. */
+  fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit)
+  /** Remove a service from the GATT server. */
+  fun removeService(serviceUuid: String, callback: (Result<Unit>) -> Unit)
+  /** Start advertising. */
+  fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit)
+  /** Stop advertising. */
+  fun stopAdvertising(callback: (Result<Unit>) -> Unit)
+  /** Send a notification to all subscribed centrals. */
+  fun notifyCharacteristic(characteristicUuid: String, value: ByteArray, callback: (Result<Unit>) -> Unit)
+  /** Send a notification to a specific central. */
+  fun notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: ByteArray, callback: (Result<Unit>) -> Unit)
+  /** Respond to a read request. */
+  fun respondToReadRequest(requestId: Long, status: GattStatusDto, value: ByteArray?, callback: (Result<Unit>) -> Unit)
+  /** Respond to a write request. */
+  fun respondToWriteRequest(requestId: Long, status: GattStatusDto, callback: (Result<Unit>) -> Unit)
+  /** Disconnect a central from the server. */
+  fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by BlueyHostApi. */
@@ -843,6 +1191,181 @@ interface BlueyHostApi {
           channel.setMessageHandler(null)
         }
       }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.addService$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val serviceArg = args[0] as LocalServiceDto
+            api.addService(serviceArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.removeService$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val serviceUuidArg = args[0] as String
+            api.removeService(serviceUuidArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.startAdvertising$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val configArg = args[0] as AdvertiseConfigDto
+            api.startAdvertising(configArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.stopAdvertising$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.stopAdvertising{ result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristic$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val characteristicUuidArg = args[0] as String
+            val valueArg = args[1] as ByteArray
+            api.notifyCharacteristic(characteristicUuidArg, valueArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristicTo$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val centralIdArg = args[0] as String
+            val characteristicUuidArg = args[1] as String
+            val valueArg = args[2] as ByteArray
+            api.notifyCharacteristicTo(centralIdArg, characteristicUuidArg, valueArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToReadRequest$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val requestIdArg = args[0] as Long
+            val statusArg = args[1] as GattStatusDto
+            val valueArg = args[2] as ByteArray?
+            api.respondToReadRequest(requestIdArg, statusArg, valueArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToWriteRequest$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val requestIdArg = args[0] as Long
+            val statusArg = args[1] as GattStatusDto
+            api.respondToWriteRequest(requestIdArg, statusArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.disconnectCentral$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val centralIdArg = args[0] as String
+            api.disconnectCentral(centralIdArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
     }
   }
 }
@@ -955,6 +1478,114 @@ class BlueyFlutterApi(private val binaryMessenger: BinaryMessenger, private val 
     val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged$separatedMessageChannelSuffix"
     val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
     channel.send(listOf(eventArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A central device connected to the server. */
+  fun onCentralConnected(centralArg: CentralDto, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralConnected$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(centralArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A central device disconnected from the server. */
+  fun onCentralDisconnected(centralIdArg: String, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralDisconnected$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(centralIdArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A read request was received from a central. */
+  fun onReadRequest(requestArg: ReadRequestDto, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onReadRequest$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(requestArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A write request was received from a central. */
+  fun onWriteRequest(requestArg: WriteRequestDto, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onWriteRequest$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(requestArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A central subscribed to notifications for a characteristic. */
+  fun onCharacteristicSubscribed(centralIdArg: String, characteristicUuidArg: String, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicSubscribed$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(centralIdArg, characteristicUuidArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A central unsubscribed from notifications for a characteristic. */
+  fun onCharacteristicUnsubscribed(centralIdArg: String, characteristicUuidArg: String, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicUnsubscribed$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(centralIdArg, characteristicUuidArg)) {
       if (it is List<*>) {
         if (it.size > 1) {
           callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))

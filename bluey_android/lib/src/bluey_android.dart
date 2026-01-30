@@ -22,6 +22,16 @@ class BlueyAndroid extends BlueyPlatform {
   final Map<String, StreamController<PlatformNotification>>
       _notificationControllers = {};
 
+  // Server (peripheral) streams
+  final StreamController<PlatformCentral> _centralConnectionsController =
+      StreamController<PlatformCentral>.broadcast();
+  final StreamController<String> _centralDisconnectionsController =
+      StreamController<String>.broadcast();
+  final StreamController<PlatformReadRequest> _readRequestsController =
+      StreamController<PlatformReadRequest>.broadcast();
+  final StreamController<PlatformWriteRequest> _writeRequestsController =
+      StreamController<PlatformWriteRequest>.broadcast();
+
   BlueyAndroid() {
     // Set up the Flutter API to receive callbacks from platform
     BlueyFlutterApi.setUp(_flutterApi);
@@ -60,6 +70,48 @@ class BlueyAndroid extends BlueyPlatform {
     _flutterApi.onMtuChangedCallback = (event) {
       // MTU change is also reflected through the callback
       // Currently we don't expose this as a separate stream
+    };
+
+    // Server (peripheral) callbacks
+    _flutterApi.onCentralConnectedCallback = (central) {
+      _centralConnectionsController.add(PlatformCentral(
+        id: central.id,
+        mtu: central.mtu,
+      ));
+    };
+
+    _flutterApi.onCentralDisconnectedCallback = (centralId) {
+      _centralDisconnectionsController.add(centralId);
+    };
+
+    _flutterApi.onReadRequestCallback = (request) {
+      _readRequestsController.add(PlatformReadRequest(
+        requestId: request.requestId,
+        centralId: request.centralId,
+        characteristicUuid: request.characteristicUuid,
+        offset: request.offset,
+      ));
+    };
+
+    _flutterApi.onWriteRequestCallback = (request) {
+      _writeRequestsController.add(PlatformWriteRequest(
+        requestId: request.requestId,
+        centralId: request.centralId,
+        characteristicUuid: request.characteristicUuid,
+        value: request.value,
+        offset: request.offset,
+        responseNeeded: request.responseNeeded,
+      ));
+    };
+
+    _flutterApi.onCharacteristicSubscribedCallback =
+        (centralId, characteristicUuid) {
+      // Could expose this as a stream if needed
+    };
+
+    _flutterApi.onCharacteristicUnsubscribedCallback =
+        (centralId, characteristicUuid) {
+      // Could expose this as a stream if needed
     };
   }
 
@@ -219,6 +271,83 @@ class BlueyAndroid extends BlueyPlatform {
     return await _hostApi.readRssi(deviceId);
   }
 
+  // === Server (Peripheral) Operations ===
+
+  @override
+  Future<void> addService(PlatformLocalService service) async {
+    final dto = _mapLocalServiceToDto(service);
+    await _hostApi.addService(dto);
+  }
+
+  @override
+  Future<void> removeService(String serviceUuid) async {
+    await _hostApi.removeService(serviceUuid);
+  }
+
+  @override
+  Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
+    final dto = AdvertiseConfigDto(
+      name: config.name,
+      serviceUuids: config.serviceUuids,
+      manufacturerDataCompanyId: config.manufacturerDataCompanyId,
+      manufacturerData: config.manufacturerData,
+      timeoutMs: config.timeoutMs,
+    );
+    await _hostApi.startAdvertising(dto);
+  }
+
+  @override
+  Future<void> stopAdvertising() async {
+    await _hostApi.stopAdvertising();
+  }
+
+  @override
+  Future<void> notifyCharacteristic(
+      String characteristicUuid, Uint8List value) async {
+    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+  }
+
+  @override
+  Future<void> notifyCharacteristicTo(
+      String centralId, String characteristicUuid, Uint8List value) async {
+    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+  }
+
+  @override
+  Stream<PlatformCentral> get centralConnections =>
+      _centralConnectionsController.stream;
+
+  @override
+  Stream<String> get centralDisconnections =>
+      _centralDisconnectionsController.stream;
+
+  @override
+  Stream<PlatformReadRequest> get readRequests =>
+      _readRequestsController.stream;
+
+  @override
+  Stream<PlatformWriteRequest> get writeRequests =>
+      _writeRequestsController.stream;
+
+  @override
+  Future<void> respondToReadRequest(
+      int requestId, PlatformGattStatus status, Uint8List? value) async {
+    await _hostApi.respondToReadRequest(
+        requestId, _mapGattStatusToDto(status), value);
+  }
+
+  @override
+  Future<void> respondToWriteRequest(
+      int requestId, PlatformGattStatus status) async {
+    await _hostApi.respondToWriteRequest(
+        requestId, _mapGattStatusToDto(status));
+  }
+
+  @override
+  Future<void> disconnectCentral(String centralId) async {
+    await _hostApi.disconnectCentral(centralId);
+  }
+
   // Mapping functions from DTOs to platform interface types
 
   BluetoothState _mapBluetoothState(BluetoothStateDto dto) {
@@ -286,6 +415,81 @@ class BlueyAndroid extends BlueyPlatform {
   PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
     return PlatformDescriptor(uuid: dto.uuid);
   }
+
+  // Mapping functions for Server types
+
+  LocalServiceDto _mapLocalServiceToDto(PlatformLocalService service) {
+    return LocalServiceDto(
+      uuid: service.uuid,
+      isPrimary: service.isPrimary,
+      characteristics:
+          service.characteristics.map(_mapLocalCharacteristicToDto).toList(),
+      includedServices:
+          service.includedServices.map(_mapLocalServiceToDto).toList(),
+    );
+  }
+
+  LocalCharacteristicDto _mapLocalCharacteristicToDto(
+      PlatformLocalCharacteristic characteristic) {
+    return LocalCharacteristicDto(
+      uuid: characteristic.uuid,
+      properties: CharacteristicPropertiesDto(
+        canRead: characteristic.properties.canRead,
+        canWrite: characteristic.properties.canWrite,
+        canWriteWithoutResponse:
+            characteristic.properties.canWriteWithoutResponse,
+        canNotify: characteristic.properties.canNotify,
+        canIndicate: characteristic.properties.canIndicate,
+      ),
+      permissions:
+          characteristic.permissions.map(_mapGattPermissionToDto).toList(),
+      descriptors:
+          characteristic.descriptors.map(_mapLocalDescriptorToDto).toList(),
+    );
+  }
+
+  LocalDescriptorDto _mapLocalDescriptorToDto(
+      PlatformLocalDescriptor descriptor) {
+    return LocalDescriptorDto(
+      uuid: descriptor.uuid,
+      permissions: descriptor.permissions.map(_mapGattPermissionToDto).toList(),
+      value: descriptor.value,
+    );
+  }
+
+  GattPermissionDto _mapGattPermissionToDto(PlatformGattPermission permission) {
+    switch (permission) {
+      case PlatformGattPermission.read:
+        return GattPermissionDto.read;
+      case PlatformGattPermission.readEncrypted:
+        return GattPermissionDto.readEncrypted;
+      case PlatformGattPermission.write:
+        return GattPermissionDto.write;
+      case PlatformGattPermission.writeEncrypted:
+        return GattPermissionDto.writeEncrypted;
+    }
+  }
+
+  GattStatusDto _mapGattStatusToDto(PlatformGattStatus status) {
+    switch (status) {
+      case PlatformGattStatus.success:
+        return GattStatusDto.success;
+      case PlatformGattStatus.readNotPermitted:
+        return GattStatusDto.readNotPermitted;
+      case PlatformGattStatus.writeNotPermitted:
+        return GattStatusDto.writeNotPermitted;
+      case PlatformGattStatus.invalidOffset:
+        return GattStatusDto.invalidOffset;
+      case PlatformGattStatus.invalidAttributeLength:
+        return GattStatusDto.invalidAttributeLength;
+      case PlatformGattStatus.insufficientAuthentication:
+        return GattStatusDto.insufficientAuthentication;
+      case PlatformGattStatus.insufficientEncryption:
+        return GattStatusDto.insufficientEncryption;
+      case PlatformGattStatus.requestNotSupported:
+        return GattStatusDto.requestNotSupported;
+    }
+  }
 }
 
 /// Implementation of Flutter API that receives callbacks from platform.
@@ -296,6 +500,14 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   void Function(ConnectionStateEventDto)? onConnectionStateChangedCallback;
   void Function(NotificationEventDto)? onNotificationCallback;
   void Function(MtuChangedEventDto)? onMtuChangedCallback;
+
+  // Server (peripheral) callbacks
+  void Function(CentralDto)? onCentralConnectedCallback;
+  void Function(String)? onCentralDisconnectedCallback;
+  void Function(ReadRequestDto)? onReadRequestCallback;
+  void Function(WriteRequestDto)? onWriteRequestCallback;
+  void Function(String, String)? onCharacteristicSubscribedCallback;
+  void Function(String, String)? onCharacteristicUnsubscribedCallback;
 
   @override
   void onStateChanged(BluetoothStateDto state) {
@@ -325,5 +537,38 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   @override
   void onMtuChanged(MtuChangedEventDto event) {
     onMtuChangedCallback?.call(event);
+  }
+
+  // Server (peripheral) callbacks
+
+  @override
+  void onCentralConnected(CentralDto central) {
+    onCentralConnectedCallback?.call(central);
+  }
+
+  @override
+  void onCentralDisconnected(String centralId) {
+    onCentralDisconnectedCallback?.call(centralId);
+  }
+
+  @override
+  void onReadRequest(ReadRequestDto request) {
+    onReadRequestCallback?.call(request);
+  }
+
+  @override
+  void onWriteRequest(WriteRequestDto request) {
+    onWriteRequestCallback?.call(request);
+  }
+
+  @override
+  void onCharacteristicSubscribed(String centralId, String characteristicUuid) {
+    onCharacteristicSubscribedCallback?.call(centralId, characteristicUuid);
+  }
+
+  @override
+  void onCharacteristicUnsubscribed(
+      String centralId, String characteristicUuid) {
+    onCharacteristicUnsubscribedCallback?.call(centralId, characteristicUuid);
   }
 }

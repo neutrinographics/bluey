@@ -135,6 +135,51 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<int> readRssi(String deviceId) async => -60;
 
+  // Server (Peripheral) operations - stub implementations
+  @override
+  Future<void> addService(platform.PlatformLocalService service) async {}
+
+  @override
+  Future<void> removeService(String serviceUuid) async {}
+
+  @override
+  Future<void> startAdvertising(
+      platform.PlatformAdvertiseConfig config) async {}
+
+  @override
+  Future<void> stopAdvertising() async {}
+
+  @override
+  Future<void> notifyCharacteristic(
+      String characteristicUuid, Uint8List value) async {}
+
+  @override
+  Future<void> notifyCharacteristicTo(
+      String centralId, String characteristicUuid, Uint8List value) async {}
+
+  @override
+  Stream<platform.PlatformCentral> get centralConnections => Stream.empty();
+
+  @override
+  Stream<String> get centralDisconnections => Stream.empty();
+
+  @override
+  Stream<platform.PlatformReadRequest> get readRequests => Stream.empty();
+
+  @override
+  Stream<platform.PlatformWriteRequest> get writeRequests => Stream.empty();
+
+  @override
+  Future<void> respondToReadRequest(int requestId,
+      platform.PlatformGattStatus status, Uint8List? value) async {}
+
+  @override
+  Future<void> respondToWriteRequest(
+      int requestId, platform.PlatformGattStatus status) async {}
+
+  @override
+  Future<void> disconnectCentral(String centralId) async {}
+
   void dispose() {
     _stateController.close();
     _scanController.close();

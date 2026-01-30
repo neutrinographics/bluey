@@ -171,6 +171,133 @@ class MtuChangedEventDto {
   });
 }
 
+// === Server (Peripheral) DTOs ===
+
+/// GATT permission flags (DTO for platform channel).
+enum GattPermissionDto {
+  read,
+  readEncrypted,
+  write,
+  writeEncrypted,
+}
+
+/// A local descriptor for GATT server (DTO for platform channel).
+class LocalDescriptorDto {
+  final String uuid;
+  final List<GattPermissionDto> permissions;
+  final Uint8List? value;
+
+  LocalDescriptorDto({
+    required this.uuid,
+    required this.permissions,
+    this.value,
+  });
+}
+
+/// A local characteristic for GATT server (DTO for platform channel).
+class LocalCharacteristicDto {
+  final String uuid;
+  final CharacteristicPropertiesDto properties;
+  final List<GattPermissionDto> permissions;
+  final List<LocalDescriptorDto> descriptors;
+
+  LocalCharacteristicDto({
+    required this.uuid,
+    required this.properties,
+    required this.permissions,
+    required this.descriptors,
+  });
+}
+
+/// A local service for GATT server (DTO for platform channel).
+class LocalServiceDto {
+  final String uuid;
+  final bool isPrimary;
+  final List<LocalCharacteristicDto> characteristics;
+  final List<LocalServiceDto> includedServices;
+
+  LocalServiceDto({
+    required this.uuid,
+    required this.isPrimary,
+    required this.characteristics,
+    required this.includedServices,
+  });
+}
+
+/// Advertising configuration (DTO for platform channel).
+class AdvertiseConfigDto {
+  final String? name;
+  final List<String> serviceUuids;
+  final int? manufacturerDataCompanyId;
+  final Uint8List? manufacturerData;
+  final int? timeoutMs;
+
+  AdvertiseConfigDto({
+    this.name,
+    required this.serviceUuids,
+    this.manufacturerDataCompanyId,
+    this.manufacturerData,
+    this.timeoutMs,
+  });
+}
+
+/// A connected central device (DTO for platform channel).
+class CentralDto {
+  final String id;
+  final int mtu;
+
+  CentralDto({
+    required this.id,
+    required this.mtu,
+  });
+}
+
+/// Read request from a central (DTO for platform channel).
+class ReadRequestDto {
+  final int requestId;
+  final String centralId;
+  final String characteristicUuid;
+  final int offset;
+
+  ReadRequestDto({
+    required this.requestId,
+    required this.centralId,
+    required this.characteristicUuid,
+    required this.offset,
+  });
+}
+
+/// Write request from a central (DTO for platform channel).
+class WriteRequestDto {
+  final int requestId;
+  final String centralId;
+  final String characteristicUuid;
+  final Uint8List value;
+  final int offset;
+  final bool responseNeeded;
+
+  WriteRequestDto({
+    required this.requestId,
+    required this.centralId,
+    required this.characteristicUuid,
+    required this.value,
+    required this.offset,
+    required this.responseNeeded,
+  });
+}
+
+/// GATT status code for responses (DTO for platform channel).
+enum GattStatusDto {
+  success,
+  readNotPermitted,
+  writeNotPermitted,
+  invalidOffset,
+  invalidAttributeLength,
+  insufficientAuthentication,
+  insufficientEncryption,
+  requestNotSupported,
+}
+
 /// Host API - called from Dart to platform.
 @HostApi()
 abstract class BlueyHostApi {
@@ -248,6 +375,46 @@ abstract class BlueyHostApi {
   /// Read the current RSSI for a connected device.
   @async
   int readRssi(String deviceId);
+
+  // === Server (Peripheral) Operations ===
+
+  /// Add a service to the GATT server.
+  @async
+  void addService(LocalServiceDto service);
+
+  /// Remove a service from the GATT server.
+  @async
+  void removeService(String serviceUuid);
+
+  /// Start advertising.
+  @async
+  void startAdvertising(AdvertiseConfigDto config);
+
+  /// Stop advertising.
+  @async
+  void stopAdvertising();
+
+  /// Send a notification to all subscribed centrals.
+  @async
+  void notifyCharacteristic(String characteristicUuid, Uint8List value);
+
+  /// Send a notification to a specific central.
+  @async
+  void notifyCharacteristicTo(
+      String centralId, String characteristicUuid, Uint8List value);
+
+  /// Respond to a read request.
+  @async
+  void respondToReadRequest(
+      int requestId, GattStatusDto status, Uint8List? value);
+
+  /// Respond to a write request.
+  @async
+  void respondToWriteRequest(int requestId, GattStatusDto status);
+
+  /// Disconnect a central from the server.
+  @async
+  void disconnectCentral(String centralId);
 }
 
 /// Flutter API - called from platform to Dart.
@@ -270,4 +437,25 @@ abstract class BlueyFlutterApi {
 
   /// MTU changed for a connection.
   void onMtuChanged(MtuChangedEventDto event);
+
+  // === Server (Peripheral) Callbacks ===
+
+  /// A central device connected to the server.
+  void onCentralConnected(CentralDto central);
+
+  /// A central device disconnected from the server.
+  void onCentralDisconnected(String centralId);
+
+  /// A read request was received from a central.
+  void onReadRequest(ReadRequestDto request);
+
+  /// A write request was received from a central.
+  void onWriteRequest(WriteRequestDto request);
+
+  /// A central subscribed to notifications for a characteristic.
+  void onCharacteristicSubscribed(String centralId, String characteristicUuid);
+
+  /// A central unsubscribed from notifications for a characteristic.
+  void onCharacteristicUnsubscribed(
+      String centralId, String characteristicUuid);
 }
