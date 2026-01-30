@@ -128,6 +128,18 @@ void main() {
         expect(await bluey.state, equals(BluetoothState.unauthorized));
       });
 
+      test('currentState returns cached state synchronously', () async {
+        // Initially unknown before platform reports
+        expect(bluey.currentState, equals(BluetoothState.unknown));
+
+        // After platform emits, currentState is updated
+        mockPlatform.emitState(platform.BluetoothState.on);
+
+        // Allow stream event to process
+        await Future.delayed(Duration.zero);
+        expect(bluey.currentState, equals(BluetoothState.on));
+      });
+
       test('stateStream emits state changes', () async {
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);

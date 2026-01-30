@@ -62,19 +62,30 @@ class Bluey {
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
 
+  BluetoothState _currentState = BluetoothState.unknown;
+
   /// Creates a new Bluey instance.
   ///
   /// Typically you create one instance and reuse it throughout your app.
   /// Call [dispose] when done to release resources.
   Bluey() : _platform = platform.BlueyPlatform.instance {
     _stateSubscription = _platform.stateStream.listen(
-      (state) => _stateController.add(_mapState(state)),
+      (state) {
+        _currentState = _mapState(state);
+        _stateController.add(_currentState);
+      },
       onError: (error) => _stateController.addError(_wrapError(error)),
     );
   }
 
   /// Platform capabilities.
   platform.Capabilities get capabilities => _platform.capabilities;
+
+  /// Current Bluetooth state synchronously.
+  ///
+  /// This returns the last known state, which may be [BluetoothState.unknown]
+  /// if the platform hasn't reported yet. For an up-to-date state, use [state].
+  BluetoothState get currentState => _currentState;
 
   /// Stream of Bluetooth state changes.
   ///
