@@ -147,6 +147,56 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
     _connectionControllers[deviceId]?.add(state);
   }
 
+  // GATT operations - stub implementations for tests that don't use them
+  @override
+  Future<List<platform.PlatformService>> discoverServices(
+          String deviceId) async =>
+      [];
+
+  @override
+  Future<Uint8List> readCharacteristic(
+          String deviceId, String characteristicUuid) async =>
+      Uint8List(0);
+
+  @override
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) async {}
+
+  @override
+  Future<void> setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) async {}
+
+  @override
+  Stream<platform.PlatformNotification> notificationStream(String deviceId) =>
+      Stream.empty();
+
+  @override
+  Future<Uint8List> readDescriptor(
+    String deviceId,
+    String descriptorUuid,
+  ) async =>
+      Uint8List(0);
+
+  @override
+  Future<void> writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<int> requestMtu(String deviceId, int mtu) async => mtu;
+
+  @override
+  Future<int> readRssi(String deviceId) async => -60;
+
   void dispose() {
     _stateController.close();
     for (final controller in _connectionControllers.values) {

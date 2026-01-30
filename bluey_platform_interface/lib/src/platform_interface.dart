@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'capabilities.dart';
@@ -72,6 +74,62 @@ class PlatformConnectConfig {
 
   @override
   int get hashCode => Object.hash(timeoutMs, mtu);
+}
+
+/// Characteristic properties from the platform layer.
+@immutable
+class PlatformCharacteristicProperties {
+  final bool canRead;
+  final bool canWrite;
+  final bool canWriteWithoutResponse;
+  final bool canNotify;
+  final bool canIndicate;
+
+  const PlatformCharacteristicProperties({
+    required this.canRead,
+    required this.canWrite,
+    required this.canWriteWithoutResponse,
+    required this.canNotify,
+    required this.canIndicate,
+  });
+}
+
+/// A descriptor from the platform layer.
+@immutable
+class PlatformDescriptor {
+  final String uuid;
+
+  const PlatformDescriptor({required this.uuid});
+}
+
+/// A characteristic from the platform layer.
+@immutable
+class PlatformCharacteristic {
+  final String uuid;
+  final PlatformCharacteristicProperties properties;
+  final List<PlatformDescriptor> descriptors;
+
+  const PlatformCharacteristic({
+    required this.uuid,
+    required this.properties,
+    required this.descriptors,
+  });
+}
+
+/// A service from the platform layer.
+@immutable
+class PlatformService {
+  final String uuid;
+  final bool isPrimary;
+  final List<PlatformCharacteristic> characteristics;
+  final List<PlatformService> includedServices;
+
+  const PlatformService({
+    required this.uuid,
+    required this.isPrimary,
+    required this.characteristics,
+    required this.includedServices,
+  });
 }
 
 /// A discovered device from the platform layer.
@@ -186,6 +244,63 @@ abstract class BlueyPlatform extends PlatformInterface {
 
   /// Stream of connection state changes for a device.
   Stream<PlatformConnectionState> connectionStateStream(String deviceId);
+
+  // === GATT Operations ===
+
+  /// Discover services on a connected device.
+  Future<List<PlatformService>> discoverServices(String deviceId);
+
+  /// Read a characteristic value.
+  Future<Uint8List> readCharacteristic(
+      String deviceId, String characteristicUuid);
+
+  /// Write a characteristic value.
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  );
+
+  /// Enable or disable notifications for a characteristic.
+  Future<void> setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  );
+
+  /// Stream of characteristic notifications.
+  Stream<PlatformNotification> notificationStream(String deviceId);
+
+  /// Read a descriptor value.
+  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid);
+
+  /// Write a descriptor value.
+  Future<void> writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  );
+
+  /// Request a specific MTU.
+  Future<int> requestMtu(String deviceId, int mtu);
+
+  /// Read the current RSSI for a connected device.
+  Future<int> readRssi(String deviceId);
+}
+
+/// A notification from a characteristic.
+@immutable
+class PlatformNotification {
+  final String deviceId;
+  final String characteristicUuid;
+  final Uint8List value;
+
+  const PlatformNotification({
+    required this.deviceId,
+    required this.characteristicUuid,
+    required this.value,
+  });
 }
 
 /// Placeholder implementation that throws on all operations.
@@ -229,5 +344,55 @@ class _PlaceholderPlatform extends BlueyPlatform {
 
   @override
   Stream<PlatformConnectionState> connectionStateStream(String deviceId) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<List<PlatformService>> discoverServices(String deviceId) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<Uint8List> readCharacteristic(
+          String deviceId, String characteristicUuid) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<void> setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Stream<PlatformNotification> notificationStream(String deviceId) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<void> writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<int> requestMtu(String deviceId, int mtu) =>
+      throw UnimplementedError('No platform implementation registered.');
+
+  @override
+  Future<int> readRssi(String deviceId) =>
       throw UnimplementedError('No platform implementation registered.');
 }

@@ -180,6 +180,198 @@ class ConnectionStateEventDto {
   }
 }
 
+/// Characteristic properties flags (DTO for platform channel).
+class CharacteristicPropertiesDto {
+  CharacteristicPropertiesDto({
+    required this.canRead,
+    required this.canWrite,
+    required this.canWriteWithoutResponse,
+    required this.canNotify,
+    required this.canIndicate,
+  });
+
+  bool canRead;
+
+  bool canWrite;
+
+  bool canWriteWithoutResponse;
+
+  bool canNotify;
+
+  bool canIndicate;
+
+  Object encode() {
+    return <Object?>[
+      canRead,
+      canWrite,
+      canWriteWithoutResponse,
+      canNotify,
+      canIndicate,
+    ];
+  }
+
+  static CharacteristicPropertiesDto decode(Object result) {
+    result as List<Object?>;
+    return CharacteristicPropertiesDto(
+      canRead: result[0]! as bool,
+      canWrite: result[1]! as bool,
+      canWriteWithoutResponse: result[2]! as bool,
+      canNotify: result[3]! as bool,
+      canIndicate: result[4]! as bool,
+    );
+  }
+}
+
+/// A descriptor on a remote device (DTO for platform channel).
+class DescriptorDto {
+  DescriptorDto({
+    required this.uuid,
+  });
+
+  String uuid;
+
+  Object encode() {
+    return <Object?>[
+      uuid,
+    ];
+  }
+
+  static DescriptorDto decode(Object result) {
+    result as List<Object?>;
+    return DescriptorDto(
+      uuid: result[0]! as String,
+    );
+  }
+}
+
+/// A characteristic on a remote device (DTO for platform channel).
+class CharacteristicDto {
+  CharacteristicDto({
+    required this.uuid,
+    required this.properties,
+    required this.descriptors,
+  });
+
+  String uuid;
+
+  CharacteristicPropertiesDto properties;
+
+  List<DescriptorDto> descriptors;
+
+  Object encode() {
+    return <Object?>[
+      uuid,
+      properties,
+      descriptors,
+    ];
+  }
+
+  static CharacteristicDto decode(Object result) {
+    result as List<Object?>;
+    return CharacteristicDto(
+      uuid: result[0]! as String,
+      properties: result[1]! as CharacteristicPropertiesDto,
+      descriptors: (result[2] as List<Object?>?)!.cast<DescriptorDto>(),
+    );
+  }
+}
+
+/// A service on a remote device (DTO for platform channel).
+class ServiceDto {
+  ServiceDto({
+    required this.uuid,
+    required this.isPrimary,
+    required this.characteristics,
+    required this.includedServices,
+  });
+
+  String uuid;
+
+  bool isPrimary;
+
+  List<CharacteristicDto> characteristics;
+
+  List<ServiceDto> includedServices;
+
+  Object encode() {
+    return <Object?>[
+      uuid,
+      isPrimary,
+      characteristics,
+      includedServices,
+    ];
+  }
+
+  static ServiceDto decode(Object result) {
+    result as List<Object?>;
+    return ServiceDto(
+      uuid: result[0]! as String,
+      isPrimary: result[1]! as bool,
+      characteristics: (result[2] as List<Object?>?)!.cast<CharacteristicDto>(),
+      includedServices: (result[3] as List<Object?>?)!.cast<ServiceDto>(),
+    );
+  }
+}
+
+/// Notification event (DTO for platform channel).
+class NotificationEventDto {
+  NotificationEventDto({
+    required this.deviceId,
+    required this.characteristicUuid,
+    required this.value,
+  });
+
+  String deviceId;
+
+  String characteristicUuid;
+
+  Uint8List value;
+
+  Object encode() {
+    return <Object?>[
+      deviceId,
+      characteristicUuid,
+      value,
+    ];
+  }
+
+  static NotificationEventDto decode(Object result) {
+    result as List<Object?>;
+    return NotificationEventDto(
+      deviceId: result[0]! as String,
+      characteristicUuid: result[1]! as String,
+      value: result[2]! as Uint8List,
+    );
+  }
+}
+
+/// MTU changed event (DTO for platform channel).
+class MtuChangedEventDto {
+  MtuChangedEventDto({
+    required this.deviceId,
+    required this.mtu,
+  });
+
+  String deviceId;
+
+  int mtu;
+
+  Object encode() {
+    return <Object?>[
+      deviceId,
+      mtu,
+    ];
+  }
+
+  static MtuChangedEventDto decode(Object result) {
+    result as List<Object?>;
+    return MtuChangedEventDto(
+      deviceId: result[0]! as String,
+      mtu: result[1]! as int,
+    );
+  }
+}
+
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -206,6 +398,24 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is ConnectionStateEventDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
+    }    else if (value is CharacteristicPropertiesDto) {
+      buffer.putUint8(135);
+      writeValue(buffer, value.encode());
+    }    else if (value is DescriptorDto) {
+      buffer.putUint8(136);
+      writeValue(buffer, value.encode());
+    }    else if (value is CharacteristicDto) {
+      buffer.putUint8(137);
+      writeValue(buffer, value.encode());
+    }    else if (value is ServiceDto) {
+      buffer.putUint8(138);
+      writeValue(buffer, value.encode());
+    }    else if (value is NotificationEventDto) {
+      buffer.putUint8(139);
+      writeValue(buffer, value.encode());
+    }    else if (value is MtuChangedEventDto) {
+      buffer.putUint8(140);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -228,6 +438,18 @@ class _PigeonCodec extends StandardMessageCodec {
         return DeviceDto.decode(readValue(buffer)!);
       case 134: 
         return ConnectionStateEventDto.decode(readValue(buffer)!);
+      case 135: 
+        return CharacteristicPropertiesDto.decode(readValue(buffer)!);
+      case 136: 
+        return DescriptorDto.decode(readValue(buffer)!);
+      case 137: 
+        return CharacteristicDto.decode(readValue(buffer)!);
+      case 138: 
+        return ServiceDto.decode(readValue(buffer)!);
+      case 139: 
+        return NotificationEventDto.decode(readValue(buffer)!);
+      case 140: 
+        return MtuChangedEventDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -425,6 +647,217 @@ class BlueyHostApi {
       return;
     }
   }
+
+  /// Discover services on a connected device.
+  /// Services are cached after first discovery.
+  Future<List<ServiceDto>> discoverServices(String deviceId) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.discoverServices$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as List<Object?>?)!.cast<ServiceDto>();
+    }
+  }
+
+  /// Read a characteristic value.
+  Future<Uint8List> readCharacteristic(String deviceId, String characteristicUuid) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as Uint8List?)!;
+    }
+  }
+
+  /// Write a characteristic value.
+  Future<void> writeCharacteristic(String deviceId, String characteristicUuid, Uint8List value, bool withResponse) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, value, withResponse]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Enable or disable notifications for a characteristic.
+  Future<void> setNotification(String deviceId, String characteristicUuid, bool enable) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.setNotification$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, enable]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Read a descriptor value.
+  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as Uint8List?)!;
+    }
+  }
+
+  /// Write a descriptor value.
+  Future<void> writeDescriptor(String deviceId, String descriptorUuid, Uint8List value) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, value]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Request a specific MTU.
+  /// Returns the negotiated MTU.
+  Future<int> requestMtu(String deviceId, int mtu) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.requestMtu$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId, mtu]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as int?)!;
+    }
+  }
+
+  /// Read the current RSSI for a connected device.
+  Future<int> readRssi(String deviceId) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readRssi$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[deviceId]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as int?)!;
+    }
+  }
 }
 
 /// Flutter API - called from platform to Dart.
@@ -442,6 +875,12 @@ abstract class BlueyFlutterApi {
 
   /// Connection state changed.
   void onConnectionStateChanged(ConnectionStateEventDto event);
+
+  /// Characteristic notification received.
+  void onNotification(NotificationEventDto event);
+
+  /// MTU changed for a connection.
+  void onMtuChanged(MtuChangedEventDto event);
 
   static void setUp(BlueyFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
@@ -530,6 +969,56 @@ abstract class BlueyFlutterApi {
               'Argument for dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onConnectionStateChanged was null, expected non-null ConnectionStateEventDto.');
           try {
             api.onConnectionStateChanged(arg_event!);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onNotification$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onNotification was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final NotificationEventDto? arg_event = (args[0] as NotificationEventDto?);
+          assert(arg_event != null,
+              'Argument for dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onNotification was null, expected non-null NotificationEventDto.');
+          try {
+            api.onNotification(arg_event!);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final MtuChangedEventDto? arg_event = (args[0] as MtuChangedEventDto?);
+          assert(arg_event != null,
+              'Argument for dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged was null, expected non-null MtuChangedEventDto.');
+          try {
+            api.onMtuChanged(arg_event!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

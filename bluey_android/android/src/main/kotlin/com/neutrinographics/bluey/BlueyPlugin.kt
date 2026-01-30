@@ -194,6 +194,78 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
         )
     }
 
+    override fun discoverServices(deviceId: String, callback: (Result<List<ServiceDto>>) -> Unit) {
+        connectionManager?.discoverServices(deviceId, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun readCharacteristic(
+        deviceId: String,
+        characteristicUuid: String,
+        callback: (Result<ByteArray>) -> Unit
+    ) {
+        connectionManager?.readCharacteristic(deviceId, characteristicUuid, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun writeCharacteristic(
+        deviceId: String,
+        characteristicUuid: String,
+        value: ByteArray,
+        withResponse: Boolean,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        connectionManager?.writeCharacteristic(deviceId, characteristicUuid, value, withResponse, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun setNotification(
+        deviceId: String,
+        characteristicUuid: String,
+        enable: Boolean,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        connectionManager?.setNotification(deviceId, characteristicUuid, enable, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun readDescriptor(
+        deviceId: String,
+        descriptorUuid: String,
+        callback: (Result<ByteArray>) -> Unit
+    ) {
+        connectionManager?.readDescriptor(deviceId, descriptorUuid, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun writeDescriptor(
+        deviceId: String,
+        descriptorUuid: String,
+        value: ByteArray,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        connectionManager?.writeDescriptor(deviceId, descriptorUuid, value, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit) {
+        connectionManager?.requestMtu(deviceId, mtu, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
+    override fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
+        connectionManager?.readRssi(deviceId, callback) ?: callback(
+            Result.failure(IllegalStateException("ConnectionManager not initialized"))
+        )
+    }
+
     // Private helper methods
 
     private fun getCurrentBluetoothState(): BluetoothStateDto {
