@@ -2055,7 +2055,7 @@ Complete the entire domain layer before platform implementations.
 
 **Test Coverage:** 191 unit tests passing
 
-### Phase 2: Android Implementation (GATT Client ✅ COMPLETE)
+### Phase 2: Android Implementation ✅ COMPLETE
 
 Complete Android platform with full GATT client and server support.
 
@@ -2085,14 +2085,22 @@ Complete Android platform with full GATT client and server support.
 
 **Test Coverage:** 207 unit tests passing
 
-**Server (Peripheral Role):**
-- [ ] Implement BluetoothGattServer integration
-- [ ] Implement advertising (BluetoothLeAdvertiser)
-- [ ] Implement read/write request handling
-- [ ] Implement notification sending
+**Server (Peripheral Role) ✅ COMPLETE:**
+- [x] TDD: Write failing tests for BlueyServer (15 tests)
+- [x] TDD: Implement BlueyServer (Dart domain layer)
+- [x] Extend Pigeon API with Server DTOs (LocalServiceDto, CentralDto, etc.)
+- [x] Update platform interface with Server types and methods
+- [x] Update BlueyAndroid Dart with Server methods
+- [x] Implement GattServer.kt (BluetoothGattServer integration)
+- [x] Implement Advertiser.kt (BluetoothLeAdvertiser integration)
+- [x] Wire Server operations in BlueyPlugin.kt
+- [x] Verify Android APK builds successfully
+
+**Test Coverage:** 222 unit tests passing
 
 **Testing:**
 - [x] Unit tests for GATT client domain layer (TDD)
+- [x] Unit tests for Server domain layer (TDD)
 - [ ] Integration tests on real devices
 
 ### Phase 3: Example App
@@ -2196,6 +2204,7 @@ class Descriptors {
 | 0.1.0 | 2026-01-30 | Claude | Initial architecture document |
 | 0.2.0 | 2026-01-30 | Claude | Updated roadmap with Phase 1 complete, Phase 2 in progress |
 | 0.3.0 | 2026-01-31 | Claude | Phase 2 Android GATT Client complete (207 tests passing) |
+| 0.4.0 | 2026-01-31 | Claude | Phase 2 Android Server (Peripheral) complete (222 tests passing) |
 
 ---
 
