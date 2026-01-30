@@ -58,6 +58,8 @@ enum BluetoothState {
 /// }
 /// ```
 class Bluey {
+  static Bluey? _instance;
+
   final platform.BlueyPlatform _platform;
 
   StreamSubscription? _stateSubscription;
@@ -66,11 +68,23 @@ class Bluey {
 
   BluetoothState _currentState = BluetoothState.unknown;
 
-  /// Creates a new Bluey instance.
+  /// Gets or creates the Bluey instance.
+  ///
+  /// This uses a singleton pattern to ensure the platform implementation
+  /// is properly registered before being accessed.
   ///
   /// Typically you create one instance and reuse it throughout your app.
   /// Call [dispose] when done to release resources.
-  Bluey() : _platform = platform.BlueyPlatform.instance {
+  factory Bluey() {
+    var instance = _instance;
+    if (instance == null) {
+      _instance = instance = Bluey._internal(platform.BlueyPlatform.instance);
+    }
+    return instance;
+  }
+
+  /// Internal constructor.
+  Bluey._internal(this._platform) {
     _stateSubscription = _platform.stateStream.listen(
       (state) {
         _currentState = _mapState(state);
@@ -243,9 +257,11 @@ class Bluey {
   /// Release all resources.
   ///
   /// After calling dispose, this instance cannot be used.
+  /// The singleton is cleared, so a new instance can be created.
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _stateController.close();
+    _instance = null;
   }
 
   // === Private mapping methods ===

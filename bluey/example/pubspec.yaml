@@ -3,8 +3,10 @@ description: Example app demonstrating Bluey BLE library
 publish_to: none
 
 environment:
-  sdk: ^3.0.0
-  flutter: ^3.0.0
+  sdk: ^3.7.0
+  flutter: ^3.7.0
+
+resolution: workspace
 
 dependencies:
   flutter:
@@ -12,10 +14,10 @@ dependencies:
 
   bluey:
     path: ../
-  bluey_android:
-    path: ../../bluey_android
-  bluey_platform_interface:
-    path: ../../bluey_platform_interface
+  # bluey_android:
+  #   path: ../../bluey_android
+  # bluey_platform_interface:
+  #   path: ../../bluey_platform_interface
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,11 @@
+name: _
+publish_to: none
+
+environment:
+  sdk: ^3.7.0
+
+workspace:
+  - bluey_platform_interface
+  - bluey_android
+  - bluey
+  - bluey/example

@@ -284,14 +284,22 @@ void main() {
       });
 
       test('server() returns null when platform does not support advertising',
-          () {
+          () async {
+        // Dispose the existing bluey instance to clear singleton
+        await bluey.dispose();
+
         // Change capabilities to not support advertising
-        mockPlatform = _NonAdvertisingPlatform();
-        platform.BlueyPlatform.instance = mockPlatform;
+        final nonAdvertisingPlatform = _NonAdvertisingPlatform();
+        platform.BlueyPlatform.instance = nonAdvertisingPlatform;
         final bluey2 = Bluey();
 
         final server = bluey2.server();
         expect(server, isNull);
+
+        // Clean up and restore for other tests
+        await bluey2.dispose();
+        platform.BlueyPlatform.instance = mockPlatform;
+        bluey = Bluey();
       });
     });
 
