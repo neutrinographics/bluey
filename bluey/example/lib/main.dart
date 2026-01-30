@@ -1,3 +1,6 @@
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bluey/bluey.dart';
 
@@ -6,6 +9,29 @@ import 'features/server/server_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set up error logging to console
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    developer.log(
+      'Flutter Error: ${details.exceptionAsString()}',
+      error: details.exception,
+      stackTrace: details.stack,
+      name: 'BlueyExample',
+    );
+  };
+
+  // Handle errors not caught by Flutter framework
+  PlatformDispatcher.instance.onError = (error, stack) {
+    developer.log(
+      'Unhandled Error: $error',
+      error: error,
+      stackTrace: stack,
+      name: 'BlueyExample',
+    );
+    return true;
+  };
+
   runApp(const BlueyExampleApp());
 }
 

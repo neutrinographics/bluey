@@ -52,8 +52,8 @@ class Advertisement {
     this.manufacturerData,
     this.txPowerLevel,
     required this.isConnectable,
-  })  : serviceUuids = UnmodifiableListView(serviceUuids),
-        serviceData = UnmodifiableMapView(serviceData);
+  }) : serviceUuids = UnmodifiableListView(serviceUuids),
+       serviceData = UnmodifiableMapView(serviceData);
 
   /// Creates an empty advertisement.
   factory Advertisement.empty() {
@@ -77,13 +77,16 @@ class Advertisement {
 
   @override
   int get hashCode => Object.hash(
-        Object.hashAll(serviceUuids),
-        Object.hashAllUnordered(serviceData.entries
-            .map((e) => Object.hash(e.key, Object.hashAll(e.value)))),
-        manufacturerData,
-        txPowerLevel,
-        isConnectable,
-      );
+    Object.hashAll(serviceUuids),
+    Object.hashAllUnordered(
+      serviceData.entries.map(
+        (e) => Object.hash(e.key, Object.hashAll(e.value)),
+      ),
+    ),
+    manufacturerData,
+    txPowerLevel,
+    isConnectable,
+  );
 
   @override
   String toString() {
@@ -112,8 +115,17 @@ class Advertisement {
 /// Immutable value - use [copyWith] to create updated instances.
 @immutable
 class Device {
-  /// Unique device identifier (platform-specific format).
+  /// Unique device identifier as a UUID.
+  ///
+  /// On iOS, this is the native CoreBluetooth UUID.
+  /// On Android, this is derived from the MAC address.
   final UUID id;
+
+  /// Platform-specific device identifier used for connections.
+  ///
+  /// On Android, this is the MAC address (e.g., "AA:BB:CC:DD:EE:FF").
+  /// On iOS, this is the same as [id].
+  final String platformId;
 
   /// Advertised device name, if available.
   final String? name;
@@ -129,11 +141,13 @@ class Device {
 
   Device({
     required this.id,
+    String? platformId,
     this.name,
     required this.rssi,
     required this.advertisement,
     DateTime? lastSeen,
-  }) : lastSeen = lastSeen ?? DateTime.now();
+  }) : platformId = platformId ?? id.toString(),
+       lastSeen = lastSeen ?? DateTime.now();
 
   /// Creates a copy with updated fields.
   ///
@@ -147,6 +161,7 @@ class Device {
   }) {
     return Device(
       id: id,
+      platformId: platformId,
       name: name == _sentinel ? this.name : name as String?,
       rssi: rssi ?? this.rssi,
       advertisement: advertisement ?? this.advertisement,

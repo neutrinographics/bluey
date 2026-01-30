@@ -26,7 +26,11 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    _connect();
+    // Defer _connect() until after the widget is fully mounted
+    // so we can access inherited widgets via context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _connect();
+    });
   }
 
   @override

@@ -20,19 +20,19 @@ sealed class BlueyException implements Exception {
 /// Bluetooth is not available on this device.
 class BluetoothUnavailableException extends BlueyException {
   const BluetoothUnavailableException()
-      : super(
-          'Bluetooth is not available on this device',
-          action: 'This device does not support Bluetooth LE',
-        );
+    : super(
+        'Bluetooth is not available on this device',
+        action: 'This device does not support Bluetooth LE',
+      );
 }
 
 /// Bluetooth is turned off.
 class BluetoothDisabledException extends BlueyException {
   const BluetoothDisabledException()
-      : super(
-          'Bluetooth is turned off',
-          action: 'Call bluey.requestEnable() or direct user to Settings',
-        );
+    : super(
+        'Bluetooth is turned off',
+        action: 'Call bluey.requestEnable() or direct user to Settings',
+      );
 }
 
 /// Required permissions not granted.
@@ -40,10 +40,10 @@ class PermissionDeniedException extends BlueyException {
   final List<String> permissions;
 
   PermissionDeniedException(this.permissions)
-      : super(
-          'Required permissions not granted: ${permissions.join(", ")}',
-          action: 'Request permissions or direct user to Settings',
-        );
+    : super(
+        'Required permissions not granted: ${permissions.join(", ")}',
+        action: 'Request permissions or direct user to Settings',
+      );
 }
 
 // === Connection Exceptions ===
@@ -64,7 +64,7 @@ class ConnectionException extends BlueyException {
   final ConnectionFailureReason reason;
 
   const ConnectionException(this.deviceId, this.reason)
-      : super('Failed to connect to device: $reason');
+    : super('Failed to connect to device: $reason');
 }
 
 /// Reasons why a device might disconnect.
@@ -82,7 +82,7 @@ class DisconnectedException extends BlueyException {
   final DisconnectReason reason;
 
   const DisconnectedException(this.deviceId, this.reason)
-      : super('Device disconnected: $reason');
+    : super('Device disconnected: $reason');
 }
 
 // === GATT Exceptions ===
@@ -92,7 +92,7 @@ class ServiceNotFoundException extends BlueyException {
   final UUID serviceUuid;
 
   const ServiceNotFoundException(this.serviceUuid)
-      : super('Service not found: $serviceUuid');
+    : super('Service not found: $serviceUuid');
 }
 
 /// Characteristic not found in service.
@@ -100,7 +100,7 @@ class CharacteristicNotFoundException extends BlueyException {
   final UUID characteristicUuid;
 
   const CharacteristicNotFoundException(this.characteristicUuid)
-      : super('Characteristic not found: $characteristicUuid');
+    : super('Characteristic not found: $characteristicUuid');
 }
 
 /// GATT operation status codes.
@@ -127,10 +127,10 @@ class OperationNotSupportedException extends BlueyException {
   final String operation; // 'read', 'write', 'notify'
 
   const OperationNotSupportedException(this.operation)
-      : super(
-          'Operation "$operation" not supported by this characteristic',
-          action: 'Check characteristic properties before calling',
-        );
+    : super(
+        'Operation "$operation" not supported by this characteristic',
+        action: 'Check characteristic properties before calling',
+      );
 }
 
 // === Server Exceptions ===
@@ -149,7 +149,7 @@ class AdvertisingException extends BlueyException {
   final AdvertisingFailureReason reason;
 
   const AdvertisingException(this.reason)
-      : super('Failed to start advertising: $reason');
+    : super('Failed to start advertising: $reason');
 }
 
 // === Platform Exceptions ===
@@ -160,8 +160,14 @@ class UnsupportedOperationException extends BlueyException {
   final String platform;
 
   const UnsupportedOperationException(this.operation, this.platform)
-      : super(
-          'Operation "$operation" is not supported on $platform',
-          action: 'Check bluey.capabilities before calling',
-        );
+    : super(
+        'Operation "$operation" is not supported on $platform',
+        action: 'Check bluey.capabilities before calling',
+      );
+}
+
+/// Generic platform exception for errors that don't fit other categories.
+class BlueyPlatformException extends BlueyException {
+  BlueyPlatformException(String message, {Object? cause})
+    : super(message, cause: cause);
 }

@@ -223,10 +223,8 @@ class Bluey {
     );
 
     try {
-      final connectionId = await _platform.connect(
-        device.id.toString(),
-        config,
-      );
+      // Use platformId for the actual connection (MAC address on Android)
+      final connectionId = await _platform.connect(device.platformId, config);
 
       return BlueyConnection(
         platformInstance: _platform,
@@ -328,9 +326,11 @@ class Bluey {
 
     // Create device
     // Note: On Android, the device ID is a MAC address, not a UUID.
-    // We create a UUID from the MAC by padding it.
+    // We create a UUID from the MAC by padding it, but preserve the original
+    // platformId for connections.
     return Device(
       id: _deviceIdToUuid(platformDevice.id),
+      platformId: platformDevice.id, // Keep original for platform calls
       name: platformDevice.name,
       rssi: platformDevice.rssi,
       advertisement: advertisement,
@@ -360,14 +360,18 @@ class Bluey {
       return error;
     }
 
+    // Log the error for debugging
+    // ignore: avoid_print
+    print('[Bluey] Platform error: $error');
+
     // Convert common platform errors to domain exceptions
-    final message = error.toString();
+    final message = error.toString().toLowerCase();
 
     if (message.contains('permission') || message.contains('unauthorized')) {
       return PermissionDeniedException(['Bluetooth']);
     }
 
-    if (message.contains('disabled') || message.contains('off')) {
+    if (message.contains('disabled') || message.contains('bluetooth is off')) {
       return const BluetoothDisabledException();
     }
 
@@ -375,17 +379,22 @@ class Bluey {
       return const BluetoothUnavailableException();
     }
 
-    if (message.contains('timeout')) {
+    if (message.contains('timeout') && message.contains('connect')) {
       return ConnectionException(
         UUID.short(0x0000), // Unknown device
         ConnectionFailureReason.timeout,
       );
     }
 
-    // Generic fallback
-    return ConnectionException(
-      UUID.short(0x0000),
-      ConnectionFailureReason.unknown,
-    );
+    if (message.contains('not connected') ||
+        message.contains('device not found')) {
+      return ConnectionException(
+        UUID.short(0x0000),
+        ConnectionFailureReason.deviceNotFound,
+      );
+    }
+
+    // Generic fallback - preserve the original error message
+    return BlueyPlatformException(error.toString(), cause: error);
   }
 }
