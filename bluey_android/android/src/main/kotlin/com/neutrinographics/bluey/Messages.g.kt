@@ -832,6 +832,11 @@ interface BlueyHostApi {
    * Returns true if enabled, false if user declined.
    */
   fun requestEnable(callback: (Result<Boolean>) -> Unit)
+  /**
+   * Request Bluetooth permissions from the user.
+   * Returns true if all required permissions were granted, false otherwise.
+   */
+  fun authorize(callback: (Result<Boolean>) -> Unit)
   /** Open system Bluetooth settings. */
   fun openSettings(callback: (Result<Unit>) -> Unit)
   /** Start scanning. */
@@ -918,6 +923,24 @@ interface BlueyHostApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.requestEnable{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.authorize$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.authorize{ result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

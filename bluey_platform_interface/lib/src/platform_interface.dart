@@ -228,6 +228,10 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Returns true if enabled, false if user declined.
   Future<bool> requestEnable();
 
+  /// Request Bluetooth permissions from the user.
+  /// Returns true if all required permissions were granted, false otherwise.
+  Future<bool> authorize();
+
   /// Open system Bluetooth settings.
   Future<void> openSettings();
 

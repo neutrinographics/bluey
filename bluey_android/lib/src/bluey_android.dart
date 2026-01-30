@@ -157,6 +157,12 @@ final class BlueyAndroid extends BlueyPlatform {
   }
 
   @override
+  Future<bool> authorize() async {
+    _ensureInitialized();
+    return await _hostApi.authorize();
+  }
+
+  @override
   Future<void> openSettings() async {
     _ensureInitialized();
     await _hostApi.openSettings();

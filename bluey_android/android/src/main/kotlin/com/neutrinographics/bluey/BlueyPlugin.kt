@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.PluginRegistry
 
 /**
  * BlueyPlugin - Android implementation of Bluey BLE library.
@@ -25,9 +26,10 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
  * - Delegates to domain-specific classes (Scanner, ConnectionManager)
  * - Manages lifecycle and permissions
  */
-class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
+class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.RequestPermissionsResultListener {
     private var context: Context? = null
     private var activity: Activity? = null
+    private var activityBinding: ActivityPluginBinding? = null
     private var flutterApi: BlueyFlutterApi? = null
 
     private var bluetoothManager: BluetoothManager? = null
@@ -40,6 +42,9 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
 
     // Bluetooth state receiver
     private var bluetoothStateReceiver: BroadcastReceiver? = null
+
+    // Permission request callback
+    private var permissionCallback: ((Result<Boolean>) -> Unit)? = null
 
     // FlutterPlugin implementation
 
@@ -106,6 +111,8 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
         scanner?.setActivity(activity)
         connectionManager?.setActivity(activity)
         gattServer?.setActivity(activity)
@@ -113,11 +120,15 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
         activity = null
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
         scanner?.setActivity(activity)
         connectionManager?.setActivity(activity)
         gattServer?.setActivity(activity)
@@ -125,6 +136,8 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
     }
 
     override fun onDetachedFromActivity() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
         activity = null
         scanner?.setActivity(null)
         connectionManager?.setActivity(null)
@@ -176,6 +189,42 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
             // Android 13+ - user must enable manually via settings
             callback(Result.success(false))
         }
+    }
+
+    override fun authorize(callback: (Result<Boolean>) -> Unit) {
+        val currentActivity = activity
+        if (currentActivity == null) {
+            callback(Result.success(false))
+            return
+        }
+
+        // Determine which permissions are needed based on Android version
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+
+        // Check if permissions are already granted
+        val allGranted = permissions.all {
+            ContextCompat.checkSelfPermission(context!!, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allGranted) {
+            callback(Result.success(true))
+            return
+        }
+
+        // Request permissions
+        permissionCallback = callback
+        ActivityCompat.requestPermissions(currentActivity, permissions, REQUEST_PERMISSIONS)
     }
 
     override fun openSettings(callback: (Result<Unit>) -> Unit) {
@@ -437,7 +486,32 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
         }
     }
 
+    // RequestPermissionsResultListener implementation
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ): Boolean {
+        if (requestCode != REQUEST_PERMISSIONS) {
+            return false
+        }
+
+        val allGranted = grantResults.isNotEmpty() && grantResults.all {
+            it == PackageManager.PERMISSION_GRANTED
+        }
+
+        permissionCallback?.invoke(Result.success(allGranted))
+        permissionCallback = null
+
+        // Update state after permission change
+        flutterApi?.onStateChanged(getCurrentBluetoothState()) {}
+
+        return true
+    }
+
     companion object {
         private const val REQUEST_ENABLE_BT = 1001
+        private const val REQUEST_PERMISSIONS = 1002
     }
 }

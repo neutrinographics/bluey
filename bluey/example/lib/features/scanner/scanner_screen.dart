@@ -184,6 +184,108 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Widget _buildEmptyState() {
+    // Show permission request UI if unauthorized
+    if (_bluetoothState == BluetoothState.unauthorized) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Bluetooth Permission Required',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This app needs Bluetooth permission to scan for and connect to BLE devices.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () async {
+                  final bluey = BlueyProvider.of(context);
+                  final granted = await bluey.authorize();
+                  if (!granted && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Permission denied. Please grant permission in Settings.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.lock_open),
+                label: const Text('Grant Permission'),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () async {
+                  final bluey = BlueyProvider.of(context);
+                  await bluey.openSettings();
+                },
+                icon: const Icon(Icons.settings),
+                label: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show Bluetooth off UI
+    if (_bluetoothState == BluetoothState.off) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.bluetooth_disabled,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Bluetooth is Off',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please enable Bluetooth to scan for devices.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () async {
+                  final bluey = BlueyProvider.of(context);
+                  await bluey.requestEnable();
+                },
+                icon: const Icon(Icons.bluetooth),
+                label: const Text('Enable Bluetooth'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

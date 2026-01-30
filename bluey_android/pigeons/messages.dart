@@ -1,30 +1,19 @@
 import 'package:pigeon/pigeon.dart';
 
-@ConfigurePigeon(PigeonOptions(
-  dartOut: 'lib/src/messages.g.dart',
-  dartOptions: DartOptions(),
-  kotlinOut: 'android/src/main/kotlin/com/neutrinographics/bluey/Messages.g.kt',
-  kotlinOptions: KotlinOptions(
-    package: 'com.neutrinographics.bluey',
+@ConfigurePigeon(
+  PigeonOptions(
+    dartOut: 'lib/src/messages.g.dart',
+    dartOptions: DartOptions(),
+    kotlinOut:
+        'android/src/main/kotlin/com/neutrinographics/bluey/Messages.g.kt',
+    kotlinOptions: KotlinOptions(package: 'com.neutrinographics.bluey'),
   ),
-))
-
+)
 /// Bluetooth adapter state (DTO for platform channel).
-enum BluetoothStateDto {
-  unknown,
-  unsupported,
-  unauthorized,
-  off,
-  on,
-}
+enum BluetoothStateDto { unknown, unsupported, unauthorized, off, on }
 
 /// Connection state (DTO for platform channel).
-enum ConnectionStateDto {
-  disconnected,
-  connecting,
-  connected,
-  disconnecting,
-}
+enum ConnectionStateDto { disconnected, connecting, connected, disconnecting }
 
 /// Scan configuration (DTO for platform channel).
 class ScanConfigDto {
@@ -34,10 +23,7 @@ class ScanConfigDto {
   /// Timeout in milliseconds (null for no timeout).
   final int? timeoutMs;
 
-  ScanConfigDto({
-    required this.serviceUuids,
-    this.timeoutMs,
-  });
+  ScanConfigDto({required this.serviceUuids, this.timeoutMs});
 }
 
 /// Connect configuration (DTO for platform channel).
@@ -48,10 +34,7 @@ class ConnectConfigDto {
   /// Requested MTU.
   final int? mtu;
 
-  ConnectConfigDto({
-    this.timeoutMs,
-    this.mtu,
-  });
+  ConnectConfigDto({this.timeoutMs, this.mtu});
 }
 
 /// A discovered device (DTO for platform channel).
@@ -89,10 +72,7 @@ class ConnectionStateEventDto {
   final String deviceId;
   final ConnectionStateDto state;
 
-  ConnectionStateEventDto({
-    required this.deviceId,
-    required this.state,
-  });
+  ConnectionStateEventDto({required this.deviceId, required this.state});
 }
 
 /// Characteristic properties flags (DTO for platform channel).
@@ -165,21 +145,13 @@ class MtuChangedEventDto {
   final String deviceId;
   final int mtu;
 
-  MtuChangedEventDto({
-    required this.deviceId,
-    required this.mtu,
-  });
+  MtuChangedEventDto({required this.deviceId, required this.mtu});
 }
 
 // === Server (Peripheral) DTOs ===
 
 /// GATT permission flags (DTO for platform channel).
-enum GattPermissionDto {
-  read,
-  readEncrypted,
-  write,
-  writeEncrypted,
-}
+enum GattPermissionDto { read, readEncrypted, write, writeEncrypted }
 
 /// A local descriptor for GATT server (DTO for platform channel).
 class LocalDescriptorDto {
@@ -246,10 +218,7 @@ class CentralDto {
   final String id;
   final int mtu;
 
-  CentralDto({
-    required this.id,
-    required this.mtu,
-  });
+  CentralDto({required this.id, required this.mtu});
 }
 
 /// Read request from a central (DTO for platform channel).
@@ -310,6 +279,11 @@ abstract class BlueyHostApi {
   @async
   bool requestEnable();
 
+  /// Request Bluetooth permissions from the user.
+  /// Returns true if all required permissions were granted, false otherwise.
+  @async
+  bool authorize();
+
   /// Open system Bluetooth settings.
   @async
   void openSettings();
@@ -353,11 +327,7 @@ abstract class BlueyHostApi {
 
   /// Enable or disable notifications for a characteristic.
   @async
-  void setNotification(
-    String deviceId,
-    String characteristicUuid,
-    bool enable,
-  );
+  void setNotification(String deviceId, String characteristicUuid, bool enable);
 
   /// Read a descriptor value.
   @async
@@ -401,12 +371,18 @@ abstract class BlueyHostApi {
   /// Send a notification to a specific central.
   @async
   void notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value);
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  );
 
   /// Respond to a read request.
   @async
   void respondToReadRequest(
-      int requestId, GattStatusDto status, Uint8List? value);
+    int requestId,
+    GattStatusDto status,
+    Uint8List? value,
+  );
 
   /// Respond to a write request.
   @async
@@ -457,5 +433,7 @@ abstract class BlueyFlutterApi {
 
   /// A central unsubscribed from notifications for a characteristic.
   void onCharacteristicUnsubscribed(
-      String centralId, String characteristicUuid);
+    String centralId,
+    String characteristicUuid,
+  );
 }

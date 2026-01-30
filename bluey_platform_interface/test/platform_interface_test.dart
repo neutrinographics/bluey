@@ -27,6 +27,9 @@ final class MockBlueyPlatform extends BlueyPlatform
   Future<bool> requestEnable() => throw UnimplementedError();
 
   @override
+  Future<bool> authorize() => throw UnimplementedError();
+
+  @override
   Future<void> openSettings() => throw UnimplementedError();
 
   @override

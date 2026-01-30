@@ -35,6 +35,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<bool> requestEnable() async => requestEnableResult;
 
   @override
+  Future<bool> authorize() async => true;
+
+  @override
   Future<void> openSettings() async {}
 
   @override

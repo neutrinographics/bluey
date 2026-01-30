@@ -85,13 +85,10 @@ class Bluey {
 
   /// Internal constructor.
   Bluey._internal(this._platform) {
-    _stateSubscription = _platform.stateStream.listen(
-      (state) {
-        _currentState = _mapState(state);
-        _stateController.add(_currentState);
-      },
-      onError: (error) => _stateController.addError(_wrapError(error)),
-    );
+    _stateSubscription = _platform.stateStream.listen((state) {
+      _currentState = _mapState(state);
+      _stateController.add(_currentState);
+    }, onError: (error) => _stateController.addError(_wrapError(error)));
   }
 
   /// Platform capabilities.
@@ -154,6 +151,20 @@ class Bluey {
     }
   }
 
+  /// Request Bluetooth permissions from the user.
+  ///
+  /// Returns true if all required permissions were granted, false otherwise.
+  /// On Android 12+, this requests BLUETOOTH_SCAN and BLUETOOTH_CONNECT.
+  /// On older Android versions, this requests BLUETOOTH, BLUETOOTH_ADMIN,
+  /// and ACCESS_FINE_LOCATION.
+  Future<bool> authorize() async {
+    try {
+      return await _platform.authorize();
+    } catch (e) {
+      throw _wrapError(e);
+    }
+  }
+
   /// Open system Bluetooth settings.
   Future<void> openSettings() async {
     try {
@@ -177,10 +188,7 @@ class Bluey {
   ///   print('Found: ${device.name}');
   /// }
   /// ```
-  Stream<Device> scan({
-    List<UUID>? services,
-    Duration? timeout,
-  }) {
+  Stream<Device> scan({List<UUID>? services, Duration? timeout}) {
     final config = platform.PlatformScanConfig(
       serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
       timeoutMs: timeout?.inMilliseconds,
@@ -208,18 +216,17 @@ class Bluey {
   ///
   /// Returns a [Connection] for GATT operations.
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(
-    Device device, {
-    Duration? timeout,
-  }) async {
+  Future<Connection> connect(Device device, {Duration? timeout}) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
     );
 
     try {
-      final connectionId =
-          await _platform.connect(device.id.toString(), config);
+      final connectionId = await _platform.connect(
+        device.id.toString(),
+        config,
+      );
 
       return BlueyConnection(
         platformInstance: _platform,
@@ -282,7 +289,8 @@ class Bluey {
   }
 
   ConnectionState _mapConnectionState(
-      platform.PlatformConnectionState platformState) {
+    platform.PlatformConnectionState platformState,
+  ) {
     switch (platformState) {
       case platform.PlatformConnectionState.disconnected:
         return ConnectionState.disconnected;
