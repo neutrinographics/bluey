@@ -2103,18 +2103,20 @@ Complete Android platform with full GATT client and server support.
 - [x] Unit tests for Server domain layer (TDD)
 - [ ] Integration tests on real devices
 
-### Phase 3: Example App
+### Phase 3: Example App ✅ COMPLETE
 
 Validate the Android implementation with a complete example app.
 
 - [x] Create example app scaffold (bluey/example)
-- [ ] Implement scanner screen with device list
-- [ ] Implement connection screen with state display
-- [ ] Implement GATT explorer (services/characteristics/descriptors)
-- [ ] Implement characteristic read/write UI
-- [ ] Implement notification subscription UI
-- [ ] Implement server demo (advertising as peripheral)
-- [ ] Material Design 3 theming
+- [x] Implement scanner screen with device list
+- [x] Implement connection screen with state display
+- [x] Implement GATT explorer (services/characteristics/descriptors)
+- [x] Implement characteristic read/write UI
+- [x] Implement notification subscription UI
+- [x] Implement server demo (advertising as peripheral)
+- [x] Material Design 3 theming
+- [x] All flutter analyze issues resolved
+- [x] APK builds successfully
 
 ### Phase 4: iOS Implementation
 
@@ -2205,6 +2207,7 @@ class Descriptors {
 | 0.2.0 | 2026-01-30 | Claude | Updated roadmap with Phase 1 complete, Phase 2 in progress |
 | 0.3.0 | 2026-01-31 | Claude | Phase 2 Android GATT Client complete (207 tests passing) |
 | 0.4.0 | 2026-01-31 | Claude | Phase 2 Android Server (Peripheral) complete (222 tests passing) |
+| 0.5.0 | 2026-01-31 | Claude | Phase 3 Example App complete (scanner, connection, GATT explorer, server demo) |
 
 ---
 
