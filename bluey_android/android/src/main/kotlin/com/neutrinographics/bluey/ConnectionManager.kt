@@ -467,29 +467,17 @@ class ConnectionManager(
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-                android.util.Log.d(
-                    "Bluey",
-                    "onConnectionStateChange: deviceId=$deviceId, status=$status, newState=$newState"
-                )
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTING -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTING)
                     }
 
                     BluetoothProfile.STATE_CONNECTED -> {
-                        android.util.Log.d(
-                            "Bluey",
-                            "STATE_CONNECTED: pendingConnections contains $deviceId = ${
-                                pendingConnections.containsKey(deviceId)
-                            }"
-                        )
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
                         // Connection successful - invoke pending callback on main thread
                         val pendingCallback = pendingConnections.remove(deviceId)
-                        android.util.Log.d("Bluey", "STATE_CONNECTED: pendingCallback = $pendingCallback")
                         if (pendingCallback != null) {
                             handler.post {
-                                android.util.Log.d("Bluey", "STATE_CONNECTED: invoking callback with success")
                                 pendingCallback.invoke(Result.success(deviceId))
                             }
                         }
@@ -525,19 +513,14 @@ class ConnectionManager(
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                android.util.Log.d("Bluey", "onServicesDiscovered: status=$status, services=${gatt.services?.size}")
                 val callback = pendingServiceDiscovery.remove(deviceId)
-                android.util.Log.d("Bluey", "onServicesDiscovered: callback=$callback")
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(mapServices(gatt.services))
                     } else {
                         Result.failure(IllegalStateException("Service discovery failed with status: $status"))
                     }
-                    handler.post {
-                        android.util.Log.d("Bluey", "onServicesDiscovered: invoking callback")
-                        callback(result)
-                    }
+                    handler.post { callback(result) }
                 }
             }
 

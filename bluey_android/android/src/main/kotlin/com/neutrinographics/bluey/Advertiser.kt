@@ -38,13 +38,10 @@ class Advertiser(
     }
 
     fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
-        android.util.Log.d("Bluey", "startAdvertising: checking permissions")
         if (!hasRequiredPermissions()) {
-            android.util.Log.e("Bluey", "startAdvertising: BLUETOOTH_ADVERTISE permission not granted")
             callback(Result.failure(SecurityException("Missing required permissions: BLUETOOTH_ADVERTISE")))
             return
         }
-        android.util.Log.d("Bluey", "startAdvertising: permissions OK")
 
         if (isAdvertising) {
             callback(Result.success(Unit))
@@ -85,10 +82,9 @@ class Advertiser(
         for (uuidString in config.serviceUuids) {
             try {
                 val uuid = UUID.fromString(normalizeUuid(uuidString))
-                android.util.Log.d("Bluey", "Adding service UUID to advertise data: $uuid")
                 dataBuilder.addServiceUuid(ParcelUuid(uuid))
             } catch (e: IllegalArgumentException) {
-                android.util.Log.e("Bluey", "Invalid UUID: $uuidString", e)
+                // Invalid UUID, skip
             }
         }
 
@@ -107,18 +103,9 @@ class Advertiser(
 
         val scanResponse = scanResponseBuilder.build()
 
-        // Log what we're advertising
-        android.util.Log.d("Bluey", "startAdvertising: settings=$settings")
-        android.util.Log.d("Bluey", "startAdvertising: advertiseData=$advertiseData")
-        android.util.Log.d("Bluey", "startAdvertising: scanResponse=$scanResponse")
-        android.util.Log.d("Bluey", "startAdvertising: serviceUuids=${config.serviceUuids}")
-
         // Create callback
         advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                android.util.Log.d("Bluey", "onStartSuccess: advertising started, settingsInEffect=$settingsInEffect")
-                android.util.Log.d("Bluey", "onStartSuccess: adapter name=${bluetoothAdapter?.name}")
-                android.util.Log.d("Bluey", "onStartSuccess: adapter address=${bluetoothAdapter?.address}")
                 isAdvertising = true
                 callback(Result.success(Unit))
 

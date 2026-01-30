@@ -56,9 +56,7 @@ class GattServer(
     }
 
     fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
-        android.util.Log.d("Bluey", "addService: uuid=${service.uuid}")
         if (!hasRequiredPermissions()) {
-            android.util.Log.e("Bluey", "addService: missing permissions")
             callback(Result.failure(SecurityException("Missing required permissions")))
             return
         }
@@ -66,28 +64,20 @@ class GattServer(
         ensureServerOpen()
         val server = gattServer
         if (server == null) {
-            android.util.Log.e("Bluey", "addService: gattServer is null after ensureServerOpen")
             callback(Result.failure(IllegalStateException("Failed to open GATT server")))
             return
         }
 
         val gattService = createGattService(service)
-        android.util.Log.d(
-            "Bluey",
-            "addService: created gattService with ${gattService.characteristics.size} characteristics"
-        )
         pendingServiceCallback = callback
 
         try {
-            val result = server.addService(gattService)
-            android.util.Log.d("Bluey", "addService: server.addService returned $result")
-            if (!result) {
+            if (!server.addService(gattService)) {
                 pendingServiceCallback = null
                 callback(Result.failure(IllegalStateException("Failed to add service")))
             }
             // Callback will be invoked in onServiceAdded
         } catch (e: SecurityException) {
-            android.util.Log.e("Bluey", "addService: SecurityException", e)
             pendingServiceCallback = null
             callback(Result.failure(e))
         }
@@ -251,22 +241,14 @@ class GattServer(
     }
 
     private fun ensureServerOpen() {
-        if (gattServer != null) {
-            android.util.Log.d("Bluey", "ensureServerOpen: server already open")
-            return
-        }
+        if (gattServer != null) return
 
-        if (!hasRequiredPermissions()) {
-            android.util.Log.e("Bluey", "ensureServerOpen: missing permissions")
-            return
-        }
+        if (!hasRequiredPermissions()) return
 
         try {
-            android.util.Log.d("Bluey", "ensureServerOpen: opening GATT server")
             gattServer = bluetoothManager?.openGattServer(context, gattServerCallback)
-            android.util.Log.d("Bluey", "ensureServerOpen: gattServer=$gattServer")
         } catch (e: SecurityException) {
-            android.util.Log.e("Bluey", "ensureServerOpen: SecurityException", e)
+            // Permission revoked
         }
     }
 

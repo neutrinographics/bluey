@@ -146,10 +146,6 @@ class _ServerScreenState extends State<ServerScreen> {
   }
 
   void _showError(String message) {
-    // Log to console for debugging
-    // ignore: avoid_print
-    print('[ServerScreen] Error: $message');
-
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

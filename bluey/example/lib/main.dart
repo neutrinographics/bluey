@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
@@ -44,15 +45,26 @@ class BlueyExampleApp extends StatefulWidget {
 
 class _BlueyExampleAppState extends State<BlueyExampleApp> {
   late final Bluey _bluey;
+  StreamSubscription<BlueyException>? _errorSubscription;
 
   @override
   void initState() {
     super.initState();
     _bluey = Bluey();
+
+    // Listen to Bluey errors and log them to console
+    _errorSubscription = _bluey.errorStream.listen((error) {
+      developer.log(
+        'Bluey Error: ${error.message}',
+        error: error,
+        name: 'Bluey',
+      );
+    });
   }
 
   @override
   void dispose() {
+    _errorSubscription?.cancel();
     _bluey.dispose();
     super.dispose();
   }

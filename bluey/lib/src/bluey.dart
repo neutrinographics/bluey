@@ -65,6 +65,8 @@ class Bluey {
   StreamSubscription? _stateSubscription;
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
+  final StreamController<BlueyException> _errorController =
+      StreamController<BlueyException>.broadcast();
 
   BluetoothState _currentState = BluetoothState.unknown;
 
@@ -104,6 +106,13 @@ class Bluey {
   ///
   /// Emits whenever Bluetooth is enabled, disabled, or permissions change.
   Stream<BluetoothState> get stateStream => _stateController.stream;
+
+  /// Stream of errors from Bluey operations.
+  ///
+  /// Subscribe to this stream to receive notifications about errors
+  /// that occur during BLE operations. This is useful for logging
+  /// or displaying error messages to the user.
+  Stream<BlueyException> get errorStream => _errorController.stream;
 
   /// Get current Bluetooth state.
   Future<BluetoothState> get state async {
@@ -266,6 +275,7 @@ class Bluey {
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _stateController.close();
+    await _errorController.close();
     _instance = null;
   }
 
@@ -354,47 +364,43 @@ class Bluey {
     return UUID(padded);
   }
 
-  /// Wraps platform errors in domain exceptions.
+  /// Wraps platform errors in domain exceptions and emits to error stream.
   BlueyException _wrapError(Object error) {
     if (error is BlueyException) {
+      _errorController.add(error);
       return error;
     }
-
-    // Log the error for debugging
-    // ignore: avoid_print
-    print('[Bluey] Platform error: $error');
 
     // Convert common platform errors to domain exceptions
     final message = error.toString().toLowerCase();
 
+    BlueyException exception;
+
     if (message.contains('permission') || message.contains('unauthorized')) {
-      return PermissionDeniedException(['Bluetooth']);
-    }
-
-    if (message.contains('disabled') || message.contains('bluetooth is off')) {
-      return const BluetoothDisabledException();
-    }
-
-    if (message.contains('unavailable') || message.contains('unsupported')) {
-      return const BluetoothUnavailableException();
-    }
-
-    if (message.contains('timeout') && message.contains('connect')) {
-      return ConnectionException(
+      exception = PermissionDeniedException(['Bluetooth']);
+    } else if (message.contains('disabled') ||
+        message.contains('bluetooth is off')) {
+      exception = const BluetoothDisabledException();
+    } else if (message.contains('unavailable') ||
+        message.contains('unsupported')) {
+      exception = const BluetoothUnavailableException();
+    } else if (message.contains('timeout') && message.contains('connect')) {
+      exception = ConnectionException(
         UUID.short(0x0000), // Unknown device
         ConnectionFailureReason.timeout,
       );
-    }
-
-    if (message.contains('not connected') ||
+    } else if (message.contains('not connected') ||
         message.contains('device not found')) {
-      return ConnectionException(
+      exception = ConnectionException(
         UUID.short(0x0000),
         ConnectionFailureReason.deviceNotFound,
       );
+    } else {
+      // Generic fallback - preserve the original error message
+      exception = BlueyPlatformException(error.toString(), cause: error);
     }
 
-    // Generic fallback - preserve the original error message
-    return BlueyPlatformException(error.toString(), cause: error);
+    _errorController.add(exception);
+    return exception;
   }
 }
