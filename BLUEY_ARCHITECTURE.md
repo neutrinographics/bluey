@@ -1765,6 +1765,8 @@ await for (final device in bluey.scan(services: [serviceUUID])) {
 
 ## Package Structure
 
+The initial release targets Android and iOS only. Desktop platforms (macOS, Windows, Linux) will be added in future releases.
+
 ```
 bluey/                              # Main package (facade)
 ├── lib/
@@ -1776,6 +1778,11 @@ bluey/                              # Main package (facade)
 │       ├── server.dart             # Server, LocalService, etc.
 │       ├── uuid.dart               # UUID class
 │       └── exceptions.dart         # Exception hierarchy
+├── example/                        # Cross-platform example app
+│   ├── lib/
+│   ├── android/
+│   ├── ios/
+│   └── pubspec.yaml
 ├── test/
 │   ├── bluey_test.dart
 │   ├── connection_test.dart
@@ -1812,13 +1819,13 @@ bluey_android/                      # Android implementation
 │   └── api.dart                    # Pigeon definition
 └── pubspec.yaml
 
-bluey_darwin/                       # iOS/macOS implementation
+bluey_ios/                          # iOS implementation
 ├── lib/
-│   ├── bluey_darwin.dart
+│   ├── bluey_ios.dart
 │   └── src/
-│       ├── bluey_darwin.dart
+│       ├── bluey_ios.dart
 │       └── api.g.dart
-├── darwin/Classes/
+├── ios/Classes/
 │   ├── BlueyPlugin.swift
 │   ├── Scanner.swift
 │   ├── Connection.swift
@@ -1827,21 +1834,10 @@ bluey_darwin/                       # iOS/macOS implementation
 │   └── api.dart
 └── pubspec.yaml
 
-bluey_windows/                      # Windows implementation
-├── lib/
-│   ├── bluey_windows.dart
-│   └── src/
-│       └── bluey_windows.dart
-├── windows/
-│   └── ...
-└── pubspec.yaml
-
-bluey_linux/                        # Linux implementation
-├── lib/
-│   ├── bluey_linux.dart
-│   └── src/
-│       └── bluey_linux.dart        # Uses bluez D-Bus
-└── pubspec.yaml
+# Future packages (post-1.0):
+# bluey_macos/                      # macOS implementation
+# bluey_windows/                    # Windows implementation  
+# bluey_linux/                      # Linux implementation
 ```
 
 ---
@@ -2045,7 +2041,7 @@ class _CharacteristicScreenState extends State<CharacteristicScreen> {
 - [ ] Implement notification handling
 - [ ] Integration tests on real devices
 
-### Phase 3: iOS/macOS Implementation
+### Phase 3: iOS Implementation
 
 - [ ] Implement scanning
 - [ ] Implement connection management
@@ -2056,23 +2052,24 @@ class _CharacteristicScreenState extends State<CharacteristicScreen> {
 ### Phase 4: Server (Peripheral) Role
 
 - [ ] Implement Android server
-- [ ] Implement iOS/macOS server
+- [ ] Implement iOS server
 - [ ] Implement notification flow control
 - [ ] Integration tests (device-to-device)
 
-### Phase 5: Windows & Linux
+### Phase 5: Example App & Documentation
 
-- [ ] Windows implementation
-- [ ] Linux implementation (BlueZ D-Bus)
-- [ ] Platform capability documentation
-
-### Phase 6: Example App & Documentation
-
-- [ ] Implement cross-platform example app
+- [ ] Implement example app (Android + iOS)
 - [ ] Comprehensive API documentation
 - [ ] Migration guide from bluetooth_low_energy
 - [ ] Performance optimization
 - [ ] Publish to pub.dev
+
+### Future Phases (Post-1.0)
+
+- [ ] macOS implementation
+- [ ] Windows implementation
+- [ ] Linux implementation (BlueZ D-Bus)
+- [ ] Platform capability documentation for desktop
 
 ---
 
