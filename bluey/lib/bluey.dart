@@ -6,6 +6,7 @@ library bluey;
 
 // Core value objects
 export 'src/uuid.dart';
+export 'src/device.dart';
 
 // Exception hierarchy
 export 'src/exceptions.dart';
