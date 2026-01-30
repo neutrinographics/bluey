@@ -116,7 +116,9 @@ class _ServerScreenState extends State<ServerScreen> {
       final data = Uint8List.fromList([_notificationCount & 0xFF]);
       await _server!.notify(_demoCharUuid, data: data);
       _addLog(
-          'Notify', 'Sent notification #$_notificationCount to all centrals');
+        'Notify',
+        'Sent notification #$_notificationCount to all centrals',
+      );
     } catch (e) {
       _showError('Failed to send notification: $e');
     }
@@ -243,25 +245,31 @@ class _ServerScreenState extends State<ServerScreen> {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: _isAdvertising
-                            ? _stopAdvertising
-                            : _startAdvertising,
+                        onPressed:
+                            _isAdvertising
+                                ? _stopAdvertising
+                                : _startAdvertising,
                         icon: Icon(
-                            _isAdvertising ? Icons.stop : Icons.play_arrow),
-                        label: Text(_isAdvertising
-                            ? 'Stop Advertising'
-                            : 'Start Advertising'),
-                        style: _isAdvertising
-                            ? FilledButton.styleFrom(
-                                backgroundColor: theme.colorScheme.error,
-                                foregroundColor: theme.colorScheme.onError,
-                              )
-                            : null,
+                          _isAdvertising ? Icons.stop : Icons.play_arrow,
+                        ),
+                        label: Text(
+                          _isAdvertising
+                              ? 'Stop Advertising'
+                              : 'Start Advertising',
+                        ),
+                        style:
+                            _isAdvertising
+                                ? FilledButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.error,
+                                  foregroundColor: theme.colorScheme.onError,
+                                )
+                                : null,
                       ),
                       FilledButton.tonalIcon(
-                        onPressed: _connectedCentrals.isNotEmpty
-                            ? _sendNotification
-                            : null,
+                        onPressed:
+                            _connectedCentrals.isNotEmpty
+                                ? _sendNotification
+                                : null,
                         icon: const Icon(Icons.send),
                         label: const Text('Send Notification'),
                       ),
@@ -277,10 +285,7 @@ class _ServerScreenState extends State<ServerScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Text(
-                  'Connected Centrals',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Connected Centrals', style: theme.textTheme.titleMedium),
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 12,
@@ -311,8 +316,10 @@ class _ServerScreenState extends State<ServerScreen> {
               height: 80,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 itemCount: _connectedCentrals.length,
                 itemBuilder: (context, index) {
                   final central = _connectedCentrals[index];
@@ -342,23 +349,24 @@ class _ServerScreenState extends State<ServerScreen> {
           ),
 
           Expanded(
-            child: _log.isEmpty
-                ? Center(
-                    child: Text(
-                      'No log entries',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.outline,
+            child:
+                _log.isEmpty
+                    ? Center(
+                      child: Text(
+                        'No log entries',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _log.length,
+                      itemBuilder: (context, index) {
+                        final entry = _log[index];
+                        return _LogTile(entry: entry);
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _log.length,
-                    itemBuilder: (context, index) {
-                      final entry = _log[index];
-                      return _LogTile(entry: entry);
-                    },
-                  ),
           ),
         ],
       ),
@@ -394,10 +402,7 @@ class _CentralChip extends StatelessWidget {
   final Central central;
   final VoidCallback onDisconnect;
 
-  const _CentralChip({
-    required this.central,
-    required this.onDisconnect,
-  });
+  const _CentralChip({required this.central, required this.onDisconnect});
 
   @override
   Widget build(BuildContext context) {
@@ -426,10 +431,7 @@ class _CentralChip extends StatelessWidget {
                     fontFamily: 'monospace',
                   ),
                 ),
-                Text(
-                  'MTU: ${central.mtu}',
-                  style: theme.textTheme.labelSmall,
-                ),
+                Text('MTU: ${central.mtu}', style: theme.textTheme.labelSmall),
               ],
             ),
             const SizedBox(width: 8),
@@ -493,10 +495,7 @@ class _LogTile extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              entry.message,
-              style: theme.textTheme.bodySmall,
-            ),
+            child: Text(entry.message, style: theme.textTheme.bodySmall),
           ),
         ],
       ),

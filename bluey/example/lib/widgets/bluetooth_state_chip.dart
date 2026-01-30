@@ -18,8 +18,10 @@ class BluetoothStateChip extends StatelessWidget {
 
     return Chip(
       avatar: Icon(icon, color: Colors.white, size: 16),
-      label: Text(label,
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
       backgroundColor: color,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,

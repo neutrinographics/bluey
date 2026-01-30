@@ -59,10 +59,7 @@ class PlatformConnectConfig {
   /// Requested MTU (null for default).
   final int? mtu;
 
-  const PlatformConnectConfig({
-    required this.timeoutMs,
-    required this.mtu,
-  });
+  const PlatformConnectConfig({required this.timeoutMs, required this.mtu});
 
   @override
   bool operator ==(Object other) {
@@ -176,13 +173,13 @@ class PlatformDevice {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        name,
-        rssi,
-        Object.hashAll(serviceUuids),
-        manufacturerDataCompanyId,
-        Object.hashAll(manufacturerData ?? []),
-      );
+    id,
+    name,
+    rssi,
+    Object.hashAll(serviceUuids),
+    manufacturerDataCompanyId,
+    Object.hashAll(manufacturerData ?? []),
+  );
 }
 
 /// Platform-specific implementation interface.
@@ -252,7 +249,9 @@ abstract class BlueyPlatform extends PlatformInterface {
 
   /// Read a characteristic value.
   Future<Uint8List> readCharacteristic(
-      String deviceId, String characteristicUuid);
+    String deviceId,
+    String characteristicUuid,
+  );
 
   /// Write a characteristic value.
   Future<void> writeCharacteristic(
@@ -307,7 +306,10 @@ abstract class BlueyPlatform extends PlatformInterface {
 
   /// Send a notification to a specific central.
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value);
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  );
 
   /// Stream of connected centrals.
   Stream<PlatformCentral> get centralConnections;
@@ -323,7 +325,10 @@ abstract class BlueyPlatform extends PlatformInterface {
 
   /// Respond to a read request.
   Future<void> respondToReadRequest(
-      int requestId, PlatformGattStatus status, Uint8List? value);
+    int requestId,
+    PlatformGattStatus status,
+    Uint8List? value,
+  );
 
   /// Respond to a write request.
   Future<void> respondToWriteRequest(int requestId, PlatformGattStatus status);
@@ -349,12 +354,7 @@ class PlatformNotification {
 // === Server (Peripheral) Platform Types ===
 
 /// GATT permission flags for the platform layer.
-enum PlatformGattPermission {
-  read,
-  readEncrypted,
-  write,
-  writeEncrypted,
-}
+enum PlatformGattPermission { read, readEncrypted, write, writeEncrypted }
 
 /// A local descriptor for GATT server (platform layer).
 @immutable
@@ -426,10 +426,7 @@ class PlatformCentral {
   final String id;
   final int mtu;
 
-  const PlatformCentral({
-    required this.id,
-    required this.mtu,
-  });
+  const PlatformCentral({required this.id, required this.mtu});
 }
 
 /// Read request from a central (platform layer).
@@ -487,9 +484,11 @@ class _PlaceholderPlatform extends BlueyPlatform {
   Capabilities get capabilities => const Capabilities();
 
   @override
-  Stream<BluetoothState> get stateStream => throw UnimplementedError(
-      'No platform implementation registered. '
-      'Did you forget to add bluey_android or bluey_ios to your dependencies?');
+  Stream<BluetoothState> get stateStream =>
+      throw UnimplementedError(
+        'No platform implementation registered. '
+        'Did you forget to add bluey_android or bluey_ios to your dependencies?',
+      );
 
   @override
   Future<BluetoothState> getState() =>
@@ -529,8 +528,9 @@ class _PlaceholderPlatform extends BlueyPlatform {
 
   @override
   Future<Uint8List> readCharacteristic(
-          String deviceId, String characteristicUuid) =>
-      throw UnimplementedError('No platform implementation registered.');
+    String deviceId,
+    String characteristicUuid,
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<void> writeCharacteristic(
@@ -538,16 +538,14 @@ class _PlaceholderPlatform extends BlueyPlatform {
     String characteristicUuid,
     Uint8List value,
     bool withResponse,
-  ) =>
-      throw UnimplementedError('No platform implementation registered.');
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
     bool enable,
-  ) =>
-      throw UnimplementedError('No platform implementation registered.');
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Stream<PlatformNotification> notificationStream(String deviceId) =>
@@ -562,8 +560,7 @@ class _PlaceholderPlatform extends BlueyPlatform {
     String deviceId,
     String descriptorUuid,
     Uint8List value,
-  ) =>
-      throw UnimplementedError('No platform implementation registered.');
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) =>
@@ -593,13 +590,16 @@ class _PlaceholderPlatform extends BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-          String characteristicUuid, Uint8List value) =>
-      throw UnimplementedError('No platform implementation registered.');
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<void> notifyCharacteristicTo(
-          String centralId, String characteristicUuid, Uint8List value) =>
-      throw UnimplementedError('No platform implementation registered.');
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Stream<PlatformCentral> get centralConnections =>
@@ -619,13 +619,16 @@ class _PlaceholderPlatform extends BlueyPlatform {
 
   @override
   Future<void> respondToReadRequest(
-          int requestId, PlatformGattStatus status, Uint8List? value) =>
-      throw UnimplementedError('No platform implementation registered.');
+    int requestId,
+    PlatformGattStatus status,
+    Uint8List? value,
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<void> respondToWriteRequest(
-          int requestId, PlatformGattStatus status) =>
-      throw UnimplementedError('No platform implementation registered.');
+    int requestId,
+    PlatformGattStatus status,
+  ) => throw UnimplementedError('No platform implementation registered.');
 
   @override
   Future<void> disconnectCentral(String centralId) =>

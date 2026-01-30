@@ -18,9 +18,9 @@ class BlueyAndroid extends BlueyPlatform {
   final StreamController<PlatformDevice> _scanController =
       StreamController<PlatformDevice>.broadcast();
   final Map<String, StreamController<PlatformConnectionState>>
-      _connectionStateControllers = {};
+  _connectionStateControllers = {};
   final Map<String, StreamController<PlatformNotification>>
-      _notificationControllers = {};
+  _notificationControllers = {};
 
   // Server (peripheral) streams
   final StreamController<PlatformCentral> _centralConnectionsController =
@@ -59,11 +59,13 @@ class BlueyAndroid extends BlueyPlatform {
     _flutterApi.onNotificationCallback = (event) {
       final controller = _notificationControllers[event.deviceId];
       if (controller != null) {
-        controller.add(PlatformNotification(
-          deviceId: event.deviceId,
-          characteristicUuid: event.characteristicUuid,
-          value: event.value,
-        ));
+        controller.add(
+          PlatformNotification(
+            deviceId: event.deviceId,
+            characteristicUuid: event.characteristicUuid,
+            value: event.value,
+          ),
+        );
       }
     };
 
@@ -74,10 +76,9 @@ class BlueyAndroid extends BlueyPlatform {
 
     // Server (peripheral) callbacks
     _flutterApi.onCentralConnectedCallback = (central) {
-      _centralConnectionsController.add(PlatformCentral(
-        id: central.id,
-        mtu: central.mtu,
-      ));
+      _centralConnectionsController.add(
+        PlatformCentral(id: central.id, mtu: central.mtu),
+      );
     };
 
     _flutterApi.onCentralDisconnectedCallback = (centralId) {
@@ -85,32 +86,40 @@ class BlueyAndroid extends BlueyPlatform {
     };
 
     _flutterApi.onReadRequestCallback = (request) {
-      _readRequestsController.add(PlatformReadRequest(
-        requestId: request.requestId,
-        centralId: request.centralId,
-        characteristicUuid: request.characteristicUuid,
-        offset: request.offset,
-      ));
+      _readRequestsController.add(
+        PlatformReadRequest(
+          requestId: request.requestId,
+          centralId: request.centralId,
+          characteristicUuid: request.characteristicUuid,
+          offset: request.offset,
+        ),
+      );
     };
 
     _flutterApi.onWriteRequestCallback = (request) {
-      _writeRequestsController.add(PlatformWriteRequest(
-        requestId: request.requestId,
-        centralId: request.centralId,
-        characteristicUuid: request.characteristicUuid,
-        value: request.value,
-        offset: request.offset,
-        responseNeeded: request.responseNeeded,
-      ));
+      _writeRequestsController.add(
+        PlatformWriteRequest(
+          requestId: request.requestId,
+          centralId: request.centralId,
+          characteristicUuid: request.characteristicUuid,
+          value: request.value,
+          offset: request.offset,
+          responseNeeded: request.responseNeeded,
+        ),
+      );
     };
 
-    _flutterApi.onCharacteristicSubscribedCallback =
-        (centralId, characteristicUuid) {
+    _flutterApi.onCharacteristicSubscribedCallback = (
+      centralId,
+      characteristicUuid,
+    ) {
       // Could expose this as a stream if needed
     };
 
-    _flutterApi.onCharacteristicUnsubscribedCallback =
-        (centralId, characteristicUuid) {
+    _flutterApi.onCharacteristicUnsubscribedCallback = (
+      centralId,
+      characteristicUuid,
+    ) {
       // Could expose this as a stream if needed
     };
   }
@@ -157,10 +166,7 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
-    final dto = ConnectConfigDto(
-      timeoutMs: config.timeoutMs,
-      mtu: config.mtu,
-    );
+    final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
 
     // Create connection state controller for this device
     _connectionStateControllers[deviceId] =
@@ -303,13 +309,18 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-      String characteristicUuid, Uint8List value) async {
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
     await _hostApi.notifyCharacteristic(characteristicUuid, value);
   }
 
   @override
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value) async {
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
     await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
   }
 
@@ -331,16 +342,26 @@ class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> respondToReadRequest(
-      int requestId, PlatformGattStatus status, Uint8List? value) async {
+    int requestId,
+    PlatformGattStatus status,
+    Uint8List? value,
+  ) async {
     await _hostApi.respondToReadRequest(
-        requestId, _mapGattStatusToDto(status), value);
+      requestId,
+      _mapGattStatusToDto(status),
+      value,
+    );
   }
 
   @override
   Future<void> respondToWriteRequest(
-      int requestId, PlatformGattStatus status) async {
+    int requestId,
+    PlatformGattStatus status,
+  ) async {
     await _hostApi.respondToWriteRequest(
-        requestId, _mapGattStatusToDto(status));
+      requestId,
+      _mapGattStatusToDto(status),
+    );
   }
 
   @override
@@ -430,7 +451,8 @@ class BlueyAndroid extends BlueyPlatform {
   }
 
   LocalCharacteristicDto _mapLocalCharacteristicToDto(
-      PlatformLocalCharacteristic characteristic) {
+    PlatformLocalCharacteristic characteristic,
+  ) {
     return LocalCharacteristicDto(
       uuid: characteristic.uuid,
       properties: CharacteristicPropertiesDto(
@@ -449,7 +471,8 @@ class BlueyAndroid extends BlueyPlatform {
   }
 
   LocalDescriptorDto _mapLocalDescriptorToDto(
-      PlatformLocalDescriptor descriptor) {
+    PlatformLocalDescriptor descriptor,
+  ) {
     return LocalDescriptorDto(
       uuid: descriptor.uuid,
       permissions: descriptor.permissions.map(_mapGattPermissionToDto).toList(),
@@ -568,7 +591,9 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
 
   @override
   void onCharacteristicUnsubscribed(
-      String centralId, String characteristicUuid) {
+    String centralId,
+    String characteristicUuid,
+  ) {
     onCharacteristicUnsubscribedCallback?.call(centralId, characteristicUuid);
   }
 }

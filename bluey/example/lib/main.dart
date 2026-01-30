@@ -62,11 +62,7 @@ class _BlueyExampleAppState extends State<BlueyExampleApp> {
 class BlueyProvider extends InheritedWidget {
   final Bluey bluey;
 
-  const BlueyProvider({
-    super.key,
-    required this.bluey,
-    required super.child,
-  });
+  const BlueyProvider({super.key, required this.bluey, required super.child});
 
   static Bluey of(BuildContext context) {
     final provider =
@@ -95,10 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          ScannerScreen(),
-          ServerScreen(),
-        ],
+        children: const [ScannerScreen(), ServerScreen()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

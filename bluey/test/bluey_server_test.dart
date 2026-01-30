@@ -35,7 +35,7 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   final _stateController =
       StreamController<platform.BluetoothState>.broadcast();
   final Map<String, StreamController<platform.PlatformConnectionState>>
-      _connectionStateControllers = {};
+  _connectionStateControllers = {};
 
   @override
   platform.Capabilities get capabilities => platform.Capabilities.android;
@@ -61,7 +61,9 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<String> connect(
-      String deviceId, platform.PlatformConnectConfig config) async {
+    String deviceId,
+    platform.PlatformConnectConfig config,
+  ) async {
     _connectionStateControllers[deviceId] =
         StreamController<platform.PlatformConnectionState>.broadcast();
     return deviceId;
@@ -75,7 +77,8 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Stream<platform.PlatformConnectionState> connectionStateStream(
-      String deviceId) {
+    String deviceId,
+  ) {
     return _connectionStateControllers[deviceId]?.stream ??
         Stream.error(StateError('Not connected'));
   }
@@ -83,21 +86,29 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   // GATT Client operations - stub implementations
   @override
   Future<List<platform.PlatformService>> discoverServices(
-          String deviceId) async =>
-      [];
+    String deviceId,
+  ) async => [];
 
   @override
   Future<Uint8List> readCharacteristic(
-          String deviceId, String characteristicUuid) async =>
-      Uint8List(0);
+    String deviceId,
+    String characteristicUuid,
+  ) async => Uint8List(0);
 
   @override
-  Future<void> writeCharacteristic(String deviceId, String characteristicUuid,
-      Uint8List value, bool withResponse) async {}
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) async {}
 
   @override
   Future<void> setNotification(
-      String deviceId, String characteristicUuid, bool enable) async {}
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) async {}
 
   @override
   Stream<platform.PlatformNotification> notificationStream(String deviceId) =>
@@ -105,12 +116,16 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<Uint8List> readDescriptor(
-          String deviceId, String descriptorUuid) async =>
-      Uint8List(0);
+    String deviceId,
+    String descriptorUuid,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
-      String deviceId, String descriptorUuid, Uint8List value) async {}
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async => mtu;
@@ -143,18 +158,27 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-      String characteristicUuid, Uint8List value) async {
-    notifyCalls
-        .add(NotifyCall(characteristicUuid: characteristicUuid, value: value));
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    notifyCalls.add(
+      NotifyCall(characteristicUuid: characteristicUuid, value: value),
+    );
   }
 
   @override
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value) async {
-    notifyToCalls.add(NotifyToCall(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    notifyToCalls.add(
+      NotifyToCall(
         centralId: centralId,
         characteristicUuid: characteristicUuid,
-        value: value));
+        value: value,
+      ),
+    );
   }
 
   @override
@@ -174,17 +198,24 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
       _writeRequestsController.stream;
 
   @override
-  Future<void> respondToReadRequest(int requestId,
-      platform.PlatformGattStatus status, Uint8List? value) async {
+  Future<void> respondToReadRequest(
+    int requestId,
+    platform.PlatformGattStatus status,
+    Uint8List? value,
+  ) async {
     respondToReadCalls.add(
-        RespondToReadCall(requestId: requestId, status: status, value: value));
+      RespondToReadCall(requestId: requestId, status: status, value: value),
+    );
   }
 
   @override
   Future<void> respondToWriteRequest(
-      int requestId, platform.PlatformGattStatus status) async {
-    respondToWriteCalls
-        .add(RespondToWriteCall(requestId: requestId, status: status));
+    int requestId,
+    platform.PlatformGattStatus status,
+  ) async {
+    respondToWriteCalls.add(
+      RespondToWriteCall(requestId: requestId, status: status),
+    );
   }
 
   @override
@@ -283,24 +314,26 @@ void main() {
         expect(server, isA<Server>());
       });
 
-      test('server() returns null when platform does not support advertising',
-          () async {
-        // Dispose the existing bluey instance to clear singleton
-        await bluey.dispose();
+      test(
+        'server() returns null when platform does not support advertising',
+        () async {
+          // Dispose the existing bluey instance to clear singleton
+          await bluey.dispose();
 
-        // Change capabilities to not support advertising
-        final nonAdvertisingPlatform = _NonAdvertisingPlatform();
-        platform.BlueyPlatform.instance = nonAdvertisingPlatform;
-        final bluey2 = Bluey();
+          // Change capabilities to not support advertising
+          final nonAdvertisingPlatform = _NonAdvertisingPlatform();
+          platform.BlueyPlatform.instance = nonAdvertisingPlatform;
+          final bluey2 = Bluey();
 
-        final server = bluey2.server();
-        expect(server, isNull);
+          final server = bluey2.server();
+          expect(server, isNull);
 
-        // Clean up and restore for other tests
-        await bluey2.dispose();
-        platform.BlueyPlatform.instance = mockPlatform;
-        bluey = Bluey();
-      });
+          // Clean up and restore for other tests
+          await bluey2.dispose();
+          platform.BlueyPlatform.instance = mockPlatform;
+          bluey = Bluey();
+        },
+      );
     });
 
     group('Service Management', () {
@@ -320,8 +353,10 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(mockPlatform.addedServices, hasLength(1));
-        expect(mockPlatform.addedServices.first.uuid,
-            equals('0000180f-0000-1000-8000-00805f9b34fb'));
+        expect(
+          mockPlatform.addedServices.first.uuid,
+          equals('0000180f-0000-1000-8000-00805f9b34fb'),
+        );
       });
 
       test('removeService removes service from platform', () async {
@@ -333,8 +368,10 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(mockPlatform.removedServiceUuids, hasLength(1));
-        expect(mockPlatform.removedServiceUuids.first,
-            equals('0000180f-0000-1000-8000-00805f9b34fb'));
+        expect(
+          mockPlatform.removedServiceUuids.first,
+          equals('0000180f-0000-1000-8000-00805f9b34fb'),
+        );
       });
     });
 
@@ -357,24 +394,34 @@ void main() {
         );
 
         expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(2));
-        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids,
-            contains('0000180f-0000-1000-8000-00805f9b34fb'));
-        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids,
-            contains('0000180d-0000-1000-8000-00805f9b34fb'));
+        expect(
+          mockPlatform.lastAdvertiseConfig?.serviceUuids,
+          contains('0000180f-0000-1000-8000-00805f9b34fb'),
+        );
+        expect(
+          mockPlatform.lastAdvertiseConfig?.serviceUuids,
+          contains('0000180d-0000-1000-8000-00805f9b34fb'),
+        );
       });
 
       test('startAdvertising includes manufacturer data', () async {
         final server = bluey.server()!;
 
         await server.startAdvertising(
-          manufacturerData:
-              ManufacturerData(0x004C, Uint8List.fromList([1, 2, 3])),
+          manufacturerData: ManufacturerData(
+            0x004C,
+            Uint8List.fromList([1, 2, 3]),
+          ),
         );
 
-        expect(mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
-            equals(0x004C));
-        expect(mockPlatform.lastAdvertiseConfig?.manufacturerData,
-            equals(Uint8List.fromList([1, 2, 3])));
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+          equals(0x004C),
+        );
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerData,
+          equals(Uint8List.fromList([1, 2, 3])),
+        );
       });
 
       test('stopAdvertising stops advertising', () async {
@@ -455,8 +502,10 @@ void main() {
         await server.notify(charUuid, data: data);
 
         expect(mockPlatform.notifyCalls, hasLength(1));
-        expect(mockPlatform.notifyCalls.first.characteristicUuid,
-            equals('00002a19-0000-1000-8000-00805f9b34fb'));
+        expect(
+          mockPlatform.notifyCalls.first.characteristicUuid,
+          equals('00002a19-0000-1000-8000-00805f9b34fb'),
+        );
         expect(mockPlatform.notifyCalls.first.value, equals(data));
       });
 
@@ -517,8 +566,8 @@ void main() {
 class _NonAdvertisingPlatform extends MockBlueyPlatform {
   @override
   platform.Capabilities get capabilities => const platform.Capabilities(
-        canScan: true,
-        canConnect: true,
-        canAdvertise: false,
-      );
+    canScan: true,
+    canConnect: true,
+    canAdvertise: false,
+  );
 }

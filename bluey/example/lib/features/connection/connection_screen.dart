@@ -109,36 +109,36 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnected'),
-        content: const Text('The device has been disconnected.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Go back to scanner
-            },
-            child: const Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Disconnected'),
+            content: const Text('The device has been disconnected.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to scanner
+                },
+                child: const Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  _connect(); // Reconnect
+                },
+                child: const Text('Reconnect'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              _connect(); // Reconnect
-            },
-            child: const Text('Reconnect'),
-          ),
-        ],
-      ),
     );
   }
 
   void _openService(RemoteService service) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ServiceScreen(
-          connection: _connection!,
-          service: service,
-        ),
+        builder:
+            (context) =>
+                ServiceScreen(connection: _connection!, service: service),
       ),
     );
   }
@@ -156,15 +156,16 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         ],
       ),
       body: _buildBody(theme),
-      floatingActionButton: _connectionState.isConnected
-          ? FloatingActionButton.extended(
-              onPressed: _disconnect,
-              icon: const Icon(Icons.link_off),
-              label: const Text('Disconnect'),
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
-            )
-          : null,
+      floatingActionButton:
+          _connectionState.isConnected
+              ? FloatingActionButton.extended(
+                onPressed: _disconnect,
+                icon: const Icon(Icons.link_off),
+                label: const Text('Disconnect'),
+                backgroundColor: theme.colorScheme.error,
+                foregroundColor: theme.colorScheme.onError,
+              )
+              : null,
     );
   }
 
@@ -195,10 +196,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 color: theme.colorScheme.error,
               ),
               const SizedBox(height: 16),
-              Text(
-                'Connection Failed',
-                style: theme.textTheme.titleLarge,
-              ),
+              Text('Connection Failed', style: theme.textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
                 _error!,
@@ -220,28 +218,20 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     }
 
     if (!_connectionState.isConnected) {
-      return const Center(
-        child: Text('Not connected'),
-      );
+      return const Center(child: Text('Not connected'));
     }
 
     return Column(
       children: [
         // Device info card
-        _DeviceInfoCard(
-          device: widget.device,
-          connection: _connection!,
-        ),
+        _DeviceInfoCard(device: widget.device, connection: _connection!),
 
         // Services header
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Text(
-                'Services',
-                style: theme.textTheme.titleMedium,
-              ),
+              Text('Services', style: theme.textTheme.titleMedium),
               const SizedBox(width: 8),
               if (_isDiscovering)
                 const SizedBox(
@@ -269,28 +259,29 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
         // Services list
         Expanded(
-          child: _services == null || _services!.isEmpty
-              ? Center(
-                  child: Text(
-                    _isDiscovering
-                        ? 'Discovering services...'
-                        : 'No services found',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.outline,
+          child:
+              _services == null || _services!.isEmpty
+                  ? Center(
+                    child: Text(
+                      _isDiscovering
+                          ? 'Discovering services...'
+                          : 'No services found',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
+                  )
+                  : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: _services!.length,
+                    itemBuilder: (context, index) {
+                      final service = _services![index];
+                      return _ServiceCard(
+                        service: service,
+                        onTap: () => _openService(service),
+                      );
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: _services!.length,
-                  itemBuilder: (context, index) {
-                    final service = _services![index];
-                    return _ServiceCard(
-                      service: service,
-                      onTap: () => _openService(service),
-                    );
-                  },
-                ),
         ),
       ],
     );
@@ -312,8 +303,10 @@ class _ConnectionStateChip extends StatelessWidget {
     };
 
     return Chip(
-      label: Text(label,
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
       backgroundColor: color,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
@@ -325,10 +318,7 @@ class _DeviceInfoCard extends StatelessWidget {
   final Device device;
   final Connection connection;
 
-  const _DeviceInfoCard({
-    required this.device,
-    required this.connection,
-  });
+  const _DeviceInfoCard({required this.device, required this.connection});
 
   @override
   Widget build(BuildContext context) {
@@ -416,10 +406,12 @@ class _InfoItem extends StatelessWidget {
         Icon(icon, color: theme.colorScheme.primary),
         const SizedBox(height: 4),
         Text(label, style: theme.textTheme.labelSmall),
-        Text(value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            )),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -429,10 +421,7 @@ class _ServiceCard extends StatelessWidget {
   final RemoteService service;
   final VoidCallback onTap;
 
-  const _ServiceCard({
-    required this.service,
-    required this.onTap,
-  });
+  const _ServiceCard({required this.service, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -443,14 +432,16 @@ class _ServiceCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: service.isPrimary
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.secondaryContainer,
+          backgroundColor:
+              service.isPrimary
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.secondaryContainer,
           child: Icon(
             Icons.widgets,
-            color: service.isPrimary
-                ? theme.colorScheme.onPrimaryContainer
-                : theme.colorScheme.onSecondaryContainer,
+            color:
+                service.isPrimary
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSecondaryContainer,
           ),
         ),
         title: Text(
@@ -475,10 +466,7 @@ class _ServiceCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: Icon(
-          Icons.chevron_right,
-          color: theme.colorScheme.outline,
-        ),
+        trailing: Icon(Icons.chevron_right, color: theme.colorScheme.outline),
         onTap: onTap,
         isThreeLine: true,
       ),

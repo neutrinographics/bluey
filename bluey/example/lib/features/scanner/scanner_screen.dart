@@ -119,9 +119,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (!mounted) return;
 
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ConnectionScreen(device: device),
-      ),
+      MaterialPageRoute(builder: (context) => ConnectionScreen(device: device)),
     );
   }
 
@@ -152,19 +150,20 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
           // Device list
           Expanded(
-            child: _devices.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: _devices.length,
-                    itemBuilder: (context, index) {
-                      final device = _devices[index];
-                      return _DeviceCard(
-                        device: device,
-                        onTap: () => _connectToDevice(device),
-                      );
-                    },
-                  ),
+            child:
+                _devices.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemCount: _devices.length,
+                      itemBuilder: (context, index) {
+                        final device = _devices[index];
+                        return _DeviceCard(
+                          device: device,
+                          onTap: () => _connectToDevice(device),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -172,12 +171,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
         onPressed: _isScanning ? _stopScan : _startScan,
         icon: Icon(_isScanning ? Icons.stop : Icons.search),
         label: Text(_isScanning ? 'Stop' : 'Scan'),
-        backgroundColor: _isScanning
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.primary,
-        foregroundColor: _isScanning
-            ? Theme.of(context).colorScheme.onError
-            : Theme.of(context).colorScheme.onPrimary,
+        backgroundColor:
+            _isScanning
+                ? Theme.of(context).colorScheme.error
+                : Theme.of(context).colorScheme.primary,
+        foregroundColor:
+            _isScanning
+                ? Theme.of(context).colorScheme.onError
+                : Theme.of(context).colorScheme.onPrimary,
       ),
     );
   }
@@ -198,8 +199,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 ? 'Scanning for devices...'
                 : 'Tap Scan to find nearby devices',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
         ],
       ),
@@ -211,10 +212,7 @@ class _DeviceCard extends StatelessWidget {
   final Device device;
   final VoidCallback onTap;
 
-  const _DeviceCard({
-    required this.device,
-    required this.onTap,
-  });
+  const _DeviceCard({required this.device, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -272,10 +270,7 @@ class _DeviceCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: Icon(
-          Icons.chevron_right,
-          color: theme.colorScheme.outline,
-        ),
+        trailing: Icon(Icons.chevron_right, color: theme.colorScheme.outline),
         onTap: onTap,
         isThreeLine: true,
       ),

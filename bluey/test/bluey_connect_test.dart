@@ -88,7 +88,7 @@ void main() {
 class MockBlueyPlatform extends platform.BlueyPlatform {
   platform.BluetoothState mockState = platform.BluetoothState.on;
   final Map<String, StreamController<platform.PlatformConnectionState>>
-      _connectionControllers = {};
+  _connectionControllers = {};
   final _stateController =
       StreamController<platform.BluetoothState>.broadcast();
 
@@ -116,47 +116,56 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<String> connect(
-      String deviceId, platform.PlatformConnectConfig config) async {
+    String deviceId,
+    platform.PlatformConnectConfig config,
+  ) async {
     _connectionControllers[deviceId] =
         StreamController<platform.PlatformConnectionState>.broadcast();
     // Emit connecting state immediately
-    _connectionControllers[deviceId]
-        ?.add(platform.PlatformConnectionState.connecting);
+    _connectionControllers[deviceId]?.add(
+      platform.PlatformConnectionState.connecting,
+    );
     return deviceId;
   }
 
   @override
   Future<void> disconnect(String deviceId) async {
-    _connectionControllers[deviceId]
-        ?.add(platform.PlatformConnectionState.disconnecting);
-    _connectionControllers[deviceId]
-        ?.add(platform.PlatformConnectionState.disconnected);
+    _connectionControllers[deviceId]?.add(
+      platform.PlatformConnectionState.disconnecting,
+    );
+    _connectionControllers[deviceId]?.add(
+      platform.PlatformConnectionState.disconnected,
+    );
     await _connectionControllers[deviceId]?.close();
     _connectionControllers.remove(deviceId);
   }
 
   @override
   Stream<platform.PlatformConnectionState> connectionStateStream(
-      String deviceId) {
+    String deviceId,
+  ) {
     return _connectionControllers[deviceId]?.stream ??
         Stream.error(StateError('Not connected'));
   }
 
   void emitConnectionState(
-      String deviceId, platform.PlatformConnectionState state) {
+    String deviceId,
+    platform.PlatformConnectionState state,
+  ) {
     _connectionControllers[deviceId]?.add(state);
   }
 
   // GATT operations - stub implementations for tests that don't use them
   @override
   Future<List<platform.PlatformService>> discoverServices(
-          String deviceId) async =>
-      [];
+    String deviceId,
+  ) async => [];
 
   @override
   Future<Uint8List> readCharacteristic(
-          String deviceId, String characteristicUuid) async =>
-      Uint8List(0);
+    String deviceId,
+    String characteristicUuid,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeCharacteristic(
@@ -181,8 +190,7 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<Uint8List> readDescriptor(
     String deviceId,
     String descriptorUuid,
-  ) async =>
-      Uint8List(0);
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
@@ -206,18 +214,24 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> startAdvertising(
-      platform.PlatformAdvertiseConfig config) async {}
+    platform.PlatformAdvertiseConfig config,
+  ) async {}
 
   @override
   Future<void> stopAdvertising() async {}
 
   @override
   Future<void> notifyCharacteristic(
-      String characteristicUuid, Uint8List value) async {}
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value) async {}
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Stream<platform.PlatformCentral> get centralConnections => Stream.empty();
@@ -232,12 +246,17 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.PlatformWriteRequest> get writeRequests => Stream.empty();
 
   @override
-  Future<void> respondToReadRequest(int requestId,
-      platform.PlatformGattStatus status, Uint8List? value) async {}
+  Future<void> respondToReadRequest(
+    int requestId,
+    platform.PlatformGattStatus status,
+    Uint8List? value,
+  ) async {}
 
   @override
   Future<void> respondToWriteRequest(
-      int requestId, platform.PlatformGattStatus status) async {}
+    int requestId,
+    platform.PlatformGattStatus status,
+  ) async {}
 
   @override
   Future<void> disconnectCentral(String centralId) async {}

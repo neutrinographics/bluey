@@ -18,7 +18,7 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   final StreamController<platform.PlatformDevice> _scanController =
       StreamController<platform.PlatformDevice>.broadcast();
   final Map<String, StreamController<platform.PlatformConnectionState>>
-      _connectionControllers = {};
+  _connectionControllers = {};
 
   @override
   platform.Capabilities get capabilities => platform.Capabilities.android;
@@ -56,7 +56,9 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<String> connect(
-      String deviceId, platform.PlatformConnectConfig config) async {
+    String deviceId,
+    platform.PlatformConnectConfig config,
+  ) async {
     _connectionControllers[deviceId] =
         StreamController<platform.PlatformConnectionState>.broadcast();
     return deviceId;
@@ -70,7 +72,8 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Stream<platform.PlatformConnectionState> connectionStateStream(
-      String deviceId) {
+    String deviceId,
+  ) {
     return _connectionControllers[deviceId]?.stream ??
         Stream.error(StateError('Not connected'));
   }
@@ -81,20 +84,23 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   }
 
   void emitConnectionState(
-      String deviceId, platform.PlatformConnectionState state) {
+    String deviceId,
+    platform.PlatformConnectionState state,
+  ) {
     _connectionControllers[deviceId]?.add(state);
   }
 
   // GATT operations - stub implementations for tests that don't use them
   @override
   Future<List<platform.PlatformService>> discoverServices(
-          String deviceId) async =>
-      [];
+    String deviceId,
+  ) async => [];
 
   @override
   Future<Uint8List> readCharacteristic(
-          String deviceId, String characteristicUuid) async =>
-      Uint8List(0);
+    String deviceId,
+    String characteristicUuid,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeCharacteristic(
@@ -119,8 +125,7 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<Uint8List> readDescriptor(
     String deviceId,
     String descriptorUuid,
-  ) async =>
-      Uint8List(0);
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
@@ -144,18 +149,24 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> startAdvertising(
-      platform.PlatformAdvertiseConfig config) async {}
+    platform.PlatformAdvertiseConfig config,
+  ) async {}
 
   @override
   Future<void> stopAdvertising() async {}
 
   @override
   Future<void> notifyCharacteristic(
-      String characteristicUuid, Uint8List value) async {}
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value) async {}
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Stream<platform.PlatformCentral> get centralConnections => Stream.empty();
@@ -170,12 +181,17 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.PlatformWriteRequest> get writeRequests => Stream.empty();
 
   @override
-  Future<void> respondToReadRequest(int requestId,
-      platform.PlatformGattStatus status, Uint8List? value) async {}
+  Future<void> respondToReadRequest(
+    int requestId,
+    platform.PlatformGattStatus status,
+    Uint8List? value,
+  ) async {}
 
   @override
   Future<void> respondToWriteRequest(
-      int requestId, platform.PlatformGattStatus status) async {}
+    int requestId,
+    platform.PlatformGattStatus status,
+  ) async {}
 
   @override
   Future<void> disconnectCentral(String centralId) async {}
@@ -275,15 +291,17 @@ void main() {
         );
       });
 
-      test('throws BluetoothDisabledException when off and cannot enable',
-          () async {
-        mockPlatform.mockState = platform.BluetoothState.off;
-        mockPlatform.requestEnableResult = false;
-        await expectLater(
-          bluey.ensureReady(),
-          throwsA(isA<BluetoothDisabledException>()),
-        );
-      });
+      test(
+        'throws BluetoothDisabledException when off and cannot enable',
+        () async {
+          mockPlatform.mockState = platform.BluetoothState.off;
+          mockPlatform.requestEnableResult = false;
+          await expectLater(
+            bluey.ensureReady(),
+            throwsA(isA<BluetoothDisabledException>()),
+          );
+        },
+      );
 
       test('succeeds when off but can enable', () async {
         mockPlatform.mockState = platform.BluetoothState.off;
@@ -351,7 +369,7 @@ void main() {
             rssi: -50,
             serviceUuids: [
               '0000180d-0000-1000-8000-00805f9b34fb',
-              '0000180f-0000-1000-8000-00805f9b34fb'
+              '0000180f-0000-1000-8000-00805f9b34fb',
             ],
             manufacturerDataCompanyId: null,
             manufacturerData: null,

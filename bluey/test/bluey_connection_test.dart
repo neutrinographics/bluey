@@ -64,7 +64,9 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<String> connect(
-      String deviceId, platform.PlatformConnectConfig config) async {
+    String deviceId,
+    platform.PlatformConnectConfig config,
+  ) async {
     _connectionStateControllers[deviceId] =
         StreamController<platform.PlatformConnectionState>.broadcast();
     _notificationControllers[deviceId] =
@@ -82,20 +84,24 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Stream<platform.PlatformConnectionState> connectionStateStream(
-      String deviceId) {
+    String deviceId,
+  ) {
     return _connectionStateControllers[deviceId]?.stream ??
         Stream.error(StateError('Not connected'));
   }
 
   @override
   Future<List<platform.PlatformService>> discoverServices(
-      String deviceId) async {
+    String deviceId,
+  ) async {
     return mockServices;
   }
 
   @override
   Future<Uint8List> readCharacteristic(
-      String deviceId, String characteristicUuid) async {
+    String deviceId,
+    String characteristicUuid,
+  ) async {
     final value = characteristicValues[characteristicUuid.toLowerCase()];
     if (value == null) {
       throw StateError('Characteristic not found: $characteristicUuid');
@@ -110,12 +116,14 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
-    writeCharacteristicCalls.add(WriteCharacteristicCall(
-      deviceId: deviceId,
-      characteristicUuid: characteristicUuid,
-      value: value,
-      withResponse: withResponse,
-    ));
+    writeCharacteristicCalls.add(
+      WriteCharacteristicCall(
+        deviceId: deviceId,
+        characteristicUuid: characteristicUuid,
+        value: value,
+        withResponse: withResponse,
+      ),
+    );
   }
 
   @override
@@ -124,11 +132,13 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
     String characteristicUuid,
     bool enable,
   ) async {
-    setNotificationCalls.add(SetNotificationCall(
-      deviceId: deviceId,
-      characteristicUuid: characteristicUuid,
-      enable: enable,
-    ));
+    setNotificationCalls.add(
+      SetNotificationCall(
+        deviceId: deviceId,
+        characteristicUuid: characteristicUuid,
+        enable: enable,
+      ),
+    );
   }
 
   @override
@@ -139,7 +149,9 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<Uint8List> readDescriptor(
-      String deviceId, String descriptorUuid) async {
+    String deviceId,
+    String descriptorUuid,
+  ) async {
     final value = descriptorValues[descriptorUuid.toLowerCase()];
     if (value == null) {
       throw StateError('Descriptor not found: $descriptorUuid');
@@ -153,11 +165,13 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
     String descriptorUuid,
     Uint8List value,
   ) async {
-    writeDescriptorCalls.add(WriteDescriptorCall(
-      deviceId: deviceId,
-      descriptorUuid: descriptorUuid,
-      value: value,
-    ));
+    writeDescriptorCalls.add(
+      WriteDescriptorCall(
+        deviceId: deviceId,
+        descriptorUuid: descriptorUuid,
+        value: value,
+      ),
+    );
   }
 
   @override
@@ -179,18 +193,24 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> startAdvertising(
-      platform.PlatformAdvertiseConfig config) async {}
+    platform.PlatformAdvertiseConfig config,
+  ) async {}
 
   @override
   Future<void> stopAdvertising() async {}
 
   @override
   Future<void> notifyCharacteristic(
-      String characteristicUuid, Uint8List value) async {}
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
-      String centralId, String characteristicUuid, Uint8List value) async {}
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
 
   @override
   Stream<platform.PlatformCentral> get centralConnections => Stream.empty();
@@ -205,24 +225,34 @@ class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.PlatformWriteRequest> get writeRequests => Stream.empty();
 
   @override
-  Future<void> respondToReadRequest(int requestId,
-      platform.PlatformGattStatus status, Uint8List? value) async {}
+  Future<void> respondToReadRequest(
+    int requestId,
+    platform.PlatformGattStatus status,
+    Uint8List? value,
+  ) async {}
 
   @override
   Future<void> respondToWriteRequest(
-      int requestId, platform.PlatformGattStatus status) async {}
+    int requestId,
+    platform.PlatformGattStatus status,
+  ) async {}
 
   @override
   Future<void> disconnectCentral(String centralId) async {}
 
   // Helper to emit a notification
   void emitNotification(
-      String deviceId, String characteristicUuid, Uint8List value) {
-    _notificationControllers[deviceId]?.add(platform.PlatformNotification(
-      deviceId: deviceId,
-      characteristicUuid: characteristicUuid,
-      value: value,
-    ));
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+  ) {
+    _notificationControllers[deviceId]?.add(
+      platform.PlatformNotification(
+        deviceId: deviceId,
+        characteristicUuid: characteristicUuid,
+        value: value,
+      ),
+    );
   }
 }
 
@@ -272,8 +302,10 @@ void main() {
 
     setUp(() async {
       mockPlatform = MockBlueyPlatform();
-      await mockPlatform.connect(deviceId.toString(),
-          const platform.PlatformConnectConfig(timeoutMs: null, mtu: null));
+      await mockPlatform.connect(
+        deviceId.toString(),
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
       connection = BlueyConnection(
         platformInstance: mockPlatform,
         connectionId: deviceId.toString(),
@@ -326,16 +358,18 @@ void main() {
         expect(svc.uuid, equals(UUID.short(0x180D)));
       });
 
-      test('service() throws ServiceNotFoundException when not found',
-          () async {
-        mockPlatform.mockServices = [];
-        await connection.services;
+      test(
+        'service() throws ServiceNotFoundException when not found',
+        () async {
+          mockPlatform.mockServices = [];
+          await connection.services;
 
-        expect(
-          () => connection.service(UUID.short(0x180D)),
-          throwsA(isA<ServiceNotFoundException>()),
-        );
-      });
+          expect(
+            () => connection.service(UUID.short(0x180D)),
+            throwsA(isA<ServiceNotFoundException>()),
+          );
+        },
+      );
 
       test('services caches results after first discovery', () async {
         var discoverCount = 0;
@@ -385,8 +419,10 @@ void main() {
             includedServices: [],
           ),
         ];
-        mockPlatform.characteristicValues[charUuid] =
-            Uint8List.fromList([0x00, 60]); // Heart rate 60 bpm
+        mockPlatform.characteristicValues[charUuid] = Uint8List.fromList([
+          0x00,
+          60,
+        ]); // Heart rate 60 bpm
 
         await connection.services;
         final svc = connection.service(UUID.short(0x180D));
@@ -397,39 +433,41 @@ void main() {
         expect(value, equals(Uint8List.fromList([0x00, 60])));
       });
 
-      test('read() throws OperationNotSupportedException when not readable',
-          () async {
-        final charUuid = '00002a37-0000-1000-8000-00805f9b34fb';
-        mockPlatform.mockServices = [
-          platform.PlatformService(
-            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-            isPrimary: true,
-            characteristics: [
-              platform.PlatformCharacteristic(
-                uuid: charUuid,
-                properties: const platform.PlatformCharacteristicProperties(
-                  canRead: false, // Not readable
-                  canWrite: true,
-                  canWriteWithoutResponse: false,
-                  canNotify: false,
-                  canIndicate: false,
+      test(
+        'read() throws OperationNotSupportedException when not readable',
+        () async {
+          final charUuid = '00002a37-0000-1000-8000-00805f9b34fb';
+          mockPlatform.mockServices = [
+            platform.PlatformService(
+              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+              isPrimary: true,
+              characteristics: [
+                platform.PlatformCharacteristic(
+                  uuid: charUuid,
+                  properties: const platform.PlatformCharacteristicProperties(
+                    canRead: false, // Not readable
+                    canWrite: true,
+                    canWriteWithoutResponse: false,
+                    canNotify: false,
+                    canIndicate: false,
+                  ),
+                  descriptors: [],
                 ),
-                descriptors: [],
-              ),
-            ],
-            includedServices: [],
-          ),
-        ];
+              ],
+              includedServices: [],
+            ),
+          ];
 
-        await connection.services;
-        final svc = connection.service(UUID.short(0x180D));
-        final char = svc.characteristic(UUID(charUuid));
+          await connection.services;
+          final svc = connection.service(UUID.short(0x180D));
+          final char = svc.characteristic(UUID(charUuid));
 
-        expect(
-          () => char.read(),
-          throwsA(isA<OperationNotSupportedException>()),
-        );
-      });
+          expect(
+            () => char.read(),
+            throwsA(isA<OperationNotSupportedException>()),
+          );
+        },
+      );
     });
 
     group('Characteristic Write', () {
@@ -463,8 +501,10 @@ void main() {
         await char.write(Uint8List.fromList([0x01]));
 
         expect(mockPlatform.writeCharacteristicCalls, hasLength(1));
-        expect(mockPlatform.writeCharacteristicCalls[0].value,
-            equals(Uint8List.fromList([0x01])));
+        expect(
+          mockPlatform.writeCharacteristicCalls[0].value,
+          equals(Uint8List.fromList([0x01])),
+        );
         expect(mockPlatform.writeCharacteristicCalls[0].withResponse, isTrue);
       });
 
@@ -501,39 +541,41 @@ void main() {
         expect(mockPlatform.writeCharacteristicCalls[0].withResponse, isFalse);
       });
 
-      test('write() throws OperationNotSupportedException when not writable',
-          () async {
-        final charUuid = '00002a37-0000-1000-8000-00805f9b34fb';
-        mockPlatform.mockServices = [
-          platform.PlatformService(
-            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-            isPrimary: true,
-            characteristics: [
-              platform.PlatformCharacteristic(
-                uuid: charUuid,
-                properties: const platform.PlatformCharacteristicProperties(
-                  canRead: true,
-                  canWrite: false, // Not writable
-                  canWriteWithoutResponse: false,
-                  canNotify: false,
-                  canIndicate: false,
+      test(
+        'write() throws OperationNotSupportedException when not writable',
+        () async {
+          final charUuid = '00002a37-0000-1000-8000-00805f9b34fb';
+          mockPlatform.mockServices = [
+            platform.PlatformService(
+              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+              isPrimary: true,
+              characteristics: [
+                platform.PlatformCharacteristic(
+                  uuid: charUuid,
+                  properties: const platform.PlatformCharacteristicProperties(
+                    canRead: true,
+                    canWrite: false, // Not writable
+                    canWriteWithoutResponse: false,
+                    canNotify: false,
+                    canIndicate: false,
+                  ),
+                  descriptors: [],
                 ),
-                descriptors: [],
-              ),
-            ],
-            includedServices: [],
-          ),
-        ];
+              ],
+              includedServices: [],
+            ),
+          ];
 
-        await connection.services;
-        final svc = connection.service(UUID.short(0x180D));
-        final char = svc.characteristic(UUID(charUuid));
+          await connection.services;
+          final svc = connection.service(UUID.short(0x180D));
+          final char = svc.characteristic(UUID(charUuid));
 
-        expect(
-          () => char.write(Uint8List.fromList([0x01])),
-          throwsA(isA<OperationNotSupportedException>()),
-        );
-      });
+          expect(
+            () => char.write(Uint8List.fromList([0x01])),
+            throwsA(isA<OperationNotSupportedException>()),
+          );
+        },
+      );
     });
 
     group('Notifications', () {
@@ -699,16 +741,16 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [
-                  platform.PlatformDescriptor(uuid: descUuid),
-                ],
+                descriptors: [platform.PlatformDescriptor(uuid: descUuid)],
               ),
             ],
             includedServices: [],
           ),
         ];
-        mockPlatform.descriptorValues[descUuid] =
-            Uint8List.fromList([0x01, 0x00]);
+        mockPlatform.descriptorValues[descUuid] = Uint8List.fromList([
+          0x01,
+          0x00,
+        ]);
 
         await connection.services;
         final svc = connection.service(UUID.short(0x180D));
@@ -737,9 +779,7 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [
-                  platform.PlatformDescriptor(uuid: descUuid),
-                ],
+                descriptors: [platform.PlatformDescriptor(uuid: descUuid)],
               ),
             ],
             includedServices: [],
@@ -754,8 +794,10 @@ void main() {
         await desc.write(Uint8List.fromList([0x01, 0x00]));
 
         expect(mockPlatform.writeDescriptorCalls, hasLength(1));
-        expect(mockPlatform.writeDescriptorCalls[0].value,
-            equals(Uint8List.fromList([0x01, 0x00])));
+        expect(
+          mockPlatform.writeDescriptorCalls[0].value,
+          equals(Uint8List.fromList([0x01, 0x00])),
+        );
       });
     });
   });

@@ -18,9 +18,7 @@ class ServiceScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_getServiceName(service.uuid) ?? 'Service'),
-      ),
+      appBar: AppBar(title: Text(_getServiceName(service.uuid) ?? 'Service')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -32,10 +30,7 @@ class ServiceScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'UUID',
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  Text('UUID', style: theme.textTheme.labelSmall),
                   SelectableText(
                     service.uuid.toString(),
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -46,8 +41,9 @@ class ServiceScreen extends StatelessWidget {
                   Row(
                     children: [
                       Chip(
-                        label:
-                            Text(service.isPrimary ? 'Primary' : 'Secondary'),
+                        label: Text(
+                          service.isPrimary ? 'Primary' : 'Secondary',
+                        ),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -68,25 +64,26 @@ class ServiceScreen extends StatelessWidget {
 
           // Characteristics list
           Expanded(
-            child: service.characteristics.isEmpty
-                ? Center(
-                    child: Text(
-                      'No characteristics',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.outline,
+            child:
+                service.characteristics.isEmpty
+                    ? Center(
+                      child: Text(
+                        'No characteristics',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: service.characteristics.length,
+                      itemBuilder: (context, index) {
+                        final characteristic = service.characteristics[index];
+                        return _CharacteristicCard(
+                          characteristic: characteristic,
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: service.characteristics.length,
-                    itemBuilder: (context, index) {
-                      final characteristic = service.characteristics[index];
-                      return _CharacteristicCard(
-                        characteristic: characteristic,
-                      );
-                    },
-                  ),
           ),
         ],
       ),
@@ -148,27 +145,28 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Write Value'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Hex bytes (e.g., 01 02 03)',
-            hintText: '00 FF',
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Write Value'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Hex bytes (e.g., 01 02 03)',
+                hintText: '00 FF',
+              ),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('Write'),
+              ),
+            ],
           ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Write'),
-          ),
-        ],
-      ),
     );
 
     if (result == null || result.isEmpty) return;
@@ -181,9 +179,9 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
         _log.insert(0, _LogEntry('Write', bytes));
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Write successful')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Write successful')));
       }
     } catch (e) {
       _showError('Write failed: $e');
@@ -297,27 +295,31 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
                     if (props.canRead)
                       FilledButton.icon(
                         onPressed: _isReading ? null : _read,
-                        icon: _isReading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.download, size: 18),
+                        icon:
+                            _isReading
+                                ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : const Icon(Icons.download, size: 18),
                         label: const Text('Read'),
                       ),
                     if (props.canWrite || props.canWriteWithoutResponse)
                       FilledButton.tonalIcon(
                         onPressed: _isWriting ? null : _write,
-                        icon: _isWriting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.upload, size: 18),
+                        icon:
+                            _isWriting
+                                ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : const Icon(Icons.upload, size: 18),
                         label: const Text('Write'),
                       ),
                     if (props.canNotify || props.canIndicate)
@@ -329,16 +331,18 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
                               : Icons.notifications,
                           size: 18,
                         ),
-                        label:
-                            Text(_isSubscribed ? 'Unsubscribe' : 'Subscribe'),
-                        style: _isSubscribed
-                            ? FilledButton.styleFrom(
-                                backgroundColor:
-                                    theme.colorScheme.errorContainer,
-                                foregroundColor:
-                                    theme.colorScheme.onErrorContainer,
-                              )
-                            : null,
+                        label: Text(
+                          _isSubscribed ? 'Unsubscribe' : 'Subscribe',
+                        ),
+                        style:
+                            _isSubscribed
+                                ? FilledButton.styleFrom(
+                                  backgroundColor:
+                                      theme.colorScheme.errorContainer,
+                                  foregroundColor:
+                                      theme.colorScheme.onErrorContainer,
+                                )
+                                : null,
                       ),
                   ],
                 ),
@@ -423,8 +427,9 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
                     style: theme.textTheme.labelMedium,
                   ),
                   const SizedBox(height: 8),
-                  ...char.descriptors
-                      .map((desc) => _DescriptorTile(descriptor: desc)),
+                  ...char.descriptors.map(
+                    (desc) => _DescriptorTile(descriptor: desc),
+                  ),
                 ],
               ],
             ),
@@ -443,7 +448,8 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
   String _formatAscii(Uint8List bytes) {
     return String.fromCharCodes(
       bytes.map(
-          (b) => b >= 32 && b < 127 ? b : 46), // Replace non-printable with '.'
+        (b) => b >= 32 && b < 127 ? b : 46,
+      ), // Replace non-printable with '.'
     );
   }
 
@@ -504,9 +510,9 @@ class _DescriptorTileState extends State<_DescriptorTile> {
       setState(() => _value = value);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Read failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Read failed: $e')));
       }
     } finally {
       setState(() => _isReading = false);
@@ -520,26 +526,33 @@ class _DescriptorTileState extends State<_DescriptorTile> {
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
-      leading:
-          Icon(Icons.description, size: 20, color: theme.colorScheme.outline),
+      leading: Icon(
+        Icons.description,
+        size: 20,
+        color: theme.colorScheme.outline,
+      ),
       title: Text(
         widget.descriptor.uuid.toString(),
         style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
       ),
-      subtitle: _value != null
-          ? Text(
-              _value!.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' '),
-              style: theme.textTheme.bodySmall,
-            )
-          : null,
-      trailing: IconButton(
-        icon: _isReading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      subtitle:
+          _value != null
+              ? Text(
+                _value!
+                    .map((b) => b.toRadixString(16).padLeft(2, '0'))
+                    .join(' '),
+                style: theme.textTheme.bodySmall,
               )
-            : const Icon(Icons.download, size: 18),
+              : null,
+      trailing: IconButton(
+        icon:
+            _isReading
+                ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                : const Icon(Icons.download, size: 18),
         onPressed: _isReading ? null : _read,
         tooltip: 'Read',
       ),
