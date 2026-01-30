@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:bluey_platform_interface/bluey_platform_interface.dart'
+    as platform;
 
+import 'connection_state.dart';
 import 'device.dart';
 import 'exceptions.dart';
 import 'uuid.dart';
 
+export 'connection_state.dart';
+
 /// The state of the Bluetooth adapter.
-enum BluetoothAdapterState {
+enum BluetoothState {
   /// Initial state before platform reports.
   unknown,
 
@@ -24,18 +28,10 @@ enum BluetoothAdapterState {
   on;
 
   /// Whether Bluetooth is ready for use.
-  bool get isReady => this == BluetoothAdapterState.on;
-}
+  bool get isReady => this == BluetoothState.on;
 
-/// Connection state for a device.
-enum ConnectionState {
-  disconnected,
-  connecting,
-  connected,
-  disconnecting;
-
-  /// Whether the connection is active.
-  bool get isActive => this == connecting || this == connected;
+  /// Whether Bluetooth can be enabled (only true when off).
+  bool get canBeEnabled => this == BluetoothState.off;
 }
 
 /// The main entry point to Bluey.
@@ -48,7 +44,7 @@ enum ConnectionState {
 /// final bluey = Bluey();
 ///
 /// // Check Bluetooth state
-/// if (await bluey.state != BluetoothAdapterState.on) {
+/// if (await bluey.state != BluetoothState.on) {
 ///   await bluey.requestEnable();
 /// }
 ///
@@ -58,17 +54,17 @@ enum ConnectionState {
 /// }
 /// ```
 class Bluey {
-  final BlueyPlatform _platform;
+  final platform.BlueyPlatform _platform;
 
   StreamSubscription? _stateSubscription;
-  final StreamController<BluetoothAdapterState> _stateController =
-      StreamController<BluetoothAdapterState>.broadcast();
+  final StreamController<BluetoothState> _stateController =
+      StreamController<BluetoothState>.broadcast();
 
   /// Creates a new Bluey instance.
   ///
   /// Typically you create one instance and reuse it throughout your app.
   /// Call [dispose] when done to release resources.
-  Bluey() : _platform = BlueyPlatform.instance {
+  Bluey() : _platform = platform.BlueyPlatform.instance {
     _stateSubscription = _platform.stateStream.listen(
       (state) => _stateController.add(_mapState(state)),
       onError: (error) => _stateController.addError(_wrapError(error)),
@@ -76,15 +72,15 @@ class Bluey {
   }
 
   /// Platform capabilities.
-  Capabilities get capabilities => _platform.capabilities;
+  platform.Capabilities get capabilities => _platform.capabilities;
 
   /// Stream of Bluetooth state changes.
   ///
   /// Emits whenever Bluetooth is enabled, disabled, or permissions change.
-  Stream<BluetoothAdapterState> get stateStream => _stateController.stream;
+  Stream<BluetoothState> get stateStream => _stateController.stream;
 
   /// Get current Bluetooth state.
-  Future<BluetoothAdapterState> get state async {
+  Future<BluetoothState> get state async {
     try {
       final platformState = await _platform.getState();
       return _mapState(platformState);
@@ -101,18 +97,18 @@ class Bluey {
   Future<void> ensureReady() async {
     final currentState = await state;
     switch (currentState) {
-      case BluetoothAdapterState.on:
+      case BluetoothState.on:
         return;
-      case BluetoothAdapterState.unsupported:
+      case BluetoothState.unsupported:
         throw const BluetoothUnavailableException();
-      case BluetoothAdapterState.unauthorized:
+      case BluetoothState.unauthorized:
         throw PermissionDeniedException(['Bluetooth']);
-      case BluetoothAdapterState.off:
+      case BluetoothState.off:
         final enabled = await requestEnable();
         if (!enabled) {
           throw const BluetoothDisabledException();
         }
-      case BluetoothAdapterState.unknown:
+      case BluetoothState.unknown:
         throw const BluetoothUnavailableException();
     }
   }
@@ -156,7 +152,7 @@ class Bluey {
     List<UUID>? services,
     Duration? timeout,
   }) {
-    final config = PlatformScanConfig(
+    final config = platform.PlatformScanConfig(
       serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
       timeoutMs: timeout?.inMilliseconds,
     );
@@ -187,7 +183,7 @@ class Bluey {
     Device device, {
     Duration? timeout,
   }) async {
-    final config = PlatformConnectConfig(
+    final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
     );
@@ -223,35 +219,36 @@ class Bluey {
 
   // === Private mapping methods ===
 
-  BluetoothAdapterState _mapState(BluetoothState platformState) {
+  BluetoothState _mapState(platform.BluetoothState platformState) {
     switch (platformState) {
-      case BluetoothState.unknown:
-        return BluetoothAdapterState.unknown;
-      case BluetoothState.unsupported:
-        return BluetoothAdapterState.unsupported;
-      case BluetoothState.unauthorized:
-        return BluetoothAdapterState.unauthorized;
-      case BluetoothState.off:
-        return BluetoothAdapterState.off;
-      case BluetoothState.on:
-        return BluetoothAdapterState.on;
+      case platform.BluetoothState.unknown:
+        return BluetoothState.unknown;
+      case platform.BluetoothState.unsupported:
+        return BluetoothState.unsupported;
+      case platform.BluetoothState.unauthorized:
+        return BluetoothState.unauthorized;
+      case platform.BluetoothState.off:
+        return BluetoothState.off;
+      case platform.BluetoothState.on:
+        return BluetoothState.on;
     }
   }
 
-  ConnectionState _mapConnectionState(PlatformConnectionState platformState) {
+  ConnectionState _mapConnectionState(
+      platform.PlatformConnectionState platformState) {
     switch (platformState) {
-      case PlatformConnectionState.disconnected:
+      case platform.PlatformConnectionState.disconnected:
         return ConnectionState.disconnected;
-      case PlatformConnectionState.connecting:
+      case platform.PlatformConnectionState.connecting:
         return ConnectionState.connecting;
-      case PlatformConnectionState.connected:
+      case platform.PlatformConnectionState.connected:
         return ConnectionState.connected;
-      case PlatformConnectionState.disconnecting:
+      case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
     }
   }
 
-  Device _mapDevice(PlatformDevice platformDevice) {
+  Device _mapDevice(platform.PlatformDevice platformDevice) {
     // Convert manufacturer data
     ManufacturerData? manufacturerData;
     if (platformDevice.manufacturerDataCompanyId != null &&

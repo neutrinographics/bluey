@@ -4,8 +4,10 @@ import android.Manifest
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
@@ -33,6 +35,9 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
 
     private var scanner: Scanner? = null
     private var connectionManager: ConnectionManager? = null
+
+    // Bluetooth state receiver
+    private var bluetoothStateReceiver: BroadcastReceiver? = null
 
     // FlutterPlugin implementation
 
@@ -66,6 +71,9 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         BlueyHostApi.setUp(binding.binaryMessenger, null)
+
+        // Stop Bluetooth state monitoring
+        stopBluetoothStateMonitoring()
 
         // Clean up
         scanner?.cleanup()
@@ -210,9 +218,54 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi {
     }
 
     private fun startBluetoothStateMonitoring() {
-        // TODO: Register BroadcastReceiver for BluetoothAdapter.ACTION_STATE_CHANGED
-        // For now, just report current state
+        // Register BroadcastReceiver for Bluetooth state changes
+        bluetoothStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                    val state = intent.getIntExtra(
+                        BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR
+                    )
+                    val bluetoothState = mapAdapterStateToDto(state)
+                    flutterApi?.onStateChanged(bluetoothState) {}
+                }
+            }
+        }
+
+        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context?.registerReceiver(
+                bluetoothStateReceiver,
+                filter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            context?.registerReceiver(bluetoothStateReceiver, filter)
+        }
+
+        // Report initial state
         flutterApi?.onStateChanged(getCurrentBluetoothState()) {}
+    }
+
+    private fun stopBluetoothStateMonitoring() {
+        bluetoothStateReceiver?.let { receiver ->
+            try {
+                context?.unregisterReceiver(receiver)
+            } catch (e: IllegalArgumentException) {
+                // Receiver was not registered, ignore
+            }
+        }
+        bluetoothStateReceiver = null
+    }
+
+    private fun mapAdapterStateToDto(adapterState: Int): BluetoothStateDto {
+        return when (adapterState) {
+            BluetoothAdapter.STATE_OFF -> BluetoothStateDto.OFF
+            BluetoothAdapter.STATE_TURNING_OFF -> BluetoothStateDto.OFF
+            BluetoothAdapter.STATE_ON -> BluetoothStateDto.ON
+            BluetoothAdapter.STATE_TURNING_ON -> BluetoothStateDto.OFF
+            else -> BluetoothStateDto.UNKNOWN
+        }
     }
 
     companion object {

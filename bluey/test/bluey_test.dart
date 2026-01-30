@@ -1,30 +1,31 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
-import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:bluey_platform_interface/bluey_platform_interface.dart'
+    as platform;
 
 /// Mock platform implementation for testing.
-class MockBlueyPlatform extends BlueyPlatform {
-  BluetoothState mockState = BluetoothState.on;
-  List<PlatformDevice> mockDevices = [];
+class MockBlueyPlatform extends platform.BlueyPlatform {
+  platform.BluetoothState mockState = platform.BluetoothState.on;
+  List<platform.PlatformDevice> mockDevices = [];
   bool requestEnableResult = true;
   Exception? scanError;
 
-  final StreamController<BluetoothState> _stateController =
-      StreamController<BluetoothState>.broadcast();
-  final StreamController<PlatformDevice> _scanController =
-      StreamController<PlatformDevice>.broadcast();
-  final Map<String, StreamController<PlatformConnectionState>>
+  final StreamController<platform.BluetoothState> _stateController =
+      StreamController<platform.BluetoothState>.broadcast();
+  final StreamController<platform.PlatformDevice> _scanController =
+      StreamController<platform.PlatformDevice>.broadcast();
+  final Map<String, StreamController<platform.PlatformConnectionState>>
       _connectionControllers = {};
 
   @override
-  Capabilities get capabilities => Capabilities.android;
+  platform.Capabilities get capabilities => platform.Capabilities.android;
 
   @override
-  Stream<BluetoothState> get stateStream => _stateController.stream;
+  Stream<platform.BluetoothState> get stateStream => _stateController.stream;
 
   @override
-  Future<BluetoothState> getState() async => mockState;
+  Future<platform.BluetoothState> getState() async => mockState;
 
   @override
   Future<bool> requestEnable() async => requestEnableResult;
@@ -33,7 +34,7 @@ class MockBlueyPlatform extends BlueyPlatform {
   Future<void> openSettings() async {}
 
   @override
-  Stream<PlatformDevice> scan(PlatformScanConfig config) {
+  Stream<platform.PlatformDevice> scan(platform.PlatformScanConfig config) {
     if (scanError != null) {
       return Stream.error(scanError!);
     }
@@ -52,9 +53,10 @@ class MockBlueyPlatform extends BlueyPlatform {
   Future<void> stopScan() async {}
 
   @override
-  Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+  Future<String> connect(
+      String deviceId, platform.PlatformConnectConfig config) async {
     _connectionControllers[deviceId] =
-        StreamController<PlatformConnectionState>.broadcast();
+        StreamController<platform.PlatformConnectionState>.broadcast();
     return deviceId;
   }
 
@@ -65,17 +67,19 @@ class MockBlueyPlatform extends BlueyPlatform {
   }
 
   @override
-  Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
+  Stream<platform.PlatformConnectionState> connectionStateStream(
+      String deviceId) {
     return _connectionControllers[deviceId]?.stream ??
         Stream.error(StateError('Not connected'));
   }
 
-  void emitState(BluetoothState state) {
+  void emitState(platform.BluetoothState state) {
     mockState = state;
     _stateController.add(state);
   }
 
-  void emitConnectionState(String deviceId, PlatformConnectionState state) {
+  void emitConnectionState(
+      String deviceId, platform.PlatformConnectionState state) {
     _connectionControllers[deviceId]?.add(state);
   }
 
@@ -94,7 +98,7 @@ void main() {
 
   setUp(() {
     mockPlatform = MockBlueyPlatform();
-    BlueyPlatform.instance = mockPlatform;
+    platform.BlueyPlatform.instance = mockPlatform;
     bluey = Bluey();
   });
 
@@ -106,35 +110,35 @@ void main() {
   group('Bluey', () {
     group('state', () {
       test('returns current Bluetooth state', () async {
-        mockPlatform.mockState = BluetoothState.on;
-        expect(await bluey.state, equals(BluetoothAdapterState.on));
+        mockPlatform.mockState = platform.BluetoothState.on;
+        expect(await bluey.state, equals(BluetoothState.on));
 
-        mockPlatform.mockState = BluetoothState.off;
-        expect(await bluey.state, equals(BluetoothAdapterState.off));
+        mockPlatform.mockState = platform.BluetoothState.off;
+        expect(await bluey.state, equals(BluetoothState.off));
       });
 
       test('maps all platform states correctly', () async {
-        mockPlatform.mockState = BluetoothState.unknown;
-        expect(await bluey.state, equals(BluetoothAdapterState.unknown));
+        mockPlatform.mockState = platform.BluetoothState.unknown;
+        expect(await bluey.state, equals(BluetoothState.unknown));
 
-        mockPlatform.mockState = BluetoothState.unsupported;
-        expect(await bluey.state, equals(BluetoothAdapterState.unsupported));
+        mockPlatform.mockState = platform.BluetoothState.unsupported;
+        expect(await bluey.state, equals(BluetoothState.unsupported));
 
-        mockPlatform.mockState = BluetoothState.unauthorized;
-        expect(await bluey.state, equals(BluetoothAdapterState.unauthorized));
+        mockPlatform.mockState = platform.BluetoothState.unauthorized;
+        expect(await bluey.state, equals(BluetoothState.unauthorized));
       });
 
       test('stateStream emits state changes', () async {
-        final states = <BluetoothAdapterState>[];
+        final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
-        mockPlatform.emitState(BluetoothState.off);
-        mockPlatform.emitState(BluetoothState.on);
+        mockPlatform.emitState(platform.BluetoothState.off);
+        mockPlatform.emitState(platform.BluetoothState.on);
 
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(states, contains(BluetoothAdapterState.off));
-        expect(states, contains(BluetoothAdapterState.on));
+        expect(states, contains(BluetoothState.off));
+        expect(states, contains(BluetoothState.on));
 
         await subscription.cancel();
       });
@@ -142,12 +146,12 @@ void main() {
 
     group('ensureReady', () {
       test('succeeds when Bluetooth is on', () async {
-        mockPlatform.mockState = BluetoothState.on;
+        mockPlatform.mockState = platform.BluetoothState.on;
         await expectLater(bluey.ensureReady(), completes);
       });
 
       test('throws BluetoothUnavailableException when unsupported', () async {
-        mockPlatform.mockState = BluetoothState.unsupported;
+        mockPlatform.mockState = platform.BluetoothState.unsupported;
         await expectLater(
           bluey.ensureReady(),
           throwsA(isA<BluetoothUnavailableException>()),
@@ -155,7 +159,7 @@ void main() {
       });
 
       test('throws PermissionDeniedException when unauthorized', () async {
-        mockPlatform.mockState = BluetoothState.unauthorized;
+        mockPlatform.mockState = platform.BluetoothState.unauthorized;
         await expectLater(
           bluey.ensureReady(),
           throwsA(isA<PermissionDeniedException>()),
@@ -164,7 +168,7 @@ void main() {
 
       test('throws BluetoothDisabledException when off and cannot enable',
           () async {
-        mockPlatform.mockState = BluetoothState.off;
+        mockPlatform.mockState = platform.BluetoothState.off;
         mockPlatform.requestEnableResult = false;
         await expectLater(
           bluey.ensureReady(),
@@ -173,7 +177,7 @@ void main() {
       });
 
       test('succeeds when off but can enable', () async {
-        mockPlatform.mockState = BluetoothState.off;
+        mockPlatform.mockState = platform.BluetoothState.off;
         mockPlatform.requestEnableResult = true;
         // After requestEnable succeeds, we need to simulate state change
         // In real implementation this would happen, but our mock is simple
@@ -185,7 +189,7 @@ void main() {
     group('scan', () {
       test('emits discovered devices', () async {
         mockPlatform.mockDevices = [
-          PlatformDevice(
+          platform.PlatformDevice(
             id: 'AA:BB:CC:DD:EE:FF',
             name: 'Test Device',
             rssi: -60,
@@ -208,7 +212,7 @@ void main() {
 
       test('converts manufacturer data correctly', () async {
         mockPlatform.mockDevices = [
-          PlatformDevice(
+          platform.PlatformDevice(
             id: 'AA:BB:CC:DD:EE:FF',
             name: null,
             rssi: -50,
@@ -232,7 +236,7 @@ void main() {
 
       test('converts service UUIDs correctly', () async {
         mockPlatform.mockDevices = [
-          PlatformDevice(
+          platform.PlatformDevice(
             id: 'AA:BB:CC:DD:EE:FF',
             name: null,
             rssi: -50,
@@ -302,11 +306,11 @@ void main() {
 
         mockPlatform.emitConnectionState(
           device.id.toString(),
-          PlatformConnectionState.connecting,
+          platform.PlatformConnectionState.connecting,
         );
         mockPlatform.emitConnectionState(
           device.id.toString(),
-          PlatformConnectionState.connected,
+          platform.PlatformConnectionState.connected,
         );
 
         await Future.delayed(Duration(milliseconds: 10));
@@ -335,7 +339,7 @@ void main() {
 
     group('capabilities', () {
       test('returns platform capabilities', () {
-        expect(bluey.capabilities, equals(Capabilities.android));
+        expect(bluey.capabilities, equals(platform.Capabilities.android));
       });
     });
 
@@ -350,13 +354,13 @@ void main() {
     });
   });
 
-  group('BluetoothAdapterState', () {
+  group('BluetoothState', () {
     test('isReady returns true only when on', () {
-      expect(BluetoothAdapterState.on.isReady, isTrue);
-      expect(BluetoothAdapterState.off.isReady, isFalse);
-      expect(BluetoothAdapterState.unknown.isReady, isFalse);
-      expect(BluetoothAdapterState.unsupported.isReady, isFalse);
-      expect(BluetoothAdapterState.unauthorized.isReady, isFalse);
+      expect(BluetoothState.on.isReady, isTrue);
+      expect(BluetoothState.off.isReady, isFalse);
+      expect(BluetoothState.unknown.isReady, isFalse);
+      expect(BluetoothState.unsupported.isReady, isFalse);
+      expect(BluetoothState.unauthorized.isReady, isFalse);
     });
   });
 

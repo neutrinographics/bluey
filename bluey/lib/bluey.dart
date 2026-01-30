@@ -10,6 +10,11 @@ export 'src/bluey.dart';
 // Core value objects
 export 'src/uuid.dart';
 export 'src/device.dart';
+export 'src/characteristic_properties.dart';
+
+// GATT interfaces
+export 'src/gatt.dart';
+export 'src/connection.dart';
 
 // Exception hierarchy
 export 'src/exceptions.dart';
