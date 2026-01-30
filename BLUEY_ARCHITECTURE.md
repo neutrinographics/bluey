@@ -2055,7 +2055,7 @@ Complete the entire domain layer before platform implementations.
 
 **Test Coverage:** 191 unit tests passing
 
-### Phase 2: Android Implementation
+### Phase 2: Android Implementation (GATT Client ✅ COMPLETE)
 
 Complete Android platform with full GATT client and server support.
 
@@ -2068,14 +2068,22 @@ Complete Android platform with full GATT client and server support.
 - [x] Implement Scanner (Kotlin - BluetoothLeScanner integration)
 - [x] Implement ConnectionManager (Kotlin - BluetoothGatt integration)
 
-**GATT Client:**
-- [ ] Implement Bluetooth state monitoring (BroadcastReceiver)
-- [ ] Implement service discovery
-- [ ] Implement characteristic read/write
-- [ ] Implement notifications/indications
-- [ ] Implement descriptor read/write
-- [ ] Implement MTU negotiation
-- [ ] Implement RSSI reading
+**GATT Client (Complete):**
+- [x] Implement Bluetooth state monitoring (BroadcastReceiver)
+- [x] Implement service discovery
+- [x] Implement characteristic read/write
+- [x] Implement notifications/indications
+- [x] Implement descriptor read/write
+- [x] Implement MTU negotiation
+- [x] Implement RSSI reading
+- [x] Extend Pigeon API with GATT DTOs (ServiceDto, CharacteristicDto, DescriptorDto, etc.)
+- [x] Update platform interface with GATT types and methods
+- [x] TDD: Write failing tests for BlueyConnection GATT methods (16 tests)
+- [x] TDD: Implement BlueyConnection with service caching, property validation
+- [x] Implement BlueyRemoteService, BlueyRemoteCharacteristic, BlueyRemoteDescriptor
+- [x] Verify Android APK builds successfully
+
+**Test Coverage:** 207 unit tests passing
 
 **Server (Peripheral Role):**
 - [ ] Implement BluetoothGattServer integration
@@ -2084,7 +2092,7 @@ Complete Android platform with full GATT client and server support.
 - [ ] Implement notification sending
 
 **Testing:**
-- [ ] Unit tests for all components
+- [x] Unit tests for GATT client domain layer (TDD)
 - [ ] Integration tests on real devices
 
 ### Phase 3: Example App
@@ -2187,6 +2195,7 @@ class Descriptors {
 |---------|------|--------|---------|
 | 0.1.0 | 2026-01-30 | Claude | Initial architecture document |
 | 0.2.0 | 2026-01-30 | Claude | Updated roadmap with Phase 1 complete, Phase 2 in progress |
+| 0.3.0 | 2026-01-31 | Claude | Phase 2 Android GATT Client complete (207 tests passing) |
 
 ---
 
