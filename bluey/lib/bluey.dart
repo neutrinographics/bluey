@@ -19,5 +19,11 @@ export 'src/scan.dart';
 export 'src/gatt.dart';
 export 'src/connection.dart';
 
+// Server (Peripheral role)
+export 'src/server.dart';
+
+// Well-known UUIDs
+export 'src/well_known_uuids.dart';
+
 // Exception hierarchy
 export 'src/exceptions.dart';
