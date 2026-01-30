@@ -65,8 +65,8 @@ class Advertiser(
 
         // Build advertise settings
         val settingsBuilder = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // More frequent advertising
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH) // Higher power for better visibility
             .setConnectable(true)
 
         config.timeoutMs?.let { timeout ->
@@ -77,17 +77,18 @@ class Advertiser(
 
         val settings = settingsBuilder.build()
 
-        // Build advertise data
+        // Build advertise data - keep it minimal, put service UUIDs here
         val dataBuilder = AdvertiseData.Builder()
-            .setIncludeDeviceName(config.name != null)
+            .setIncludeDeviceName(false) // Don't include name in main packet to save space
 
-        // Add service UUIDs
+        // Add service UUIDs to main advertise data
         for (uuidString in config.serviceUuids) {
             try {
                 val uuid = UUID.fromString(normalizeUuid(uuidString))
+                android.util.Log.d("Bluey", "Adding service UUID to advertise data: $uuid")
                 dataBuilder.addServiceUuid(ParcelUuid(uuid))
             } catch (e: IllegalArgumentException) {
-                // Invalid UUID, skip
+                android.util.Log.e("Bluey", "Invalid UUID: $uuidString", e)
             }
         }
 
@@ -100,15 +101,24 @@ class Advertiser(
 
         val advertiseData = dataBuilder.build()
 
-        // Build scan response (includes device name if set)
+        // Build scan response - put device name here
         val scanResponseBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(config.name != null)
 
         val scanResponse = scanResponseBuilder.build()
 
+        // Log what we're advertising
+        android.util.Log.d("Bluey", "startAdvertising: settings=$settings")
+        android.util.Log.d("Bluey", "startAdvertising: advertiseData=$advertiseData")
+        android.util.Log.d("Bluey", "startAdvertising: scanResponse=$scanResponse")
+        android.util.Log.d("Bluey", "startAdvertising: serviceUuids=${config.serviceUuids}")
+
         // Create callback
         advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                android.util.Log.d("Bluey", "onStartSuccess: advertising started, settingsInEffect=$settingsInEffect")
+                android.util.Log.d("Bluey", "onStartSuccess: adapter name=${bluetoothAdapter?.name}")
+                android.util.Log.d("Bluey", "onStartSuccess: adapter address=${bluetoothAdapter?.address}")
                 isAdvertising = true
                 callback(Result.success(Unit))
 
