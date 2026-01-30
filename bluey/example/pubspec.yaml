@@ -1,0 +1,26 @@
+name: bluey_example
+description: Example app demonstrating Bluey BLE library
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+  flutter: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  bluey:
+    path: ../
+  bluey_android:
+    path: ../../bluey_android
+  bluey_platform_interface:
+    path: ../../bluey_platform_interface
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
