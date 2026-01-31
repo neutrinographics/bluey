@@ -112,6 +112,12 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> disconnect() async {
+    // Idempotent: if already disconnected or disconnecting, do nothing
+    if (_state == ConnectionState.disconnected ||
+        _state == ConnectionState.disconnecting) {
+      return;
+    }
+
     _state = ConnectionState.disconnecting;
     _stateController.add(_state);
 

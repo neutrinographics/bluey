@@ -1,0 +1,599 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+
+/// A fake implementation of [BlueyPlatform] for testing.
+///
+/// This simulates both central and peripheral roles in-memory, allowing
+/// integration tests to verify client-server interactions without real
+/// Bluetooth hardware.
+///
+/// ## Usage
+///
+/// ```dart
+/// // Create a fake platform
+/// final platform = FakeBlueyPlatform();
+///
+/// // Simulate a peripheral advertising
+/// platform.simulatePeripheral(
+///   id: 'device-1',
+///   name: 'Test Device',
+///   services: [myService],
+/// );
+///
+/// // Now scanning will discover this device
+/// final devices = await platform.scan(config).toList();
+/// ```
+final class FakeBlueyPlatform extends BlueyPlatform {
+  FakeBlueyPlatform() : super.impl();
+
+  // === Configuration ===
+  BluetoothState _state = BluetoothState.on;
+  final Capabilities _capabilities = const Capabilities(
+    canScan: true,
+    canConnect: true,
+    canAdvertise: true,
+  );
+
+  // === Simulated Peripherals (devices we can discover/connect to) ===
+  final Map<String, _SimulatedPeripheral> _peripherals = {};
+
+  // === Connected Devices (as central) ===
+  final Map<String, _ConnectedDevice> _connections = {};
+
+  // === Server State (as peripheral) ===
+  final List<PlatformLocalService> _localServices = [];
+  bool _isAdvertising = false;
+  PlatformAdvertiseConfig? _advertiseConfig;
+  final Map<String, _ConnectedCentral> _connectedCentrals = {};
+  int _nextRequestId = 1;
+
+  // === Stream Controllers ===
+  final _stateController = StreamController<BluetoothState>.broadcast();
+  final _centralConnectionController =
+      StreamController<PlatformCentral>.broadcast();
+  final _centralDisconnectionController = StreamController<String>.broadcast();
+  final _readRequestController =
+      StreamController<PlatformReadRequest>.broadcast();
+  final _writeRequestController =
+      StreamController<PlatformWriteRequest>.broadcast();
+
+  final Map<String, StreamController<PlatformConnectionState>>
+  _connectionStateControllers = {};
+  final Map<String, StreamController<PlatformNotification>>
+  _notificationControllers = {};
+
+  // === Pending Requests (for responding to read/write requests) ===
+  final Map<int, Completer<Uint8List>> _pendingReadRequests = {};
+  final Map<int, Completer<void>> _pendingWriteRequests = {};
+
+  // === Test Helpers ===
+
+  /// Sets the Bluetooth state and notifies listeners.
+  void setBluetoothState(BluetoothState state) {
+    _state = state;
+    _stateController.add(state);
+  }
+
+  /// Simulates a peripheral device that can be discovered and connected to.
+  void simulatePeripheral({
+    required String id,
+    String? name,
+    int rssi = -50,
+    List<String> serviceUuids = const [],
+    int? manufacturerDataCompanyId,
+    List<int>? manufacturerData,
+    List<PlatformService> services = const [],
+    Map<String, Uint8List> characteristicValues = const {},
+  }) {
+    _peripherals[id] = _SimulatedPeripheral(
+      device: PlatformDevice(
+        id: id,
+        name: name,
+        rssi: rssi,
+        serviceUuids: serviceUuids,
+        manufacturerDataCompanyId: manufacturerDataCompanyId,
+        manufacturerData: manufacturerData,
+      ),
+      services: services,
+      characteristicValues: Map.from(characteristicValues),
+    );
+  }
+
+  /// Removes a simulated peripheral.
+  void removePeripheral(String id) {
+    _peripherals.remove(id);
+  }
+
+  /// Simulates a central connecting to our server.
+  void simulateCentralConnection({required String centralId, int mtu = 23}) {
+    if (!_isAdvertising) {
+      throw StateError('Cannot connect central when not advertising');
+    }
+    _connectedCentrals[centralId] = _ConnectedCentral(
+      id: centralId,
+      mtu: mtu,
+      subscribedCharacteristics: {},
+    );
+    _centralConnectionController.add(PlatformCentral(id: centralId, mtu: mtu));
+  }
+
+  /// Simulates a central disconnecting from our server.
+  void simulateCentralDisconnection(String centralId) {
+    _connectedCentrals.remove(centralId);
+    _centralDisconnectionController.add(centralId);
+  }
+
+  /// Simulates a read request from a connected central.
+  Future<Uint8List> simulateReadRequest({
+    required String centralId,
+    required String characteristicUuid,
+    int offset = 0,
+  }) {
+    if (!_connectedCentrals.containsKey(centralId)) {
+      throw StateError('Central $centralId is not connected');
+    }
+
+    final requestId = _nextRequestId++;
+    final completer = Completer<Uint8List>();
+    _pendingReadRequests[requestId] = completer;
+
+    _readRequestController.add(
+      PlatformReadRequest(
+        requestId: requestId,
+        centralId: centralId,
+        characteristicUuid: characteristicUuid,
+        offset: offset,
+      ),
+    );
+
+    return completer.future;
+  }
+
+  /// Simulates a write request from a connected central.
+  Future<void> simulateWriteRequest({
+    required String centralId,
+    required String characteristicUuid,
+    required Uint8List value,
+    int offset = 0,
+    bool responseNeeded = true,
+  }) {
+    if (!_connectedCentrals.containsKey(centralId)) {
+      throw StateError('Central $centralId is not connected');
+    }
+
+    final requestId = _nextRequestId++;
+    final completer = Completer<void>();
+    _pendingWriteRequests[requestId] = completer;
+
+    _writeRequestController.add(
+      PlatformWriteRequest(
+        requestId: requestId,
+        centralId: centralId,
+        characteristicUuid: characteristicUuid,
+        value: value,
+        offset: offset,
+        responseNeeded: responseNeeded,
+      ),
+    );
+
+    if (!responseNeeded) {
+      completer.complete();
+    }
+
+    return completer.future;
+  }
+
+  /// Simulates the peripheral disconnecting from us (as central).
+  void simulateDisconnection(String deviceId) {
+    final connection = _connections[deviceId];
+    if (connection != null) {
+      _connections.remove(deviceId);
+      connection.stateController.add(PlatformConnectionState.disconnected);
+    }
+  }
+
+  /// Simulates a notification from a connected peripheral.
+  void simulateNotification({
+    required String deviceId,
+    required String characteristicUuid,
+    required Uint8List value,
+  }) {
+    final controller = _notificationControllers[deviceId];
+    controller?.add(
+      PlatformNotification(
+        deviceId: deviceId,
+        characteristicUuid: characteristicUuid,
+        value: value,
+      ),
+    );
+  }
+
+  /// Gets whether we're currently advertising.
+  bool get isAdvertising => _isAdvertising;
+
+  /// Gets the current advertise config.
+  PlatformAdvertiseConfig? get advertiseConfig => _advertiseConfig;
+
+  /// Gets the list of connected centrals.
+  List<String> get connectedCentralIds => _connectedCentrals.keys.toList();
+
+  /// Gets the local services.
+  List<PlatformLocalService> get localServices =>
+      List.unmodifiable(_localServices);
+
+  // === BlueyPlatform Implementation ===
+
+  @override
+  Capabilities get capabilities => _capabilities;
+
+  @override
+  Future<void> configure(BlueyConfig config) async {
+    // No-op for fake
+  }
+
+  @override
+  Stream<BluetoothState> get stateStream => _stateController.stream;
+
+  @override
+  Future<BluetoothState> getState() async => _state;
+
+  @override
+  Future<bool> requestEnable() async {
+    if (_state == BluetoothState.off) {
+      setBluetoothState(BluetoothState.on);
+      return true;
+    }
+    return _state == BluetoothState.on;
+  }
+
+  @override
+  Future<bool> authorize() async => true;
+
+  @override
+  Future<void> openSettings() async {}
+
+  @override
+  Stream<PlatformDevice> scan(PlatformScanConfig config) {
+    // Create a new controller for each scan to avoid "closed stream" issues
+    final scanController = StreamController<PlatformDevice>.broadcast();
+
+    // Emit all simulated peripherals that match the filter
+    Future(() {
+      for (final peripheral in _peripherals.values) {
+        // Filter by service UUIDs if specified
+        if (config.serviceUuids.isNotEmpty) {
+          final hasMatchingService = peripheral.device.serviceUuids.any(
+            (uuid) => config.serviceUuids.contains(uuid),
+          );
+          if (!hasMatchingService) continue;
+        }
+        if (!scanController.isClosed) {
+          scanController.add(peripheral.device);
+        }
+      }
+    });
+
+    return scanController.stream;
+  }
+
+  @override
+  Future<void> stopScan() async {
+    // No-op - scanning is passive in fake
+  }
+
+  @override
+  Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    final peripheral = _peripherals[deviceId];
+    if (peripheral == null) {
+      throw Exception('Device not found: $deviceId');
+    }
+
+    final stateController =
+        StreamController<PlatformConnectionState>.broadcast();
+    final notificationController =
+        StreamController<PlatformNotification>.broadcast();
+
+    _connectionStateControllers[deviceId] = stateController;
+    _notificationControllers[deviceId] = notificationController;
+
+    _connections[deviceId] = _ConnectedDevice(
+      peripheral: peripheral,
+      stateController: stateController,
+      notificationController: notificationController,
+      mtu: config.mtu ?? 23,
+      subscribedCharacteristics: {},
+    );
+
+    stateController.add(PlatformConnectionState.connected);
+
+    return deviceId;
+  }
+
+  @override
+  Future<void> disconnect(String deviceId) async {
+    final connection = _connections.remove(deviceId);
+    if (connection != null) {
+      connection.stateController.add(PlatformConnectionState.disconnected);
+      await connection.stateController.close();
+      await connection.notificationController.close();
+      _connectionStateControllers.remove(deviceId);
+      _notificationControllers.remove(deviceId);
+    }
+  }
+
+  @override
+  Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
+    return _connectionStateControllers[deviceId]?.stream ??
+        Stream.value(PlatformConnectionState.disconnected);
+  }
+
+  @override
+  Future<List<PlatformService>> discoverServices(String deviceId) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+    return connection.peripheral.services;
+  }
+
+  @override
+  Future<Uint8List> readCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+  ) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+
+    final value =
+        connection.peripheral.characteristicValues[characteristicUuid];
+    if (value == null) {
+      throw Exception('Characteristic not found: $characteristicUuid');
+    }
+    return value;
+  }
+
+  @override
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+
+    connection.peripheral.characteristicValues[characteristicUuid] = value;
+  }
+
+  @override
+  Future<void> setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+
+    if (enable) {
+      connection.subscribedCharacteristics.add(characteristicUuid);
+    } else {
+      connection.subscribedCharacteristics.remove(characteristicUuid);
+    }
+  }
+
+  @override
+  Stream<PlatformNotification> notificationStream(String deviceId) {
+    return _notificationControllers[deviceId]?.stream ?? const Stream.empty();
+  }
+
+  @override
+  Future<Uint8List> readDescriptor(
+    String deviceId,
+    String descriptorUuid,
+  ) async {
+    return Uint8List(0);
+  }
+
+  @override
+  Future<void> writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<int> requestMtu(String deviceId, int mtu) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+    connection.mtu = mtu;
+    return mtu;
+  }
+
+  @override
+  Future<int> readRssi(String deviceId) async {
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+    return connection.peripheral.device.rssi;
+  }
+
+  // === Server Operations ===
+
+  @override
+  Future<void> addService(PlatformLocalService service) async {
+    _localServices.add(service);
+  }
+
+  @override
+  Future<void> removeService(String serviceUuid) async {
+    _localServices.removeWhere((s) => s.uuid == serviceUuid);
+  }
+
+  @override
+  Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
+    _isAdvertising = true;
+    _advertiseConfig = config;
+  }
+
+  @override
+  Future<void> stopAdvertising() async {
+    _isAdvertising = false;
+    _advertiseConfig = null;
+  }
+
+  @override
+  Future<void> notifyCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    // Notify all subscribed centrals
+    for (final central in _connectedCentrals.values) {
+      if (central.subscribedCharacteristics.contains(characteristicUuid)) {
+        // In a real implementation, this would send over BLE
+        // For testing, we can verify it was called
+      }
+    }
+  }
+
+  @override
+  Future<void> notifyCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    final central = _connectedCentrals[centralId];
+    if (central == null) {
+      throw Exception('Central not connected: $centralId');
+    }
+    // For testing purposes, we track this was called
+  }
+
+  @override
+  Stream<PlatformCentral> get centralConnections =>
+      _centralConnectionController.stream;
+
+  @override
+  Stream<String> get centralDisconnections =>
+      _centralDisconnectionController.stream;
+
+  @override
+  Stream<PlatformReadRequest> get readRequests => _readRequestController.stream;
+
+  @override
+  Stream<PlatformWriteRequest> get writeRequests =>
+      _writeRequestController.stream;
+
+  @override
+  Future<void> respondToReadRequest(
+    int requestId,
+    PlatformGattStatus status,
+    Uint8List? value,
+  ) async {
+    final completer = _pendingReadRequests.remove(requestId);
+    if (completer != null) {
+      if (status == PlatformGattStatus.success && value != null) {
+        completer.complete(value);
+      } else {
+        completer.completeError(Exception('Read failed with status: $status'));
+      }
+    }
+  }
+
+  @override
+  Future<void> respondToWriteRequest(
+    int requestId,
+    PlatformGattStatus status,
+  ) async {
+    final completer = _pendingWriteRequests.remove(requestId);
+    if (completer != null) {
+      if (status == PlatformGattStatus.success) {
+        completer.complete();
+      } else {
+        completer.completeError(Exception('Write failed with status: $status'));
+      }
+    }
+  }
+
+  @override
+  Future<void> disconnectCentral(String centralId) async {
+    simulateCentralDisconnection(centralId);
+  }
+
+  @override
+  Future<void> closeServer() async {
+    await stopAdvertising();
+    for (final centralId in _connectedCentrals.keys.toList()) {
+      simulateCentralDisconnection(centralId);
+    }
+    _localServices.clear();
+  }
+
+  /// Disposes all resources.
+  Future<void> dispose() async {
+    await _stateController.close();
+    await _centralConnectionController.close();
+    await _centralDisconnectionController.close();
+    await _readRequestController.close();
+    await _writeRequestController.close();
+
+    for (final controller in _connectionStateControllers.values) {
+      await controller.close();
+    }
+    for (final controller in _notificationControllers.values) {
+      await controller.close();
+    }
+  }
+}
+
+// === Internal Helper Classes ===
+
+class _SimulatedPeripheral {
+  final PlatformDevice device;
+  final List<PlatformService> services;
+  final Map<String, Uint8List> characteristicValues;
+
+  _SimulatedPeripheral({
+    required this.device,
+    required this.services,
+    required this.characteristicValues,
+  });
+}
+
+class _ConnectedDevice {
+  final _SimulatedPeripheral peripheral;
+  final StreamController<PlatformConnectionState> stateController;
+  final StreamController<PlatformNotification> notificationController;
+  int mtu;
+  final Set<String> subscribedCharacteristics;
+
+  _ConnectedDevice({
+    required this.peripheral,
+    required this.stateController,
+    required this.notificationController,
+    required this.mtu,
+    required this.subscribedCharacteristics,
+  });
+}
+
+class _ConnectedCentral {
+  final String id;
+  final int mtu;
+  final Set<String> subscribedCharacteristics;
+
+  _ConnectedCentral({
+    required this.id,
+    required this.mtu,
+    required this.subscribedCharacteristics,
+  });
+}
