@@ -7,5 +7,6 @@ environment:
 workspace:
   - bluey_platform_interface
   - bluey_android
+  - bluey_ios
   - bluey
   - bluey/example
