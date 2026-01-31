@@ -142,41 +142,18 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
   }
 
   Future<void> _write() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showDialog<Uint8List>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Write Value'),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Hex bytes (e.g., 01 02 03)',
-                hintText: '00 FF',
-              ),
-              autofocus: true,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, controller.text),
-                child: const Text('Write'),
-              ),
-            ],
-          ),
+      builder: (context) => const _WriteValueDialog(),
     );
 
     if (result == null || result.isEmpty) return;
 
     setState(() => _isWriting = true);
     try {
-      final bytes = _parseHexString(result);
-      await char.write(bytes, withResponse: props.canWrite);
+      await char.write(result, withResponse: props.canWrite);
       setState(() {
-        _log.insert(0, _LogEntry('Write', bytes));
+        _log.insert(0, _LogEntry('Write', result));
       });
       if (mounted) {
         ScaffoldMessenger.of(
@@ -210,18 +187,6 @@ class _CharacteristicCardState extends State<_CharacteristicCard> {
       );
       setState(() => _isSubscribed = true);
     }
-  }
-
-  Uint8List _parseHexString(String hex) {
-    final clean = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
-    if (clean.length % 2 != 0) {
-      throw const FormatException('Invalid hex string');
-    }
-    final bytes = <int>[];
-    for (var i = 0; i < clean.length; i += 2) {
-      bytes.add(int.parse(clean.substring(i, i + 2), radix: 16));
-    }
-    return Uint8List.fromList(bytes);
   }
 
   void _showError(String message) {
@@ -566,4 +531,159 @@ class _LogEntry {
   final DateTime timestamp;
 
   _LogEntry(this.operation, this.value) : timestamp = DateTime.now();
+}
+
+/// Dialog for writing values to a characteristic with hex or string input.
+class _WriteValueDialog extends StatefulWidget {
+  const _WriteValueDialog();
+
+  @override
+  State<_WriteValueDialog> createState() => _WriteValueDialogState();
+}
+
+class _WriteValueDialogState extends State<_WriteValueDialog> {
+  final _controller = TextEditingController();
+  bool _isHexMode = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Uint8List? _parseInput() {
+    final text = _controller.text;
+    if (text.isEmpty) return null;
+
+    try {
+      if (_isHexMode) {
+        return _parseHexString(text);
+      } else {
+        // String mode - convert to UTF-8 bytes
+        return Uint8List.fromList(text.codeUnits);
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Uint8List _parseHexString(String hex) {
+    final clean = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+    if (clean.isEmpty || clean.length % 2 != 0) {
+      throw const FormatException('Invalid hex string');
+    }
+    final bytes = <int>[];
+    for (var i = 0; i < clean.length; i += 2) {
+      bytes.add(int.parse(clean.substring(i, i + 2), radix: 16));
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  void _validate() {
+    final text = _controller.text;
+    if (text.isEmpty) {
+      setState(() => _error = null);
+      return;
+    }
+
+    if (_isHexMode) {
+      final clean = text.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+      if (clean.isEmpty) {
+        setState(() => _error = 'Enter hex characters (0-9, A-F)');
+      } else if (clean.length % 2 != 0) {
+        setState(() => _error = 'Hex string must have even length');
+      } else {
+        setState(() => _error = null);
+      }
+    } else {
+      setState(() => _error = null);
+    }
+  }
+
+  void _submit() {
+    final bytes = _parseInput();
+    if (bytes != null && bytes.isNotEmpty) {
+      Navigator.pop(context, bytes);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: const Text('Write Value'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Mode toggle
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Hex')),
+                ButtonSegment(value: false, label: Text('String')),
+              ],
+              selected: {_isHexMode},
+              onSelectionChanged: (selected) {
+                setState(() {
+                  _isHexMode = selected.first;
+                  _error = null;
+                });
+                _validate();
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                labelText: _isHexMode ? 'Hex bytes' : 'Text string',
+                hintText: _isHexMode ? '01 02 03' : 'Hello World',
+                errorText: _error,
+              ),
+              autofocus: true,
+              onChanged: (_) => _validate(),
+              onSubmitted: (_) => _submit(),
+            ),
+            if (_controller.text.isNotEmpty && _error == null) ...[
+              const SizedBox(height: 12),
+              Text('Preview:', style: theme.textTheme.labelSmall),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Builder(
+                  builder: (context) {
+                    final bytes = _parseInput();
+                    if (bytes == null) return const SizedBox.shrink();
+                    return Text(
+                      '${bytes.length} bytes: ${bytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ')}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed:
+              _error == null && _controller.text.isNotEmpty ? _submit : null,
+          child: const Text('Write'),
+        ),
+      ],
+    );
+  }
 }

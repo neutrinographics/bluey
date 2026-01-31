@@ -230,13 +230,7 @@ extension LocalDescriptorDto {
     }
 }
 
-// MARK: - FlutterStandardTypedData helpers
-
-extension FlutterStandardTypedData {
-    var data: Data {
-        return self.data
-    }
-}
+// MARK: - Data helpers
 
 extension Data {
     func toFlutterData() -> FlutterStandardTypedData {

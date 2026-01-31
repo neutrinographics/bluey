@@ -156,7 +156,8 @@ class CentralManagerImpl: NSObject {
     // MARK: - Characteristic Operations
 
     func readCharacteristic(deviceId: String, characteristicUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
-        guard let characteristic = characteristics[deviceId]?[characteristicUuid] else {
+        let charUuid = normalizeUuid(characteristicUuid)
+        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
             completion(.failure(BlueyError.notFound))
             return
         }
@@ -166,12 +167,14 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        readCharacteristicCompletions[deviceId, default: [:]][characteristicUuid] = completion
+        let cacheKey = characteristic.uuid.uuidString.lowercased()
+        readCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.readValue(for: characteristic)
     }
 
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let characteristic = characteristics[deviceId]?[characteristicUuid] else {
+        let charUuid = normalizeUuid(characteristicUuid)
+        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
             completion(.failure(BlueyError.notFound))
             return
         }
@@ -184,7 +187,8 @@ class CentralManagerImpl: NSObject {
         let type: CBCharacteristicWriteType = withResponse ? .withResponse : .withoutResponse
 
         if withResponse {
-            writeCharacteristicCompletions[deviceId, default: [:]][characteristicUuid] = completion
+            let cacheKey = characteristic.uuid.uuidString.lowercased()
+            writeCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
         }
 
         peripheral.writeValue(value.data, for: characteristic, type: type)
@@ -195,7 +199,8 @@ class CentralManagerImpl: NSObject {
     }
 
     func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let characteristic = characteristics[deviceId]?[characteristicUuid] else {
+        let charUuid = normalizeUuid(characteristicUuid)
+        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
             completion(.failure(BlueyError.notFound))
             return
         }
@@ -205,14 +210,41 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        notifyCompletions[deviceId, default: [:]][characteristicUuid] = completion
+        let cacheKey = characteristic.uuid.uuidString.lowercased()
+        notifyCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.setNotifyValue(enable, for: characteristic)
+    }
+
+    /// Finds a characteristic by UUID, handling both short and full UUID formats.
+    private func findCharacteristic(deviceId: String, uuid: String) -> CBCharacteristic? {
+        guard let deviceChars = characteristics[deviceId] else { return nil }
+
+        // Try exact match first
+        if let char = deviceChars[uuid] {
+            return char
+        }
+
+        // Try matching by CBUUID (handles short UUID matching)
+        let targetCBUUID = uuid.toCBUUID()
+        for (_, char) in deviceChars {
+            if char.uuid == targetCBUUID {
+                return char
+            }
+        }
+
+        return nil
+    }
+
+    /// Normalizes a UUID string to lowercase without hyphens for consistent comparison.
+    private func normalizeUuid(_ uuid: String) -> String {
+        return uuid.lowercased()
     }
 
     // MARK: - Descriptor Operations
 
     func readDescriptor(deviceId: String, descriptorUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
-        guard let descriptor = descriptors[deviceId]?[descriptorUuid] else {
+        let descUuid = normalizeUuid(descriptorUuid)
+        guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
             completion(.failure(BlueyError.notFound))
             return
         }
@@ -222,12 +254,14 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        readDescriptorCompletions[deviceId, default: [:]][descriptorUuid] = completion
+        let cacheKey = descriptor.uuid.uuidString.lowercased()
+        readDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.readValue(for: descriptor)
     }
 
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let descriptor = descriptors[deviceId]?[descriptorUuid] else {
+        let descUuid = normalizeUuid(descriptorUuid)
+        guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
             completion(.failure(BlueyError.notFound))
             return
         }
@@ -237,8 +271,29 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        writeDescriptorCompletions[deviceId, default: [:]][descriptorUuid] = completion
+        let cacheKey = descriptor.uuid.uuidString.lowercased()
+        writeDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.writeValue(value.data, for: descriptor)
+    }
+
+    /// Finds a descriptor by UUID, handling both short and full UUID formats.
+    private func findDescriptor(deviceId: String, uuid: String) -> CBDescriptor? {
+        guard let deviceDescs = descriptors[deviceId] else { return nil }
+
+        // Try exact match first
+        if let desc = deviceDescs[uuid] {
+            return desc
+        }
+
+        // Try matching by CBUUID (handles short UUID matching)
+        let targetCBUUID = uuid.toCBUUID()
+        for (_, desc) in deviceDescs {
+            if desc.uuid == targetCBUUID {
+                return desc
+            }
+        }
+
+        return nil
     }
 
     // MARK: - MTU
