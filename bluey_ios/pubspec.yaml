@@ -26,6 +26,5 @@ flutter:
     implements: bluey
     platforms:
       ios:
-        package: com.neutrinographics.bluey
-        pluginClass: BlueyPlugin
+        pluginClass: BlueyIosPlugin
         dartPluginClass: BlueyIos

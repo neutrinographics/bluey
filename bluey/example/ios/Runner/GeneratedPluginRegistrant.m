@@ -6,8 +6,8 @@
 
 #import "GeneratedPluginRegistrant.h"
 
-#if __has_include(<bluey_ios/BlueyPlugin.h>)
-#import <bluey_ios/BlueyPlugin.h>
+#if __has_include(<bluey_ios/BlueyIosPlugin.h>)
+#import <bluey_ios/BlueyIosPlugin.h>
 #else
 @import bluey_ios;
 #endif
@@ -21,7 +21,7 @@
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
-  [BlueyPlugin registerWithRegistrar:[registry registrarForPlugin:@"BlueyPlugin"]];
+  [BlueyIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"BlueyIosPlugin"]];
   [IntegrationTestPlugin registerWithRegistrar:[registry registrarForPlugin:@"IntegrationTestPlugin"]];
 }
 
