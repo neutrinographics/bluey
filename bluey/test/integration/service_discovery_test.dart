@@ -13,7 +13,6 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
-    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -49,7 +48,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -94,7 +93,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -148,7 +147,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -194,7 +193,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -243,7 +242,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services;
@@ -284,7 +283,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services;
@@ -326,7 +325,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services;
@@ -356,7 +355,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -390,7 +389,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -423,7 +422,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -453,7 +452,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -478,7 +477,7 @@ void main() {
           services: [],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -506,7 +505,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services;
@@ -533,7 +532,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 

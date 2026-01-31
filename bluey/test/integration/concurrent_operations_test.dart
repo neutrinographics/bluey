@@ -13,7 +13,6 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
-    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -28,7 +27,7 @@ void main() {
           name: 'Device 1',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Start two concurrent scans
         final devices1 = <Device>[];
@@ -55,7 +54,7 @@ void main() {
           name: 'Device 1',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         final devices1 = <Device>[];
         final devices2 = <Device>[];
@@ -104,7 +103,7 @@ void main() {
           name: 'Device 3',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Discover devices
         final devices = <Device>[];
@@ -139,7 +138,7 @@ void main() {
           name: 'Device 2',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Discover devices
         final devices = <Device>[];
@@ -216,7 +215,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -275,7 +274,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -340,7 +339,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -417,7 +416,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -484,7 +483,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -513,7 +512,7 @@ void main() {
 
     group('Server Concurrent Operations', () {
       test('handles multiple centrals connecting simultaneously', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final server = bluey.server()!;
 
         await server.addService(
@@ -552,7 +551,7 @@ void main() {
       test(
         'handles concurrent read requests from different centrals',
         () async {
-          final bluey = Bluey();
+          final bluey = Bluey(platformOverride: fakePlatform);
           final server = bluey.server()!;
 
           await server.addService(
@@ -606,7 +605,7 @@ void main() {
       );
 
       test('notifies all connected centrals simultaneously', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final server = bluey.server()!;
 
         await server.addService(
@@ -681,7 +680,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Start server
         final server = bluey.server()!;

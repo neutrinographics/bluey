@@ -13,7 +13,6 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
-    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -48,7 +47,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -88,7 +87,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -138,7 +137,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -172,7 +171,7 @@ void main() {
           rssi: -65, // Medium signal
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
@@ -208,7 +207,7 @@ void main() {
           rssi: -35,
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
@@ -257,7 +256,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -309,7 +308,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -342,7 +341,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -389,7 +388,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -445,7 +444,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -499,7 +498,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -541,7 +540,7 @@ void main() {
           name: 'Connected Device',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Connect to first device
         final device1 = await bluey.scan().first;
@@ -580,7 +579,7 @@ void main() {
           name: 'Device 2',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Discover devices
         final devices = <Device>[];
@@ -614,7 +613,7 @@ void main() {
           rssi: -50,
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
@@ -641,7 +640,7 @@ void main() {
           name: 'Device C',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         final deviceIds = <String>{};
         final subscription = bluey.scan().listen((device) {
@@ -683,7 +682,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -729,7 +728,7 @@ void main() {
             ],
           );
 
-          final bluey = Bluey();
+          final bluey = Bluey(platformOverride: fakePlatform);
           final device = await bluey.scan().first;
           final connection = await bluey.connect(device);
           final services = await connection.services;
@@ -758,7 +757,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -788,7 +787,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -822,7 +821,7 @@ void main() {
           manufacturerData: [0x01, 0x02],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // First scan
         final device1 = await bluey.scan().first;
@@ -847,7 +846,7 @@ void main() {
       });
 
       test('tracks RSSI changes over time', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Simulate device moving closer
         final rssiValues = [-80, -70, -60, -50, -40];
@@ -901,7 +900,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -952,7 +951,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -1004,7 +1003,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -1064,7 +1063,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -1117,7 +1116,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         final services = await connection.services;
@@ -1152,7 +1151,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -1178,7 +1177,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 

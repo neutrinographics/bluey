@@ -13,7 +13,6 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
-    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -67,7 +66,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Scan for heart rate monitors only
         final devices = <Device>[];
@@ -122,7 +121,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -163,7 +162,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -253,7 +252,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -341,7 +340,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -415,7 +414,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -463,7 +462,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -503,7 +502,7 @@ void main() {
 
     group('Peripheral Server', () {
       test('acts as a custom BLE peripheral', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final server = bluey.server()!;
 
         // Create a custom service
@@ -552,7 +551,7 @@ void main() {
       });
 
       test('handles read requests from central', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abd';
@@ -592,7 +591,7 @@ void main() {
       });
 
       test('sends notifications to connected centrals', () async {
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abe';
@@ -649,7 +648,7 @@ void main() {
           serviceUuids: ['00001810-0000-1000-8000-00805f9b34fb'],
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(platformOverride: fakePlatform);
 
         // Discover all devices
         final devices = <Device>[];

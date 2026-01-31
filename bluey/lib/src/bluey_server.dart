@@ -13,6 +13,7 @@ import 'uuid.dart';
 /// Concrete implementation of [Server] that delegates to the platform.
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
+  final BlueyEventBus _eventBus;
 
   bool _isAdvertising = false;
   final Map<String, BlueyCentral> _connectedCentrals = {};
@@ -23,7 +24,7 @@ class BlueyServer implements Server {
   StreamSubscription? _centralConnectionsSub;
   StreamSubscription? _centralDisconnectionsSub;
 
-  BlueyServer(this._platform) {
+  BlueyServer(this._platform, this._eventBus) {
     _emitEvent(const ServerStartedEvent(source: 'BlueyServer'));
 
     _centralConnectionsSub = _platform.centralConnections.listen((
@@ -228,7 +229,7 @@ class BlueyServer implements Server {
   }
 
   void _emitEvent(BlueyEvent event) {
-    BlueyEventBus.instance.emit(event);
+    _eventBus.emit(event);
   }
 }
 

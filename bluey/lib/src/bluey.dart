@@ -46,9 +46,22 @@ enum BluetoothState {
 /// This is the domain-layer facade that provides a clean API over the
 /// platform-specific implementations. All BLE operations go through this class.
 ///
-/// Example:
+/// ## Usage
+///
+/// For most apps, use the shared instance:
 /// ```dart
-/// final bluey = Bluey();
+/// final bluey = Bluey.shared;
+/// ```
+///
+/// For testing or when you need multiple isolated instances:
+/// ```dart
+/// final bluey = Bluey(platform: fakePlatform);
+/// ```
+///
+/// ## Example
+///
+/// ```dart
+/// final bluey = Bluey.shared;
 ///
 /// // Check Bluetooth state
 /// if (await bluey.state != BluetoothState.on) {
@@ -61,9 +74,23 @@ enum BluetoothState {
 /// }
 /// ```
 class Bluey {
-  static Bluey? _instance;
+  /// Shared instance for simple apps.
+  ///
+  /// Use this when you don't need dependency injection or isolated instances.
+  /// The instance is created lazily on first access.
+  static Bluey get shared => _shared ??= Bluey();
+  static Bluey? _shared;
+
+  /// Resets the shared instance.
+  ///
+  /// Call this if you need to reinitialize Bluey (e.g., after dispose).
+  /// Typically only needed in tests.
+  static void resetShared() {
+    _shared = null;
+  }
 
   final platform.BlueyPlatform _platform;
+  final BlueyEventBus _eventBus;
 
   StreamSubscription? _stateSubscription;
   final StreamController<BluetoothState> _stateController =
@@ -73,23 +100,19 @@ class Bluey {
 
   BluetoothState _currentState = BluetoothState.unknown;
 
-  /// Gets or creates the Bluey instance.
+  /// Creates a new Bluey instance.
   ///
-  /// This uses a singleton pattern to ensure the platform implementation
-  /// is properly registered before being accessed.
+  /// For most apps, prefer using [Bluey.shared] instead.
   ///
-  /// Typically you create one instance and reuse it throughout your app.
+  /// Use this constructor when you need:
+  /// - Dependency injection for testing
+  /// - Multiple isolated Bluey instances
+  /// - Custom platform implementation
+  ///
   /// Call [dispose] when done to release resources.
-  factory Bluey() {
-    var instance = _instance;
-    if (instance == null) {
-      _instance = instance = Bluey._internal(platform.BlueyPlatform.instance);
-    }
-    return instance;
-  }
-
-  /// Internal constructor.
-  Bluey._internal(this._platform) {
+  Bluey({platform.BlueyPlatform? platformOverride, BlueyEventBus? eventBus})
+    : _platform = platformOverride ?? platform.BlueyPlatform.instance,
+      _eventBus = eventBus ?? BlueyEventBus() {
     _stateSubscription = _platform.stateStream.listen((state) {
       _currentState = _mapState(state);
       _stateController.add(_currentState);
@@ -184,7 +207,7 @@ class Bluey {
   ///   print(event); // [Scan] Started filter=180d timeout=10s
   /// });
   /// ```
-  Stream<BlueyEvent> get events => BlueyEventBus.instance.stream;
+  Stream<BlueyEvent> get events => _eventBus.stream;
 
   /// Get current Bluetooth state.
   Future<BluetoothState> get state async {
@@ -360,18 +383,22 @@ class Bluey {
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
-    return BlueyServer(_platform);
+    return BlueyServer(_platform, _eventBus);
   }
 
   /// Release all resources.
   ///
   /// After calling dispose, this instance cannot be used.
-  /// The singleton is cleared, so a new instance can be created.
+  /// If this is the shared instance, it will be cleared so a new one
+  /// can be created via [Bluey.shared].
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _stateController.close();
     await _errorController.close();
-    _instance = null;
+    await _eventBus.close();
+    if (_shared == this) {
+      _shared = null;
+    }
   }
 
   // === Private mapping methods ===
@@ -461,7 +488,7 @@ class Bluey {
 
   /// Emits an event to the event bus.
   void _emitEvent(BlueyEvent event) {
-    BlueyEventBus.instance.emit(event);
+    _eventBus.emit(event);
   }
 
   /// Wraps platform errors in domain exceptions and emits to error stream.
