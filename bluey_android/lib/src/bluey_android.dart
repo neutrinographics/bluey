@@ -346,8 +346,21 @@ final class BlueyAndroid extends BlueyPlatform {
       manufacturerDataCompanyId: config.manufacturerDataCompanyId,
       manufacturerData: config.manufacturerData,
       timeoutMs: config.timeoutMs,
+      mode: _mapAdvertiseModeToDto(config.mode),
     );
     await _hostApi.startAdvertising(dto);
+  }
+
+  AdvertiseModeDto? _mapAdvertiseModeToDto(PlatformAdvertiseMode? mode) {
+    if (mode == null) return null;
+    switch (mode) {
+      case PlatformAdvertiseMode.lowPower:
+        return AdvertiseModeDto.lowPower;
+      case PlatformAdvertiseMode.balanced:
+        return AdvertiseModeDto.balanced;
+      case PlatformAdvertiseMode.lowLatency:
+        return AdvertiseModeDto.lowLatency;
+    }
   }
 
   @override

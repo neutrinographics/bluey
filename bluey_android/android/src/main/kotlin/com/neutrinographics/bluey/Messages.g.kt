@@ -92,6 +92,37 @@ enum class GattPermissionDto(val raw: Int) {
   }
 }
 
+/**
+ * Advertising mode for Android.
+ *
+ * Controls the advertising interval and power consumption.
+ * This setting only affects Android - other platforms manage advertising
+ * intervals automatically.
+ */
+enum class AdvertiseModeDto(val raw: Int) {
+  /**
+   * Lowest power consumption, 1000ms advertising interval.
+   * Best for background advertising where quick discovery isn't critical.
+   */
+  LOW_POWER(0),
+  /**
+   * Balanced power consumption, 250ms advertising interval.
+   * Good default for most use cases.
+   */
+  BALANCED(1),
+  /**
+   * Lowest latency, 100ms advertising interval.
+   * Fastest discovery but highest power consumption.
+   */
+  LOW_LATENCY(2);
+
+  companion object {
+    fun ofRaw(raw: Int): AdvertiseModeDto? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /** GATT status code for responses (DTO for platform channel). */
 enum class GattStatusDto(val raw: Int) {
   SUCCESS(0),
@@ -500,7 +531,16 @@ data class AdvertiseConfigDto (
   val serviceUuids: List<String>,
   val manufacturerDataCompanyId: Long? = null,
   val manufacturerData: ByteArray? = null,
-  val timeoutMs: Long? = null
+  val timeoutMs: Long? = null,
+  /**
+   * The advertising mode (Android only).
+   *
+   * Controls the advertising interval and power consumption.
+   * Ignored on platforms other than Android.
+   *
+   * Defaults to [AdvertiseModeDto.lowLatency] if not specified.
+   */
+  val mode: AdvertiseModeDto? = null
 )
  {
   companion object {
@@ -510,7 +550,8 @@ data class AdvertiseConfigDto (
       val manufacturerDataCompanyId = pigeonVar_list[2] as Long?
       val manufacturerData = pigeonVar_list[3] as ByteArray?
       val timeoutMs = pigeonVar_list[4] as Long?
-      return AdvertiseConfigDto(name, serviceUuids, manufacturerDataCompanyId, manufacturerData, timeoutMs)
+      val mode = pigeonVar_list[5] as AdvertiseModeDto?
+      return AdvertiseConfigDto(name, serviceUuids, manufacturerDataCompanyId, manufacturerData, timeoutMs, mode)
     }
   }
   fun toList(): List<Any?> {
@@ -520,6 +561,7 @@ data class AdvertiseConfigDto (
       manufacturerDataCompanyId,
       manufacturerData,
       timeoutMs,
+      mode,
     )
   }
 }
@@ -669,95 +711,100 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       132.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          GattStatusDto.ofRaw(it.toInt())
+          AdvertiseModeDto.ofRaw(it.toInt())
         }
       }
       133.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          ScanConfigDto.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          GattStatusDto.ofRaw(it.toInt())
         }
       }
       134.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectConfigDto.fromList(it)
+          ScanConfigDto.fromList(it)
         }
       }
       135.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DeviceDto.fromList(it)
+          ConnectConfigDto.fromList(it)
         }
       }
       136.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectionStateEventDto.fromList(it)
+          DeviceDto.fromList(it)
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicPropertiesDto.fromList(it)
+          ConnectionStateEventDto.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DescriptorDto.fromList(it)
+          CharacteristicPropertiesDto.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicDto.fromList(it)
+          DescriptorDto.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ServiceDto.fromList(it)
+          CharacteristicDto.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          NotificationEventDto.fromList(it)
+          ServiceDto.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MtuChangedEventDto.fromList(it)
+          NotificationEventDto.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalDescriptorDto.fromList(it)
+          MtuChangedEventDto.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalCharacteristicDto.fromList(it)
+          LocalDescriptorDto.fromList(it)
         }
       }
       145.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalServiceDto.fromList(it)
+          LocalCharacteristicDto.fromList(it)
         }
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AdvertiseConfigDto.fromList(it)
+          LocalServiceDto.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CentralDto.fromList(it)
+          AdvertiseConfigDto.fromList(it)
         }
       }
       148.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ReadRequestDto.fromList(it)
+          CentralDto.fromList(it)
         }
       }
       149.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WriteRequestDto.fromList(it)
+          ReadRequestDto.fromList(it)
         }
       }
       150.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WriteRequestDto.fromList(it)
+        }
+      }
+      151.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           BlueyConfigDto.fromList(it)
         }
@@ -779,80 +826,84 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(131)
         writeValue(stream, value.raw)
       }
-      is GattStatusDto -> {
+      is AdvertiseModeDto -> {
         stream.write(132)
         writeValue(stream, value.raw)
       }
-      is ScanConfigDto -> {
+      is GattStatusDto -> {
         stream.write(133)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is ConnectConfigDto -> {
+      is ScanConfigDto -> {
         stream.write(134)
         writeValue(stream, value.toList())
       }
-      is DeviceDto -> {
+      is ConnectConfigDto -> {
         stream.write(135)
         writeValue(stream, value.toList())
       }
-      is ConnectionStateEventDto -> {
+      is DeviceDto -> {
         stream.write(136)
         writeValue(stream, value.toList())
       }
-      is CharacteristicPropertiesDto -> {
+      is ConnectionStateEventDto -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is DescriptorDto -> {
+      is CharacteristicPropertiesDto -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is CharacteristicDto -> {
+      is DescriptorDto -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is ServiceDto -> {
+      is CharacteristicDto -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is NotificationEventDto -> {
+      is ServiceDto -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is MtuChangedEventDto -> {
+      is NotificationEventDto -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is LocalDescriptorDto -> {
+      is MtuChangedEventDto -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is LocalCharacteristicDto -> {
+      is LocalDescriptorDto -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is LocalServiceDto -> {
+      is LocalCharacteristicDto -> {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is AdvertiseConfigDto -> {
+      is LocalServiceDto -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is CentralDto -> {
+      is AdvertiseConfigDto -> {
         stream.write(147)
         writeValue(stream, value.toList())
       }
-      is ReadRequestDto -> {
+      is CentralDto -> {
         stream.write(148)
         writeValue(stream, value.toList())
       }
-      is WriteRequestDto -> {
+      is ReadRequestDto -> {
         stream.write(149)
         writeValue(stream, value.toList())
       }
-      is BlueyConfigDto -> {
+      is WriteRequestDto -> {
         stream.write(150)
+        writeValue(stream, value.toList())
+      }
+      is BlueyConfigDto -> {
+        stream.write(151)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)

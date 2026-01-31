@@ -50,6 +50,23 @@ enum GattPermissionDto {
   writeEncrypted,
 }
 
+/// Advertising mode for Android.
+///
+/// Controls the advertising interval and power consumption.
+/// This setting only affects Android - other platforms manage advertising
+/// intervals automatically.
+enum AdvertiseModeDto {
+  /// Lowest power consumption, 1000ms advertising interval.
+  /// Best for background advertising where quick discovery isn't critical.
+  lowPower,
+  /// Balanced power consumption, 250ms advertising interval.
+  /// Good default for most use cases.
+  balanced,
+  /// Lowest latency, 100ms advertising interval.
+  /// Fastest discovery but highest power consumption.
+  lowLatency,
+}
+
 /// GATT status code for responses (DTO for platform channel).
 enum GattStatusDto {
   success,
@@ -506,6 +523,7 @@ class AdvertiseConfigDto {
     this.manufacturerDataCompanyId,
     this.manufacturerData,
     this.timeoutMs,
+    this.mode,
   });
 
   String? name;
@@ -518,6 +536,14 @@ class AdvertiseConfigDto {
 
   int? timeoutMs;
 
+  /// The advertising mode (Android only).
+  ///
+  /// Controls the advertising interval and power consumption.
+  /// Ignored on platforms other than Android.
+  ///
+  /// Defaults to [AdvertiseModeDto.lowLatency] if not specified.
+  AdvertiseModeDto? mode;
+
   Object encode() {
     return <Object?>[
       name,
@@ -525,6 +551,7 @@ class AdvertiseConfigDto {
       manufacturerDataCompanyId,
       manufacturerData,
       timeoutMs,
+      mode,
     ];
   }
 
@@ -536,6 +563,7 @@ class AdvertiseConfigDto {
       manufacturerDataCompanyId: result[2] as int?,
       manufacturerData: result[3] as Uint8List?,
       timeoutMs: result[4] as int?,
+      mode: result[5] as AdvertiseModeDto?,
     );
   }
 }
@@ -699,62 +727,65 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is GattPermissionDto) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    }    else if (value is GattStatusDto) {
+    }    else if (value is AdvertiseModeDto) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    }    else if (value is ScanConfigDto) {
+    }    else if (value is GattStatusDto) {
       buffer.putUint8(133);
-      writeValue(buffer, value.encode());
-    }    else if (value is ConnectConfigDto) {
+      writeValue(buffer, value.index);
+    }    else if (value is ScanConfigDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
-    }    else if (value is DeviceDto) {
+    }    else if (value is ConnectConfigDto) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
-    }    else if (value is ConnectionStateEventDto) {
+    }    else if (value is DeviceDto) {
       buffer.putUint8(136);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicPropertiesDto) {
+    }    else if (value is ConnectionStateEventDto) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    }    else if (value is DescriptorDto) {
+    }    else if (value is CharacteristicPropertiesDto) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicDto) {
+    }    else if (value is DescriptorDto) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    }    else if (value is ServiceDto) {
+    }    else if (value is CharacteristicDto) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    }    else if (value is NotificationEventDto) {
+    }    else if (value is ServiceDto) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    }    else if (value is MtuChangedEventDto) {
+    }    else if (value is NotificationEventDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalDescriptorDto) {
+    }    else if (value is MtuChangedEventDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalCharacteristicDto) {
+    }    else if (value is LocalDescriptorDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalServiceDto) {
+    }    else if (value is LocalCharacteristicDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    }    else if (value is AdvertiseConfigDto) {
+    }    else if (value is LocalServiceDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    }    else if (value is CentralDto) {
+    }    else if (value is AdvertiseConfigDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    }    else if (value is ReadRequestDto) {
+    }    else if (value is CentralDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    }    else if (value is WriteRequestDto) {
+    }    else if (value is ReadRequestDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    }    else if (value is BlueyConfigDto) {
+    }    else if (value is WriteRequestDto) {
       buffer.putUint8(150);
+      writeValue(buffer, value.encode());
+    }    else if (value is BlueyConfigDto) {
+      buffer.putUint8(151);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -775,42 +806,45 @@ class _PigeonCodec extends StandardMessageCodec {
         return value == null ? null : GattPermissionDto.values[value];
       case 132: 
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : GattStatusDto.values[value];
+        return value == null ? null : AdvertiseModeDto.values[value];
       case 133: 
-        return ScanConfigDto.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : GattStatusDto.values[value];
       case 134: 
-        return ConnectConfigDto.decode(readValue(buffer)!);
+        return ScanConfigDto.decode(readValue(buffer)!);
       case 135: 
-        return DeviceDto.decode(readValue(buffer)!);
+        return ConnectConfigDto.decode(readValue(buffer)!);
       case 136: 
-        return ConnectionStateEventDto.decode(readValue(buffer)!);
+        return DeviceDto.decode(readValue(buffer)!);
       case 137: 
-        return CharacteristicPropertiesDto.decode(readValue(buffer)!);
+        return ConnectionStateEventDto.decode(readValue(buffer)!);
       case 138: 
-        return DescriptorDto.decode(readValue(buffer)!);
+        return CharacteristicPropertiesDto.decode(readValue(buffer)!);
       case 139: 
-        return CharacteristicDto.decode(readValue(buffer)!);
+        return DescriptorDto.decode(readValue(buffer)!);
       case 140: 
-        return ServiceDto.decode(readValue(buffer)!);
+        return CharacteristicDto.decode(readValue(buffer)!);
       case 141: 
-        return NotificationEventDto.decode(readValue(buffer)!);
+        return ServiceDto.decode(readValue(buffer)!);
       case 142: 
-        return MtuChangedEventDto.decode(readValue(buffer)!);
+        return NotificationEventDto.decode(readValue(buffer)!);
       case 143: 
-        return LocalDescriptorDto.decode(readValue(buffer)!);
+        return MtuChangedEventDto.decode(readValue(buffer)!);
       case 144: 
-        return LocalCharacteristicDto.decode(readValue(buffer)!);
+        return LocalDescriptorDto.decode(readValue(buffer)!);
       case 145: 
-        return LocalServiceDto.decode(readValue(buffer)!);
+        return LocalCharacteristicDto.decode(readValue(buffer)!);
       case 146: 
-        return AdvertiseConfigDto.decode(readValue(buffer)!);
+        return LocalServiceDto.decode(readValue(buffer)!);
       case 147: 
-        return CentralDto.decode(readValue(buffer)!);
+        return AdvertiseConfigDto.decode(readValue(buffer)!);
       case 148: 
-        return ReadRequestDto.decode(readValue(buffer)!);
+        return CentralDto.decode(readValue(buffer)!);
       case 149: 
-        return WriteRequestDto.decode(readValue(buffer)!);
+        return ReadRequestDto.decode(readValue(buffer)!);
       case 150: 
+        return WriteRequestDto.decode(readValue(buffer)!);
+      case 151: 
         return BlueyConfigDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);

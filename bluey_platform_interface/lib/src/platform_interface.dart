@@ -479,6 +479,25 @@ class PlatformLocalService {
   });
 }
 
+/// Advertising mode (Android only).
+///
+/// Controls the advertising interval and power consumption.
+/// This setting only affects Android - other platforms manage advertising
+/// intervals automatically.
+enum PlatformAdvertiseMode {
+  /// Lowest power consumption, 1000ms advertising interval.
+  /// Best for background advertising where quick discovery isn't critical.
+  lowPower,
+
+  /// Balanced power consumption, 250ms advertising interval.
+  /// Good default for most use cases.
+  balanced,
+
+  /// Lowest latency, 100ms advertising interval.
+  /// Fastest discovery but highest power consumption.
+  lowLatency,
+}
+
 /// Advertising configuration (platform layer).
 @immutable
 class PlatformAdvertiseConfig {
@@ -488,12 +507,21 @@ class PlatformAdvertiseConfig {
   final Uint8List? manufacturerData;
   final int? timeoutMs;
 
+  /// The advertising mode (Android only).
+  ///
+  /// Controls the advertising interval and power consumption.
+  /// Ignored on platforms other than Android.
+  ///
+  /// Defaults to [PlatformAdvertiseMode.lowLatency] if not specified.
+  final PlatformAdvertiseMode? mode;
+
   const PlatformAdvertiseConfig({
     this.name,
     required this.serviceUuids,
     this.manufacturerDataCompanyId,
     this.manufacturerData,
     this.timeoutMs,
+    this.mode,
   });
 }
 

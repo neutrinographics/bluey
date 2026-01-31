@@ -62,8 +62,15 @@ class Advertiser(
         }
 
         // Build advertise settings
+        val advertiseMode = when (config.mode) {
+            AdvertiseModeDto.LOW_POWER -> AdvertiseSettings.ADVERTISE_MODE_LOW_POWER
+            AdvertiseModeDto.BALANCED -> AdvertiseSettings.ADVERTISE_MODE_BALANCED
+            AdvertiseModeDto.LOW_LATENCY -> AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
+            null -> AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY // Default to low latency
+        }
+
         val settingsBuilder = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // More frequent advertising
+            .setAdvertiseMode(advertiseMode)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH) // Higher power for better visibility
             .setConnectable(true)
 
