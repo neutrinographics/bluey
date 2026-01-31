@@ -47,12 +47,6 @@ class GattServer(
     // Track notification subscriptions: characteristicUuid -> Set<centralId>
     private val subscriptions = mutableMapOf<String, MutableSet<String>>()
 
-    // Flag to filter phantom connections - only report centrals after advertising starts
-    private var isAdvertising = false
-
-    // Track connections that existed before advertising (phantom connections)
-    private val phantomConnections = mutableSetOf<String>()
-
     // Pending callbacks for async service addition
     private var pendingServiceCallback: ((Result<Unit>) -> Unit)? = null
 
@@ -64,27 +58,6 @@ class GattServer(
 
     fun setActivity(activity: Activity?) {
         this.activity = activity
-    }
-
-    /**
-     * Called when advertising starts. Any connections that exist at this point
-     * are "phantom" connections (where this device is the central, not peripheral).
-     */
-    fun onAdvertisingStarted() {
-        Log.d("GattServer", ">>> onAdvertisingStarted - marking ${connectedCentrals.keys} as phantom connections")
-        Log.d("GattServer", ">>> isAdvertising was: $isAdvertising, setting to true")
-        phantomConnections.clear()
-        phantomConnections.addAll(connectedCentrals.keys)
-        isAdvertising = true
-        Log.d("GattServer", ">>> phantomConnections now: $phantomConnections")
-    }
-
-    /**
-     * Called when advertising stops.
-     */
-    fun onAdvertisingStopped() {
-        Log.d("GattServer", "onAdvertisingStopped")
-        isAdvertising = false
     }
 
     fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
@@ -298,8 +271,6 @@ class GattServer(
         centralMtus.clear()
         subscriptions.clear()
         pendingServiceCallback = null
-        isAdvertising = false
-        phantomConnections.clear()
     }
 
     /**
@@ -378,33 +349,14 @@ class GattServer(
             val deviceId = device.address
             Log.d(
                 "GattServer",
-                ">>> onConnectionStateChange: device=$deviceId status=$status newState=$newState, callback=$this, gattServer=$gattServer"
+                "onConnectionStateChange: device=$deviceId status=$status newState=$newState"
             )
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
-                    Log.d("GattServer", "STATE_CONNECTED: $deviceId")
+                    Log.d("GattServer", "Central connected: $deviceId")
                     connectedCentrals[deviceId] = device
                     centralMtus[deviceId] = DEFAULT_MTU
-
-                    // Check if this is a phantom connection (existed before advertising)
-                    // or a connection that happened before we started advertising
-                    Log.d(
-                        "GattServer",
-                        "Checking connection: isAdvertising=$isAdvertising, phantomConnections=$phantomConnections"
-                    )
-                    if (!isAdvertising) {
-                        Log.d("GattServer", "Not advertising yet - marking $deviceId as phantom connection")
-                        phantomConnections.add(deviceId)
-                        return
-                    }
-
-                    if (phantomConnections.contains(deviceId)) {
-                        Log.d("GattServer", "Ignoring phantom connection reconnect for $deviceId")
-                        return
-                    }
-
-                    Log.d("GattServer", "Connection is valid - notifying Flutter")
 
                     val central = CentralDto(
                         id = deviceId,
@@ -412,25 +364,17 @@ class GattServer(
                     )
                     // Must dispatch to main thread for Flutter platform channel
                     handler.post {
-                        Log.d("GattServer", "Calling flutterApi.onCentralConnected for $deviceId")
-                        flutterApi.onCentralConnected(central) { result ->
-                            Log.d("GattServer", "onCentralConnected result: $result")
-                        }
+                        flutterApi.onCentralConnected(central) {}
                     }
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
+                    Log.d("GattServer", "Central disconnected: $deviceId")
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
                     // Remove from all subscriptions
                     subscriptions.values.forEach { it.remove(deviceId) }
-
-                    // Don't notify Flutter about phantom connection disconnects
-                    if (phantomConnections.remove(deviceId)) {
-                        Log.d("GattServer", "Phantom connection disconnected: $deviceId - not notifying Flutter")
-                        return
-                    }
 
                     // Must dispatch to main thread for Flutter platform channel
                     handler.post {
