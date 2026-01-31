@@ -162,12 +162,6 @@ await server.dispose();
 
 **Note:** On iOS, the OS handles BLE cleanup automatically when the app is terminated, so this option has no effect.
 
-##### Automatic Zombie Connection Cleanup (Android only)
-
-When the plugin initializes on Android, it automatically disconnects any stale GATT server connections that may have persisted from a previous app session (e.g., if the app was force-killed and couldn't clean up properly). This ensures a clean state when starting the app and prevents issues with connection limits or unexpected behavior.
-
-This cleanup happens automatically and requires no configuration.
-
 ### Scanning for Devices
 
 ```dart

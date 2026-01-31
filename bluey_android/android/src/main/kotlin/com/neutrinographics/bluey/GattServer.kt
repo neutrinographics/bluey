@@ -359,46 +359,13 @@ class GattServer(
             gattServer = server
             Log.d("GattServer", "ensureServerOpen: server opened = ${gattServer != null}")
 
-            // Only disconnect zombie connections if we successfully opened the server
-            if (gattServer != null) {
-                disconnectZombieConnections()
-            } else {
+            if (gattServer == null) {
                 Log.e("GattServer", "ensureServerOpen: Failed to open GATT server - Bluetooth may not be fully ready")
             }
         } catch (e: SecurityException) {
             Log.e("GattServer", "ensureServerOpen: SecurityException", e)
         } catch (e: Exception) {
             Log.e("GattServer", "ensureServerOpen: Exception", e)
-        }
-    }
-
-    /**
-     * Disconnect any pre-existing BLE connections that may be zombies from previous app sessions.
-     * This helps prevent resource exhaustion and ensures a clean state.
-     */
-    private fun disconnectZombieConnections() {
-        try {
-            val connectedDevices = bluetoothManager?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT_SERVER)
-            if (connectedDevices.isNullOrEmpty()) {
-                Log.d("GattServer", "No zombie connections to clean up")
-                return
-            }
-
-            Log.d("GattServer", "Found ${connectedDevices.size} potential zombie connections, disconnecting...")
-            val server = gattServer ?: return
-
-            for (device in connectedDevices) {
-                Log.d("GattServer", "Disconnecting zombie connection: ${device.address}")
-                try {
-                    server.cancelConnection(device)
-                } catch (e: SecurityException) {
-                    Log.e("GattServer", "Failed to disconnect zombie ${device.address}: ${e.message}")
-                }
-            }
-        } catch (e: SecurityException) {
-            Log.e("GattServer", "Cannot get connected devices: ${e.message}")
-        } catch (e: Exception) {
-            Log.e("GattServer", "Error cleaning up zombie connections: ${e.message}")
         }
     }
 

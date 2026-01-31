@@ -153,6 +153,7 @@ class Advertiser(
     }
 
     fun cleanup() {
+        Log.d("Advertiser", "cleanup() called, isAdvertising=$isAdvertising")
         stopAdvertisingInternal()
     }
 
@@ -161,18 +162,23 @@ class Advertiser(
         timeoutRunnable?.let { handler.removeCallbacks(it) }
         timeoutRunnable = null
 
-        if (!isAdvertising) return
+        if (!isAdvertising) {
+            Log.d("Advertiser", "stopAdvertisingInternal: not advertising, skipping")
+            return
+        }
 
         advertiseCallback?.let { cb ->
             try {
+                Log.d("Advertiser", "stopAdvertisingInternal: stopping advertising")
                 advertiser?.stopAdvertising(cb)
             } catch (e: SecurityException) {
-                // Permission revoked
+                Log.e("Advertiser", "stopAdvertisingInternal: SecurityException", e)
             }
         }
 
         isAdvertising = false
         advertiseCallback = null
+        Log.d("Advertiser", "stopAdvertisingInternal: advertising stopped")
     }
 
     private fun normalizeUuid(uuid: String): String {
