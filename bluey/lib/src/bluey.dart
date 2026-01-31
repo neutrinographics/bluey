@@ -14,7 +14,6 @@ import 'exceptions.dart';
 import 'server.dart';
 import 'uuid.dart';
 
-export 'connection_state.dart';
 export 'events.dart';
 
 /// The state of the Bluetooth adapter.
@@ -53,9 +52,10 @@ enum BluetoothState {
 /// final bluey = Bluey.shared;
 /// ```
 ///
-/// For testing or when you need multiple isolated instances:
+/// For testing, set the platform instance before creating Bluey:
 /// ```dart
-/// final bluey = Bluey(platform: fakePlatform);
+/// BlueyPlatform.instance = fakePlatform;
+/// final bluey = Bluey();
 /// ```
 ///
 /// ## Example
@@ -104,15 +104,12 @@ class Bluey {
   ///
   /// For most apps, prefer using [Bluey.shared] instead.
   ///
-  /// Use this constructor when you need:
-  /// - Dependency injection for testing
-  /// - Multiple isolated Bluey instances
-  /// - Custom platform implementation
+  /// Use this constructor when you need multiple isolated Bluey instances.
   ///
   /// Call [dispose] when done to release resources.
-  Bluey({platform.BlueyPlatform? platformOverride, BlueyEventBus? eventBus})
-    : _platform = platformOverride ?? platform.BlueyPlatform.instance,
-      _eventBus = eventBus ?? BlueyEventBus() {
+  Bluey()
+    : _platform = platform.BlueyPlatform.instance,
+      _eventBus = BlueyEventBus() {
     _stateSubscription = _platform.stateStream.listen((state) {
       _currentState = _mapState(state);
       _stateController.add(_currentState);
@@ -342,8 +339,8 @@ class Bluey {
     _emitEvent(ConnectingEvent(deviceId: device.id));
 
     try {
-      // Use platformId for the actual connection (MAC address on Android)
-      final connectionId = await _platform.connect(device.platformId, config);
+      // Use address for the actual connection (MAC address on Android)
+      final connectionId = await _platform.connect(device.address, config);
 
       _emitEvent(ConnectedEvent(deviceId: device.id));
 
@@ -459,10 +456,10 @@ class Bluey {
     // Create device
     // Note: On Android, the device ID is a MAC address, not a UUID.
     // We create a UUID from the MAC by padding it, but preserve the original
-    // platformId for connections.
+    // address for connections.
     return Device(
       id: _deviceIdToUuid(platformDevice.id),
-      platformId: platformDevice.id, // Keep original for platform calls
+      address: platformDevice.id, // Keep original for platform calls
       name: platformDevice.name,
       rssi: platformDevice.rssi,
       advertisement: advertisement,

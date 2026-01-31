@@ -35,8 +35,10 @@ void main() {
     });
 
     test('PermissionDeniedException with permissions list', () {
-      final exception =
-          PermissionDeniedException(['BLUETOOTH_SCAN', 'BLUETOOTH_CONNECT']);
+      final exception = PermissionDeniedException([
+        'BLUETOOTH_SCAN',
+        'BLUETOOTH_CONNECT',
+      ]);
       expect(exception.message, contains('BLUETOOTH_SCAN'));
       expect(exception.message, contains('BLUETOOTH_CONNECT'));
       expect(exception.permissions, hasLength(2));
@@ -46,22 +48,44 @@ void main() {
   group('Connection Exceptions', () {
     test('ConnectionException with reason', () {
       final deviceId = UUID.short(0x1234);
-      final exception =
-          ConnectionException(deviceId, ConnectionFailureReason.timeout);
+      final exception = ConnectionException(
+        deviceId,
+        ConnectionFailureReason.timeout,
+      );
 
       expect(exception.deviceId, equals(deviceId));
       expect(exception.reason, equals(ConnectionFailureReason.timeout));
       expect(exception.message, contains('timeout'));
     });
 
+    test('ConnectionException has action', () {
+      final exception = ConnectionException(
+        UUID.short(0x1234),
+        ConnectionFailureReason.timeout,
+      );
+      expect(exception.action, isNotNull);
+      expect(exception.action, contains('range'));
+    });
+
     test('DisconnectedException with reason', () {
       final deviceId = UUID.short(0x1234);
-      final exception =
-          DisconnectedException(deviceId, DisconnectReason.linkLoss);
+      final exception = DisconnectedException(
+        deviceId,
+        DisconnectReason.linkLoss,
+      );
 
       expect(exception.deviceId, equals(deviceId));
       expect(exception.reason, equals(DisconnectReason.linkLoss));
       expect(exception.message, contains('link'));
+    });
+
+    test('DisconnectedException has action', () {
+      final exception = DisconnectedException(
+        UUID.short(0x1234),
+        DisconnectReason.linkLoss,
+      );
+      expect(exception.action, isNotNull);
+      expect(exception.action, contains('Reconnect'));
     });
   });
 
@@ -74,6 +98,12 @@ void main() {
       expect(exception.message, contains('Service not found'));
     });
 
+    test('ServiceNotFoundException has action', () {
+      final exception = ServiceNotFoundException(Services.heartRate);
+      expect(exception.action, isNotNull);
+      expect(exception.action, contains('service'));
+    });
+
     test('CharacteristicNotFoundException', () {
       final charUuid = UUID.short(0x2A37);
       final exception = CharacteristicNotFoundException(charUuid);
@@ -82,11 +112,22 @@ void main() {
       expect(exception.message, contains('Characteristic not found'));
     });
 
+    test('CharacteristicNotFoundException has action', () {
+      final exception = CharacteristicNotFoundException(UUID.short(0x2A37));
+      expect(exception.action, isNotNull);
+      expect(exception.action, contains('characteristic'));
+    });
+
     test('GattException with status', () {
       final exception = GattException(GattStatus.readNotPermitted);
 
       expect(exception.status, equals(GattStatus.readNotPermitted));
       expect(exception.message, contains('readNotPermitted'));
+    });
+
+    test('GattException has action', () {
+      final exception = GattException(GattStatus.readNotPermitted);
+      expect(exception.action, isNotNull);
     });
 
     test('OperationNotSupportedException', () {
@@ -100,11 +141,19 @@ void main() {
 
   group('Server Exceptions', () {
     test('AdvertisingException with reason', () {
-      final exception =
-          AdvertisingException(AdvertisingFailureReason.dataTooBig);
+      final exception = AdvertisingException(
+        AdvertisingFailureReason.dataTooBig,
+      );
 
       expect(exception.reason, equals(AdvertisingFailureReason.dataTooBig));
       expect(exception.message, contains('dataTooBig'));
+    });
+
+    test('AdvertisingException has action', () {
+      final exception = AdvertisingException(
+        AdvertisingFailureReason.dataTooBig,
+      );
+      expect(exception.action, isNotNull);
     });
   });
 
@@ -122,12 +171,18 @@ void main() {
 
   group('Enums', () {
     test('ConnectionFailureReason has all cases', () {
-      expect(ConnectionFailureReason.values,
-          contains(ConnectionFailureReason.timeout));
-      expect(ConnectionFailureReason.values,
-          contains(ConnectionFailureReason.deviceNotFound));
-      expect(ConnectionFailureReason.values,
-          contains(ConnectionFailureReason.unknown));
+      expect(
+        ConnectionFailureReason.values,
+        contains(ConnectionFailureReason.timeout),
+      );
+      expect(
+        ConnectionFailureReason.values,
+        contains(ConnectionFailureReason.deviceNotFound),
+      );
+      expect(
+        ConnectionFailureReason.values,
+        contains(ConnectionFailureReason.unknown),
+      );
     });
 
     test('DisconnectReason has all cases', () {
@@ -142,10 +197,14 @@ void main() {
     });
 
     test('AdvertisingFailureReason has all cases', () {
-      expect(AdvertisingFailureReason.values,
-          contains(AdvertisingFailureReason.dataTooBig));
-      expect(AdvertisingFailureReason.values,
-          contains(AdvertisingFailureReason.notSupported));
+      expect(
+        AdvertisingFailureReason.values,
+        contains(AdvertisingFailureReason.dataTooBig),
+      );
+      expect(
+        AdvertisingFailureReason.values,
+        contains(AdvertisingFailureReason.notSupported),
+      );
     });
   });
 }

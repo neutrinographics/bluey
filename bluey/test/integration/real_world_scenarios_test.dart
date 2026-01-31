@@ -13,6 +13,7 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
+    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -66,7 +67,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Scan for heart rate monitors only
         final devices = <Device>[];
@@ -121,7 +122,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -162,7 +163,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -252,7 +253,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -340,7 +341,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -414,7 +415,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -462,7 +463,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -502,15 +503,15 @@ void main() {
 
     group('Peripheral Server', () {
       test('acts as a custom BLE peripheral', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         // Create a custom service
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('12345678-1234-1234-1234-123456789abc'),
             characteristics: [
-              LocalCharacteristic(
+              HostedCharacteristic(
                 uuid: UUID('12345678-1234-1234-1234-123456789abd'),
                 properties: const CharacteristicProperties(
                   canRead: true,
@@ -518,7 +519,7 @@ void main() {
                 ),
                 permissions: const [GattPermission.read, GattPermission.write],
               ),
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('12345678-1234-1234-1234-123456789abe'),
               ),
             ],
@@ -551,16 +552,16 @@ void main() {
       });
 
       test('handles read requests from central', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abd';
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('12345678-1234-1234-1234-123456789abc'),
             characteristics: [
-              LocalCharacteristic.readable(uuid: UUID(charUuid)),
+              HostedCharacteristic.readable(uuid: UUID(charUuid)),
             ],
           ),
         );
@@ -591,16 +592,16 @@ void main() {
       });
 
       test('sends notifications to connected centrals', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abe';
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('12345678-1234-1234-1234-123456789abc'),
             characteristics: [
-              LocalCharacteristic.notifiable(uuid: UUID(charUuid)),
+              HostedCharacteristic.notifiable(uuid: UUID(charUuid)),
             ],
           ),
         );
@@ -648,7 +649,7 @@ void main() {
           serviceUuids: ['00001810-0000-1000-8000-00805f9b34fb'],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Discover all devices
         final devices = <Device>[];

@@ -222,7 +222,8 @@ void main() {
 
   setUp(() {
     mockPlatform = MockBlueyPlatform();
-    bluey = Bluey(platformOverride: mockPlatform);
+    platform.BlueyPlatform.instance = mockPlatform;
+    bluey = Bluey();
   });
 
   tearDown(() async {

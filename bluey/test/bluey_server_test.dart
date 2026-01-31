@@ -309,7 +309,8 @@ void main() {
 
   setUp(() {
     mockPlatform = MockBlueyPlatform();
-    bluey = Bluey(platformOverride: mockPlatform);
+    platform.BlueyPlatform.instance = mockPlatform;
+    bluey = Bluey();
   });
 
   tearDown(() async {
@@ -330,7 +331,8 @@ void main() {
         () async {
           // Create a new instance with non-advertising platform
           final nonAdvertisingPlatform = _NonAdvertisingPlatform();
-          final bluey2 = Bluey(platformOverride: nonAdvertisingPlatform);
+          platform.BlueyPlatform.instance = nonAdvertisingPlatform;
+          final bluey2 = Bluey();
 
           final server = bluey2.server();
           expect(server, isNull);
@@ -344,10 +346,10 @@ void main() {
       test('addService adds service to platform', () async {
         final server = bluey.server()!;
 
-        final service = LocalService(
+        final service = HostedService(
           uuid: UUID.short(0x180F),
           characteristics: [
-            LocalCharacteristic.readable(uuid: UUID.short(0x2A19)),
+            HostedCharacteristic.readable(uuid: UUID.short(0x2A19)),
           ],
         );
 

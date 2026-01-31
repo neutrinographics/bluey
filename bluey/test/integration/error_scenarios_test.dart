@@ -13,6 +13,7 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
+    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -22,11 +23,11 @@ void main() {
   group('Error Scenarios', () {
     group('Connection Errors', () {
       test('throws when connecting to unknown device', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         final unknownDevice = Device(
           id: UUID('00000000-0000-0000-0000-000000000001'),
-          platformId: 'FF:FF:FF:FF:FF:FF',
+          address: 'FF:FF:FF:FF:FF:FF',
           name: 'Unknown Device',
           rssi: -100,
           advertisement: Advertisement(
@@ -73,7 +74,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -118,7 +119,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
         await connection.disconnect();
@@ -152,7 +153,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -197,7 +198,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -226,14 +227,14 @@ void main() {
       );
 
       test('throws when notifying to disconnected central', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -265,11 +266,11 @@ void main() {
       test(
         'throws when simulating read request from non-connected central',
         () async {
-          final bluey = Bluey(platformOverride: fakePlatform);
+          final bluey = Bluey();
           final server = bluey.server()!;
 
           await server.addService(
-            LocalService(
+            HostedService(
               uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
               characteristics: [],
             ),
@@ -294,11 +295,11 @@ void main() {
       test(
         'throws when simulating write request from non-connected central',
         () async {
-          final bluey = Bluey(platformOverride: fakePlatform);
+          final bluey = Bluey();
           final server = bluey.server()!;
 
           await server.addService(
-            LocalService(
+            HostedService(
               uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
               characteristics: [],
             ),
@@ -325,7 +326,7 @@ void main() {
       test('handles Bluetooth being unsupported', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.unsupported);
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final state = await bluey.state;
 
         expect(state, equals(BluetoothState.unsupported));
@@ -336,7 +337,7 @@ void main() {
       test('handles Bluetooth unauthorized state', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.unauthorized);
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final state = await bluey.state;
 
         expect(state, equals(BluetoothState.unauthorized));
@@ -350,7 +351,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -393,7 +394,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -426,7 +427,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -445,7 +446,7 @@ void main() {
       });
 
       test('state stream continues after Bluetooth state changes', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -471,14 +472,14 @@ void main() {
 
     group('Request/Response Errors', () {
       test('read request fails with error status', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.readable(
+              HostedCharacteristic.readable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -518,14 +519,14 @@ void main() {
       });
 
       test('write request fails with error status', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.writable(
+              HostedCharacteristic.writable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -572,7 +573,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
 
         // Rapid connect/disconnect cycles
@@ -595,7 +596,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Multiple scans in sequence
         for (var i = 0; i < 3; i++) {
@@ -611,7 +612,7 @@ void main() {
       });
 
       test('handles device appearing and disappearing', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // First scan - no devices
         var devices = <Device>[];
@@ -672,7 +673,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 
@@ -713,7 +714,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         await bluey.connect(device);
 

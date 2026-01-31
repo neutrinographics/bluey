@@ -64,7 +64,10 @@ class ConnectionException extends BlueyException {
   final ConnectionFailureReason reason;
 
   const ConnectionException(this.deviceId, this.reason)
-    : super('Failed to connect to device: $reason');
+    : super(
+        'Failed to connect to device: $reason',
+        action: 'Check device is in range and advertising',
+      );
 }
 
 /// Reasons why a device might disconnect.
@@ -82,7 +85,7 @@ class DisconnectedException extends BlueyException {
   final DisconnectReason reason;
 
   const DisconnectedException(this.deviceId, this.reason)
-    : super('Device disconnected: $reason');
+    : super('Device disconnected: $reason', action: 'Reconnect if needed');
 }
 
 // === GATT Exceptions ===
@@ -92,7 +95,10 @@ class ServiceNotFoundException extends BlueyException {
   final UUID serviceUuid;
 
   const ServiceNotFoundException(this.serviceUuid)
-    : super('Service not found: $serviceUuid');
+    : super(
+        'Service not found: $serviceUuid',
+        action: 'Verify device supports this service',
+      );
 }
 
 /// Characteristic not found in service.
@@ -100,7 +106,10 @@ class CharacteristicNotFoundException extends BlueyException {
   final UUID characteristicUuid;
 
   const CharacteristicNotFoundException(this.characteristicUuid)
-    : super('Characteristic not found: $characteristicUuid');
+    : super(
+        'Characteristic not found: $characteristicUuid',
+        action: 'Verify service contains this characteristic',
+      );
 }
 
 /// GATT operation status codes.
@@ -119,7 +128,11 @@ enum GattStatus {
 class GattException extends BlueyException {
   final GattStatus status;
 
-  const GattException(this.status) : super('GATT operation failed: $status');
+  const GattException(this.status)
+    : super(
+        'GATT operation failed: $status',
+        action: 'Retry operation or check permissions',
+      );
 }
 
 /// Operation not supported by this characteristic.
@@ -149,7 +162,10 @@ class AdvertisingException extends BlueyException {
   final AdvertisingFailureReason reason;
 
   const AdvertisingException(this.reason)
-    : super('Failed to start advertising: $reason');
+    : super(
+        'Failed to start advertising: $reason',
+        action: 'Check advertising data size and hardware support',
+      );
 }
 
 // === Platform Exceptions ===

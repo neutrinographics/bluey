@@ -11,10 +11,12 @@ void main() {
         final advertisement = Advertisement(
           serviceUuids: [Services.heartRate, Services.battery],
           serviceData: {
-            Services.heartRate: Uint8List.fromList([1, 2, 3])
+            Services.heartRate: Uint8List.fromList([1, 2, 3]),
           },
-          manufacturerData:
-              ManufacturerData(0x004C, Uint8List.fromList([10, 20])),
+          manufacturerData: ManufacturerData(
+            0x004C,
+            Uint8List.fromList([10, 20]),
+          ),
           txPowerLevel: -10,
           isConnectable: true,
         );
@@ -59,23 +61,29 @@ void main() {
           isConnectable: true,
         );
 
-        expect(() => advertisement.serviceUuids.add(Services.battery),
-            throwsUnsupportedError);
+        expect(
+          () => advertisement.serviceUuids.add(Services.battery),
+          throwsUnsupportedError,
+        );
       });
 
       test('serviceData map is unmodifiable', () {
         final advertisement = Advertisement(
           serviceUuids: [],
           serviceData: {
-            Services.heartRate: Uint8List.fromList([1, 2])
+            Services.heartRate: Uint8List.fromList([1, 2]),
           },
           isConnectable: true,
         );
 
         expect(
-            () => advertisement.serviceData[Services.battery] =
-                Uint8List.fromList([3, 4]),
-            throwsUnsupportedError);
+          () =>
+              advertisement.serviceData[Services.battery] = Uint8List.fromList([
+                3,
+                4,
+              ]),
+          throwsUnsupportedError,
+        );
       });
     });
 
@@ -169,6 +177,29 @@ void main() {
         expect(device.lastSeen, isNotNull);
       });
 
+      test('address defaults to id.toString() when not provided', () {
+        final device = Device(
+          id: testUuid,
+          rssi: -60,
+          advertisement: testAdvertisement,
+        );
+
+        expect(device.address, equals(testUuid.toString()));
+      });
+
+      test('address can be set explicitly (e.g., MAC address on Android)', () {
+        const macAddress = 'AA:BB:CC:DD:EE:FF';
+        final device = Device(
+          id: testUuid,
+          address: macAddress,
+          rssi: -60,
+          advertisement: testAdvertisement,
+        );
+
+        expect(device.address, equals(macAddress));
+        expect(device.id, equals(testUuid)); // id is still the UUID
+      });
+
       test('creates without name', () {
         final device = Device(
           id: testUuid,
@@ -188,10 +219,14 @@ void main() {
         );
         final after = DateTime.now();
 
-        expect(device.lastSeen.isAfter(before.subtract(Duration(seconds: 1))),
-            isTrue);
         expect(
-            device.lastSeen.isBefore(after.add(Duration(seconds: 1))), isTrue);
+          device.lastSeen.isAfter(before.subtract(Duration(seconds: 1))),
+          isTrue,
+        );
+        expect(
+          device.lastSeen.isBefore(after.add(Duration(seconds: 1))),
+          isTrue,
+        );
       });
 
       test('accepts custom lastSeen', () {
@@ -268,10 +303,7 @@ void main() {
           advertisement: testAdvertisement,
         );
 
-        final updated = original.copyWith(
-          name: 'Updated',
-          rssi: -50,
-        );
+        final updated = original.copyWith(name: 'Updated', rssi: -50);
 
         expect(updated.id, equals(original.id));
         expect(updated.name, equals('Updated'));

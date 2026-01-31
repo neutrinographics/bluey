@@ -13,6 +13,7 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
+    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -22,14 +23,14 @@ void main() {
   group('Server Advanced Scenarios', () {
     group('Central Subscription Tracking', () {
       test('tracks which centrals are connected', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -60,11 +61,11 @@ void main() {
       });
 
       test('tracks central disconnections', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -98,14 +99,14 @@ void main() {
       });
 
       test('can notify specific central only', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -136,14 +137,14 @@ void main() {
       });
 
       test('broadcast notifies all connected centrals', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -169,14 +170,14 @@ void main() {
 
     group('Read Request Handling', () {
       test('handles read requests from different centrals', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.readable(
+              HostedCharacteristic.readable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -222,14 +223,14 @@ void main() {
       });
 
       test('can reject read requests', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.readable(
+              HostedCharacteristic.readable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -268,14 +269,14 @@ void main() {
 
     group('Write Request Handling', () {
       test('handles write requests with response', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.writable(
+              HostedCharacteristic.writable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -312,14 +313,14 @@ void main() {
       });
 
       test('handles write without response', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.writable(
+              HostedCharacteristic.writable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -357,14 +358,14 @@ void main() {
       });
 
       test('can reject write requests', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [
-              LocalCharacteristic.writable(
+              HostedCharacteristic.writable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -403,15 +404,15 @@ void main() {
 
     group('Multiple Services', () {
       test('serves multiple services simultaneously', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         // Add multiple services
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'), // Heart Rate
             characteristics: [
-              LocalCharacteristic.notifiable(
+              HostedCharacteristic.notifiable(
                 uuid: UUID('00002a37-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -419,10 +420,10 @@ void main() {
         );
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180f-0000-1000-8000-00805f9b34fb'), // Battery
             characteristics: [
-              LocalCharacteristic.readable(
+              HostedCharacteristic.readable(
                 uuid: UUID('00002a19-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -430,10 +431,10 @@ void main() {
         );
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180a-0000-1000-8000-00805f9b34fb'), // Device Info
             characteristics: [
-              LocalCharacteristic.readable(
+              HostedCharacteristic.readable(
                 uuid: UUID('00002a29-0000-1000-8000-00805f9b34fb'),
               ),
             ],
@@ -458,18 +459,18 @@ void main() {
       });
 
       test('removes service while others remain', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
         );
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180f-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -490,11 +491,11 @@ void main() {
 
     group('Advertising with Manufacturer Data', () {
       test('includes manufacturer data in advertisement', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -525,11 +526,11 @@ void main() {
 
     group('Server Disconnect Central', () {
       test('server can disconnect a specific central', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -553,11 +554,11 @@ void main() {
       });
 
       test('closeServer disconnects all centrals', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -583,11 +584,11 @@ void main() {
 
     group('Concurrent Central Operations', () {
       test('handles rapid connects and disconnects', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),

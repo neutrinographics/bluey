@@ -66,8 +66,8 @@ class BlueyServer implements Server {
   List<Central> get connectedCentrals => _connectedCentrals.values.toList();
 
   @override
-  Future<void> addService(LocalService service) async {
-    final platformService = _mapLocalServiceToPlatform(service);
+  Future<void> addService(HostedService service) async {
+    final platformService = _mapHostedServiceToPlatform(service);
     await _platform.addService(platformService);
     _emitEvent(
       ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
@@ -165,23 +165,23 @@ class BlueyServer implements Server {
 
   // === Private mapping methods ===
 
-  platform.PlatformLocalService _mapLocalServiceToPlatform(
-    LocalService service,
+  platform.PlatformLocalService _mapHostedServiceToPlatform(
+    HostedService service,
   ) {
     return platform.PlatformLocalService(
       uuid: service.uuid.toString(),
       isPrimary: service.isPrimary,
       characteristics:
           service.characteristics
-              .map(_mapLocalCharacteristicToPlatform)
+              .map(_mapHostedCharacteristicToPlatform)
               .toList(),
       includedServices:
-          service.includedServices.map(_mapLocalServiceToPlatform).toList(),
+          service.includedServices.map(_mapHostedServiceToPlatform).toList(),
     );
   }
 
-  platform.PlatformLocalCharacteristic _mapLocalCharacteristicToPlatform(
-    LocalCharacteristic characteristic,
+  platform.PlatformLocalCharacteristic _mapHostedCharacteristicToPlatform(
+    HostedCharacteristic characteristic,
   ) {
     return platform.PlatformLocalCharacteristic(
       uuid: characteristic.uuid.toString(),
@@ -197,13 +197,13 @@ class BlueyServer implements Server {
           characteristic.permissions.map(_mapGattPermissionToPlatform).toList(),
       descriptors:
           characteristic.descriptors
-              .map(_mapLocalDescriptorToPlatform)
+              .map(_mapHostedDescriptorToPlatform)
               .toList(),
     );
   }
 
-  platform.PlatformLocalDescriptor _mapLocalDescriptorToPlatform(
-    LocalDescriptor descriptor,
+  platform.PlatformLocalDescriptor _mapHostedDescriptorToPlatform(
+    HostedDescriptor descriptor,
   ) {
     return platform.PlatformLocalDescriptor(
       uuid: descriptor.uuid.toString(),

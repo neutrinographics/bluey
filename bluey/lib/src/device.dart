@@ -107,12 +107,14 @@ class Advertisement {
   }
 }
 
-/// A discovered BLE device.
+/// A snapshot of a discovered BLE device at a point in time.
 ///
-/// Entity with identity based on [id]. Two devices with the same ID are
-/// considered equal even if their other properties differ (e.g., updated RSSI).
+/// This is a value object representing device state when discovered or updated.
+/// Two snapshots with the same [id] are considered equal, even if other
+/// properties differ (e.g., RSSI changed). This enables deduplication in
+/// collections while preserving the latest snapshot data.
 ///
-/// Immutable value - use [copyWith] to create updated instances.
+/// Immutable - use [copyWith] to create updated snapshots.
 @immutable
 class Device {
   /// Unique device identifier as a UUID.
@@ -121,11 +123,11 @@ class Device {
   /// On Android, this is derived from the MAC address.
   final UUID id;
 
-  /// Platform-specific device identifier used for connections.
+  /// Hardware address used for platform connections.
   ///
   /// On Android, this is the MAC address (e.g., "AA:BB:CC:DD:EE:FF").
-  /// On iOS, this is the same as [id].
-  final String platformId;
+  /// On iOS, this is the same as [id] since iOS doesn't expose MAC addresses.
+  final String address;
 
   /// Advertised device name, if available.
   final String? name;
@@ -141,12 +143,12 @@ class Device {
 
   Device({
     required this.id,
-    String? platformId,
+    String? address,
     this.name,
     required this.rssi,
     required this.advertisement,
     DateTime? lastSeen,
-  }) : platformId = platformId ?? id.toString(),
+  }) : address = address ?? id.toString(),
        lastSeen = lastSeen ?? DateTime.now();
 
   /// Creates a copy with updated fields.
@@ -161,7 +163,7 @@ class Device {
   }) {
     return Device(
       id: id,
-      platformId: platformId,
+      address: address,
       name: name == _sentinel ? this.name : name as String?,
       rssi: rssi ?? this.rssi,
       advertisement: advertisement ?? this.advertisement,

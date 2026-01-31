@@ -14,9 +14,9 @@ void main() {
     });
   });
 
-  group('LocalDescriptor', () {
+  group('HostedDescriptor', () {
     test('creates with uuid and permissions', () {
-      final descriptor = LocalDescriptor(
+      final descriptor = HostedDescriptor(
         uuid: UUID.short(0x2902), // CCCD
         permissions: [GattPermission.read, GattPermission.write],
       );
@@ -28,7 +28,7 @@ void main() {
 
     test('immutable creates read-only descriptor with value', () {
       final value = Uint8List.fromList([0x01, 0x02, 0x03]);
-      final descriptor = LocalDescriptor.immutable(
+      final descriptor = HostedDescriptor.immutable(
         uuid: UUID.short(0x2901), // Characteristic User Description
         value: value,
       );
@@ -40,15 +40,15 @@ void main() {
     });
 
     test('equality based on uuid', () {
-      final d1 = LocalDescriptor(
+      final d1 = HostedDescriptor(
         uuid: UUID.short(0x2902),
         permissions: [GattPermission.read],
       );
-      final d2 = LocalDescriptor(
+      final d2 = HostedDescriptor(
         uuid: UUID.short(0x2902),
         permissions: [GattPermission.write],
       );
-      final d3 = LocalDescriptor(
+      final d3 = HostedDescriptor(
         uuid: UUID.short(0x2901),
         permissions: [GattPermission.read],
       );
@@ -58,9 +58,9 @@ void main() {
     });
   });
 
-  group('LocalCharacteristic', () {
+  group('HostedCharacteristic', () {
     test('creates with uuid, properties, and permissions', () {
-      final characteristic = LocalCharacteristic(
+      final characteristic = HostedCharacteristic(
         uuid: UUID.short(0x2A37), // Heart Rate Measurement
         properties: CharacteristicProperties(canNotify: true),
         permissions: [GattPermission.read],
@@ -72,11 +72,11 @@ void main() {
     });
 
     test('can include descriptors', () {
-      final descriptor = LocalDescriptor(
+      final descriptor = HostedDescriptor(
         uuid: UUID.short(0x2902),
         permissions: [GattPermission.read, GattPermission.write],
       );
-      final characteristic = LocalCharacteristic(
+      final characteristic = HostedCharacteristic(
         uuid: UUID.short(0x2A37),
         properties: CharacteristicProperties(canNotify: true),
         permissions: [GattPermission.read],
@@ -88,7 +88,7 @@ void main() {
     });
 
     test('readable factory creates read-only characteristic', () {
-      final characteristic = LocalCharacteristic.readable(
+      final characteristic = HostedCharacteristic.readable(
         uuid: UUID.short(0x2A19), // Battery Level
       );
 
@@ -98,7 +98,7 @@ void main() {
     });
 
     test('writable factory creates writable characteristic', () {
-      final characteristic = LocalCharacteristic.writable(
+      final characteristic = HostedCharacteristic.writable(
         uuid: UUID.short(0x2A06), // Alert Level
       );
 
@@ -107,7 +107,7 @@ void main() {
     });
 
     test('notifiable factory creates notifiable characteristic', () {
-      final characteristic = LocalCharacteristic.notifiable(
+      final characteristic = HostedCharacteristic.notifiable(
         uuid: UUID.short(0x2A37), // Heart Rate Measurement
       );
 
@@ -116,12 +116,12 @@ void main() {
     });
 
     test('equality based on uuid', () {
-      final c1 = LocalCharacteristic(
+      final c1 = HostedCharacteristic(
         uuid: UUID.short(0x2A37),
         properties: CharacteristicProperties(canNotify: true),
         permissions: [GattPermission.read],
       );
-      final c2 = LocalCharacteristic(
+      final c2 = HostedCharacteristic(
         uuid: UUID.short(0x2A37),
         properties: CharacteristicProperties(canRead: true),
         permissions: [GattPermission.write],
@@ -131,12 +131,12 @@ void main() {
     });
   });
 
-  group('LocalService', () {
+  group('HostedService', () {
     test('creates with uuid and characteristics', () {
-      final characteristic = LocalCharacteristic.readable(
+      final characteristic = HostedCharacteristic.readable(
         uuid: UUID.short(0x2A19),
       );
-      final service = LocalService(
+      final service = HostedService(
         uuid: UUID.short(0x180F), // Battery Service
         characteristics: [characteristic],
       );
@@ -147,7 +147,7 @@ void main() {
     });
 
     test('can be secondary service', () {
-      final service = LocalService(
+      final service = HostedService(
         uuid: UUID.short(0x1801),
         isPrimary: false,
         characteristics: [],
@@ -157,11 +157,11 @@ void main() {
     });
 
     test('can include other services', () {
-      final includedService = LocalService(
+      final includedService = HostedService(
         uuid: UUID.short(0x1801),
         characteristics: [],
       );
-      final service = LocalService(
+      final service = HostedService(
         uuid: UUID.short(0x180F),
         characteristics: [],
         includedServices: [includedService],
@@ -172,8 +172,8 @@ void main() {
     });
 
     test('equality based on uuid', () {
-      final s1 = LocalService(uuid: UUID.short(0x180F), characteristics: []);
-      final s2 = LocalService(
+      final s1 = HostedService(uuid: UUID.short(0x180F), characteristics: []);
+      final s2 = HostedService(
         uuid: UUID.short(0x180F),
         isPrimary: false,
         characteristics: [],
@@ -223,7 +223,7 @@ void main() {
     });
 
     test('can add service', () {
-      final service = LocalService(
+      final service = HostedService(
         uuid: UUID.short(0x180F),
         characteristics: [],
       );
@@ -233,7 +233,7 @@ void main() {
     });
 
     test('can remove service', () {
-      final service = LocalService(
+      final service = HostedService(
         uuid: UUID.short(0x180F),
         characteristics: [],
       );
@@ -297,7 +297,7 @@ class MockCentral implements Central {
 
 /// Mock implementation of Server for testing.
 class MockServer implements Server {
-  final List<LocalService> _services = [];
+  final List<HostedService> _services = [];
   bool _isAdvertising = false;
   final _connectionsController = StreamController<Central>.broadcast();
 
@@ -310,10 +310,10 @@ class MockServer implements Server {
   @override
   List<Central> get connectedCentrals => [];
 
-  List<LocalService> get services => _services;
+  List<HostedService> get services => _services;
 
   @override
-  Future<void> addService(LocalService service) async {
+  Future<void> addService(HostedService service) async {
     _services.add(service);
   }
 

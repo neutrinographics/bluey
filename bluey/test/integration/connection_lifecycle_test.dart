@@ -12,6 +12,7 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
+    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -31,7 +32,7 @@ void main() {
           ], // Heart Rate Service
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Act: Scan for devices
         final devices = <Device>[];
@@ -62,7 +63,7 @@ void main() {
           serviceUuids: ['0000180f-0000-1000-8000-00805f9b34fb'], // Battery
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Act: Scan filtering for heart rate service
         final devices = <Device>[];
@@ -95,7 +96,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Discover device first
         final device = await bluey.scan().first;
@@ -111,11 +112,11 @@ void main() {
       });
 
       test('throws when connecting to non-existent device', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         final fakeDevice = Device(
           id: UUID('00000000-0000-0000-0000-000000000000'),
-          platformId: 'FF:FF:FF:FF:FF:FF',
+          address: 'FF:FF:FF:FF:FF:FF',
           name: 'Ghost Device',
           rssi: -100,
           advertisement: Advertisement(
@@ -140,7 +141,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -160,7 +161,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -189,7 +190,7 @@ void main() {
           name: 'Device 2',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Collect all devices
         final devices = <Device>[];
@@ -223,7 +224,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
 
         // First connection
@@ -247,7 +248,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
 
         // First connection
@@ -272,7 +273,7 @@ void main() {
       test('reports initial Bluetooth state', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final state = await bluey.state;
 
         expect(state, equals(BluetoothState.on));
@@ -283,7 +284,7 @@ void main() {
       test('notifies when Bluetooth turns off', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -301,7 +302,7 @@ void main() {
       test('requestEnable turns on Bluetooth when off', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Act
         final enabled = await bluey.requestEnable();

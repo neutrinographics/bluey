@@ -13,6 +13,7 @@ void main() {
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
+    platform.BlueyPlatform.instance = fakePlatform;
   });
 
   tearDown(() async {
@@ -22,7 +23,7 @@ void main() {
   group('State Machine', () {
     group('Bluetooth State Transitions', () {
       test('transitions through all Bluetooth states', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -53,7 +54,7 @@ void main() {
       });
 
       test('handles rapid state changes', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -73,7 +74,7 @@ void main() {
       });
 
       test('state getter reflects current state', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
         expect(await bluey.state, equals(BluetoothState.on));
@@ -92,7 +93,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -120,7 +121,7 @@ void main() {
             name: 'Test Device',
           );
 
-          final bluey = Bluey(platformOverride: fakePlatform);
+          final bluey = Bluey();
           final device = await bluey.scan().first;
           final connection = await bluey.connect(device);
 
@@ -168,7 +169,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -194,14 +195,14 @@ void main() {
 
     group('Server State Transitions', () {
       test('transitions idle -> advertising -> connected', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         // Initially not advertising
         expect(fakePlatform.isAdvertising, isFalse);
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -220,11 +221,11 @@ void main() {
       });
 
       test('transitions advertising -> stopped', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -241,11 +242,11 @@ void main() {
       });
 
       test('handles central disconnect -> reconnect', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -277,7 +278,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -293,11 +294,11 @@ void main() {
       });
 
       test('can restart advertising after stopping', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -320,11 +321,11 @@ void main() {
       });
 
       test('stop advertising when not advertising is safe', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -340,7 +341,7 @@ void main() {
       });
 
       test('double dispose is safe', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Double dispose should not throw
         await bluey.dispose();
@@ -348,11 +349,11 @@ void main() {
       });
 
       test('server dispose cleans up advertising', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -376,7 +377,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Start scan
         final devices = <Device>[];
@@ -415,7 +416,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -436,7 +437,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
@@ -452,12 +453,12 @@ void main() {
       });
 
       test('server state survives service changes', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         // Add service
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -468,7 +469,7 @@ void main() {
 
         // Add another service
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180f-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),
@@ -485,7 +486,7 @@ void main() {
 
     group('Recovery Scenarios', () {
       test('recovers from Bluetooth turning off and on', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
 
         // Start with Bluetooth on
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
@@ -517,7 +518,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final device = await bluey.scan().first;
 
         // Connect
@@ -538,11 +539,11 @@ void main() {
       });
 
       test('server recovers after all centrals disconnect', () async {
-        final bluey = Bluey(platformOverride: fakePlatform);
+        final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.addService(
-          LocalService(
+          HostedService(
             uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
             characteristics: [],
           ),

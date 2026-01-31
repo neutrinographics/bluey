@@ -24,13 +24,13 @@ enum GattPermission {
   writeEncrypted,
 }
 
-/// A descriptor for a local GATT characteristic.
+/// A descriptor hosted by this device's GATT server.
 ///
 /// Descriptors provide metadata about characteristics. The most common
 /// descriptor is the Client Characteristic Configuration Descriptor (CCCD)
 /// used to enable notifications.
 @immutable
-class LocalDescriptor {
+class HostedDescriptor {
   /// The UUID of this descriptor.
   final UUID uuid;
 
@@ -40,8 +40,8 @@ class LocalDescriptor {
   /// The static value of this descriptor (for immutable descriptors).
   final Uint8List? value;
 
-  /// Creates a local descriptor with the given UUID and permissions.
-  const LocalDescriptor({
+  /// Creates a hosted descriptor with the given UUID and permissions.
+  const HostedDescriptor({
     required this.uuid,
     required this.permissions,
     this.value,
@@ -51,11 +51,11 @@ class LocalDescriptor {
   ///
   /// Use this for descriptors whose value never changes, like
   /// Characteristic User Description.
-  factory LocalDescriptor.immutable({
+  factory HostedDescriptor.immutable({
     required UUID uuid,
     required Uint8List value,
   }) {
-    return LocalDescriptor(
+    return HostedDescriptor(
       uuid: uuid,
       permissions: const [GattPermission.read],
       value: value,
@@ -64,19 +64,19 @@ class LocalDescriptor {
 
   @override
   bool operator ==(Object other) {
-    return other is LocalDescriptor && other.uuid == uuid;
+    return other is HostedDescriptor && other.uuid == uuid;
   }
 
   @override
   int get hashCode => uuid.hashCode;
 }
 
-/// A characteristic for a local GATT service.
+/// A characteristic hosted by this device's GATT server.
 ///
 /// Characteristics are the primary way centrals interact with a peripheral.
 /// They can be read, written, or subscribed to for notifications.
 @immutable
-class LocalCharacteristic {
+class HostedCharacteristic {
   /// The UUID of this characteristic.
   final UUID uuid;
 
@@ -87,10 +87,10 @@ class LocalCharacteristic {
   final List<GattPermission> permissions;
 
   /// The descriptors for this characteristic.
-  final List<LocalDescriptor> descriptors;
+  final List<HostedDescriptor> descriptors;
 
-  /// Creates a local characteristic.
-  const LocalCharacteristic({
+  /// Creates a hosted characteristic.
+  const HostedCharacteristic({
     required this.uuid,
     required this.properties,
     required this.permissions,
@@ -98,11 +98,11 @@ class LocalCharacteristic {
   });
 
   /// Creates a read-only characteristic.
-  factory LocalCharacteristic.readable({
+  factory HostedCharacteristic.readable({
     required UUID uuid,
-    List<LocalDescriptor> descriptors = const [],
+    List<HostedDescriptor> descriptors = const [],
   }) {
-    return LocalCharacteristic(
+    return HostedCharacteristic(
       uuid: uuid,
       properties: const CharacteristicProperties(canRead: true),
       permissions: const [GattPermission.read],
@@ -111,12 +111,12 @@ class LocalCharacteristic {
   }
 
   /// Creates a writable characteristic.
-  factory LocalCharacteristic.writable({
+  factory HostedCharacteristic.writable({
     required UUID uuid,
     bool withResponse = true,
-    List<LocalDescriptor> descriptors = const [],
+    List<HostedDescriptor> descriptors = const [],
   }) {
-    return LocalCharacteristic(
+    return HostedCharacteristic(
       uuid: uuid,
       properties: CharacteristicProperties(
         canWrite: withResponse,
@@ -130,11 +130,11 @@ class LocalCharacteristic {
   /// Creates a notifiable characteristic.
   ///
   /// Notifiable characteristics can push updates to subscribed centrals.
-  factory LocalCharacteristic.notifiable({
+  factory HostedCharacteristic.notifiable({
     required UUID uuid,
-    List<LocalDescriptor> descriptors = const [],
+    List<HostedDescriptor> descriptors = const [],
   }) {
-    return LocalCharacteristic(
+    return HostedCharacteristic(
       uuid: uuid,
       properties: const CharacteristicProperties(canNotify: true),
       permissions: const [GattPermission.read],
@@ -144,19 +144,19 @@ class LocalCharacteristic {
 
   @override
   bool operator ==(Object other) {
-    return other is LocalCharacteristic && other.uuid == uuid;
+    return other is HostedCharacteristic && other.uuid == uuid;
   }
 
   @override
   int get hashCode => uuid.hashCode;
 }
 
-/// A service for the local GATT server.
+/// A service hosted by this device's GATT server.
 ///
 /// Services group related characteristics together. For example, the
 /// Heart Rate Service contains the Heart Rate Measurement characteristic.
 @immutable
-class LocalService {
+class HostedService {
   /// The UUID of this service.
   final UUID uuid;
 
@@ -167,13 +167,13 @@ class LocalService {
   final bool isPrimary;
 
   /// The characteristics in this service.
-  final List<LocalCharacteristic> characteristics;
+  final List<HostedCharacteristic> characteristics;
 
   /// Other services included by this service.
-  final List<LocalService> includedServices;
+  final List<HostedService> includedServices;
 
-  /// Creates a local service.
-  const LocalService({
+  /// Creates a hosted service.
+  const HostedService({
     required this.uuid,
     this.isPrimary = true,
     required this.characteristics,
@@ -182,7 +182,7 @@ class LocalService {
 
   @override
   bool operator ==(Object other) {
-    return other is LocalService && other.uuid == uuid;
+    return other is HostedService && other.uuid == uuid;
   }
 
   @override
@@ -219,10 +219,10 @@ abstract class Central {
 /// }
 ///
 /// // Add a service
-/// server.addService(LocalService(
+/// server.addService(HostedService(
 ///   uuid: UUID.short(0x180F),
 ///   characteristics: [
-///     LocalCharacteristic.readable(uuid: UUID.short(0x2A19)),
+///     HostedCharacteristic.readable(uuid: UUID.short(0x2A19)),
 ///   ],
 /// ));
 ///
@@ -250,7 +250,7 @@ abstract class Server {
   ///
   /// Must be called before [startAdvertising].
   /// Throws if the GATT server cannot be opened or the service cannot be added.
-  Future<void> addService(LocalService service);
+  Future<void> addService(HostedService service);
 
   /// Remove a service by UUID.
   ///
