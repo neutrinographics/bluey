@@ -322,6 +322,81 @@ final class BlueyAndroid extends BlueyPlatform {
     return await _hostApi.readRssi(deviceId);
   }
 
+  // === Bonding ===
+
+  @override
+  Future<PlatformBondState> getBondState(String deviceId) async {
+    // TODO: Implement when Android Pigeon API supports bonding
+    return PlatformBondState.none;
+  }
+
+  @override
+  Stream<PlatformBondState> bondStateStream(String deviceId) {
+    // TODO: Implement when Android Pigeon API supports bonding
+    return const Stream.empty();
+  }
+
+  @override
+  Future<void> bond(String deviceId) async {
+    // TODO: Implement when Android Pigeon API supports bonding
+  }
+
+  @override
+  Future<void> removeBond(String deviceId) async {
+    // TODO: Implement when Android Pigeon API supports bonding
+  }
+
+  @override
+  Future<List<PlatformDevice>> getBondedDevices() async {
+    // TODO: Implement when Android Pigeon API supports bonding
+    return [];
+  }
+
+  // === PHY ===
+
+  @override
+  Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
+    // TODO: Implement when Android Pigeon API supports PHY
+    return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
+  }
+
+  @override
+  Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
+    // TODO: Implement when Android Pigeon API supports PHY
+    return const Stream.empty();
+  }
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    PlatformPhy? txPhy,
+    PlatformPhy? rxPhy,
+  ) async {
+    // TODO: Implement when Android Pigeon API supports PHY
+  }
+
+  // === Connection Parameters ===
+
+  @override
+  Future<PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async {
+    // TODO: Implement when Android Pigeon API supports connection parameters
+    return const PlatformConnectionParameters(
+      intervalMs: 30,
+      latency: 0,
+      timeoutMs: 5000,
+    );
+  }
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters params,
+  ) async {
+    // TODO: Implement when Android Pigeon API supports connection parameters
+  }
+
   // === Server (Peripheral) Operations ===
 
   @override
@@ -380,6 +455,27 @@ final class BlueyAndroid extends BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    _ensureInitialized();
+    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+  }
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    _ensureInitialized();
+    // Android uses the same API for notifications and indications
+    // The characteristic's properties determine which is used
+    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+  }
+
+  @override
+  Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
     Uint8List value,

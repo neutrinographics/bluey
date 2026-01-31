@@ -5,6 +5,31 @@ import 'package:bluey/bluey.dart';
 
 import '../../main.dart';
 
+/// BLE Server (Peripheral) Demo Screen
+///
+/// This screen demonstrates how to use the Bluey library in "peripheral" mode,
+/// where your device advertises services that other BLE central devices can
+/// discover and connect to.
+///
+/// ## Important: Testing BLE Server/Client
+///
+/// BLE does not allow a device to connect to itself. To test the server
+/// functionality, you need **two separate physical devices**:
+///
+/// 1. **Device A (Peripheral/Server)**: Run this app and navigate to the
+///    Server screen. Start advertising.
+///
+/// 2. **Device B (Central/Client)**: Run this app (or any BLE scanner like
+///    "nRF Connect" or "LightBlue") and scan for devices. You should see
+///    "Bluey Demo" appear. Connect to it to interact with the service.
+///
+/// When Device B connects and discovers services, it will see:
+/// - Your custom service (`12345678-1234-1234-1234-123456789abc`)
+/// - Standard BLE services (Generic Access, Generic Attribute) that the
+///   OS automatically provides
+///
+/// The characteristics you define in [HostedService] will appear under your
+/// custom service UUID, not under the standard services.
 class ServerScreen extends StatefulWidget {
   const ServerScreen({super.key});
 
