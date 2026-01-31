@@ -355,12 +355,24 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     }
 
     override fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
-        advertiser?.startAdvertising(config, callback) ?: callback(
+        // Log the GATT server state before advertising
+        android.util.Log.d("BlueyPlugin", "startAdvertising called - logging GATT server state:")
+        gattServer?.logServerState()
+
+        advertiser?.startAdvertising(config) { result ->
+            if (result.isSuccess) {
+                android.util.Log.d("BlueyPlugin", "Advertising started - notifying GattServer")
+                gattServer?.onAdvertisingStarted()
+                gattServer?.logServerState()
+            }
+            callback(result)
+        } ?: callback(
             Result.failure(IllegalStateException("Advertiser not initialized"))
         )
     }
 
     override fun stopAdvertising(callback: (Result<Unit>) -> Unit) {
+        gattServer?.onAdvertisingStopped()
         advertiser?.stopAdvertising(callback) ?: callback(
             Result.failure(IllegalStateException("Advertiser not initialized"))
         )

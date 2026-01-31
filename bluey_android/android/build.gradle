@@ -47,13 +47,14 @@ android {
     }
 
     testOptions {
-        unitTests.all {
-            useJUnitPlatform()
-
-            testLogging {
-               events "passed", "skipped", "failed", "standardOut", "standardError"
-               outputs.upToDateWhen {false}
-               showStandardStreams = true
+        unitTests {
+            includeAndroidResources = true
+            all {
+                testLogging {
+                   events "passed", "skipped", "failed", "standardOut", "standardError"
+                   outputs.upToDateWhen {false}
+                   showStandardStreams = true
+                }
             }
         }
     }
@@ -61,4 +62,10 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    // Test dependencies
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "io.mockk:mockk:1.13.8"
+    testImplementation "io.mockk:mockk-android:1.13.8"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3"
 }

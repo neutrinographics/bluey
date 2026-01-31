@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import androidx.core.content.ContextCompat
+import android.util.Log
 import java.util.UUID
 
 /**
@@ -106,6 +107,10 @@ class Advertiser(
         // Create callback
         advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                Log.d("Advertiser", "Advertising started successfully. Settings: $settingsInEffect")
+                Log.d("Advertiser", "  connectable: ${settingsInEffect?.isConnectable}")
+                Log.d("Advertiser", "  mode: ${settingsInEffect?.mode}")
+                Log.d("Advertiser", "  txPowerLevel: ${settingsInEffect?.txPowerLevel}")
                 isAdvertising = true
                 callback(Result.success(Unit))
 
