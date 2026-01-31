@@ -16,8 +16,13 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 - ✅ Bluetooth state monitoring
 - ✅ Permission handling (Android 12+ and older)
 - ✅ Type-safe platform channels (Pigeon)
-- ⏳ GATT operations (read/write/notify) - planned
-- ⏳ Peripheral role (advertising) - planned
+- ✅ GATT operations (read/write/notify)
+- ✅ Peripheral role (advertising)
+- ✅ Server request/response handling
+- ✅ Notifications and indications
+- ✅ Bonding/pairing support
+- ✅ PHY (Physical Layer) configuration
+- ✅ Connection parameter control
 
 ## 📦 Packages
 
@@ -58,16 +63,24 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 
 **Value Objects (immutable, equality by value):**
 - `UUID` - 128-bit Bluetooth UUID with short-form support
-- `Device` - Discovered BLE device (entity with ID-based equality)
+- `Device` - Snapshot of a discovered BLE device (equality by ID)
 - `Advertisement` - Broadcast data from peripheral
 - `ManufacturerData` - Manufacturer-specific data
 - `Capabilities` - Platform feature matrix
+- `ConnectionParameters` - BLE connection timing parameters
+- `ReadRequest` / `WriteRequest` - GATT server request handling
+- `Central` - Connected central device in peripheral role
+
+**Enums:**
+- `BondState` - Bonding state (none, bonding, bonded)
+- `Phy` - Physical layer (le1m, le2m, leCoded)
+- `GattResponseStatus` - GATT operation response codes
 
 **Bounded Contexts:**
 1. **Discovery Context** - Scanning and device discovery
-2. **Connection Context** - Managing device connections
-3. **GATT Client Context** - Service/characteristic operations (planned)
-4. **GATT Server Context** - Peripheral role (planned)
+2. **Connection Context** - Managing device connections, bonding, PHY
+3. **GATT Client Context** - Service/characteristic operations
+4. **GATT Server Context** - Peripheral role, request handling
 5. **Platform Context** - Bluetooth state and permissions
 
 ## 🧪 Test-Driven Development
@@ -81,10 +94,10 @@ All code built following strict TDD:
 
 | Package | Tests | Status |
 |---------|-------|--------|
-| bluey | 54 | ✅ All passing |
+| bluey | 424 | ✅ All passing |
 | bluey_platform_interface | 20 | ✅ All passing |
 | bluey_android | 2 | ✅ All passing |
-| **Total** | **76** | ✅ **All passing** |
+| **Total** | **446** | ✅ **All passing** |
 
 ## 🚀 Usage
 
@@ -263,6 +276,77 @@ await server.notify(
 await server.dispose();
 ```
 
+### Bonding/Pairing
+
+```dart
+// Check bond state
+print('Bond state: ${connection.bondState}'); // none, bonding, bonded
+
+// Listen for bond state changes
+connection.bondStateChanges.listen((state) {
+  print('Bond state changed: $state');
+});
+
+// Initiate bonding
+await connection.bond();
+
+// Remove bond
+await connection.removeBond();
+
+// Get all bonded devices
+final bondedDevices = await bluey.bondedDevices;
+for (final device in bondedDevices) {
+  print('Bonded: ${device.name}');
+}
+```
+
+### PHY (Physical Layer) Configuration
+
+```dart
+// Check current PHY
+print('TX PHY: ${connection.txPhy}'); // le1m, le2m, leCoded
+print('RX PHY: ${connection.rxPhy}');
+
+// Listen for PHY changes
+connection.phyChanges.listen((phy) {
+  print('PHY changed - TX: ${phy.tx}, RX: ${phy.rx}');
+});
+
+// Request faster PHY (2 Mbps) for higher throughput
+await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
+
+// Request coded PHY for longer range
+await connection.requestPhy(txPhy: Phy.leCoded, rxPhy: Phy.leCoded);
+```
+
+### Connection Parameters
+
+```dart
+// Check current connection parameters
+final params = connection.connectionParameters;
+print('Interval: ${params.intervalMs}ms');
+print('Latency: ${params.latency}');
+print('Timeout: ${params.timeoutMs}ms');
+
+// Request faster connection parameters (lower latency)
+await connection.requestConnectionParameters(
+  ConnectionParameters(
+    intervalMs: 7.5,  // Minimum interval for low latency
+    latency: 0,       // No skipped events
+    timeoutMs: 4000,  // 4 second timeout
+  ),
+);
+
+// Request power-saving parameters
+await connection.requestConnectionParameters(
+  ConnectionParameters(
+    intervalMs: 100.0, // Longer interval saves power
+    latency: 4,        // Allow skipping 4 events
+    timeoutMs: 6000,   // Longer timeout
+  ),
+);
+```
+
 #### Server Cleanup
 
 By default, Bluey automatically cleans up BLE resources when the Android activity is destroyed.
@@ -384,16 +468,19 @@ flutter run
 - [ ] iOS scanner and connection manager
 - [ ] Integration tests
 
-### Phase 4: GATT Operations
-- [ ] Service discovery
-- [ ] Characteristic read/write
-- [ ] Notifications/indications
-- [ ] Descriptor operations
-- [ ] MTU negotiation
+### Phase 4: GATT Operations ✅ COMPLETE
+- [x] Service discovery
+- [x] Characteristic read/write
+- [x] Notifications/indications
+- [x] Descriptor operations
+- [x] MTU negotiation
 
-### Phase 5: Advanced Features
-- [ ] Peripheral role (advertising)
-- [ ] Bonding/pairing
+### Phase 5: Advanced Features ✅ COMPLETE
+- [x] Peripheral role (advertising)
+- [x] Bonding/pairing
+- [x] PHY (Physical Layer) configuration
+- [x] Connection parameter control
+- [x] Server request/response handling
 - [ ] Background operation support
 - [ ] Connection pooling
 - [ ] Reconnection strategies
