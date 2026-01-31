@@ -138,6 +138,15 @@ final class BlueyAndroid extends BlueyPlatform {
   Capabilities get capabilities => Capabilities.android;
 
   @override
+  Future<void> configure(BlueyConfig config) async {
+    _ensureInitialized();
+    final dto = BlueyConfigDto(
+      cleanupOnActivityDestroy: config.cleanupOnActivityDestroy,
+    );
+    await _hostApi.configure(dto);
+  }
+
+  @override
   Stream<BluetoothState> get stateStream {
     _ensureInitialized();
     return _stateController.stream;

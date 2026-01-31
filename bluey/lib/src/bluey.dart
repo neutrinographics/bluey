@@ -99,6 +99,59 @@ class Bluey {
   /// Platform capabilities.
   platform.Capabilities get capabilities => _platform.capabilities;
 
+  /// Configure the Bluey plugin behavior.
+  ///
+  /// Call this early in your app lifecycle (e.g., in `main()` before
+  /// `runApp()`) to customize plugin behavior.
+  ///
+  /// ## Configuration Options
+  ///
+  /// ### cleanupOnActivityDestroy (Android only)
+  ///
+  /// When `true` (default), the plugin will automatically clean up BLE
+  /// resources when the Android activity is destroyed:
+  /// - Stop advertising
+  /// - Close the GATT server
+  /// - Disconnect all connected centrals
+  ///
+  /// This prevents "zombie" BLE connections that persist after the app is
+  /// closed, which can cause issues when the app is relaunched.
+  ///
+  /// Set to `false` if you want to manage cleanup manually by calling
+  /// [Server.dispose] yourself. This gives you more control over when
+  /// cleanup happens, but you are responsible for ensuring proper cleanup.
+  ///
+  /// **Note:** On iOS, the OS handles BLE cleanup automatically when the
+  /// app is terminated, so this option has no effect.
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// void main() async {
+  ///   WidgetsFlutterBinding.ensureInitialized();
+  ///
+  ///   // Disable automatic cleanup (you'll manage it manually)
+  ///   final bluey = Bluey();
+  ///   await bluey.configure(cleanupOnActivityDestroy: false);
+  ///
+  ///   runApp(MyApp());
+  /// }
+  /// ```
+  ///
+  /// See also:
+  /// - [Server.dispose] for manual cleanup of the GATT server.
+  Future<void> configure({bool cleanupOnActivityDestroy = true}) async {
+    try {
+      await _platform.configure(
+        platform.BlueyConfig(
+          cleanupOnActivityDestroy: cleanupOnActivityDestroy,
+        ),
+      );
+    } catch (e) {
+      throw _wrapError(e);
+    }
+  }
+
   /// Current Bluetooth state synchronously.
   ///
   /// This returns the last known state, which may be [BluetoothState.unknown]

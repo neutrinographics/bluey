@@ -35,6 +35,9 @@ class _ServerScreenState extends State<ServerScreen> {
   @override
   void dispose() {
     _connectionSubscription?.cancel();
+    // Note: Server cleanup is handled automatically by the plugin when the
+    // activity is destroyed (cleanupOnActivityDestroy is true by default).
+    // We still call dispose() here for when navigating away from this screen.
     _server?.dispose();
     super.dispose();
   }

@@ -182,6 +182,47 @@ class PlatformDevice {
   );
 }
 
+/// Configuration options for the Bluey plugin.
+///
+/// Use this class to customize plugin behavior on platforms that support it.
+@immutable
+class BlueyConfig {
+  /// Whether to automatically clean up BLE resources when the activity is destroyed.
+  ///
+  /// When enabled (default), the plugin will automatically:
+  /// - Stop advertising
+  /// - Close the GATT server
+  /// - Disconnect all connected centrals
+  ///
+  /// This prevents "zombie" BLE connections that persist after the app is closed.
+  ///
+  /// Set to `false` if you want to manage cleanup manually by calling
+  /// [BlueyPlatform.closeServer] yourself. This is useful if you need more
+  /// control over when cleanup happens, such as keeping connections alive
+  /// during configuration changes.
+  ///
+  /// **Note:** This option only affects Android. On iOS, the OS handles
+  /// BLE cleanup automatically when the app is terminated.
+  ///
+  /// Default: `true`
+  final bool cleanupOnActivityDestroy;
+
+  /// Creates a configuration for the Bluey plugin.
+  ///
+  /// All parameters have sensible defaults and are optional.
+  const BlueyConfig({this.cleanupOnActivityDestroy = true});
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is BlueyConfig &&
+        other.cleanupOnActivityDestroy == cleanupOnActivityDestroy;
+  }
+
+  @override
+  int get hashCode => cleanupOnActivityDestroy.hashCode;
+}
+
 /// Platform-specific implementation interface.
 ///
 /// This follows the Clean Architecture pattern. Each platform
@@ -212,6 +253,19 @@ abstract base class BlueyPlatform extends PlatformInterface {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }
+
+  /// Configure the Bluey plugin behavior.
+  ///
+  /// Call this early in your app lifecycle to customize plugin behavior.
+  /// See [BlueyConfig] for available options.
+  ///
+  /// Example:
+  /// ```dart
+  /// await BlueyPlatform.instance.configure(
+  ///   const BlueyConfig(cleanupOnActivityDestroy: false),
+  /// );
+  /// ```
+  Future<void> configure(BlueyConfig config);
 
   /// Platform capabilities.
   Capabilities get capabilities;

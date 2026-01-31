@@ -616,6 +616,39 @@ data class WriteRequestDto (
     )
   }
 }
+
+/**
+ * Configuration options for the Bluey plugin.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class BlueyConfigDto (
+  /**
+   * Whether to automatically clean up BLE resources when the activity is destroyed.
+   *
+   * When enabled (default), the plugin will automatically:
+   * - Stop advertising
+   * - Close the GATT server
+   * - Disconnect all connected centrals
+   *
+   * This prevents "zombie" BLE connections that persist after the app is closed.
+   * Disable this if you want to manage cleanup manually via [BlueyHostApi.closeServer].
+   */
+  val cleanupOnActivityDestroy: Boolean
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): BlueyConfigDto {
+      val cleanupOnActivityDestroy = pigeonVar_list[0] as Boolean
+      return BlueyConfigDto(cleanupOnActivityDestroy)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      cleanupOnActivityDestroy,
+    )
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -724,6 +757,11 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           WriteRequestDto.fromList(it)
         }
       }
+      150.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          BlueyConfigDto.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -813,6 +851,10 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(149)
         writeValue(stream, value.toList())
       }
+      is BlueyConfigDto -> {
+        stream.write(150)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
@@ -825,6 +867,13 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
  * Generated interface from Pigeon that represents a handler of messages from Flutter.
  */
 interface BlueyHostApi {
+  /**
+   * Configure the Bluey plugin behavior.
+   *
+   * Call this early in your app lifecycle to customize plugin behavior.
+   * See [BlueyConfigDto] for available options.
+   */
+  fun configure(config: BlueyConfigDto, callback: (Result<Unit>) -> Unit)
   /** Get current Bluetooth state. */
   fun getState(callback: (Result<BluetoothStateDto>) -> Unit)
   /**
@@ -906,6 +955,25 @@ interface BlueyHostApi {
     @JvmOverloads
     fun setUp(binaryMessenger: BinaryMessenger, api: BlueyHostApi?, messageChannelSuffix: String = "") {
       val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.configure$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val configArg = args[0] as BlueyConfigDto
+            api.configure(configArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
       run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.getState$separatedMessageChannelSuffix", codec)
         if (api != null) {

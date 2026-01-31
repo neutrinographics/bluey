@@ -267,9 +267,32 @@ enum GattStatusDto {
   requestNotSupported,
 }
 
+/// Configuration options for the Bluey plugin.
+class BlueyConfigDto {
+  /// Whether to automatically clean up BLE resources when the activity is destroyed.
+  ///
+  /// When enabled (default), the plugin will automatically:
+  /// - Stop advertising
+  /// - Close the GATT server
+  /// - Disconnect all connected centrals
+  ///
+  /// This prevents "zombie" BLE connections that persist after the app is closed.
+  /// Disable this if you want to manage cleanup manually via [BlueyHostApi.closeServer].
+  final bool cleanupOnActivityDestroy;
+
+  BlueyConfigDto({this.cleanupOnActivityDestroy = true});
+}
+
 /// Host API - called from Dart to platform.
 @HostApi()
 abstract class BlueyHostApi {
+  /// Configure the Bluey plugin behavior.
+  ///
+  /// Call this early in your app lifecycle to customize plugin behavior.
+  /// See [BlueyConfigDto] for available options.
+  @async
+  void configure(BlueyConfigDto config);
+
   /// Get current Bluetooth state.
   @async
   BluetoothStateDto getState();

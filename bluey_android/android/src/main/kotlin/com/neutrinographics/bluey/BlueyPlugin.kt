@@ -46,6 +46,10 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     // Permission request callback
     private var permissionCallback: ((Result<Boolean>) -> Unit)? = null
 
+    // Configuration: whether to clean up BLE resources when activity is destroyed
+    // Default is true to prevent zombie connections
+    private var cleanupOnActivityDestroy: Boolean = true
+
     // FlutterPlugin implementation
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -139,6 +143,20 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     override fun onDetachedFromActivity() {
         activityBinding?.removeRequestPermissionsResultListener(this)
         activityBinding = null
+
+        // Clean up BLE resources if configured to do so
+        // This prevents zombie BLE connections when the app is closed
+        if (cleanupOnActivityDestroy) {
+            android.util.Log.d(
+                "BlueyPlugin",
+                "Activity detached - cleaning up BLE resources (cleanupOnActivityDestroy=true)"
+            )
+            advertiser?.cleanup()
+            gattServer?.cleanup()
+        } else {
+            android.util.Log.d("BlueyPlugin", "Activity detached - skipping cleanup (cleanupOnActivityDestroy=false)")
+        }
+
         activity = null
         scanner?.setActivity(null)
         connectionManager?.setActivity(null)
@@ -147,6 +165,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     }
 
     // BlueyHostApi implementation
+
+    override fun configure(config: BlueyConfigDto, callback: (Result<Unit>) -> Unit) {
+        cleanupOnActivityDestroy = config.cleanupOnActivityDestroy
+        android.util.Log.d("BlueyPlugin", "Configured: cleanupOnActivityDestroy=$cleanupOnActivityDestroy")
+        callback(Result.success(Unit))
+    }
 
     override fun getState(callback: (Result<BluetoothStateDto>) -> Unit) {
         val state = getCurrentBluetoothState()

@@ -109,6 +109,59 @@ void main() {
 }
 ```
 
+### Configuration
+
+Bluey provides configuration options to customize plugin behavior. Call `configure()` early in your app lifecycle.
+
+```dart
+import 'package:bluey/bluey.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  final bluey = Bluey();
+  
+  // Configure plugin behavior (optional - defaults are sensible)
+  await bluey.configure(
+    cleanupOnActivityDestroy: true,  // Default: true
+  );
+  
+  runApp(MyApp());
+}
+```
+
+#### Configuration Options
+
+| Option | Default | Platform | Description |
+|--------|---------|----------|-------------|
+| `cleanupOnActivityDestroy` | `true` | Android | Automatically clean up BLE resources when the activity is destroyed |
+
+##### cleanupOnActivityDestroy (Android only)
+
+When `true` (default), the plugin will automatically clean up BLE resources when the Android activity is destroyed:
+- Stop advertising
+- Close the GATT server  
+- Disconnect all connected centrals
+
+This prevents "zombie" BLE connections that persist after the app is closed, which can cause issues when the app is relaunched (battery drain, connection limits, unexpected behavior).
+
+**When to disable:**
+- If you need fine-grained control over when cleanup happens
+- If you're handling cleanup manually in your app lifecycle callbacks
+- If you have a specific use case that requires connections to persist
+
+**If disabled, you are responsible for calling `server.dispose()` to clean up resources.**
+
+```dart
+// Disable automatic cleanup (you manage it manually)
+await bluey.configure(cleanupOnActivityDestroy: false);
+
+// Later, when you're done with the server:
+await server.dispose();
+```
+
+**Note:** On iOS, the OS handles BLE cleanup automatically when the app is terminated, so this option has no effect.
+
 ### Scanning for Devices
 
 ```dart
@@ -212,41 +265,18 @@ await server.dispose();
 
 #### Server Cleanup
 
-On Android, BLE connections can persist at the OS level even after your app closes.
-To prevent "zombie" connections that consume resources and battery:
+By default, Bluey automatically cleans up BLE resources when the Android activity is destroyed.
+This prevents "zombie" connections that persist after the app closes.
 
-1. **Always call `server.dispose()`** when you're done with the server
-2. **Handle app lifecycle** - dispose the server when the app is backgrounded or closed
+If you need manual control, you can disable automatic cleanup (see [Configuration](#configuration))
+and handle cleanup yourself:
 
 ```dart
-class MyWidget extends StatefulWidget {
-  @override
-  State<MyWidget> createState() => _MyWidgetState();
-}
-
-class _MyWidgetState extends State<MyWidget> with WidgetsBindingObserver {
-  Server? _server;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _server = bluey.server();
-  }
-
-  @override
-  void dispose() {
-    _server?.dispose();  // Clean up BLE resources
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached) {
-      _server?.dispose();  // Clean up when app is closing
-    }
-  }
+// In your widget's dispose method
+@override
+void dispose() {
+  _server?.dispose();  // Clean up BLE resources
+  super.dispose();
 }
 ```
 

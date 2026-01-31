@@ -651,6 +651,37 @@ class WriteRequestDto {
   }
 }
 
+/// Configuration options for the Bluey plugin.
+class BlueyConfigDto {
+  BlueyConfigDto({
+    required this.cleanupOnActivityDestroy,
+  });
+
+  /// Whether to automatically clean up BLE resources when the activity is destroyed.
+  ///
+  /// When enabled (default), the plugin will automatically:
+  /// - Stop advertising
+  /// - Close the GATT server
+  /// - Disconnect all connected centrals
+  ///
+  /// This prevents "zombie" BLE connections that persist after the app is closed.
+  /// Disable this if you want to manage cleanup manually via [BlueyHostApi.closeServer].
+  bool cleanupOnActivityDestroy;
+
+  Object encode() {
+    return <Object?>[
+      cleanupOnActivityDestroy,
+    ];
+  }
+
+  static BlueyConfigDto decode(Object result) {
+    result as List<Object?>;
+    return BlueyConfigDto(
+      cleanupOnActivityDestroy: result[0]! as bool,
+    );
+  }
+}
+
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -722,6 +753,9 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is WriteRequestDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
+    }    else if (value is BlueyConfigDto) {
+      buffer.putUint8(150);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -776,6 +810,8 @@ class _PigeonCodec extends StandardMessageCodec {
         return ReadRequestDto.decode(readValue(buffer)!);
       case 149: 
         return WriteRequestDto.decode(readValue(buffer)!);
+      case 150: 
+        return BlueyConfigDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -795,6 +831,32 @@ class BlueyHostApi {
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
+
+  /// Configure the Bluey plugin behavior.
+  ///
+  /// Call this early in your app lifecycle to customize plugin behavior.
+  /// See [BlueyConfigDto] for available options.
+  Future<void> configure(BlueyConfigDto config) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.configure$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[config]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
 
   /// Get current Bluetooth state.
   Future<BluetoothStateDto> getState() async {
