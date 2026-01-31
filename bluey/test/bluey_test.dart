@@ -201,6 +201,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> disconnectCentral(String centralId) async {}
 
+  @override
+  Future<void> closeServer() async {}
+
   void dispose() {
     _stateController.close();
     _scanController.close();

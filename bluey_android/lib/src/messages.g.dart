@@ -1420,6 +1420,31 @@ class BlueyHostApi {
       return;
     }
   }
+
+  /// Close the GATT server and disconnect all centrals.
+  /// Call this when the server is no longer needed to release resources
+  /// and properly terminate BLE connections.
+  Future<void> closeServer() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.closeServer$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
 }
 
 /// Flutter API - called from platform to Dart.

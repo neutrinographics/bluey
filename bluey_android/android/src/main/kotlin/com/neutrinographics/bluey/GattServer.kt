@@ -267,11 +267,32 @@ class GattServer(
     }
 
     fun cleanup() {
-        try {
-            gattServer?.close()
-        } catch (e: Exception) {
-            // Ignore errors during cleanup
+        Log.d("GattServer", "cleanup() called - disconnecting ${connectedCentrals.size} centrals")
+
+        // Disconnect all connected centrals before closing the server
+        val server = gattServer
+        if (server != null) {
+            try {
+                for ((address, device) in connectedCentrals) {
+                    Log.d("GattServer", "Disconnecting central: $address")
+                    try {
+                        server.cancelConnection(device)
+                    } catch (e: SecurityException) {
+                        Log.e("GattServer", "Failed to disconnect $address: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("GattServer", "Error disconnecting centrals: ${e.message}")
+            }
+
+            try {
+                server.close()
+                Log.d("GattServer", "GATT server closed")
+            } catch (e: Exception) {
+                Log.e("GattServer", "Error closing GATT server: ${e.message}")
+            }
         }
+
         gattServer = null
         connectedCentrals.clear()
         centralMtus.clear()
@@ -326,8 +347,41 @@ class GattServer(
             Log.d("GattServer", "ensureServerOpen: opening GATT server with callback $gattServerCallback")
             gattServer = bluetoothManager?.openGattServer(context, gattServerCallback)
             Log.d("GattServer", "ensureServerOpen: server opened = ${gattServer != null}")
+
+            // Disconnect any zombie connections from previous app sessions
+            disconnectZombieConnections()
         } catch (e: SecurityException) {
             Log.e("GattServer", "ensureServerOpen: SecurityException", e)
+        }
+    }
+
+    /**
+     * Disconnect any pre-existing BLE connections that may be zombies from previous app sessions.
+     * This helps prevent resource exhaustion and ensures a clean state.
+     */
+    private fun disconnectZombieConnections() {
+        try {
+            val connectedDevices = bluetoothManager?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT_SERVER)
+            if (connectedDevices.isNullOrEmpty()) {
+                Log.d("GattServer", "No zombie connections to clean up")
+                return
+            }
+
+            Log.d("GattServer", "Found ${connectedDevices.size} potential zombie connections, disconnecting...")
+            val server = gattServer ?: return
+
+            for (device in connectedDevices) {
+                Log.d("GattServer", "Disconnecting zombie connection: ${device.address}")
+                try {
+                    server.cancelConnection(device)
+                } catch (e: SecurityException) {
+                    Log.e("GattServer", "Failed to disconnect zombie ${device.address}: ${e.message}")
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e("GattServer", "Cannot get connected devices: ${e.message}")
+        } catch (e: Exception) {
+            Log.e("GattServer", "Error cleaning up zombie connections: ${e.message}")
         }
     }
 

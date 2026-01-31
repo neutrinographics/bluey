@@ -422,6 +422,12 @@ final class BlueyAndroid extends BlueyPlatform {
     await _hostApi.disconnectCentral(centralId);
   }
 
+  @override
+  Future<void> closeServer() async {
+    _ensureInitialized();
+    await _hostApi.closeServer();
+  }
+
   // Mapping functions from DTOs to platform interface types
 
   BluetoothState _mapBluetoothState(BluetoothStateDto dto) {

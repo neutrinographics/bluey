@@ -426,6 +426,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         )
     }
 
+    override fun closeServer(callback: (Result<Unit>) -> Unit) {
+        android.util.Log.d("BlueyPlugin", "closeServer called")
+        advertiser?.cleanup()
+        gattServer?.cleanup()
+        callback(Result.success(Unit))
+    }
+
     // Private helper methods
 
     private fun getCurrentBluetoothState(): BluetoothStateDto {

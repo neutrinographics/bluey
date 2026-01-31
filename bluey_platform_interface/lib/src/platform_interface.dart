@@ -349,6 +349,15 @@ abstract base class BlueyPlatform extends PlatformInterface {
 
   /// Disconnect a central from the server.
   Future<void> disconnectCentral(String centralId);
+
+  /// Close the GATT server and disconnect all centrals.
+  ///
+  /// Call this when the server is no longer needed to release resources
+  /// and properly terminate BLE connections. This is especially important
+  /// on Android where BLE connections can persist after the app closes.
+  ///
+  /// After calling this, the server instance should not be reused.
+  Future<void> closeServer();
 }
 
 /// A notification from a characteristic.

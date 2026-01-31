@@ -391,6 +391,12 @@ abstract class BlueyHostApi {
   /// Disconnect a central from the server.
   @async
   void disconnectCentral(String centralId);
+
+  /// Close the GATT server and disconnect all centrals.
+  /// Call this when the server is no longer needed to release resources
+  /// and properly terminate BLE connections.
+  @async
+  void closeServer();
 }
 
 /// Flutter API - called from platform to Dart.

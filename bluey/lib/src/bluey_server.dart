@@ -151,6 +151,10 @@ class BlueyServer implements Server {
       await stopAdvertising();
     }
 
+    // Close the GATT server and disconnect all centrals
+    // This is important on Android to prevent zombie BLE connections
+    await _platform.closeServer();
+
     await _centralConnectionsSub?.cancel();
     await _centralDisconnectionsSub?.cancel();
     await _connectionsController.close();

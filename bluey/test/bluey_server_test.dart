@@ -227,6 +227,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     disconnectedCentrals.add(centralId);
   }
 
+  @override
+  Future<void> closeServer() async {
+    // Mock implementation - nothing to do
+  }
+
   // Test helpers
   void emitCentralConnected(platform.PlatformCentral central) {
     _centralConnectionsController.add(central);

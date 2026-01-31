@@ -244,6 +244,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> disconnectCentral(String centralId) async {}
 
+  @override
+  Future<void> closeServer() async {}
+
   // Helper to emit a notification
   void emitNotification(
     String deviceId,

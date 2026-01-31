@@ -890,6 +890,12 @@ interface BlueyHostApi {
   fun respondToWriteRequest(requestId: Long, status: GattStatusDto, callback: (Result<Unit>) -> Unit)
   /** Disconnect a central from the server. */
   fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit)
+  /**
+   * Close the GATT server and disconnect all centrals.
+   * Call this when the server is no longer needed to release resources
+   * and properly terminate BLE connections.
+   */
+  fun closeServer(callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by BlueyHostApi. */
@@ -1377,6 +1383,23 @@ interface BlueyHostApi {
             val args = message as List<Any?>
             val centralIdArg = args[0] as String
             api.disconnectCentral(centralIdArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.closeServer$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.closeServer{ result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))
