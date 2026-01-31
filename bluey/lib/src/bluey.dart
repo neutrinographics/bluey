@@ -130,8 +130,11 @@ class Bluey {
   /// void main() async {
   ///   WidgetsFlutterBinding.ensureInitialized();
   ///
-  ///   // Disable automatic cleanup (you'll manage it manually)
+  ///   // Use default cleanup behavior (recommended)
   ///   final bluey = Bluey();
+  ///   await bluey.configure();
+  ///
+  ///   // Or disable automatic cleanup (you'll manage it manually)
   ///   await bluey.configure(cleanupOnActivityDestroy: false);
   ///
   ///   runApp(MyApp());

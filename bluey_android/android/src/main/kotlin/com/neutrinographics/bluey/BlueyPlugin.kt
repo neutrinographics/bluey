@@ -2,14 +2,17 @@ package com.neutrinographics.bluey
 
 import android.Manifest
 import android.app.Activity
+import android.app.Application
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -50,6 +53,9 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     // Default is true to prevent zombie connections
     private var cleanupOnActivityDestroy: Boolean = true
 
+    // Activity lifecycle callbacks for more reliable cleanup
+    private var activityLifecycleCallbacks: Application.ActivityLifecycleCallbacks? = null
+
     // FlutterPlugin implementation
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -63,6 +69,11 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         // Initialize Bluetooth
         bluetoothManager = context?.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
+
+        // Clean up any zombie BLE connections from previous app sessions.
+        // This handles the case where the app was force-killed and couldn't clean up properly.
+        // We do this unconditionally on startup to ensure a clean state.
+        cleanupZombieConnections()
 
         // Initialize domain components
         scanner = Scanner(
@@ -122,6 +133,46 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         connectionManager?.setActivity(activity)
         gattServer?.setActivity(activity)
         advertiser?.setActivity(activity)
+
+        // Register activity lifecycle callbacks for more reliable cleanup
+        registerActivityLifecycleCallbacks(binding.activity)
+    }
+
+    private fun registerActivityLifecycleCallbacks(activity: Activity) {
+        val application = activity.application ?: return
+
+        // Unregister any existing callbacks first
+        activityLifecycleCallbacks?.let { application.unregisterActivityLifecycleCallbacks(it) }
+
+        activityLifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+            override fun onActivityDestroyed(activity: Activity) {
+                android.util.Log.d("BlueyPlugin", "onActivityDestroyed called for ${activity.javaClass.simpleName}")
+                if (activity == this@BlueyPlugin.activity && cleanupOnActivityDestroy) {
+                    android.util.Log.d("BlueyPlugin", "Cleaning up BLE resources in onActivityDestroyed")
+                    advertiser?.cleanup()
+                    gattServer?.cleanup()
+                }
+            }
+        }
+
+        application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks)
+        android.util.Log.d("BlueyPlugin", "Registered ActivityLifecycleCallbacks")
+    }
+
+    private fun unregisterActivityLifecycleCallbacks() {
+        val application = activity?.application ?: return
+        activityLifecycleCallbacks?.let {
+            application.unregisterActivityLifecycleCallbacks(it)
+            android.util.Log.d("BlueyPlugin", "Unregistered ActivityLifecycleCallbacks")
+        }
+        activityLifecycleCallbacks = null
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -144,8 +195,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         activityBinding?.removeRequestPermissionsResultListener(this)
         activityBinding = null
 
+        // Unregister lifecycle callbacks
+        unregisterActivityLifecycleCallbacks()
+
         // Clean up BLE resources if configured to do so
         // This prevents zombie BLE connections when the app is closed
+        // Note: onActivityDestroyed may have already done this cleanup, but it's safe to call twice
         if (cleanupOnActivityDestroy) {
             android.util.Log.d(
                 "BlueyPlugin",
@@ -528,6 +583,75 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
             BluetoothAdapter.STATE_ON -> BluetoothStateDto.ON
             BluetoothAdapter.STATE_TURNING_ON -> BluetoothStateDto.OFF
             else -> BluetoothStateDto.UNKNOWN
+        }
+    }
+
+    /**
+     * Clean up any zombie BLE connections from previous app sessions.
+     * This handles the case where the app was force-killed and couldn't clean up properly.
+     * Called automatically when the plugin attaches to the Flutter engine.
+     */
+    private fun cleanupZombieConnections() {
+        val manager = bluetoothManager ?: return
+
+        // Check permissions first
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(
+                    context!!,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                android.util.Log.d(
+                    "BlueyPlugin",
+                    "cleanupZombieConnections: missing BLUETOOTH_CONNECT permission"
+                )
+                return
+            }
+        }
+
+        try {
+            val connectedDevices = manager.getConnectedDevices(BluetoothProfile.GATT_SERVER)
+            if (connectedDevices.isNullOrEmpty()) {
+                android.util.Log.d("BlueyPlugin", "cleanupZombieConnections: no zombie connections found")
+                return
+            }
+
+            android.util.Log.d(
+                "BlueyPlugin",
+                "cleanupZombieConnections: found ${connectedDevices.size} zombie connections"
+            )
+
+            // Open a temporary GATT server just to disconnect these devices
+            val tempCallback = object : android.bluetooth.BluetoothGattServerCallback() {}
+            val tempServer = manager.openGattServer(context, tempCallback)
+
+            if (tempServer != null) {
+                for (device in connectedDevices) {
+                    android.util.Log.d(
+                        "BlueyPlugin",
+                        "cleanupZombieConnections: disconnecting ${device.address}"
+                    )
+                    try {
+                        tempServer.cancelConnection(device)
+                    } catch (e: SecurityException) {
+                        android.util.Log.e(
+                            "BlueyPlugin",
+                            "cleanupZombieConnections: failed to disconnect ${device.address}: ${e.message}"
+                        )
+                    }
+                }
+                tempServer.close()
+                android.util.Log.d("BlueyPlugin", "cleanupZombieConnections: cleanup complete")
+            } else {
+                android.util.Log.e(
+                    "BlueyPlugin",
+                    "cleanupZombieConnections: failed to open temporary GATT server"
+                )
+            }
+        } catch (e: SecurityException) {
+            android.util.Log.e("BlueyPlugin", "cleanupZombieConnections: SecurityException: ${e.message}")
+        } catch (e: Exception) {
+            android.util.Log.e("BlueyPlugin", "cleanupZombieConnections: Exception: ${e.message}")
         }
     }
 
