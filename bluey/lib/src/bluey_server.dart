@@ -65,12 +65,12 @@ class BlueyServer implements Server {
   List<Central> get connectedCentrals => _connectedCentrals.values.toList();
 
   @override
-  void addService(LocalService service) {
+  Future<void> addService(LocalService service) async {
+    final platformService = _mapLocalServiceToPlatform(service);
+    await _platform.addService(platformService);
     _emitEvent(
       ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
     );
-    final platformService = _mapLocalServiceToPlatform(service);
-    _platform.addService(platformService);
   }
 
   @override

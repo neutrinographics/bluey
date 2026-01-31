@@ -249,7 +249,8 @@ abstract class Server {
   /// Add a service to the GATT database.
   ///
   /// Must be called before [startAdvertising].
-  void addService(LocalService service);
+  /// Throws if the GATT server cannot be opened or the service cannot be added.
+  Future<void> addService(LocalService service);
 
   /// Remove a service by UUID.
   ///

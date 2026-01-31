@@ -345,13 +345,30 @@ class GattServer(
 
         try {
             Log.d("GattServer", "ensureServerOpen: opening GATT server with callback $gattServerCallback")
-            gattServer = bluetoothManager?.openGattServer(context, gattServerCallback)
+
+            // Try to open the GATT server, with retry on failure
+            var server = bluetoothManager?.openGattServer(context, gattServerCallback)
+
+            if (server == null) {
+                Log.w("GattServer", "ensureServerOpen: first attempt failed, retrying after delay...")
+                // Sometimes the Bluetooth stack needs a moment, especially after being enabled
+                Thread.sleep(100)
+                server = bluetoothManager?.openGattServer(context, gattServerCallback)
+            }
+
+            gattServer = server
             Log.d("GattServer", "ensureServerOpen: server opened = ${gattServer != null}")
 
-            // Disconnect any zombie connections from previous app sessions
-            disconnectZombieConnections()
+            // Only disconnect zombie connections if we successfully opened the server
+            if (gattServer != null) {
+                disconnectZombieConnections()
+            } else {
+                Log.e("GattServer", "ensureServerOpen: Failed to open GATT server - Bluetooth may not be fully ready")
+            }
         } catch (e: SecurityException) {
             Log.e("GattServer", "ensureServerOpen: SecurityException", e)
+        } catch (e: Exception) {
+            Log.e("GattServer", "ensureServerOpen: Exception", e)
         }
     }
 

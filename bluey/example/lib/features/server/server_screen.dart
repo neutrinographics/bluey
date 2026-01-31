@@ -42,7 +42,7 @@ class _ServerScreenState extends State<ServerScreen> {
     super.dispose();
   }
 
-  void _initServer() {
+  Future<void> _initServer() async {
     final bluey = BlueyProvider.of(context);
     _server = bluey.server();
 
@@ -61,25 +61,29 @@ class _ServerScreenState extends State<ServerScreen> {
     });
 
     // Add demo service
-    _server!.addService(
-      LocalService(
-        uuid: _demoServiceUuid,
-        isPrimary: true,
-        characteristics: [
-          LocalCharacteristic(
-            uuid: _demoCharUuid,
-            properties: const CharacteristicProperties(
-              canRead: true,
-              canWrite: true,
-              canNotify: true,
+    try {
+      await _server!.addService(
+        LocalService(
+          uuid: _demoServiceUuid,
+          isPrimary: true,
+          characteristics: [
+            LocalCharacteristic(
+              uuid: _demoCharUuid,
+              properties: const CharacteristicProperties(
+                canRead: true,
+                canWrite: true,
+                canNotify: true,
+              ),
+              permissions: const [GattPermission.read, GattPermission.write],
             ),
-            permissions: const [GattPermission.read, GattPermission.write],
-          ),
-        ],
-      ),
-    );
-
-    _addLog('Server', 'Initialized with demo service');
+          ],
+        ),
+      );
+      _addLog('Server', 'Initialized with demo service');
+    } catch (e) {
+      _addLog('Error', 'Failed to add service: $e');
+      _showError('Failed to initialize server: $e');
+    }
   }
 
   Future<void> _startAdvertising() async {
