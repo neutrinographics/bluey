@@ -189,6 +189,103 @@ class HostedService {
   int get hashCode => uuid.hashCode;
 }
 
+/// Response status for GATT operations.
+///
+/// Used when responding to read or write requests from centrals.
+enum GattResponseStatus {
+  /// Operation completed successfully.
+  success,
+
+  /// Read operation not permitted.
+  readNotPermitted,
+
+  /// Write operation not permitted.
+  writeNotPermitted,
+
+  /// Invalid offset for the attribute value.
+  invalidOffset,
+
+  /// Invalid attribute value length.
+  invalidAttributeLength,
+
+  /// Insufficient authentication for the operation.
+  insufficientAuthentication,
+
+  /// Insufficient encryption for the operation.
+  insufficientEncryption,
+
+  /// Request not supported.
+  requestNotSupported,
+}
+
+/// A read request from a connected central.
+///
+/// When a central reads a characteristic value, a [ReadRequest] is emitted
+/// on [Server.readRequests]. The server must respond using [Server.respondToRead].
+@immutable
+class ReadRequest {
+  /// The central that initiated this request.
+  final Central central;
+
+  /// The characteristic being read.
+  final UUID characteristicId;
+
+  /// The offset into the characteristic value.
+  final int offset;
+
+  // Internal request ID for response correlation.
+  // ignore: public_member_api_docs
+  final int internalRequestId;
+
+  /// Creates a read request.
+  const ReadRequest({
+    required this.central,
+    required this.characteristicId,
+    required this.offset,
+    required this.internalRequestId,
+  });
+}
+
+/// A write request from a connected central.
+///
+/// When a central writes to a characteristic, a [WriteRequest] is emitted
+/// on [Server.writeRequests]. If [responseNeeded] is true, the server must
+/// respond using [Server.respondToWrite].
+@immutable
+class WriteRequest {
+  /// The central that initiated this request.
+  final Central central;
+
+  /// The characteristic being written.
+  final UUID characteristicId;
+
+  /// The value being written.
+  final Uint8List value;
+
+  /// The offset into the characteristic value.
+  final int offset;
+
+  /// Whether a response is needed.
+  ///
+  /// If true, the server must call [Server.respondToWrite].
+  /// If false, this is a "write without response" operation.
+  final bool responseNeeded;
+
+  // Internal request ID for response correlation.
+  // ignore: public_member_api_docs
+  final int internalRequestId;
+
+  /// Creates a write request.
+  const WriteRequest({
+    required this.central,
+    required this.characteristicId,
+    required this.value,
+    required this.offset,
+    required this.responseNeeded,
+    required this.internalRequestId,
+  });
+}
+
 /// A connected central device (from the server's perspective).
 ///
 /// When a central connects to this peripheral, a [Central] instance is
@@ -288,6 +385,58 @@ abstract class Server {
     Central central,
     UUID characteristic, {
     required Uint8List data,
+  });
+
+  /// Send an indication to all subscribed centrals.
+  ///
+  /// Unlike notifications, indications require acknowledgment from the central
+  /// before returning. Use this for data that must be reliably delivered.
+  ///
+  /// [characteristic] - The characteristic UUID to indicate.
+  /// [data] - The data to send.
+  Future<void> indicate(UUID characteristic, {required Uint8List data});
+
+  /// Send an indication to a specific central.
+  ///
+  /// Unlike notifications, indications require acknowledgment from the central
+  /// before returning. Use this for data that must be reliably delivered.
+  Future<void> indicateTo(
+    Central central,
+    UUID characteristic, {
+    required Uint8List data,
+  });
+
+  /// Stream of read requests from centrals.
+  ///
+  /// When a central reads a characteristic value, a [ReadRequest] is emitted.
+  /// The server must respond using [respondToRead].
+  Stream<ReadRequest> get readRequests;
+
+  /// Stream of write requests from centrals.
+  ///
+  /// When a central writes to a characteristic, a [WriteRequest] is emitted.
+  /// If [WriteRequest.responseNeeded] is true, the server must respond using
+  /// [respondToWrite].
+  Stream<WriteRequest> get writeRequests;
+
+  /// Respond to a read request.
+  ///
+  /// [request] - The read request to respond to.
+  /// [status] - The GATT status for the response.
+  /// [value] - The value to return (required for success status).
+  Future<void> respondToRead(
+    ReadRequest request, {
+    required GattResponseStatus status,
+    Uint8List? value,
+  });
+
+  /// Respond to a write request.
+  ///
+  /// [request] - The write request to respond to.
+  /// [status] - The GATT status for the response.
+  Future<void> respondToWrite(
+    WriteRequest request, {
+    required GattResponseStatus status,
   });
 
   /// Dispose the server and release resources.

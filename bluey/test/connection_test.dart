@@ -15,17 +15,42 @@ class MockConnection implements Connection {
   @override
   int mtu;
 
+  @override
+  BondState bondState;
+
+  @override
+  Phy txPhy;
+
+  @override
+  Phy rxPhy;
+
+  @override
+  ConnectionParameters connectionParameters;
+
   final List<RemoteService> _services;
   bool _servicesDiscovered = false;
 
   final _stateController = StreamController<ConnectionState>.broadcast();
+  final _bondStateController = StreamController<BondState>.broadcast();
+  final _phyController = StreamController<({Phy tx, Phy rx})>.broadcast();
 
   MockConnection({
     required this.deviceId,
     this.state = ConnectionState.connected,
     this.mtu = 23,
+    this.bondState = BondState.none,
+    this.txPhy = Phy.le1m,
+    this.rxPhy = Phy.le1m,
+    ConnectionParameters? connectionParameters,
     List<RemoteService>? services,
-  }) : _services = services ?? [];
+  }) : connectionParameters =
+           connectionParameters ??
+           const ConnectionParameters(
+             intervalMs: 30.0,
+             latency: 0,
+             timeoutMs: 4000,
+           ),
+       _services = services ?? [];
 
   @override
   Stream<ConnectionState> get stateChanges => _stateController.stream;
@@ -71,6 +96,38 @@ class MockConnection implements Connection {
     _stateController.add(state);
   }
 
+  @override
+  Stream<BondState> get bondStateChanges => _bondStateController.stream;
+
+  @override
+  Future<void> bond() async {
+    bondState = BondState.bonding;
+    _bondStateController.add(bondState);
+    bondState = BondState.bonded;
+    _bondStateController.add(bondState);
+  }
+
+  @override
+  Future<void> removeBond() async {
+    bondState = BondState.none;
+    _bondStateController.add(bondState);
+  }
+
+  @override
+  Stream<({Phy tx, Phy rx})> get phyChanges => _phyController.stream;
+
+  @override
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
+    if (txPhy != null) this.txPhy = txPhy;
+    if (rxPhy != null) this.rxPhy = rxPhy;
+    _phyController.add((tx: this.txPhy, rx: this.rxPhy));
+  }
+
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) async {
+    connectionParameters = params;
+  }
+
   void emitState(ConnectionState newState) {
     state = newState;
     _stateController.add(state);
@@ -78,6 +135,8 @@ class MockConnection implements Connection {
 
   void dispose() {
     _stateController.close();
+    _bondStateController.close();
+    _phyController.close();
   }
 }
 
@@ -238,6 +297,192 @@ void main() {
         expect(states, contains(ConnectionState.disconnected));
         expect(connection.state, equals(ConnectionState.disconnected));
       });
+    });
+
+    group('Bonding', () {
+      test('has bondState property', () {
+        expect(connection.bondState, isA<BondState>());
+      });
+
+      test('bondState defaults to none', () {
+        expect(connection.bondState, equals(BondState.none));
+      });
+
+      test('provides bondStateChanges stream', () {
+        expect(connection.bondStateChanges, isA<Stream<BondState>>());
+      });
+
+      test('bond() initiates bonding', () async {
+        await connection.bond();
+        expect(connection.bondState, equals(BondState.bonded));
+      });
+
+      test('bond() emits state changes', () async {
+        final states = <BondState>[];
+        final subscription = connection.bondStateChanges.listen(states.add);
+
+        await connection.bond();
+
+        await Future.delayed(Duration(milliseconds: 10));
+        await subscription.cancel();
+
+        expect(states, contains(BondState.bonding));
+        expect(states, contains(BondState.bonded));
+      });
+
+      test('removeBond() removes bond', () async {
+        await connection.bond();
+        expect(connection.bondState, equals(BondState.bonded));
+
+        await connection.removeBond();
+        expect(connection.bondState, equals(BondState.none));
+      });
+    });
+
+    group('PHY', () {
+      test('has txPhy property', () {
+        expect(connection.txPhy, isA<Phy>());
+      });
+
+      test('has rxPhy property', () {
+        expect(connection.rxPhy, isA<Phy>());
+      });
+
+      test('txPhy defaults to le1m', () {
+        expect(connection.txPhy, equals(Phy.le1m));
+      });
+
+      test('rxPhy defaults to le1m', () {
+        expect(connection.rxPhy, equals(Phy.le1m));
+      });
+
+      test('provides phyChanges stream', () {
+        expect(connection.phyChanges, isA<Stream<({Phy tx, Phy rx})>>());
+      });
+
+      test('requestPhy updates PHY values', () async {
+        await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
+
+        expect(connection.txPhy, equals(Phy.le2m));
+        expect(connection.rxPhy, equals(Phy.le2m));
+      });
+
+      test('requestPhy emits changes', () async {
+        final changes = <({Phy tx, Phy rx})>[];
+        final subscription = connection.phyChanges.listen(changes.add);
+
+        await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.leCoded);
+
+        await Future.delayed(Duration(milliseconds: 10));
+        await subscription.cancel();
+
+        expect(changes.length, greaterThanOrEqualTo(1));
+        expect(changes.last.tx, equals(Phy.le2m));
+        expect(changes.last.rx, equals(Phy.leCoded));
+      });
+    });
+
+    group('Connection Parameters', () {
+      test('has connectionParameters property', () {
+        expect(connection.connectionParameters, isA<ConnectionParameters>());
+      });
+
+      test('connectionParameters has default values', () {
+        final params = connection.connectionParameters;
+        expect(params.intervalMs, isA<double>());
+        expect(params.latency, isA<int>());
+        expect(params.timeoutMs, isA<int>());
+      });
+
+      test('requestConnectionParameters updates values', () async {
+        final newParams = ConnectionParameters(
+          intervalMs: 15.0,
+          latency: 2,
+          timeoutMs: 5000,
+        );
+
+        await connection.requestConnectionParameters(newParams);
+
+        expect(connection.connectionParameters.intervalMs, equals(15.0));
+        expect(connection.connectionParameters.latency, equals(2));
+        expect(connection.connectionParameters.timeoutMs, equals(5000));
+      });
+    });
+  });
+}
+
+/// Tests for ConnectionParameters value object.
+void connectionParametersTests() {
+  group('ConnectionParameters', () {
+    test('can be created with values', () {
+      final params = ConnectionParameters(
+        intervalMs: 7.5,
+        latency: 0,
+        timeoutMs: 4000,
+      );
+
+      expect(params.intervalMs, equals(7.5));
+      expect(params.latency, equals(0));
+      expect(params.timeoutMs, equals(4000));
+    });
+
+    test('is immutable', () {
+      final params = ConnectionParameters(
+        intervalMs: 15.0,
+        latency: 4,
+        timeoutMs: 6000,
+      );
+
+      // These should be final properties
+      expect(params.intervalMs, equals(15.0));
+      expect(params.latency, equals(4));
+      expect(params.timeoutMs, equals(6000));
+    });
+
+    test('equality based on values', () {
+      final params1 = ConnectionParameters(
+        intervalMs: 15.0,
+        latency: 4,
+        timeoutMs: 6000,
+      );
+      final params2 = ConnectionParameters(
+        intervalMs: 15.0,
+        latency: 4,
+        timeoutMs: 6000,
+      );
+      final params3 = ConnectionParameters(
+        intervalMs: 30.0,
+        latency: 4,
+        timeoutMs: 6000,
+      );
+
+      expect(params1, equals(params2));
+      expect(params1, isNot(equals(params3)));
+    });
+  });
+}
+
+/// Bonding state of a device.
+///
+/// Tests that BondState enum exists with correct values.
+void bondStateEnumTests() {
+  group('BondState', () {
+    test('has none value', () {
+      expect(BondState.none, isNotNull);
+    });
+
+    test('has bonding value', () {
+      expect(BondState.bonding, isNotNull);
+    });
+
+    test('has bonded value', () {
+      expect(BondState.bonded, isNotNull);
+    });
+
+    test('values are distinct', () {
+      expect(BondState.none, isNot(equals(BondState.bonding)));
+      expect(BondState.none, isNot(equals(BondState.bonded)));
+      expect(BondState.bonding, isNot(equals(BondState.bonded)));
     });
   });
 }

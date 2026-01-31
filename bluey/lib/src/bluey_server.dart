@@ -147,6 +147,102 @@ class BlueyServer implements Server {
   }
 
   @override
+  Future<void> indicate(UUID characteristic, {required Uint8List data}) async {
+    await _platform.indicateCharacteristic(characteristic.toString(), data);
+    _emitEvent(
+      IndicationSentEvent(
+        characteristicId: characteristic,
+        valueLength: data.length,
+        source: 'BlueyServer',
+      ),
+    );
+  }
+
+  @override
+  Future<void> indicateTo(
+    Central central,
+    UUID characteristic, {
+    required Uint8List data,
+  }) async {
+    final blueyCentral = central as BlueyCentral;
+    await _platform.indicateCharacteristicTo(
+      blueyCentral.platformId,
+      characteristic.toString(),
+      data,
+    );
+    _emitEvent(
+      IndicationSentEvent(
+        characteristicId: characteristic,
+        valueLength: data.length,
+        centralId: blueyCentral.platformId,
+        source: 'BlueyServer',
+      ),
+    );
+  }
+
+  @override
+  Stream<ReadRequest> get readRequests {
+    return _platform.readRequests.map((platformRequest) {
+      final central = _connectedCentrals[platformRequest.centralId];
+      if (central == null) {
+        throw StateError(
+          'Read request from unknown central: ${platformRequest.centralId}',
+        );
+      }
+      return ReadRequest(
+        central: central,
+        characteristicId: UUID(platformRequest.characteristicUuid),
+        offset: platformRequest.offset,
+        internalRequestId: platformRequest.requestId,
+      );
+    });
+  }
+
+  @override
+  Stream<WriteRequest> get writeRequests {
+    return _platform.writeRequests.map((platformRequest) {
+      final central = _connectedCentrals[platformRequest.centralId];
+      if (central == null) {
+        throw StateError(
+          'Write request from unknown central: ${platformRequest.centralId}',
+        );
+      }
+      return WriteRequest(
+        central: central,
+        characteristicId: UUID(platformRequest.characteristicUuid),
+        value: platformRequest.value,
+        offset: platformRequest.offset,
+        responseNeeded: platformRequest.responseNeeded,
+        internalRequestId: platformRequest.requestId,
+      );
+    });
+  }
+
+  @override
+  Future<void> respondToRead(
+    ReadRequest request, {
+    required GattResponseStatus status,
+    Uint8List? value,
+  }) async {
+    await _platform.respondToReadRequest(
+      request.internalRequestId,
+      _mapGattResponseStatusToPlatform(status),
+      value,
+    );
+  }
+
+  @override
+  Future<void> respondToWrite(
+    WriteRequest request, {
+    required GattResponseStatus status,
+  }) async {
+    await _platform.respondToWriteRequest(
+      request.internalRequestId,
+      _mapGattResponseStatusToPlatform(status),
+    );
+  }
+
+  @override
   Future<void> dispose() async {
     if (_isAdvertising) {
       await stopAdvertising();
@@ -225,6 +321,29 @@ class BlueyServer implements Server {
         return platform.PlatformGattPermission.write;
       case GattPermission.writeEncrypted:
         return platform.PlatformGattPermission.writeEncrypted;
+    }
+  }
+
+  platform.PlatformGattStatus _mapGattResponseStatusToPlatform(
+    GattResponseStatus status,
+  ) {
+    switch (status) {
+      case GattResponseStatus.success:
+        return platform.PlatformGattStatus.success;
+      case GattResponseStatus.readNotPermitted:
+        return platform.PlatformGattStatus.readNotPermitted;
+      case GattResponseStatus.writeNotPermitted:
+        return platform.PlatformGattStatus.writeNotPermitted;
+      case GattResponseStatus.invalidOffset:
+        return platform.PlatformGattStatus.invalidOffset;
+      case GattResponseStatus.invalidAttributeLength:
+        return platform.PlatformGattStatus.invalidAttributeLength;
+      case GattResponseStatus.insufficientAuthentication:
+        return platform.PlatformGattStatus.insufficientAuthentication;
+      case GattResponseStatus.insufficientEncryption:
+        return platform.PlatformGattStatus.insufficientEncryption;
+      case GattResponseStatus.requestNotSupported:
+        return platform.PlatformGattStatus.requestNotSupported;
     }
   }
 

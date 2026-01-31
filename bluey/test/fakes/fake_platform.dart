@@ -428,6 +428,75 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     return connection.peripheral.device.rssi;
   }
 
+  // === Bonding Operations ===
+
+  @override
+  Future<PlatformBondState> getBondState(String deviceId) async {
+    return PlatformBondState.none;
+  }
+
+  @override
+  Stream<PlatformBondState> bondStateStream(String deviceId) {
+    return Stream.empty();
+  }
+
+  @override
+  Future<void> bond(String deviceId) async {
+    // Simulate bonding success
+  }
+
+  @override
+  Future<void> removeBond(String deviceId) async {
+    // Simulate bond removal
+  }
+
+  @override
+  Future<List<PlatformDevice>> getBondedDevices() async {
+    return [];
+  }
+
+  // === PHY Operations ===
+
+  @override
+  Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
+    return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
+  }
+
+  @override
+  Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
+    return Stream.empty();
+  }
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    PlatformPhy? txPhy,
+    PlatformPhy? rxPhy,
+  ) async {
+    // Simulate PHY request success
+  }
+
+  // === Connection Parameters ===
+
+  @override
+  Future<PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async {
+    return const PlatformConnectionParameters(
+      intervalMs: 30.0,
+      latency: 0,
+      timeoutMs: 4000,
+    );
+  }
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters params,
+  ) async {
+    // Simulate connection parameters request success
+  }
+
   // === Server Operations ===
 
   @override
@@ -477,6 +546,33 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Central not connected: $centralId');
     }
     // For testing purposes, we track this was called
+  }
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    // Indicate all subscribed centrals (with acknowledgment)
+    for (final central in _connectedCentrals.values) {
+      if (central.subscribedCharacteristics.contains(characteristicUuid)) {
+        // In a real implementation, this would wait for acknowledgment
+      }
+    }
+  }
+
+  @override
+  Future<void> indicateCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    final central = _connectedCentrals[centralId];
+    if (central == null) {
+      throw Exception('Central not connected: $centralId');
+    }
+    // For testing purposes, we track this was called
+    // In a real implementation, this would wait for acknowledgment
   }
 
   @override

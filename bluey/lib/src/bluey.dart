@@ -360,6 +360,28 @@ class Bluey {
     }
   }
 
+  /// Get all bonded devices.
+  ///
+  /// Returns a list of devices that have been previously bonded/paired
+  /// with this device. Bonded devices can reconnect without re-pairing
+  /// and may have access to encrypted characteristics.
+  ///
+  /// Example:
+  /// ```dart
+  /// final bonded = await bluey.bondedDevices;
+  /// for (final device in bonded) {
+  ///   print('Bonded: ${device.name}');
+  /// }
+  /// ```
+  Future<List<Device>> get bondedDevices async {
+    try {
+      final platformDevices = await _platform.getBondedDevices();
+      return platformDevices.map(_mapDevice).toList();
+    } catch (e) {
+      throw _wrapError(e);
+    }
+  }
+
   /// Create a GATT server for peripheral role.
   ///
   /// Returns a [Server] for advertising services and handling requests

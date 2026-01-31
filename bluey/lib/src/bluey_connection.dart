@@ -25,11 +25,25 @@ class BlueyConnection implements Connection {
       ConnectionState
           .connected; // Start as connected since we're created after successful connection
   int _mtu = 23; // Default BLE MTU
+  BondState _bondState = BondState.none;
+  Phy _txPhy = Phy.le1m;
+  Phy _rxPhy = Phy.le1m;
+  ConnectionParameters _connectionParameters = const ConnectionParameters(
+    intervalMs: 30.0, // Default 30ms interval
+    latency: 0,
+    timeoutMs: 4000, // Default 4s timeout
+  );
 
   final StreamController<ConnectionState> _stateController =
       StreamController<ConnectionState>.broadcast();
+  final StreamController<BondState> _bondStateController =
+      StreamController<BondState>.broadcast();
+  final StreamController<({Phy tx, Phy rx})> _phyController =
+      StreamController<({Phy tx, Phy rx})>.broadcast();
 
   StreamSubscription? _platformStateSubscription;
+  StreamSubscription? _platformBondStateSubscription;
+  StreamSubscription? _platformPhySubscription;
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
@@ -55,6 +69,49 @@ class BlueyConnection implements Connection {
             _stateController.addError(error);
           },
         );
+
+    // Subscribe to platform bond state changes
+    _platformBondStateSubscription = _platform
+        .bondStateStream(_deviceAddress)
+        .listen(
+          (platformBondState) {
+            _bondState = _mapBondState(platformBondState);
+            _bondStateController.add(_bondState);
+          },
+          onError: (error) {
+            _bondStateController.addError(error);
+          },
+        );
+
+    // Initialize bond state
+    _platform.getBondState(_deviceAddress).then((platformBondState) {
+      _bondState = _mapBondState(platformBondState);
+    });
+
+    // Subscribe to platform PHY changes
+    _platformPhySubscription = _platform
+        .phyStream(_deviceAddress)
+        .listen(
+          (platformPhy) {
+            _txPhy = _mapPhy(platformPhy.tx);
+            _rxPhy = _mapPhy(platformPhy.rx);
+            _phyController.add((tx: _txPhy, rx: _rxPhy));
+          },
+          onError: (error) {
+            _phyController.addError(error);
+          },
+        );
+
+    // Initialize PHY
+    _platform.getPhy(_deviceAddress).then((platformPhy) {
+      _txPhy = _mapPhy(platformPhy.tx);
+      _rxPhy = _mapPhy(platformPhy.rx);
+    });
+
+    // Initialize connection parameters
+    _platform.getConnectionParameters(_deviceAddress).then((params) {
+      _connectionParameters = _mapConnectionParameters(params);
+    });
   }
 
   @override
@@ -129,10 +186,70 @@ class BlueyConnection implements Connection {
     await _cleanup();
   }
 
+  // === Bonding ===
+
+  @override
+  BondState get bondState => _bondState;
+
+  @override
+  Stream<BondState> get bondStateChanges => _bondStateController.stream;
+
+  @override
+  Future<void> bond() async {
+    await _platform.bond(_deviceAddress);
+  }
+
+  @override
+  Future<void> removeBond() async {
+    await _platform.removeBond(_deviceAddress);
+  }
+
+  // === PHY ===
+
+  @override
+  Phy get txPhy => _txPhy;
+
+  @override
+  Phy get rxPhy => _rxPhy;
+
+  @override
+  Stream<({Phy tx, Phy rx})> get phyChanges => _phyController.stream;
+
+  @override
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
+    await _platform.requestPhy(
+      _deviceAddress,
+      txPhy != null ? _mapPhyToPlatform(txPhy) : null,
+      rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
+    );
+  }
+
+  // === Connection Parameters ===
+
+  @override
+  ConnectionParameters get connectionParameters => _connectionParameters;
+
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) async {
+    await _platform.requestConnectionParameters(
+      _deviceAddress,
+      platform.PlatformConnectionParameters(
+        intervalMs: params.intervalMs,
+        latency: params.latency,
+        timeoutMs: params.timeoutMs,
+      ),
+    );
+    _connectionParameters = params;
+  }
+
   /// Clean up resources.
   Future<void> _cleanup() async {
     await _platformStateSubscription?.cancel();
+    await _platformBondStateSubscription?.cancel();
+    await _platformPhySubscription?.cancel();
     await _stateController.close();
+    await _bondStateController.close();
+    await _phyController.close();
     _cachedServices = null;
   }
 
@@ -149,6 +266,49 @@ class BlueyConnection implements Connection {
       case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
     }
+  }
+
+  BondState _mapBondState(platform.PlatformBondState platformBondState) {
+    switch (platformBondState) {
+      case platform.PlatformBondState.none:
+        return BondState.none;
+      case platform.PlatformBondState.bonding:
+        return BondState.bonding;
+      case platform.PlatformBondState.bonded:
+        return BondState.bonded;
+    }
+  }
+
+  Phy _mapPhy(platform.PlatformPhy platformPhy) {
+    switch (platformPhy) {
+      case platform.PlatformPhy.le1m:
+        return Phy.le1m;
+      case platform.PlatformPhy.le2m:
+        return Phy.le2m;
+      case platform.PlatformPhy.leCoded:
+        return Phy.leCoded;
+    }
+  }
+
+  platform.PlatformPhy _mapPhyToPlatform(Phy phy) {
+    switch (phy) {
+      case Phy.le1m:
+        return platform.PlatformPhy.le1m;
+      case Phy.le2m:
+        return platform.PlatformPhy.le2m;
+      case Phy.leCoded:
+        return platform.PlatformPhy.leCoded;
+    }
+  }
+
+  ConnectionParameters _mapConnectionParameters(
+    platform.PlatformConnectionParameters params,
+  ) {
+    return ConnectionParameters(
+      intervalMs: params.intervalMs,
+      latency: params.latency,
+      timeoutMs: params.timeoutMs,
+    );
   }
 
   BlueyRemoteService _mapService(platform.PlatformService ps) {

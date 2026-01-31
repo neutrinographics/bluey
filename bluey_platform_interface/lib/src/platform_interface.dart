@@ -24,6 +24,26 @@ enum PlatformConnectionState {
   disconnecting,
 }
 
+/// Bond state.
+enum PlatformBondState { none, bonding, bonded }
+
+/// PHY (Physical Layer) options.
+enum PlatformPhy { le1m, le2m, leCoded }
+
+/// Connection parameters from the platform layer.
+@immutable
+class PlatformConnectionParameters {
+  final double intervalMs;
+  final int latency;
+  final int timeoutMs;
+
+  const PlatformConnectionParameters({
+    required this.intervalMs,
+    required this.latency,
+    required this.timeoutMs,
+  });
+}
+
 /// Configuration for scanning.
 @immutable
 class PlatformScanConfig {
@@ -355,6 +375,49 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Read the current RSSI for a connected device.
   Future<int> readRssi(String deviceId);
 
+  // === Bonding ===
+
+  /// Get the current bond state for a device.
+  Future<PlatformBondState> getBondState(String deviceId);
+
+  /// Stream of bond state changes for a device.
+  Stream<PlatformBondState> bondStateStream(String deviceId);
+
+  /// Initiate bonding with a device.
+  Future<void> bond(String deviceId);
+
+  /// Remove bond with a device.
+  Future<void> removeBond(String deviceId);
+
+  /// Get all bonded devices.
+  Future<List<PlatformDevice>> getBondedDevices();
+
+  // === PHY ===
+
+  /// Get the current PHY for a connection.
+  Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId);
+
+  /// Stream of PHY changes for a device.
+  Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId);
+
+  /// Request specific PHY settings.
+  Future<void> requestPhy(
+    String deviceId,
+    PlatformPhy? txPhy,
+    PlatformPhy? rxPhy,
+  );
+
+  // === Connection Parameters ===
+
+  /// Get the current connection parameters for a device.
+  Future<PlatformConnectionParameters> getConnectionParameters(String deviceId);
+
+  /// Request updated connection parameters.
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters params,
+  );
+
   // === Server (Peripheral) Operations ===
 
   /// Add a service to the GATT server.
@@ -374,6 +437,23 @@ abstract base class BlueyPlatform extends PlatformInterface {
 
   /// Send a notification to a specific central.
   Future<void> notifyCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  );
+
+  /// Send an indication to all subscribed centrals.
+  ///
+  /// Unlike notifications, indications require acknowledgment from the central.
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  );
+
+  /// Send an indication to a specific central.
+  ///
+  /// Unlike notifications, indications require acknowledgment from the central.
+  Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
     Uint8List value,

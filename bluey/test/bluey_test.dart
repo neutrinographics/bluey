@@ -12,6 +12,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   platform.BluetoothState mockState = platform.BluetoothState.on;
   List<platform.PlatformDevice> mockDevices = [];
+  List<platform.PlatformDevice> mockBondedDevices = [];
   bool requestEnableResult = true;
   Exception? scanError;
 
@@ -148,6 +149,59 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<int> readRssi(String deviceId) async => -60;
 
+  // Bonding operations
+  @override
+  Future<platform.PlatformBondState> getBondState(String deviceId) async =>
+      platform.PlatformBondState.none;
+
+  @override
+  Stream<platform.PlatformBondState> bondStateStream(String deviceId) =>
+      Stream.empty();
+
+  @override
+  Future<void> bond(String deviceId) async {}
+
+  @override
+  Future<void> removeBond(String deviceId) async {}
+
+  @override
+  Future<List<platform.PlatformDevice>> getBondedDevices() async =>
+      mockBondedDevices;
+
+  // PHY operations - stub implementations
+  @override
+  Future<({platform.PlatformPhy tx, platform.PlatformPhy rx})> getPhy(
+    String deviceId,
+  ) async => (tx: platform.PlatformPhy.le1m, rx: platform.PlatformPhy.le1m);
+
+  @override
+  Stream<({platform.PlatformPhy tx, platform.PlatformPhy rx})> phyStream(
+    String deviceId,
+  ) => Stream.empty();
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    platform.PlatformPhy? txPhy,
+    platform.PlatformPhy? rxPhy,
+  ) async {}
+
+  // Connection parameters - stub implementations
+  @override
+  Future<platform.PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async => const platform.PlatformConnectionParameters(
+    intervalMs: 30.0,
+    latency: 0,
+    timeoutMs: 4000,
+  );
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    platform.PlatformConnectionParameters params,
+  ) async {}
+
   // Server (Peripheral) operations - stub implementations
   @override
   Future<void> addService(platform.PlatformLocalService service) async {}
@@ -171,6 +225,19 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
     Uint8List value,
@@ -490,6 +557,43 @@ void main() {
         expect(bluey.stateStream.isBroadcast, isTrue);
         // After dispose, adding listeners should still work (broadcast stream)
         // but no new events will come through
+      });
+    });
+
+    group('bondedDevices', () {
+      test('returns list of bonded devices', () async {
+        mockPlatform.mockBondedDevices = [
+          platform.PlatformDevice(
+            id: 'AA:BB:CC:DD:EE:FF',
+            name: 'Bonded Device 1',
+            rssi: 0,
+            serviceUuids: [],
+            manufacturerDataCompanyId: null,
+            manufacturerData: null,
+          ),
+          platform.PlatformDevice(
+            id: '11:22:33:44:55:66',
+            name: 'Bonded Device 2',
+            rssi: 0,
+            serviceUuids: [],
+            manufacturerDataCompanyId: null,
+            manufacturerData: null,
+          ),
+        ];
+
+        final devices = await bluey.bondedDevices;
+
+        expect(devices, hasLength(2));
+        expect(devices[0].name, equals('Bonded Device 1'));
+        expect(devices[1].name, equals('Bonded Device 2'));
+      });
+
+      test('returns empty list when no bonded devices', () async {
+        mockPlatform.mockBondedDevices = [];
+
+        final devices = await bluey.bondedDevices;
+
+        expect(devices, isEmpty);
       });
     });
   });

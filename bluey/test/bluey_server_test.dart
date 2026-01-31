@@ -19,6 +19,8 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   bool isAdvertising = false;
   final List<NotifyCall> notifyCalls = [];
   final List<NotifyToCall> notifyToCalls = [];
+  final List<IndicateCall> indicateCalls = [];
+  final List<IndicateToCall> indicateToCalls = [];
   final List<RespondToReadCall> respondToReadCalls = [];
   final List<RespondToWriteCall> respondToWriteCalls = [];
   final List<String> disconnectedCentrals = [];
@@ -140,6 +142,58 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<int> readRssi(String deviceId) async => -60;
 
+  // Bonding operations - stub implementations
+  @override
+  Future<platform.PlatformBondState> getBondState(String deviceId) async =>
+      platform.PlatformBondState.none;
+
+  @override
+  Stream<platform.PlatformBondState> bondStateStream(String deviceId) =>
+      Stream.empty();
+
+  @override
+  Future<void> bond(String deviceId) async {}
+
+  @override
+  Future<void> removeBond(String deviceId) async {}
+
+  @override
+  Future<List<platform.PlatformDevice>> getBondedDevices() async => [];
+
+  // PHY operations - stub implementations
+  @override
+  Future<({platform.PlatformPhy tx, platform.PlatformPhy rx})> getPhy(
+    String deviceId,
+  ) async => (tx: platform.PlatformPhy.le1m, rx: platform.PlatformPhy.le1m);
+
+  @override
+  Stream<({platform.PlatformPhy tx, platform.PlatformPhy rx})> phyStream(
+    String deviceId,
+  ) => Stream.empty();
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    platform.PlatformPhy? txPhy,
+    platform.PlatformPhy? rxPhy,
+  ) async {}
+
+  // Connection parameters - stub implementations
+  @override
+  Future<platform.PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async => const platform.PlatformConnectionParameters(
+    intervalMs: 30.0,
+    latency: 0,
+    timeoutMs: 4000,
+  );
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    platform.PlatformConnectionParameters params,
+  ) async {}
+
   // === Server (Peripheral) Operations ===
 
   @override
@@ -181,6 +235,31 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   ) async {
     notifyToCalls.add(
       NotifyToCall(
+        centralId: centralId,
+        characteristicUuid: characteristicUuid,
+        value: value,
+      ),
+    );
+  }
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    indicateCalls.add(
+      IndicateCall(characteristicUuid: characteristicUuid, value: value),
+    );
+  }
+
+  @override
+  Future<void> indicateCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {
+    indicateToCalls.add(
+      IndicateToCall(
         centralId: centralId,
         characteristicUuid: characteristicUuid,
         value: value,
@@ -278,6 +357,25 @@ class NotifyToCall {
   final Uint8List value;
 
   NotifyToCall({
+    required this.centralId,
+    required this.characteristicUuid,
+    required this.value,
+  });
+}
+
+class IndicateCall {
+  final String characteristicUuid;
+  final Uint8List value;
+
+  IndicateCall({required this.characteristicUuid, required this.value});
+}
+
+class IndicateToCall {
+  final String centralId;
+  final String characteristicUuid;
+  final Uint8List value;
+
+  IndicateToCall({
     required this.centralId,
     required this.characteristicUuid,
     required this.value,
@@ -537,6 +635,47 @@ void main() {
       });
     });
 
+    group('Indications', () {
+      test('indicate sends indication to all subscribed centrals', () async {
+        final server = bluey.server()!;
+        final charUuid = UUID.short(0x2A19);
+        final data = Uint8List.fromList([42]);
+
+        await server.indicate(charUuid, data: data);
+
+        expect(mockPlatform.indicateCalls, hasLength(1));
+        expect(
+          mockPlatform.indicateCalls.first.characteristicUuid,
+          equals('00002a19-0000-1000-8000-00805f9b34fb'),
+        );
+        expect(mockPlatform.indicateCalls.first.value, equals(data));
+      });
+
+      test('indicateTo sends indication to specific central', () async {
+        final server = bluey.server()!;
+
+        // First connect a central
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        final central = server.connectedCentrals.first;
+        final charUuid = UUID.short(0x2A19);
+        final data = Uint8List.fromList([99]);
+
+        await server.indicateTo(central, charUuid, data: data);
+
+        expect(mockPlatform.indicateToCalls, hasLength(1));
+        expect(
+          mockPlatform.indicateToCalls.first.centralId,
+          equals('central-1'),
+        );
+        expect(mockPlatform.indicateToCalls.first.value, equals(data));
+      });
+    });
+
     group('Central disconnect', () {
       test('central.disconnect() disconnects the central', () async {
         final server = bluey.server()!;
@@ -563,6 +702,199 @@ void main() {
 
         // Should have stopped advertising
         expect(mockPlatform.isAdvertising, isFalse);
+      });
+    });
+
+    group('Read Requests', () {
+      test('readRequests stream emits domain ReadRequest', () async {
+        final server = bluey.server()!;
+
+        // First connect a central
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        final requests = <ReadRequest>[];
+        final subscription = server.readRequests.listen(requests.add);
+
+        mockPlatform.emitReadRequest(
+          const platform.PlatformReadRequest(
+            requestId: 1,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            offset: 0,
+          ),
+        );
+
+        await Future.delayed(Duration(milliseconds: 10));
+        await subscription.cancel();
+
+        expect(requests, hasLength(1));
+        expect(requests.first.central, isNotNull);
+        expect(requests.first.characteristicId, equals(UUID.short(0x2A19)));
+        expect(requests.first.offset, equals(0));
+      });
+
+      test('respondToRead sends response through platform', () async {
+        final server = bluey.server()!;
+
+        // Connect a central and receive a read request
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        late ReadRequest capturedRequest;
+        server.readRequests.listen((r) => capturedRequest = r);
+
+        mockPlatform.emitReadRequest(
+          const platform.PlatformReadRequest(
+            requestId: 42,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            offset: 0,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        final responseData = Uint8List.fromList([100]);
+        await server.respondToRead(
+          capturedRequest,
+          status: GattResponseStatus.success,
+          value: responseData,
+        );
+
+        expect(mockPlatform.respondToReadCalls, hasLength(1));
+        expect(mockPlatform.respondToReadCalls.first.requestId, equals(42));
+        expect(
+          mockPlatform.respondToReadCalls.first.status,
+          equals(platform.PlatformGattStatus.success),
+        );
+        expect(
+          mockPlatform.respondToReadCalls.first.value,
+          equals(responseData),
+        );
+      });
+    });
+
+    group('Write Requests', () {
+      test('writeRequests stream emits domain WriteRequest', () async {
+        final server = bluey.server()!;
+
+        // First connect a central
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        final requests = <WriteRequest>[];
+        final subscription = server.writeRequests.listen(requests.add);
+
+        final writeValue = Uint8List.fromList([1, 2, 3]);
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 2,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            value: writeValue,
+            offset: 0,
+            responseNeeded: true,
+          ),
+        );
+
+        await Future.delayed(Duration(milliseconds: 10));
+        await subscription.cancel();
+
+        expect(requests, hasLength(1));
+        expect(requests.first.central, isNotNull);
+        expect(requests.first.characteristicId, equals(UUID.short(0x2A19)));
+        expect(requests.first.value, equals(writeValue));
+        expect(requests.first.offset, equals(0));
+        expect(requests.first.responseNeeded, isTrue);
+      });
+
+      test('respondToWrite sends response through platform', () async {
+        final server = bluey.server()!;
+
+        // Connect a central and receive a write request
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        late WriteRequest capturedRequest;
+        server.writeRequests.listen((r) => capturedRequest = r);
+
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 99,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            value: Uint8List.fromList([5]),
+            offset: 0,
+            responseNeeded: true,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        await server.respondToWrite(
+          capturedRequest,
+          status: GattResponseStatus.success,
+        );
+
+        expect(mockPlatform.respondToWriteCalls, hasLength(1));
+        expect(mockPlatform.respondToWriteCalls.first.requestId, equals(99));
+        expect(
+          mockPlatform.respondToWriteCalls.first.status,
+          equals(platform.PlatformGattStatus.success),
+        );
+      });
+    });
+
+    group('GattResponseStatus mapping', () {
+      test('all GattResponseStatus values map to platform status', () async {
+        final server = bluey.server()!;
+
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        late ReadRequest capturedRequest;
+        server.readRequests.listen((r) => capturedRequest = r);
+
+        // Test each status
+        for (final status in GattResponseStatus.values) {
+          mockPlatform.respondToReadCalls.clear();
+
+          mockPlatform.emitReadRequest(
+            platform.PlatformReadRequest(
+              requestId: status.index,
+              centralId: 'central-1',
+              characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+              offset: 0,
+            ),
+          );
+          await Future.delayed(Duration(milliseconds: 10));
+
+          await server.respondToRead(
+            capturedRequest,
+            status: status,
+            value: Uint8List(0),
+          );
+
+          expect(
+            mockPlatform.respondToReadCalls,
+            hasLength(1),
+            reason: 'Status $status should be mapped',
+          );
+        }
       });
     });
   });

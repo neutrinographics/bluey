@@ -348,6 +348,35 @@ class MockServer implements Server {
   }) async {}
 
   @override
+  Future<void> indicate(UUID characteristic, {required Uint8List data}) async {}
+
+  @override
+  Future<void> indicateTo(
+    Central central,
+    UUID characteristic, {
+    required Uint8List data,
+  }) async {}
+
+  @override
+  Stream<ReadRequest> get readRequests => const Stream.empty();
+
+  @override
+  Stream<WriteRequest> get writeRequests => const Stream.empty();
+
+  @override
+  Future<void> respondToRead(
+    ReadRequest request, {
+    required GattResponseStatus status,
+    Uint8List? value,
+  }) async {}
+
+  @override
+  Future<void> respondToWrite(
+    WriteRequest request, {
+    required GattResponseStatus status,
+  }) async {}
+
+  @override
   Future<void> dispose() async {
     await _connectionsController.close();
   }

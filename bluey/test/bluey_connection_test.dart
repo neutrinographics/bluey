@@ -191,6 +191,58 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     return mockRssi;
   }
 
+  // Bonding operations - stub implementations
+  @override
+  Future<platform.PlatformBondState> getBondState(String deviceId) async =>
+      platform.PlatformBondState.none;
+
+  @override
+  Stream<platform.PlatformBondState> bondStateStream(String deviceId) =>
+      Stream.empty();
+
+  @override
+  Future<void> bond(String deviceId) async {}
+
+  @override
+  Future<void> removeBond(String deviceId) async {}
+
+  @override
+  Future<List<platform.PlatformDevice>> getBondedDevices() async => [];
+
+  // PHY operations - stub implementations
+  @override
+  Future<({platform.PlatformPhy tx, platform.PlatformPhy rx})> getPhy(
+    String deviceId,
+  ) async => (tx: platform.PlatformPhy.le1m, rx: platform.PlatformPhy.le1m);
+
+  @override
+  Stream<({platform.PlatformPhy tx, platform.PlatformPhy rx})> phyStream(
+    String deviceId,
+  ) => Stream.empty();
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    platform.PlatformPhy? txPhy,
+    platform.PlatformPhy? rxPhy,
+  ) async {}
+
+  // Connection parameters - stub implementations
+  @override
+  Future<platform.PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async => const platform.PlatformConnectionParameters(
+    intervalMs: 30.0,
+    latency: 0,
+    timeoutMs: 4000,
+  );
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    platform.PlatformConnectionParameters params,
+  ) async {}
+
   // Server (Peripheral) operations - stub implementations
   @override
   Future<void> addService(platform.PlatformLocalService service) async {}
@@ -214,6 +266,19 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) async {}
+
+  @override
+  Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
     Uint8List value,

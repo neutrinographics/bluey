@@ -429,6 +429,35 @@ final class NotificationSentEvent extends BlueyEvent {
   }
 }
 
+/// Indication sent to central(s).
+///
+/// Indications are like notifications but require acknowledgment from the central.
+final class IndicationSentEvent extends BlueyEvent {
+  final UUID characteristicId;
+  final int valueLength;
+  final String? centralId; // null means broadcast to all
+
+  const IndicationSentEvent({
+    required this.characteristicId,
+    required this.valueLength,
+    this.centralId,
+    super.source,
+  });
+
+  @override
+  String toString() {
+    final target = centralId != null ? ' to ${_shortId(centralId!)}' : '';
+    return '[Server] Sent indication$target ($valueLength bytes)';
+  }
+
+  String _shortId(String id) {
+    if (id.length > 8) {
+      return '${id.substring(0, 8)}...';
+    }
+    return id;
+  }
+}
+
 // === Error Events ===
 
 /// An error occurred.
