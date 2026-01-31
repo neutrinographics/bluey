@@ -50,6 +50,15 @@ class UUID {
     return _value;
   }
 
+  /// Returns a short representation for display purposes.
+  /// Uses short form for standard Bluetooth UUIDs, first 8 chars otherwise.
+  String toShortString() {
+    if (isShort) {
+      return _value.substring(4, 8);
+    }
+    return _value.substring(0, 8);
+  }
+
   @override
   String toString() => _value;
 

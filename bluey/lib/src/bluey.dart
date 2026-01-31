@@ -8,11 +8,14 @@ import 'bluey_server.dart';
 import 'connection.dart';
 import 'connection_state.dart';
 import 'device.dart';
+import 'event_bus.dart';
+import 'events.dart';
 import 'exceptions.dart';
 import 'server.dart';
 import 'uuid.dart';
 
 export 'connection_state.dart';
+export 'events.dart';
 
 /// The state of the Bluetooth adapter.
 enum BluetoothState {
@@ -114,6 +117,19 @@ class Bluey {
   /// or displaying error messages to the user.
   Stream<BlueyException> get errorStream => _errorController.stream;
 
+  /// Stream of diagnostic events from Bluey.
+  ///
+  /// Subscribe to this stream to monitor what's happening inside Bluey.
+  /// Useful for debugging, logging, and understanding BLE operations.
+  ///
+  /// Example:
+  /// ```dart
+  /// bluey.events.listen((event) {
+  ///   print(event); // [Scan] Started filter=180d timeout=10s
+  /// });
+  /// ```
+  Stream<BlueyEvent> get events => BlueyEventBus.instance.stream;
+
   /// Get current Bluetooth state.
   Future<BluetoothState> get state async {
     try {
@@ -203,9 +219,21 @@ class Bluey {
       timeoutMs: timeout?.inMilliseconds,
     );
 
+    _emitEvent(ScanStartedEvent(serviceFilter: services, timeout: timeout));
+
     return _platform
         .scan(config)
-        .map(_mapDevice)
+        .map((platformDevice) {
+          final device = _mapDevice(platformDevice);
+          _emitEvent(
+            DeviceDiscoveredEvent(
+              deviceId: device.id,
+              name: device.name,
+              rssi: device.rssi,
+            ),
+          );
+          return device;
+        })
         .handleError((error) => throw _wrapError(error));
   }
 
@@ -213,6 +241,7 @@ class Bluey {
   Future<void> stopScan() async {
     try {
       await _platform.stopScan();
+      _emitEvent(const ScanStoppedEvent());
     } catch (e) {
       throw _wrapError(e);
     }
@@ -231,9 +260,13 @@ class Bluey {
       mtu: null,
     );
 
+    _emitEvent(ConnectingEvent(deviceId: device.id));
+
     try {
       // Use platformId for the actual connection (MAC address on Android)
       final connectionId = await _platform.connect(device.platformId, config);
+
+      _emitEvent(ConnectedEvent(deviceId: device.id));
 
       return BlueyConnection(
         platformInstance: _platform,
@@ -241,6 +274,12 @@ class Bluey {
         deviceId: device.id,
       );
     } catch (e) {
+      _emitEvent(
+        ErrorEvent(
+          message: 'Connection failed to ${device.id.toShortString()}',
+          error: e,
+        ),
+      );
       throw _wrapError(e);
     }
   }
@@ -362,6 +401,11 @@ class Bluey {
     final clean = id.replaceAll(':', '').toLowerCase();
     final padded = clean.padLeft(32, '0');
     return UUID(padded);
+  }
+
+  /// Emits an event to the event bus.
+  void _emitEvent(BlueyEvent event) {
+    BlueyEventBus.instance.emit(event);
   }
 
   /// Wraps platform errors in domain exceptions and emits to error stream.

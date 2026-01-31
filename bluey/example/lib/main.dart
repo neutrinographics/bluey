@@ -46,6 +46,7 @@ class BlueyExampleApp extends StatefulWidget {
 class _BlueyExampleAppState extends State<BlueyExampleApp> {
   late final Bluey _bluey;
   StreamSubscription<BlueyException>? _errorSubscription;
+  StreamSubscription<BlueyEvent>? _eventSubscription;
 
   @override
   void initState() {
@@ -54,17 +55,20 @@ class _BlueyExampleAppState extends State<BlueyExampleApp> {
 
     // Listen to Bluey errors and log them to console
     _errorSubscription = _bluey.errorStream.listen((error) {
-      developer.log(
-        'Bluey Error: ${error.message}',
-        error: error,
-        name: 'Bluey',
-      );
+      debugPrint('[Bluey Error] ${error.message}');
+    });
+
+    // Listen to all Bluey events and log them to console
+    debugPrint('[Bluey] Subscribing to event stream');
+    _eventSubscription = _bluey.events.listen((event) {
+      debugPrint('[Bluey] $event');
     });
   }
 
   @override
   void dispose() {
     _errorSubscription?.cancel();
+    _eventSubscription?.cancel();
     _bluey.dispose();
     super.dispose();
   }

@@ -49,6 +49,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     // FlutterPlugin implementation
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        android.util.Log.d("BlueyPlugin", "onAttachedToEngine called")
         context = binding.applicationContext
 
         // Set up Pigeon APIs

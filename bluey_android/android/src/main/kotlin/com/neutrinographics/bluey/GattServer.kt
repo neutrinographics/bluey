@@ -16,6 +16,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.core.content.ContextCompat
 import java.util.UUID
 
@@ -34,6 +35,10 @@ class GattServer(
     private var activity: Activity? = null
     private var gattServer: BluetoothGattServer? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    init {
+        Log.d("GattServer", "GattServer instance created: $this")
+    }
 
     // Track connected centrals
     private val connectedCentrals = mutableMapOf<String, BluetoothDevice>()
@@ -56,7 +61,9 @@ class GattServer(
     }
 
     fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
+        Log.d("GattServer", "addService: ${service.uuid}")
         if (!hasRequiredPermissions()) {
+            Log.d("GattServer", "addService: missing permissions")
             callback(Result.failure(SecurityException("Missing required permissions")))
             return
         }
@@ -64,6 +71,7 @@ class GattServer(
         ensureServerOpen()
         val server = gattServer
         if (server == null) {
+            Log.d("GattServer", "addService: server is null after ensureServerOpen")
             callback(Result.failure(IllegalStateException("Failed to open GATT server")))
             return
         }
@@ -72,12 +80,16 @@ class GattServer(
         pendingServiceCallback = callback
 
         try {
+            Log.d("GattServer", "addService: calling server.addService")
             if (!server.addService(gattService)) {
+                Log.d("GattServer", "addService: server.addService returned false")
                 pendingServiceCallback = null
                 callback(Result.failure(IllegalStateException("Failed to add service")))
             }
+            Log.d("GattServer", "addService: server.addService returned true, waiting for onServiceAdded")
             // Callback will be invoked in onServiceAdded
         } catch (e: SecurityException) {
+            Log.e("GattServer", "addService: SecurityException", e)
             pendingServiceCallback = null
             callback(Result.failure(e))
         }
@@ -241,34 +253,36 @@ class GattServer(
     }
 
     private fun ensureServerOpen() {
-        if (gattServer != null) return
+        if (gattServer != null) {
+            Log.d("GattServer", "ensureServerOpen: server already open")
+            return
+        }
 
-        if (!hasRequiredPermissions()) return
+        if (!hasRequiredPermissions()) {
+            Log.d("GattServer", "ensureServerOpen: missing permissions")
+            return
+        }
 
         try {
+            Log.d("GattServer", "ensureServerOpen: opening GATT server with callback $gattServerCallback")
             gattServer = bluetoothManager?.openGattServer(context, gattServerCallback)
+            Log.d("GattServer", "ensureServerOpen: server opened = ${gattServer != null}")
         } catch (e: SecurityException) {
-            // Permission revoked
+            Log.e("GattServer", "ensureServerOpen: SecurityException", e)
         }
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             val deviceId = device.address
+            Log.d(
+                "GattServer",
+                "onConnectionStateChange: device=$deviceId status=$status newState=$newState, this=$this, gattServer=$gattServer"
+            )
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
-                    // Ignore connections that happen before we've added any services
-                    // These are stale connections from central role operations
-                    if (gattServer?.services?.isEmpty() != false) {
-                        try {
-                            gattServer?.cancelConnection(device)
-                        } catch (e: SecurityException) {
-                            // Ignore
-                        }
-                        return
-                    }
-
+                    Log.d("GattServer", "STATE_CONNECTED: $deviceId")
                     connectedCentrals[deviceId] = device
                     centralMtus[deviceId] = DEFAULT_MTU
 
@@ -278,14 +292,14 @@ class GattServer(
                     )
                     // Must dispatch to main thread for Flutter platform channel
                     handler.post {
-                        flutterApi.onCentralConnected(central) {}
+                        Log.d("GattServer", "Calling flutterApi.onCentralConnected for $deviceId")
+                        flutterApi.onCentralConnected(central) { result ->
+                            Log.d("GattServer", "onCentralConnected result: $result")
+                        }
                     }
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    // Only notify if we were tracking this central
-                    if (!connectedCentrals.containsKey(deviceId)) return
-
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
@@ -301,6 +315,7 @@ class GattServer(
         }
 
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
+            Log.d("GattServer", "onServiceAdded: status=$status service=${service.uuid}")
             val callback = pendingServiceCallback
             pendingServiceCallback = null
 
@@ -319,6 +334,7 @@ class GattServer(
             offset: Int,
             characteristic: BluetoothGattCharacteristic
         ) {
+            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid}")
             val request = ReadRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
@@ -354,6 +370,7 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
+            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid}")
             val request = WriteRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
@@ -389,6 +406,7 @@ class GattServer(
             offset: Int,
             descriptor: BluetoothGattDescriptor
         ) {
+            Log.d("GattServer", "onDescriptorReadRequest: device=${device.address} desc=${descriptor.uuid}")
             try {
                 gattServer?.sendResponse(
                     device,
@@ -411,6 +429,7 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
+            Log.d("GattServer", "onDescriptorWriteRequest: device=${device.address} desc=${descriptor.uuid}")
             // Check if this is a CCCD write (subscription change)
             if (descriptor.uuid == CCCD_UUID) {
                 val characteristicUuid = descriptor.characteristic.uuid.toString()
@@ -451,11 +470,21 @@ class GattServer(
         }
 
         override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+            Log.d("GattServer", "onMtuChanged: device=${device.address} mtu=$mtu")
             centralMtus[device.address] = mtu
         }
 
         override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+            Log.d("GattServer", "onNotificationSent: device=${device.address} status=$status")
             // Notification was sent - could track for reliability
+        }
+
+        override fun onPhyUpdate(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {
+            Log.d("GattServer", "onPhyUpdate: device=${device.address} txPhy=$txPhy rxPhy=$rxPhy status=$status")
+        }
+
+        override fun onPhyRead(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {
+            Log.d("GattServer", "onPhyRead: device=${device.address} txPhy=$txPhy rxPhy=$rxPhy status=$status")
         }
     }
 

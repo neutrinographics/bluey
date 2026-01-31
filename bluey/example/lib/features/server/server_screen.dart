@@ -48,6 +48,15 @@ class _ServerScreenState extends State<ServerScreen> {
       return;
     }
 
+    // Listen for central connections BEFORE adding services
+    // (broadcast streams don't buffer events for late subscribers)
+    _connectionSubscription = _server!.connections.listen((central) {
+      setState(() {
+        _connectedCentrals.add(central);
+      });
+      _addLog('Connection', 'Central connected: ${central.id}');
+    });
+
     // Add demo service
     _server!.addService(
       LocalService(
@@ -66,14 +75,6 @@ class _ServerScreenState extends State<ServerScreen> {
         ],
       ),
     );
-
-    // Listen for central connections
-    _connectionSubscription = _server!.connections.listen((central) {
-      setState(() {
-        _connectedCentrals.add(central);
-      });
-      _addLog('Connection', 'Central connected: ${central.id}');
-    });
 
     _addLog('Server', 'Initialized with demo service');
   }

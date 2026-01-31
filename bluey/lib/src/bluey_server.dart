@@ -5,6 +5,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import 'device.dart';
+import 'event_bus.dart';
+import 'events.dart';
 import 'server.dart';
 import 'uuid.dart';
 
@@ -22,23 +24,35 @@ class BlueyServer implements Server {
   StreamSubscription? _centralDisconnectionsSub;
 
   BlueyServer(this._platform) {
-    _centralConnectionsSub = _platform.centralConnections.listen(
-      (platformCentral) {
-        final central = BlueyCentral(
-          platform: _platform,
-          id: platformCentral.id,
-          mtu: platformCentral.mtu,
-        );
-        _connectedCentrals[platformCentral.id] = central;
-        _connectionsController.add(central);
-      },
-    );
+    _emitEvent(const ServerStartedEvent(source: 'BlueyServer'));
 
-    _centralDisconnectionsSub = _platform.centralDisconnections.listen(
-      (centralId) {
-        _connectedCentrals.remove(centralId);
-      },
-    );
+    _centralConnectionsSub = _platform.centralConnections.listen((
+      platformCentral,
+    ) {
+      _emitEvent(
+        CentralConnectedEvent(
+          centralId: platformCentral.id,
+          mtu: platformCentral.mtu,
+          source: 'BlueyServer',
+        ),
+      );
+      final central = BlueyCentral(
+        platform: _platform,
+        id: platformCentral.id,
+        mtu: platformCentral.mtu,
+      );
+      _connectedCentrals[platformCentral.id] = central;
+      _connectionsController.add(central);
+    });
+
+    _centralDisconnectionsSub = _platform.centralDisconnections.listen((
+      centralId,
+    ) {
+      _emitEvent(
+        CentralDisconnectedEvent(centralId: centralId, source: 'BlueyServer'),
+      );
+      _connectedCentrals.remove(centralId);
+    });
   }
 
   @override
@@ -52,6 +66,9 @@ class BlueyServer implements Server {
 
   @override
   void addService(LocalService service) {
+    _emitEvent(
+      ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
+    );
     final platformService = _mapLocalServiceToPlatform(service);
     _platform.addService(platformService);
   }
@@ -78,17 +95,32 @@ class BlueyServer implements Server {
 
     await _platform.startAdvertising(config);
     _isAdvertising = true;
+    _emitEvent(
+      AdvertisingStartedEvent(
+        name: name,
+        services: services,
+        source: 'BlueyServer',
+      ),
+    );
   }
 
   @override
   Future<void> stopAdvertising() async {
     await _platform.stopAdvertising();
     _isAdvertising = false;
+    _emitEvent(const AdvertisingStoppedEvent(source: 'BlueyServer'));
   }
 
   @override
   Future<void> notify(UUID characteristic, {required Uint8List data}) async {
     await _platform.notifyCharacteristic(characteristic.toString(), data);
+    _emitEvent(
+      NotificationSentEvent(
+        characteristicId: characteristic,
+        valueLength: data.length,
+        source: 'BlueyServer',
+      ),
+    );
   }
 
   @override
@@ -102,6 +134,14 @@ class BlueyServer implements Server {
       blueyCentral.platformId,
       characteristic.toString(),
       data,
+    );
+    _emitEvent(
+      NotificationSentEvent(
+        characteristicId: characteristic,
+        valueLength: data.length,
+        centralId: blueyCentral.platformId,
+        source: 'BlueyServer',
+      ),
     );
   }
 
@@ -121,20 +161,23 @@ class BlueyServer implements Server {
   // === Private mapping methods ===
 
   platform.PlatformLocalService _mapLocalServiceToPlatform(
-      LocalService service) {
+    LocalService service,
+  ) {
     return platform.PlatformLocalService(
       uuid: service.uuid.toString(),
       isPrimary: service.isPrimary,
-      characteristics: service.characteristics
-          .map(_mapLocalCharacteristicToPlatform)
-          .toList(),
+      characteristics:
+          service.characteristics
+              .map(_mapLocalCharacteristicToPlatform)
+              .toList(),
       includedServices:
           service.includedServices.map(_mapLocalServiceToPlatform).toList(),
     );
   }
 
   platform.PlatformLocalCharacteristic _mapLocalCharacteristicToPlatform(
-      LocalCharacteristic characteristic) {
+    LocalCharacteristic characteristic,
+  ) {
     return platform.PlatformLocalCharacteristic(
       uuid: characteristic.uuid.toString(),
       properties: platform.PlatformCharacteristicProperties(
@@ -147,14 +190,16 @@ class BlueyServer implements Server {
       ),
       permissions:
           characteristic.permissions.map(_mapGattPermissionToPlatform).toList(),
-      descriptors: characteristic.descriptors
-          .map(_mapLocalDescriptorToPlatform)
-          .toList(),
+      descriptors:
+          characteristic.descriptors
+              .map(_mapLocalDescriptorToPlatform)
+              .toList(),
     );
   }
 
   platform.PlatformLocalDescriptor _mapLocalDescriptorToPlatform(
-      LocalDescriptor descriptor) {
+    LocalDescriptor descriptor,
+  ) {
     return platform.PlatformLocalDescriptor(
       uuid: descriptor.uuid.toString(),
       permissions:
@@ -164,7 +209,8 @@ class BlueyServer implements Server {
   }
 
   platform.PlatformGattPermission _mapGattPermissionToPlatform(
-      GattPermission permission) {
+    GattPermission permission,
+  ) {
     switch (permission) {
       case GattPermission.read:
         return platform.PlatformGattPermission.read;
@@ -175,6 +221,10 @@ class BlueyServer implements Server {
       case GattPermission.writeEncrypted:
         return platform.PlatformGattPermission.writeEncrypted;
     }
+  }
+
+  void _emitEvent(BlueyEvent event) {
+    BlueyEventBus.instance.emit(event);
   }
 }
 
@@ -188,9 +238,9 @@ class BlueyCentral implements Central {
     required platform.BlueyPlatform platform,
     required String id,
     required int mtu,
-  })  : _platform = platform,
-        platformId = id,
-        _mtu = mtu;
+  }) : _platform = platform,
+       platformId = id,
+       _mtu = mtu;
 
   @override
   UUID get id {
