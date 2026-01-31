@@ -63,11 +63,11 @@ class _ServerScreenState extends State<ServerScreen> {
     // Add demo service
     try {
       await _server!.addService(
-        LocalService(
+        HostedService(
           uuid: _demoServiceUuid,
           isPrimary: true,
           characteristics: [
-            LocalCharacteristic(
+            HostedCharacteristic(
               uuid: _demoCharUuid,
               properties: const CharacteristicProperties(
                 canRead: true,
