@@ -172,10 +172,7 @@ void main() {
     });
 
     test('equality based on uuid', () {
-      final s1 = LocalService(
-        uuid: UUID.short(0x180F),
-        characteristics: [],
-      );
+      final s1 = LocalService(uuid: UUID.short(0x180F), characteristics: []);
       final s2 = LocalService(
         uuid: UUID.short(0x180F),
         isPrimary: false,
@@ -188,28 +185,19 @@ void main() {
 
   group('Central', () {
     test('has id property', () {
-      final central = MockCentral(
-        id: UUID.short(0x1234),
-        mtu: 23,
-      );
+      final central = MockCentral(id: UUID.short(0x1234), mtu: 23);
 
       expect(central.id, equals(UUID.short(0x1234)));
     });
 
     test('has mtu property', () {
-      final central = MockCentral(
-        id: UUID.short(0x1234),
-        mtu: 512,
-      );
+      final central = MockCentral(id: UUID.short(0x1234), mtu: 512);
 
       expect(central.mtu, equals(512));
     });
 
     test('can disconnect', () async {
-      final central = MockCentral(
-        id: UUID.short(0x1234),
-        mtu: 23,
-      );
+      final central = MockCentral(id: UUID.short(0x1234), mtu: 23);
 
       await expectLater(central.disconnect(), completes);
     });
@@ -325,12 +313,12 @@ class MockServer implements Server {
   List<LocalService> get services => _services;
 
   @override
-  void addService(LocalService service) {
+  Future<void> addService(LocalService service) async {
     _services.add(service);
   }
 
   @override
-  void removeService(UUID uuid) {
+  Future<void> removeService(UUID uuid) async {
     _services.removeWhere((s) => s.uuid == uuid);
   }
 

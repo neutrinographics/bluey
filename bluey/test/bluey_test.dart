@@ -26,6 +26,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   platform.Capabilities get capabilities => platform.Capabilities.android;
 
   @override
+  Future<void> configure(platform.BlueyConfig config) async {}
+
+  @override
   Stream<platform.BluetoothState> get stateStream => _stateController.stream;
 
   @override
