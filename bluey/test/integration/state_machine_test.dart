@@ -29,19 +29,19 @@ void main() {
 
         // Start unknown
         fakePlatform.setBluetoothState(platform.BluetoothState.unknown);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         // Transition to off
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         // Transition to on
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         // Transition to unauthorized
         fakePlatform.setBluetoothState(platform.BluetoothState.unauthorized);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         expect(states, hasLength(4));
         expect(states[0], equals(BluetoothState.unknown));
@@ -65,7 +65,7 @@ void main() {
           );
         }
 
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(Duration.zero);
 
         expect(states, hasLength(10));
 
@@ -104,7 +104,7 @@ void main() {
 
         await connection.disconnect();
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(states, contains(ConnectionState.disconnected));
         expect(connection.state, equals(ConnectionState.disconnected));
@@ -131,7 +131,7 @@ void main() {
           // Server disconnects
           fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
 
-          await Future.delayed(const Duration(milliseconds: 50));
+          await Future.delayed(Duration.zero);
 
           expect(states, contains(ConnectionState.disconnected));
 
@@ -383,7 +383,7 @@ void main() {
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Cancel scan
         await subscription.cancel();
@@ -394,7 +394,7 @@ void main() {
         // Can start another scan
         final devices2 = <Device>[];
         final subscription2 = bluey.scan().listen(devices2.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription2.cancel();
 
         expect(devices2, hasLength(1));
@@ -527,7 +527,7 @@ void main() {
 
         // Unexpected disconnection
         fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         expect(connection1.state, equals(ConnectionState.disconnected));
 
         // Reconnect

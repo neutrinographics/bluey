@@ -352,7 +352,7 @@ void main() {
           value: Uint8List.fromList([0x00, 75]), // HR = 75 bpm
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(notifications, hasLength(2));

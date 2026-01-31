@@ -75,7 +75,7 @@ void main() {
             .scan(services: [UUID(heartRateServiceUuid)])
             .listen(devices.add);
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         expect(devices, hasLength(1));
@@ -201,7 +201,7 @@ void main() {
           value: Uint8List.fromList([0x00, 78]), // 78 bpm
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(heartRates, equals([72, 75, 78]));
 
@@ -492,7 +492,7 @@ void main() {
           value: Uint8List.fromList([0x01]), // Locked
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(stateChanges, equals([0x00, 0x01]));
 
@@ -542,7 +542,7 @@ void main() {
         );
 
         fakePlatform.simulateCentralConnection(centralId: 'phone-1');
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(centrals, contains('phone-1'));
 
@@ -654,7 +654,7 @@ void main() {
         // Discover all devices
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         expect(devices, hasLength(3));

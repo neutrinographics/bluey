@@ -37,7 +37,7 @@ void main() {
         final subscription1 = bluey.scan().listen(devices1.add);
         final subscription2 = bluey.scan().listen(devices2.add);
 
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(Duration.zero);
 
         await subscription1.cancel();
         await subscription2.cancel();
@@ -63,7 +63,7 @@ void main() {
         final subscription1 = bluey.scan().listen(devices1.add);
         final subscription2 = bluey.scan().listen(devices2.add);
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Cancel first listener
         await subscription1.cancel();
@@ -77,7 +77,7 @@ void main() {
         // Need to trigger another scan for the new device
         final devices3 = <Device>[];
         final subscription3 = bluey.scan().listen(devices3.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         await subscription2.cancel();
         await subscription3.cancel();
@@ -109,7 +109,7 @@ void main() {
         // Discover devices
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         expect(devices, hasLength(3));
@@ -144,7 +144,7 @@ void main() {
         // Discover devices
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         // Remove one device before connecting (simulate connection failure)
@@ -450,7 +450,7 @@ void main() {
           value: Uint8List.fromList([0x02]),
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(notifications, hasLength(2));
 
@@ -502,7 +502,7 @@ void main() {
           );
         }
 
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(Duration.zero);
 
         expect(notifications, hasLength(100));
 
@@ -539,7 +539,7 @@ void main() {
         fakePlatform.simulateCentralConnection(centralId: 'central-2');
         fakePlatform.simulateCentralConnection(centralId: 'central-3');
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(centrals, hasLength(3));
         expect(fakePlatform.connectedCentralIds, hasLength(3));

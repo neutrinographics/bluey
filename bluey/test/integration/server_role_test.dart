@@ -267,7 +267,7 @@ void main() {
           mtu: 23,
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(connections, hasLength(1));
@@ -291,7 +291,7 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:01',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(server.connectedCentrals, hasLength(1));
@@ -311,13 +311,13 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:01',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(server.connectedCentrals, hasLength(1));
 
         // Act: Central disconnects
         fakePlatform.simulateCentralDisconnection('AA:BB:CC:DD:EE:01');
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(server.connectedCentrals, isEmpty);
@@ -346,7 +346,7 @@ void main() {
           mtu: 256,
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(server.connectedCentrals, hasLength(3));
@@ -369,7 +369,7 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:02',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(server.connectedCentrals, hasLength(2));
 
@@ -377,7 +377,7 @@ void main() {
         final centralToDisconnect = server.connectedCentrals.first;
         await centralToDisconnect.disconnect();
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert: Only one central remains
         expect(server.connectedCentrals, hasLength(1));
@@ -407,7 +407,7 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:01',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Act: Send notification
         final data = Uint8List.fromList([0x00, 75]); // HR = 75 bpm
@@ -443,7 +443,7 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:02',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Act: Send notification to specific central
         final targetCentral = server.connectedCentrals.first;
@@ -489,7 +489,7 @@ void main() {
           centralId: 'AA:BB:CC:DD:EE:02',
           mtu: 23,
         );
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(fakePlatform.connectedCentralIds, hasLength(2));
 

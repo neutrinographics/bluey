@@ -411,7 +411,7 @@ void main() {
           value: Uint8List.fromList([0x01]),
         );
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         expect(notifications, hasLength(1));
 
         // Disconnect - stream should handle this gracefully
@@ -437,7 +437,7 @@ void main() {
         // Simulate abrupt disconnection
         fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         expect(states, contains(ConnectionState.disconnected));
 
@@ -452,13 +452,13 @@ void main() {
 
         // Multiple state changes
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
-        await Future.delayed(const Duration(milliseconds: 20));
+        await Future.delayed(Duration.zero);
 
         expect(states, hasLength(3));
         expect(states[0], equals(BluetoothState.off));
@@ -602,7 +602,7 @@ void main() {
         for (var i = 0; i < 3; i++) {
           final devices = <Device>[];
           final subscription = bluey.scan().listen(devices.add);
-          await Future.delayed(const Duration(milliseconds: 50));
+          await Future.delayed(Duration.zero);
           await subscription.cancel();
 
           expect(devices, hasLength(1));
@@ -617,7 +617,7 @@ void main() {
         // First scan - no devices
         var devices = <Device>[];
         var subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
         expect(devices, isEmpty);
 
@@ -630,7 +630,7 @@ void main() {
         // Second scan - device present
         devices = <Device>[];
         subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
         expect(devices, hasLength(1));
 
@@ -640,7 +640,7 @@ void main() {
         // Third scan - no devices again
         devices = <Device>[];
         subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
         expect(devices, isEmpty);
 

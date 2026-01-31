@@ -39,7 +39,7 @@ void main() {
         final subscription = bluey.scan().listen(devices.add);
 
         // Wait for scan to emit
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         // Assert
@@ -71,7 +71,7 @@ void main() {
             .scan(services: [UUID('0000180d-0000-1000-8000-00805f9b34fb')])
             .listen(devices.add);
 
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         // Assert: Only heart rate device found
@@ -169,7 +169,7 @@ void main() {
         fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
 
         // Give time for state to propagate
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert: We should detect the disconnection
         expect(connection.state, equals(ConnectionState.disconnected));
@@ -195,7 +195,7 @@ void main() {
         // Collect all devices
         final devices = <Device>[];
         final subscription = bluey.scan().listen(devices.add);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
         await subscription.cancel();
 
         // Act: Connect to both
@@ -256,7 +256,7 @@ void main() {
 
         // Server disconnects us
         fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Act: Reconnect
         final connection2 = await bluey.connect(device);
@@ -290,7 +290,7 @@ void main() {
 
         // Act: Turn off Bluetooth
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(Duration.zero);
 
         // Assert
         expect(states, contains(BluetoothState.off));
