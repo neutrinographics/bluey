@@ -33,8 +33,15 @@ void main() {
 
       test('throws on invalid UUID string', () {
         expect(() => UUID('invalid'), throwsArgumentError);
-        expect(() => UUID('180d'), throwsArgumentError);
         expect(() => UUID(''), throwsArgumentError);
+        expect(
+          () => UUID('180d'),
+          throwsArgumentError,
+        ); // 4 chars - use UUID.short() instead
+        expect(
+          () => UUID('12345678'),
+          throwsArgumentError,
+        ); // 8 chars - not full UUID
       });
 
       test('throws on invalid short value', () {

@@ -5,10 +5,13 @@
 ///
 /// Bluetooth UUIDs can be either:
 /// - Full 128-bit: '0000180d-0000-1000-8000-00805f9b34fb'
-/// - Short 16-bit (Bluetooth SIG assigned): '180d' or 0x180D
+/// - Short 16-bit (Bluetooth SIG assigned): created via `UUID.short(0x180D)`
 ///
 /// Short UUIDs are expanded using the Bluetooth base UUID:
 /// 0000xxxx-0000-1000-8000-00805f9b34fb
+///
+/// Note: The string constructor only accepts full 128-bit UUIDs (with or
+/// without hyphens). Use `UUID.short()` for 16-bit short UUIDs.
 class UUID {
   /// Bluetooth SIG base UUID
   static const String _baseUuid = '0000-1000-8000-00805f9b34fb';
@@ -71,6 +74,8 @@ class UUID {
   int get hashCode => _value.hashCode;
 
   /// Normalizes a UUID string to lowercase with hyphens.
+  ///
+  /// Accepts full 128-bit UUIDs (32 hex chars, with or without hyphens).
   static String _normalize(String value) {
     if (value.isEmpty) {
       throw ArgumentError('UUID cannot be empty');
@@ -79,9 +84,12 @@ class UUID {
     // Remove hyphens and convert to lowercase
     final clean = value.replaceAll('-', '').toLowerCase();
 
-    // Validate length
+    // Validate length - must be full 128-bit UUID
     if (clean.length != 32) {
-      throw ArgumentError('UUID must be 32 hex characters (128 bits)');
+      throw ArgumentError(
+        'UUID must be 32 hex characters (128 bits). '
+        'Use UUID.short() for 16-bit short UUIDs.',
+      );
     }
 
     // Validate hex characters
