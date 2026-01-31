@@ -159,6 +159,97 @@ final service = connection.service(UUID('0000180d-0000-1000-8000-00805f9b34fb'))
 await connection.disconnect();
 ```
 
+### Peripheral Role (GATT Server)
+
+```dart
+import 'package:bluey/bluey.dart';
+
+final bluey = Bluey();
+
+// Create a server (peripheral)
+final server = bluey.server();
+
+// Add a service with characteristics
+server.addService(
+  LocalService(
+    uuid: UUID('12345678-1234-1234-1234-123456789abc'),
+    isPrimary: true,
+    characteristics: [
+      LocalCharacteristic(
+        uuid: UUID('12345678-1234-1234-1234-123456789abd'),
+        properties: CharacteristicProperties(
+          canRead: true,
+          canWrite: true,
+          canNotify: true,
+        ),
+        permissions: [GattPermission.read, GattPermission.write],
+      ),
+    ],
+  ),
+);
+
+// Start advertising
+await server.startAdvertising(
+  name: 'My Device',
+  services: [UUID('12345678-1234-1234-1234-123456789abc')],
+);
+
+// Listen for central connections
+server.connections.listen((central) {
+  print('Central connected: ${central.id}');
+});
+
+// Send notifications to subscribed centrals
+await server.notify(
+  UUID('12345678-1234-1234-1234-123456789abd'),
+  Uint8List.fromList([0x01, 0x02, 0x03]),
+);
+
+// IMPORTANT: Dispose when done to properly close connections
+// This is especially important on Android to prevent zombie BLE connections
+await server.dispose();
+```
+
+#### Server Cleanup
+
+On Android, BLE connections can persist at the OS level even after your app closes.
+To prevent "zombie" connections that consume resources and battery:
+
+1. **Always call `server.dispose()`** when you're done with the server
+2. **Handle app lifecycle** - dispose the server when the app is backgrounded or closed
+
+```dart
+class MyWidget extends StatefulWidget {
+  @override
+  State<MyWidget> createState() => _MyWidgetState();
+}
+
+class _MyWidgetState extends State<MyWidget> with WidgetsBindingObserver {
+  Server? _server;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _server = bluey.server();
+  }
+
+  @override
+  void dispose() {
+    _server?.dispose();  // Clean up BLE resources
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      _server?.dispose();  // Clean up when app is closing
+    }
+  }
+}
+```
+
 ## 🛠️ Implementation Details
 
 ### Android Platform

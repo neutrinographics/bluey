@@ -34,7 +34,7 @@ void main() {
       expect(connection.deviceId, equals(device.id));
     });
 
-    test('connection starts in connecting state', () async {
+    test('connection is connected after connect completes', () async {
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
         rssi: -60,
@@ -43,8 +43,8 @@ void main() {
 
       final connection = await bluey.connect(device);
 
-      // Initially connecting
-      expect(connection.state, equals(ConnectionState.connecting));
+      // Connection is established after connect() completes
+      expect(connection.state, equals(ConnectionState.connected));
     });
 
     test('connection state changes are emitted', () async {
