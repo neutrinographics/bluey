@@ -205,5 +205,130 @@ void main() {
       act: (cubit) => cubit.clearError(),
       expect: () => [const ScannerState(bluetoothState: BluetoothState.on)],
     );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'stopScan emits error when stop fails',
+      setUp: () {
+        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockStopScan()).thenThrow(Exception('Stop failed'));
+      },
+      build: createCubit,
+      seed:
+          () => const ScannerState(
+            bluetoothState: BluetoothState.on,
+            isScanning: true,
+          ),
+      act: (cubit) => cubit.stopScan(),
+      expect:
+          () => [
+            isA<ScannerState>()
+                .having((s) => s.isScanning, 'isScanning', false)
+                .having(
+                  (s) => s.error,
+                  'error',
+                  contains('Failed to stop scan'),
+                ),
+          ],
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'requestEnable emits error when enable fails',
+      setUp: () {
+        when(
+          () => mockGetBluetoothState.current,
+        ).thenReturn(BluetoothState.off);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockRequestEnable()).thenThrow(Exception('Enable failed'));
+      },
+      build: createCubit,
+      act: (cubit) => cubit.requestEnable(),
+      expect:
+          () => [
+            isA<ScannerState>().having(
+              (s) => s.error,
+              'error',
+              contains('Failed to enable Bluetooth'),
+            ),
+          ],
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'openSettings emits error when open fails',
+      setUp: () {
+        when(
+          () => mockGetBluetoothState.current,
+        ).thenReturn(BluetoothState.off);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockRequestEnable.openSettings(),
+        ).thenThrow(Exception('Settings failed'));
+      },
+      build: createCubit,
+      act: (cubit) => cubit.openSettings(),
+      expect:
+          () => [
+            isA<ScannerState>().having(
+              (s) => s.error,
+              'error',
+              contains('Failed to open settings'),
+            ),
+          ],
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'requestPermissions emits error when request throws',
+      setUp: () {
+        when(
+          () => mockGetBluetoothState.current,
+        ).thenReturn(BluetoothState.unauthorized);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockRequestPermissions(),
+        ).thenThrow(Exception('Permission error'));
+      },
+      build: createCubit,
+      act: (cubit) async {
+        final result = await cubit.requestPermissions();
+        expect(result, false);
+      },
+      expect:
+          () => [
+            isA<ScannerState>().having(
+              (s) => s.error,
+              'error',
+              contains('Failed to request permissions'),
+            ),
+          ],
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'initialize emits error when bluetooth state stream errors',
+      setUp: () {
+        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => Stream.error(Exception('State stream error')));
+      },
+      build: createCubit,
+      act: (cubit) => cubit.initialize(),
+      expect:
+          () => [
+            const ScannerState(bluetoothState: BluetoothState.on),
+            isA<ScannerState>().having(
+              (s) => s.error,
+              'error',
+              contains('Bluetooth state error'),
+            ),
+          ],
+    );
   });
 }

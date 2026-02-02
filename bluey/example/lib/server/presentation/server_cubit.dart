@@ -49,11 +49,17 @@ class ServerCubit extends Cubit<ServerScreenState> {
     }
 
     // Listen for central connections
-    _connectionSubscription = _repository.connections.listen((central) {
-      final centrals = [...state.connectedCentrals, central];
-      emit(state.copyWith(connectedCentrals: centrals));
-      _addLog('Connection', 'Central connected: ${central.id}');
-    });
+    _connectionSubscription = _repository.connections.listen(
+      (central) {
+        final centrals = [...state.connectedCentrals, central];
+        emit(state.copyWith(connectedCentrals: centrals));
+        _addLog('Connection', 'Central connected: ${central.id}');
+      },
+      onError: (error) {
+        _addLog('Error', 'Connection stream error: $error');
+        emit(state.copyWith(error: 'Connection error: $error'));
+      },
+    );
 
     // Add demo service
     try {

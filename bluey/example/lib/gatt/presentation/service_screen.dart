@@ -461,15 +461,20 @@ class _DescriptorTile extends StatefulWidget {
 class _DescriptorTileState extends State<_DescriptorTile> {
   Uint8List? _value;
   bool _isReading = false;
+  bool _hasError = false;
 
   Future<void> _read() async {
-    setState(() => _isReading = true);
+    setState(() {
+      _isReading = true;
+      _hasError = false;
+    });
     try {
       final cubit = context.read<CharacteristicCubit>();
       final value = await cubit.readDescriptorValue(widget.descriptor);
-      if (value != null) {
-        setState(() => _value = value);
-      }
+      setState(() {
+        _value = value;
+        _hasError = value == null;
+      });
     } finally {
       setState(() => _isReading = false);
     }
@@ -485,14 +490,21 @@ class _DescriptorTileState extends State<_DescriptorTile> {
       leading: Icon(
         Icons.description,
         size: 20,
-        color: theme.colorScheme.outline,
+        color: _hasError ? theme.colorScheme.error : theme.colorScheme.outline,
       ),
       title: Text(
         widget.descriptor.uuid.toString(),
         style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
       ),
       subtitle:
-          _value != null
+          _hasError
+              ? Text(
+                'Read failed',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              )
+              : _value != null
               ? Text(
                 ValueFormatters.formatHex(_value!),
                 style: theme.textTheme.bodySmall,
@@ -506,7 +518,11 @@ class _DescriptorTileState extends State<_DescriptorTile> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-                : const Icon(Icons.download, size: 18),
+                : Icon(
+                  Icons.download,
+                  size: 18,
+                  color: _hasError ? theme.colorScheme.error : null,
+                ),
         onPressed: _isReading ? null : _read,
         tooltip: 'Read',
       ),

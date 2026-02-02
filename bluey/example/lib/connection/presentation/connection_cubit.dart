@@ -35,16 +35,26 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     try {
       final connection = await _connectToDevice(state.device);
 
-      _stateSubscription = connection.stateChanges.listen((connectionState) {
-        emit(state.copyWith(connectionState: connectionState));
+      _stateSubscription = connection.stateChanges.listen(
+        (connectionState) {
+          emit(state.copyWith(connectionState: connectionState));
 
-        if (connectionState == ConnectionState.disconnected) {
-          // Connection lost - emit event for UI to handle
+          if (connectionState == ConnectionState.disconnected) {
+            // Connection lost - emit event for UI to handle
+            emit(
+              state.withoutConnection().copyWith(error: 'Device disconnected'),
+            );
+          }
+        },
+        onError: (error) {
           emit(
-            state.withoutConnection().copyWith(error: 'Device disconnected'),
+            state.copyWith(
+              connectionState: ConnectionState.disconnected,
+              error: 'Connection state error: $error',
+            ),
           );
-        }
-      });
+        },
+      );
 
       emit(
         state.copyWith(
@@ -77,11 +87,14 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     final connection = state.connection;
     if (connection == null) return;
 
-    await _disconnectDevice(connection);
-    await _stateSubscription?.cancel();
-    _stateSubscription = null;
-
-    emit(state.withoutConnection());
+    try {
+      await _disconnectDevice(connection);
+      await _stateSubscription?.cancel();
+      _stateSubscription = null;
+      emit(state.withoutConnection());
+    } catch (e) {
+      emit(state.copyWith(error: 'Failed to disconnect: $e'));
+    }
   }
 
   /// Discovers services on the connected device.

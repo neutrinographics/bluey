@@ -180,5 +180,63 @@ void main() {
             ),
           ],
     );
+
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'disconnect emits error when disconnect fails',
+      setUp: () {
+        when(
+          () => mockDisconnectDevice(any()),
+        ).thenThrow(Exception('Disconnect failed'));
+      },
+      build: createCubit,
+      seed: () {
+        final mockConnection = MockConnection();
+        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
+        return ConnectionScreenState(
+          device: testDevice,
+          connection: mockConnection,
+          connectionState: ConnectionState.connected,
+        );
+      },
+      act: (cubit) => cubit.disconnect(),
+      expect:
+          () => [
+            isA<ConnectionScreenState>().having(
+              (s) => s.error,
+              'error',
+              contains('Failed to disconnect'),
+            ),
+          ],
+    );
+
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'connect emits error when connection state stream errors',
+      setUp: () {
+        final mockConnection = MockConnection();
+        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        // Use async* to emit error after a microtask delay
+        when(() => mockConnection.stateChanges).thenAnswer((_) async* {
+          await Future.delayed(Duration.zero);
+          throw Exception('State stream error');
+        });
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
+
+        when(
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        ).thenAnswer((_) async => mockConnection);
+        when(() => mockDiscoverServices(any())).thenAnswer((_) async => []);
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.connect();
+        // Allow stream error to propagate
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        // Verify that the error was emitted at some point
+        expect(cubit.state.error, contains('Connection state error'));
+      },
+    );
   });
 }
