@@ -1,14 +1,13 @@
-import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bluey/bluey.dart';
 
-import 'features/scanner/scanner_screen.dart';
-import 'features/server/server_screen.dart';
+import 'core/di/service_locator.dart';
+import 'app.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set up error logging to console
@@ -33,128 +32,18 @@ void main() {
     return true;
   };
 
+  // Initialize dependency injection
+  await setupServiceLocator();
+
+  // Set up Bluey error and event logging
+  final bluey = getIt<Bluey>();
+  bluey.errorStream.listen((error) {
+    debugPrint('[Bluey Error] ${error.message}');
+  });
+  debugPrint('[Bluey] Subscribing to event stream');
+  bluey.events.listen((event) {
+    debugPrint('[Bluey] $event');
+  });
+
   runApp(const BlueyExampleApp());
-}
-
-class BlueyExampleApp extends StatefulWidget {
-  const BlueyExampleApp({super.key});
-
-  @override
-  State<BlueyExampleApp> createState() => _BlueyExampleAppState();
-}
-
-class _BlueyExampleAppState extends State<BlueyExampleApp> {
-  late final Bluey _bluey;
-  StreamSubscription<BlueyException>? _errorSubscription;
-  StreamSubscription<BlueyEvent>? _eventSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _bluey = Bluey();
-
-    // Listen to Bluey errors and log them to console
-    _errorSubscription = _bluey.errorStream.listen((error) {
-      debugPrint('[Bluey Error] ${error.message}');
-    });
-
-    // Listen to all Bluey events and log them to console
-    debugPrint('[Bluey] Subscribing to event stream');
-    _eventSubscription = _bluey.events.listen((event) {
-      debugPrint('[Bluey] $event');
-    });
-  }
-
-  @override
-  void dispose() {
-    _errorSubscription?.cancel();
-    _eventSubscription?.cancel();
-    _bluey.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlueyProvider(
-      bluey: _bluey,
-      child: MaterialApp(
-        title: 'Bluey Example',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
-        home: const HomeScreen(),
-      ),
-    );
-  }
-}
-
-/// Provides Bluey instance to descendant widgets
-class BlueyProvider extends InheritedWidget {
-  final Bluey bluey;
-
-  const BlueyProvider({super.key, required this.bluey, required super.child});
-
-  static Bluey of(BuildContext context) {
-    final provider =
-        context.dependOnInheritedWidgetOfExactType<BlueyProvider>();
-    assert(provider != null, 'No BlueyProvider found in context');
-    return provider!.bluey;
-  }
-
-  @override
-  bool updateShouldNotify(BlueyProvider oldWidget) => bluey != oldWidget.bluey;
-}
-
-/// Home screen with navigation to Scanner and Server
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: const [ScannerScreen(), ServerScreen()],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            selectedIcon: Icon(Icons.search),
-            label: 'Scanner',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.cell_tower_outlined),
-            selectedIcon: Icon(Icons.cell_tower),
-            label: 'Server',
-          ),
-        ],
-      ),
-    );
-  }
 }

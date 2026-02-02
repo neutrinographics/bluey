@@ -18,6 +18,8 @@ dependencies:
   #   path: ../../bluey_android
   # bluey_platform_interface:
   #   path: ../../bluey_platform_interface
+  flutter_bloc: ^8.1.0
+  get_it: ^7.6.0
 
 dev_dependencies:
   flutter_test:
@@ -25,6 +27,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  bloc_test: ^9.1.0
+  mocktail: ^1.0.0
 
 flutter:
   uses-material-design: true
