@@ -10,7 +10,7 @@ class ConnectToDevice {
 
   /// Connects to the specified [device].
   ///
-  /// Returns a [Connection] object that can be used for GATT operations.
+  /// Returns a [Connection] object for reading and writing characteristics.
   /// Throws a [BlueyException] if the connection fails.
   Future<Connection> call(Device device, {Duration? timeout}) async {
     return await _repository.connect(device, timeout: timeout);

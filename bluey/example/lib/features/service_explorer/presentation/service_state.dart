@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 
-/// State for the service/GATT screen.
+/// State for the service explorer screen.
 class ServiceScreenState {
   final Connection connection;
   final RemoteService service;

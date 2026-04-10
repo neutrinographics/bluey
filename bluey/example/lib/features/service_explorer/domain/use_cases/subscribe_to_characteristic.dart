@@ -2,11 +2,11 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 
-import '../gatt_repository.dart';
+import '../characteristic_repository.dart';
 
 /// Use case for subscribing to characteristic notifications/indications.
 class SubscribeToCharacteristic {
-  final GattRepository _repository;
+  final CharacteristicRepository _repository;
 
   SubscribeToCharacteristic(this._repository);
 

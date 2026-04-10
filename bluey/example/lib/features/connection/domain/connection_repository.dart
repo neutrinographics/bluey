@@ -9,6 +9,6 @@ abstract class ConnectionRepository {
   /// Disconnects from a device.
   Future<void> disconnect(Connection connection);
 
-  /// Discovers services on a connected device.
-  Future<List<RemoteService>> discoverServices(Connection connection);
+  /// Returns the services available on a connected device.
+  Future<List<RemoteService>> getServices(Connection connection);
 }

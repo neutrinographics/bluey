@@ -53,7 +53,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   /// Initializes the server.
   Future<void> initialize() async {
     if (!_checkServerSupport()) {
-      _addLog('Server', 'Peripheral role not supported on this platform');
+      _addLog('Server', 'Server not supported on this platform');
       emit(state.copyWith(isSupported: false));
       return;
     }

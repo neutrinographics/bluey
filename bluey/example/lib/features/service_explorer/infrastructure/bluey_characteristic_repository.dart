@@ -2,11 +2,11 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 
-import '../domain/gatt_repository.dart';
+import '../domain/characteristic_repository.dart';
 
-/// Implementation of [GattRepository] using the Bluey library.
-class GattRepositoryImpl implements GattRepository {
-  GattRepositoryImpl();
+/// Implementation of [CharacteristicRepository] using the Bluey library.
+class BlueyCharacteristicRepository implements CharacteristicRepository {
+  BlueyCharacteristicRepository();
 
   @override
   Future<Uint8List> readCharacteristic(

@@ -2,9 +2,9 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 
-/// Abstract repository interface for BLE server/peripheral operations.
+/// Abstract repository interface for BLE server operations.
 abstract class ServerRepository {
-  /// Gets the server instance, or null if peripheral mode is not supported.
+  /// Gets the server instance, or null if not supported on this platform.
   Server? getServer();
 
   /// Starts advertising with the given parameters.

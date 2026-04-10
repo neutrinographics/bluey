@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 
-/// Abstract repository interface for GATT operations.
-abstract class GattRepository {
+/// Abstract repository interface for characteristic and descriptor operations.
+abstract class CharacteristicRepository {
   /// Reads the value of a characteristic.
   Future<Uint8List> readCharacteristic(RemoteCharacteristic characteristic);
 

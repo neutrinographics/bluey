@@ -5,11 +5,11 @@ import 'package:bluey/bluey.dart';
 import '../domain/server_repository.dart';
 
 /// Implementation of [ServerRepository] using the Bluey library.
-class ServerRepositoryImpl implements ServerRepository {
+class BlueyServerRepository implements ServerRepository {
   final Bluey _bluey;
   Server? _server;
 
-  ServerRepositoryImpl(this._bluey);
+  BlueyServerRepository(this._bluey);
 
   @override
   Server? getServer() {
@@ -26,7 +26,7 @@ class ServerRepositoryImpl implements ServerRepository {
   }) async {
     final server = getServer();
     if (server == null) {
-      throw UnsupportedError('Peripheral mode not supported on this platform');
+      throw UnsupportedError('Server not supported on this platform');
     }
     await server.startAdvertising(
       name: name,
@@ -45,7 +45,7 @@ class ServerRepositoryImpl implements ServerRepository {
   Future<void> addService(HostedService service) async {
     final server = getServer();
     if (server == null) {
-      throw UnsupportedError('Peripheral mode not supported on this platform');
+      throw UnsupportedError('Server not supported on this platform');
     }
     await server.addService(service);
   }

@@ -2,7 +2,7 @@ import 'package:get_it/get_it.dart';
 import 'package:bluey/bluey.dart';
 
 import '../domain/server_repository.dart';
-import '../infrastructure/server_repository_impl.dart';
+import '../infrastructure/bluey_server_repository.dart';
 import '../domain/use_cases/check_server_support.dart';
 import '../domain/use_cases/start_advertising.dart';
 import '../domain/use_cases/stop_advertising.dart';
@@ -14,7 +14,7 @@ import '../domain/use_cases/dispose_server.dart';
 
 void registerServerDependencies(GetIt getIt) {
   getIt.registerLazySingleton<ServerRepository>(
-    () => ServerRepositoryImpl(getIt<Bluey>()),
+    () => BlueyServerRepository(getIt<Bluey>()),
   );
 
   getIt.registerFactory<CheckServerSupport>(

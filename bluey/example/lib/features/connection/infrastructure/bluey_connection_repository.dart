@@ -3,10 +3,10 @@ import 'package:bluey/bluey.dart';
 import '../domain/connection_repository.dart';
 
 /// Implementation of [ConnectionRepository] using the Bluey library.
-class ConnectionRepositoryImpl implements ConnectionRepository {
+class BlueyConnectionRepository implements ConnectionRepository {
   final Bluey _bluey;
 
-  ConnectionRepositoryImpl(this._bluey);
+  BlueyConnectionRepository(this._bluey);
 
   @override
   Future<Connection> connect(Device device, {Duration? timeout}) async {
@@ -19,7 +19,7 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
   }
 
   @override
-  Future<List<RemoteService>> discoverServices(Connection connection) async {
+  Future<List<RemoteService>> getServices(Connection connection) async {
     return await connection.services;
   }
 }

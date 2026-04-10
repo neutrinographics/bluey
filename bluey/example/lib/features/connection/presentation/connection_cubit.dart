@@ -5,14 +5,14 @@ import 'package:bluey/bluey.dart';
 
 import '../domain/use_cases/connect_to_device.dart';
 import '../domain/use_cases/disconnect_device.dart';
-import '../domain/use_cases/discover_services.dart';
+import '../domain/use_cases/get_services.dart';
 import 'connection_state.dart';
 
 /// Cubit for managing connection state.
 class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final ConnectToDevice _connectToDevice;
   final DisconnectDevice _disconnectDevice;
-  final DiscoverServices _discoverServices;
+  final GetServices _getServices;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
 
@@ -20,10 +20,10 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required Device device,
     required ConnectToDevice connectToDevice,
     required DisconnectDevice disconnectDevice,
-    required DiscoverServices discoverServices,
+    required GetServices getServices,
   }) : _connectToDevice = connectToDevice,
        _disconnectDevice = disconnectDevice,
-       _discoverServices = discoverServices,
+       _getServices = getServices,
        super(ConnectionScreenState(device: device));
 
   /// Connects to the device.
@@ -63,8 +63,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         ),
       );
 
-      // Auto-discover services after connecting
-      await discoverServices();
+      // Load services after connecting
+      await loadServices();
     } on BlueyException catch (e) {
       emit(
         state.copyWith(
@@ -97,21 +97,21 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     }
   }
 
-  /// Discovers services on the connected device.
-  Future<void> discoverServices() async {
+  /// Loads the services available on the connected device.
+  Future<void> loadServices() async {
     final connection = state.connection;
     if (connection == null) return;
 
     emit(state.copyWith(isDiscovering: true));
 
     try {
-      final services = await _discoverServices(connection);
+      final services = await _getServices(connection);
       emit(state.copyWith(services: services, isDiscovering: false));
     } catch (e) {
       emit(
         state.copyWith(
           isDiscovering: false,
-          error: 'Failed to discover services: $e',
+          error: 'Failed to load services: $e',
         ),
       );
     }

@@ -6,10 +6,10 @@ import '../../../shared/di/service_locator.dart';
 import '../../../shared/presentation/bluetooth_state_chip.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../../../shared/domain/uuid_names.dart';
-import '../../gatt/presentation/service_screen.dart';
+import '../../service_explorer/presentation/service_screen.dart';
 import '../domain/use_cases/connect_to_device.dart';
 import '../domain/use_cases/disconnect_device.dart';
-import '../domain/use_cases/discover_services.dart';
+import '../domain/use_cases/get_services.dart';
 import 'connection_cubit.dart';
 import 'connection_state.dart';
 
@@ -26,7 +26,7 @@ class ConnectionScreen extends StatelessWidget {
             device: device,
             connectToDevice: getIt<ConnectToDevice>(),
             disconnectDevice: getIt<DisconnectDevice>(),
-            discoverServices: getIt<DiscoverServices>(),
+            getServices: getIt<GetServices>(),
           )..connect(),
       child: const _ConnectionView(),
     );
@@ -355,7 +355,7 @@ class _ServicesHeader extends StatelessWidget {
           if (!isDiscovering)
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: cubit.discoverServices,
+              onPressed: cubit.loadServices,
               tooltip: 'Refresh services',
             ),
         ],

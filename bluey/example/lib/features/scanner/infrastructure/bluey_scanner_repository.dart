@@ -3,10 +3,10 @@ import 'package:bluey/bluey.dart';
 import '../domain/scanner_repository.dart';
 
 /// Implementation of [ScannerRepository] using the Bluey library.
-class ScannerRepositoryImpl implements ScannerRepository {
+class BlueyScannerRepository implements ScannerRepository {
   final Bluey _bluey;
 
-  ScannerRepositoryImpl(this._bluey);
+  BlueyScannerRepository(this._bluey);
 
   @override
   BluetoothState get currentState => _bluey.currentState;

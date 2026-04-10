@@ -70,12 +70,12 @@ class _ServerView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Peripheral role not supported',
+                    'Server not supported',
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'This platform does not support BLE advertising',
+                    'This platform does not support the server role',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
