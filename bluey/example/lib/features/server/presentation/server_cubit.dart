@@ -4,14 +4,14 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../domain/use_cases/check_server_support.dart';
-import '../domain/use_cases/start_advertising.dart';
-import '../domain/use_cases/stop_advertising.dart';
-import '../domain/use_cases/add_service.dart';
-import '../domain/use_cases/send_notification.dart';
-import '../domain/use_cases/observe_connections.dart';
-import '../domain/use_cases/disconnect_central.dart';
-import '../domain/use_cases/dispose_server.dart';
+import '../application/check_server_support.dart';
+import '../application/start_advertising.dart';
+import '../application/stop_advertising.dart';
+import '../application/add_service.dart';
+import '../application/send_notification.dart';
+import '../application/observe_connections.dart';
+import '../application/disconnect_central.dart';
+import '../application/dispose_server.dart';
 import 'server_state.dart';
 
 /// Cubit for managing server state.

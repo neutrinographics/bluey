@@ -6,11 +6,11 @@ import '../../../shared/di/service_locator.dart';
 import '../../../shared/presentation/bluetooth_state_chip.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../../connection/presentation/connection_screen.dart';
-import '../domain/use_cases/scan_for_devices.dart';
-import '../domain/use_cases/stop_scan.dart';
-import '../domain/use_cases/get_bluetooth_state.dart';
-import '../domain/use_cases/request_permissions.dart';
-import '../domain/use_cases/request_enable.dart';
+import '../application/scan_for_devices.dart';
+import '../application/stop_scan.dart';
+import '../application/get_bluetooth_state.dart';
+import '../application/request_permissions.dart';
+import '../application/request_enable.dart';
 import 'scanner_cubit.dart';
 import 'scanner_state.dart';
 

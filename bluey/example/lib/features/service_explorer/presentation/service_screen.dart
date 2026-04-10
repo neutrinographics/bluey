@@ -8,10 +8,10 @@ import '../../../shared/di/service_locator.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../../shared/domain/value_formatters.dart';
 import '../../../shared/presentation/error_snackbar.dart';
-import '../domain/use_cases/read_characteristic.dart';
-import '../domain/use_cases/write_characteristic.dart';
-import '../domain/use_cases/subscribe_to_characteristic.dart';
-import '../domain/use_cases/read_descriptor.dart';
+import '../application/read_characteristic.dart';
+import '../application/write_characteristic.dart';
+import '../application/subscribe_to_characteristic.dart';
+import '../application/read_descriptor.dart';
 import 'service_cubit.dart';
 import 'service_state.dart';
 

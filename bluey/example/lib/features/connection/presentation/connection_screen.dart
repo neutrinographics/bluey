@@ -7,9 +7,9 @@ import '../../../shared/presentation/bluetooth_state_chip.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../service_explorer/presentation/service_screen.dart';
-import '../domain/use_cases/connect_to_device.dart';
-import '../domain/use_cases/disconnect_device.dart';
-import '../domain/use_cases/get_services.dart';
+import '../application/connect_to_device.dart';
+import '../application/disconnect_device.dart';
+import '../application/get_services.dart';
 import 'connection_cubit.dart';
 import 'connection_state.dart';
 

@@ -4,10 +4,10 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../domain/use_cases/read_characteristic.dart';
-import '../domain/use_cases/write_characteristic.dart';
-import '../domain/use_cases/subscribe_to_characteristic.dart';
-import '../domain/use_cases/read_descriptor.dart';
+import '../application/read_characteristic.dart';
+import '../application/write_characteristic.dart';
+import '../application/subscribe_to_characteristic.dart';
+import '../application/read_descriptor.dart';
 import 'service_state.dart';
 
 /// Cubit for managing a single characteristic's state.

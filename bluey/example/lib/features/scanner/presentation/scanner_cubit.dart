@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../domain/use_cases/scan_for_devices.dart';
-import '../domain/use_cases/stop_scan.dart';
-import '../domain/use_cases/get_bluetooth_state.dart';
-import '../domain/use_cases/request_permissions.dart';
-import '../domain/use_cases/request_enable.dart';
+import '../application/scan_for_devices.dart';
+import '../application/stop_scan.dart';
+import '../application/get_bluetooth_state.dart';
+import '../application/request_permissions.dart';
+import '../application/request_enable.dart';
 import 'scanner_state.dart';
 
 /// Cubit for managing scanner state.

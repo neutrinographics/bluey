@@ -3,9 +3,9 @@ import 'package:bluey/bluey.dart';
 
 import '../domain/connection_repository.dart';
 import '../infrastructure/bluey_connection_repository.dart';
-import '../domain/use_cases/connect_to_device.dart';
-import '../domain/use_cases/disconnect_device.dart';
-import '../domain/use_cases/get_services.dart';
+import '../application/connect_to_device.dart';
+import '../application/disconnect_device.dart';
+import '../application/get_services.dart';
 
 void registerConnectionDependencies(GetIt getIt) {
   getIt.registerLazySingleton<ConnectionRepository>(

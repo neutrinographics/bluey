@@ -3,8 +3,8 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey/bluey.dart';
 
-import 'package:bluey_example/connection/presentation/connection_cubit.dart';
-import 'package:bluey_example/connection/presentation/connection_state.dart';
+import 'package:bluey_example/features/connection/presentation/connection_cubit.dart';
+import 'package:bluey_example/features/connection/presentation/connection_state.dart';
 
 import '../../mocks/mock_use_cases.dart';
 import '../../mocks/mock_bluey.dart';
@@ -12,7 +12,7 @@ import '../../mocks/mock_bluey.dart';
 void main() {
   late MockConnectToDevice mockConnectToDevice;
   late MockDisconnectDevice mockDisconnectDevice;
-  late MockDiscoverServices mockDiscoverServices;
+  late MockGetServices mockGetServices;
   late Device testDevice;
 
   setUpAll(() {
@@ -23,7 +23,7 @@ void main() {
   setUp(() {
     mockConnectToDevice = MockConnectToDevice();
     mockDisconnectDevice = MockDisconnectDevice();
-    mockDiscoverServices = MockDiscoverServices();
+    mockGetServices = MockGetServices();
 
     testDevice = Device(
       id: UUID('00000000-0000-0000-0000-000000000001'),
@@ -40,7 +40,7 @@ void main() {
       device: testDevice,
       connectToDevice: mockConnectToDevice,
       disconnectDevice: mockDisconnectDevice,
-      discoverServices: mockDiscoverServices,
+      getServices: mockGetServices,
     );
   }
 
@@ -68,7 +68,7 @@ void main() {
           () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
         ).thenAnswer((_) async => mockConnection);
         when(
-          () => mockDiscoverServices(any()),
+          () => mockGetServices(any()),
         ).thenAnswer((_) async => [mockService]);
       },
       build: createCubit,
@@ -225,7 +225,7 @@ void main() {
         when(
           () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
         ).thenAnswer((_) async => mockConnection);
-        when(() => mockDiscoverServices(any())).thenAnswer((_) async => []);
+        when(() => mockGetServices(any())).thenAnswer((_) async => []);
       },
       build: createCubit,
       act: (cubit) async {

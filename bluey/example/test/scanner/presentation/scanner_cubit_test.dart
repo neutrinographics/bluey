@@ -3,8 +3,8 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey/bluey.dart';
 
-import 'package:bluey_example/scanner/presentation/scanner_cubit.dart';
-import 'package:bluey_example/scanner/presentation/scanner_state.dart';
+import 'package:bluey_example/features/scanner/presentation/scanner_cubit.dart';
+import 'package:bluey_example/features/scanner/presentation/scanner_state.dart';
 
 import '../../mocks/mock_use_cases.dart';
 

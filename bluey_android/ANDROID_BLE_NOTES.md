@@ -81,7 +81,7 @@ This manifests as:
 - `onConnectionStateChange` with `STATE_CONNECTED` fires immediately when opening the GATT server
 - The connection appears before we even start advertising
 
-**Our approach:** We report all connections to Flutter immediately, regardless of whether advertising has started. This allows the app to handle these "adopted" connections rather than leaving them in a broken state.
+**Our approach:** We report all connections to Flutter immediately, regardless of whether advertising has started. This allows the app to handle these "inherited" connections rather than leaving them in a broken state.
 
 ### Connection Persistence After Server Close
 
