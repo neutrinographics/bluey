@@ -390,6 +390,13 @@ class Bluey {
   /// Returns null on platforms that don't support peripheral role.
   /// Check [capabilities.canAdvertise] before calling.
   ///
+  /// [lifecycleInterval] controls automatic lifecycle management between
+  /// Bluey peers. When non-null (the default), the server hosts a hidden
+  /// control service that Bluey clients use for heartbeat-based disconnect
+  /// detection. This solves the iOS limitation where `CBPeripheralManager`
+  /// has no callback for client disconnections. Set to null to disable
+  /// lifecycle management and use raw BLE behavior.
+  ///
   /// Example:
   /// ```dart
   /// final server = bluey.server();
@@ -398,11 +405,15 @@ class Bluey {
   ///   await server.startAdvertising(name: 'My Device');
   /// }
   /// ```
-  Server? server() {
+  Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
-    return BlueyServer(_platform, _eventBus);
+    return BlueyServer(
+      _platform,
+      _eventBus,
+      lifecycleInterval: lifecycleInterval,
+    );
   }
 
   /// Release all resources.

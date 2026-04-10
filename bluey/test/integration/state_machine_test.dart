@@ -477,7 +477,8 @@ void main() {
 
         // Still advertising
         expect(fakePlatform.isAdvertising, isTrue);
-        expect(fakePlatform.localServices, hasLength(2));
+        // 3 services: control service (lifecycle) + 2 consumer services
+        expect(fakePlatform.localServices, hasLength(3));
 
         await server.dispose();
         await bluey.dispose();

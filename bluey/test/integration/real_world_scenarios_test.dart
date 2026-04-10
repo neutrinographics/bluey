@@ -533,7 +533,8 @@ void main() {
         );
 
         expect(fakePlatform.isAdvertising, isTrue);
-        expect(fakePlatform.localServices, hasLength(1));
+        // 2 services: the control service (lifecycle) + the consumer's service
+        expect(fakePlatform.localServices, hasLength(2));
 
         // Handle incoming connection
         final centrals = <String>[];

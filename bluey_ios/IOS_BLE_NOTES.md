@@ -42,6 +42,34 @@ There is no way to distinguish between:
 If a client only reads and writes without subscribing to any characteristic, we will never receive a disconnection signal. The client will remain in our tracked list indefinitely until:
 - The server is disposed
 - The client is explicitly disconnected via `disconnectCentral()`
+- The lifecycle heartbeat timeout fires (see below)
+
+### Solution: Lifecycle Control Service
+
+Bluey solves the disconnect detection problem with an internal control service that is invisible to library consumers. When `Bluey.server()` is called with a non-null `lifecycleInterval` (the default is 10 seconds), the server automatically adds a hidden GATT service with a heartbeat characteristic.
+
+**How it works:**
+
+1. The Bluey server adds the control service before advertising starts
+2. When a Bluey client connects and discovers services, it recognizes the control service by its UUID and starts sending periodic heartbeat writes (at half the server's interval)
+3. The server maintains a per-client timer. Each heartbeat resets the timer. If no heartbeat arrives within `lifecycleInterval`, the server fires a disconnect event
+4. Before disconnecting, the client writes a special disconnect command for immediate cleanup — no timer wait
+5. The control service is filtered from the public `services()`, `readRequests`, and `writeRequests` APIs. Consumers never see it
+
+**What this solves:**
+- Reliable disconnect detection on iOS without native API support
+- Clean disconnect notification even when `cancelPeripheralConnection` doesn't terminate the physical link
+- Force-kill detection via heartbeat timeout
+- Consistent behavior across iOS and Android
+
+**Configuration:**
+```dart
+final server = bluey.server();                                    // lifecycle enabled, 10s default
+final server = bluey.server(lifecycleInterval: Duration(seconds: 5)); // custom interval
+final server = bluey.server(lifecycleInterval: null);             // disabled, raw BLE behavior
+```
+
+**Limitation:** Non-Bluey clients connecting to a Bluey server won't send heartbeats. They will be timed out after `lifecycleInterval` unless lifecycle management is disabled.
 
 ## Advertising
 
@@ -86,17 +114,28 @@ Unlike Android, iOS does not have a runtime permission prompt specifically for B
 
 ## Central Role (Scanner/Client)
 
-### cancelPeripheralConnection May Not Terminate the BLE Link
+### cancelPeripheralConnection Does Not Reliably Terminate the BLE Link
 
-Calling `CBCentralManager.cancelPeripheralConnection()` cleans up CoreBluetooth's local state and fires `didDisconnectPeripheral` immediately, but it does **not** reliably send a BLE link termination (LL_TERMINATE_IND) to the remote device.
+`cancelPeripheralConnection()` does **not** directly terminate the physical BLE connection. It decrements an internal reference count. iOS treats BLE connections as **shared resources multiplexed across all apps and system services**. The actual link termination (`LL_TERMINATE_IND`) is only sent when every consumer — including system services — releases the connection.
+
+This is an intentional Apple design decision, not a bug.
+
+**Why it happens:**
+
+- iOS system services (notably ANCS — Apple Notification Center Service) may hold their own reference to the same BLE connection. When your app calls `cancelPeripheralConnection`, iOS releases your app's reference but keeps the link alive for ANCS or other services.
+- A TI engineer confirmed with a BLE sniffer that when ANCS is active, the disconnect packet is literally never sent.
+- Even without system services, iOS may delay physical disconnection by ~30 seconds to avoid rapid reconnect/disconnect cycles.
+- `didDisconnectPeripheral` fires locally (the app thinks it disconnected), but the physical link stays up.
 
 **Observed behavior:** When an iOS app disconnects from an Android peripheral:
-- iOS reports the disconnect immediately (local cleanup succeeds)
+- iOS reports the disconnect immediately via `didDisconnectPeripheral` (local cleanup succeeds)
 - Android's GATT server never receives `onConnectionStateChange` with `STATE_DISCONNECTED`
 - The Android side shows the client as still connected indefinitely
 - Only toggling Bluetooth off on iOS (which forces the radio down) causes Android to detect the link loss via supervision timeout
 
-**Implication:** The remote device may hold a stale connection entry until its supervision timeout fires (10-30 seconds), or indefinitely if the timeout doesn't trigger. There is no workaround on the iOS side — `cancelPeripheralConnection` is the only API available.
+**Industry status:** Every major Flutter BLE library (flutter_blue_plus, flutter_reactive_ble) has the same problem with no solution. This is a fundamental CoreBluetooth limitation.
+
+**Recommended workaround:** For applications that need reliable cross-platform disconnect, use an application-level disconnect protocol — have the client write a "disconnect command" to a custom characteristic, and let the server initiate the disconnection from its side. The server's `LL_TERMINATE_IND` is always sent because the server owns the connection.
 
 ### BLE Address Rotation
 
@@ -120,5 +159,5 @@ Starting with iOS 16, `UIDevice.current.name` returns only the generic model nam
 5. **No manufacturer data in advertising** — CoreBluetooth ignores manufacturer data in the advertising dictionary.
 6. **GAP name not controllable** — The name shown after connection is the system device name, not the advertised name.
 7. **Device name restricted (iOS 16+)** — `UIDevice.current.name` returns generic model name without special entitlement.
-8. **cancelPeripheralConnection unreliable** — Local cleanup succeeds but the remote device may never receive the disconnect.
+8. **cancelPeripheralConnection unreliable** — iOS treats connections as shared resources; `cancelPeripheralConnection` only releases the app's reference. The physical link stays up if system services (ANCS, etc.) maintain their own reference. The remote device may never receive a disconnect.
 9. **BLE address rotation** — iOS uses random addresses per connection, causing stale client entries on remote servers.

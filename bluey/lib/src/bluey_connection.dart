@@ -8,6 +8,7 @@ import 'connection.dart';
 import 'connection_state.dart';
 import 'exceptions.dart';
 import 'gatt.dart';
+import 'lifecycle.dart' as lifecycle;
 import 'uuid.dart';
 
 /// Internal implementation of [Connection] that wraps platform calls.
@@ -47,6 +48,10 @@ class BlueyConnection implements Connection {
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
+
+  // Lifecycle management — heartbeat to the server's control service
+  Timer? _heartbeatTimer;
+  String? _heartbeatCharUuid;
 
   /// Creates a new connection instance.
   ///
@@ -125,6 +130,9 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
+    if (lifecycle.isControlService(uuid.toString())) {
+      throw ServiceNotFoundException(uuid);
+    }
     if (_cachedServices == null) {
       throw ServiceNotFoundException(uuid);
     }
@@ -145,12 +153,23 @@ class BlueyConnection implements Connection {
     }
 
     final platformServices = await _platform.discoverServices(_deviceAddress);
-    _cachedServices = platformServices.map((ps) => _mapService(ps)).toList();
+    final allServices =
+        platformServices.map((ps) => _mapService(ps)).toList();
+
+    // Start lifecycle heartbeat if the server hosts the control service
+    _startHeartbeatIfNeeded(allServices);
+
+    // Filter the control service from the public result
+    _cachedServices =
+        allServices
+            .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+            .toList();
     return _cachedServices!;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
+    if (lifecycle.isControlService(uuid.toString())) return false;
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
@@ -177,6 +196,10 @@ class BlueyConnection implements Connection {
 
     _state = ConnectionState.disconnecting;
     _stateController.add(_state);
+
+    // Send disconnect command to the server's control service so it can
+    // clean up immediately. Best-effort — the connection may already be lost.
+    await _sendDisconnectCommand();
 
     await _platform.disconnect(_deviceAddress);
 
@@ -242,8 +265,112 @@ class BlueyConnection implements Connection {
     _connectionParameters = params;
   }
 
+  // === Lifecycle management ===
+
+  void _startHeartbeatIfNeeded(List<BlueyRemoteService> allServices) {
+    // Already running
+    if (_heartbeatTimer != null) return;
+
+    // Look for the control service
+    final controlService = allServices
+        .where((s) => lifecycle.isControlService(s.uuid.toString()))
+        .firstOrNull;
+    if (controlService == null) return;
+
+    // Find the heartbeat characteristic
+    final heartbeatChar = controlService.characteristics
+        .where(
+          (c) =>
+              c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
+        )
+        .firstOrNull;
+    if (heartbeatChar == null) return;
+
+    _heartbeatCharUuid = heartbeatChar.uuid.toString();
+
+    // Find the interval characteristic and read the server's interval
+    final intervalChar = controlService.characteristics
+        .where(
+          (c) =>
+              c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
+        )
+        .firstOrNull;
+
+    // Read the interval, then start heartbeat at half the server's interval
+    if (intervalChar != null) {
+      _platform
+          .readCharacteristic(_deviceAddress, intervalChar.uuid.toString())
+          .then((bytes) {
+        final serverInterval = lifecycle.decodeInterval(bytes);
+        final heartbeatInterval = Duration(
+          milliseconds: serverInterval.inMilliseconds ~/ 2,
+        );
+        _beginHeartbeat(heartbeatInterval);
+      }).catchError((_) {
+        // Fallback: use half of the default interval
+        _beginHeartbeat(
+          Duration(
+            milliseconds:
+                lifecycle.defaultLifecycleInterval.inMilliseconds ~/ 2,
+          ),
+        );
+      });
+    } else {
+      _beginHeartbeat(
+        Duration(
+          milliseconds:
+              lifecycle.defaultLifecycleInterval.inMilliseconds ~/ 2,
+        ),
+      );
+    }
+  }
+
+  void _beginHeartbeat(Duration interval) {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(interval, (_) {
+      _sendHeartbeat();
+    });
+    // Send the first heartbeat immediately
+    _sendHeartbeat();
+  }
+
+  void _sendHeartbeat() {
+    final charUuid = _heartbeatCharUuid;
+    if (charUuid == null) return;
+
+    _platform
+        .writeCharacteristic(
+          _deviceAddress,
+          charUuid,
+          lifecycle.heartbeatValue,
+          false, // write without response
+        )
+        .catchError((_) {
+      // Heartbeat write failed — connection may be lost.
+      // The server's heartbeat timeout will handle cleanup.
+    });
+  }
+
+  Future<void> _sendDisconnectCommand() async {
+    final charUuid = _heartbeatCharUuid;
+    if (charUuid == null) return;
+
+    try {
+      await _platform.writeCharacteristic(
+        _deviceAddress,
+        charUuid,
+        lifecycle.disconnectValue,
+        false, // write without response
+      );
+    } catch (_) {
+      // Best effort — connection may already be lost
+    }
+  }
+
   /// Clean up resources.
   Future<void> _cleanup() async {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();

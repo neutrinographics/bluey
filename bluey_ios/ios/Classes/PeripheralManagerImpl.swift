@@ -279,12 +279,11 @@ class PeripheralManagerImpl: NSObject {
         // Notify Flutter
         flutterApi.onCharacteristicUnsubscribed(centralId: centralId, characteristicUuid: charUuid) { _ in }
 
-        // Check if central has any remaining subscriptions
-        let hasSubscriptions = subscribedCentrals.values.contains { $0.contains(centralId) }
-        if !hasSubscriptions {
-            centrals.removeValue(forKey: centralId)
-            flutterApi.onCentralDisconnected(centralId: centralId) { _ in }
-        }
+        // Note: We do NOT infer disconnection from unsubscribe events.
+        // Disconnect detection is handled by the Bluey lifecycle control
+        // service at the Dart layer via heartbeat timeouts and explicit
+        // disconnect commands. This avoids false disconnections when a
+        // client unsubscribes from notifications but stays connected.
     }
 
     func didReceiveRead(peripheral: CBPeripheralManager, request: CBATTRequest) {
