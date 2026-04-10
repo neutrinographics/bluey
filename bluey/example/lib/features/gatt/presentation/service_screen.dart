@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../../core/di/service_locator.dart';
-import '../../core/utils/uuid_names.dart';
-import '../../core/utils/value_formatters.dart';
-import '../../core/widgets/error_snackbar.dart';
+import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/uuid_names.dart';
+import '../../../shared/domain/value_formatters.dart';
+import '../../../shared/presentation/error_snackbar.dart';
 import '../domain/use_cases/read_characteristic.dart';
 import '../domain/use_cases/write_characteristic.dart';
 import '../domain/use_cases/subscribe_to_characteristic.dart';
@@ -449,83 +449,73 @@ class _DescriptorsList extends StatelessWidget {
   }
 }
 
-class _DescriptorTile extends StatefulWidget {
+class _DescriptorTile extends StatelessWidget {
   final RemoteDescriptor descriptor;
 
   const _DescriptorTile({required this.descriptor});
 
   @override
-  State<_DescriptorTile> createState() => _DescriptorTileState();
-}
-
-class _DescriptorTileState extends State<_DescriptorTile> {
-  Uint8List? _value;
-  bool _isReading = false;
-  bool _hasError = false;
-
-  Future<void> _read() async {
-    setState(() {
-      _isReading = true;
-      _hasError = false;
-    });
-    try {
-      final cubit = context.read<CharacteristicCubit>();
-      final value = await cubit.readDescriptorValue(widget.descriptor);
-      setState(() {
-        _value = value;
-        _hasError = value == null;
-      });
-    } finally {
-      setState(() => _isReading = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cubit = context.read<CharacteristicCubit>();
+    final key = descriptor.uuid.toString();
 
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        Icons.description,
-        size: 20,
-        color: _hasError ? theme.colorScheme.error : theme.colorScheme.outline,
+    return BlocSelector<CharacteristicCubit, CharacteristicState,
+        ({Uint8List? value, bool isReading, bool hasError})>(
+      selector: (state) => (
+        value: state.descriptorValues[key],
+        isReading: state.readingDescriptors.contains(key),
+        hasError: state.failedDescriptors.contains(key),
       ),
-      title: Text(
-        widget.descriptor.uuid.toString(),
-        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-      ),
-      subtitle:
-          _hasError
-              ? Text(
-                'Read failed',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              )
-              : _value != null
-              ? Text(
-                ValueFormatters.formatHex(_value!),
-                style: theme.textTheme.bodySmall,
-              )
-              : null,
-      trailing: IconButton(
-        icon:
-            _isReading
-                ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                : Icon(
-                  Icons.download,
-                  size: 18,
-                  color: _hasError ? theme.colorScheme.error : null,
-                ),
-        onPressed: _isReading ? null : _read,
-        tooltip: 'Read',
-      ),
+      builder: (context, desc) {
+        return ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.description,
+            size: 20,
+            color:
+                desc.hasError
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.outline,
+          ),
+          title: Text(
+            key,
+            style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+          ),
+          subtitle:
+              desc.hasError
+                  ? Text(
+                    'Read failed',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  )
+                  : desc.value != null
+                  ? Text(
+                    ValueFormatters.formatHex(desc.value!),
+                    style: theme.textTheme.bodySmall,
+                  )
+                  : null,
+          trailing: IconButton(
+            icon:
+                desc.isReading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : Icon(
+                      Icons.download,
+                      size: 18,
+                      color: desc.hasError ? theme.colorScheme.error : null,
+                    ),
+            onPressed:
+                desc.isReading ? null : () => cubit.readDescriptor(descriptor),
+            tooltip: 'Read',
+          ),
+        );
+      },
     );
   }
 }

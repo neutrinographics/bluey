@@ -19,6 +19,9 @@ class CharacteristicState {
   final bool isSubscribed;
   final List<LogEntry> log;
   final String? error;
+  final Map<String, Uint8List> descriptorValues;
+  final Set<String> readingDescriptors;
+  final Set<String> failedDescriptors;
 
   const CharacteristicState({
     required this.characteristic,
@@ -28,6 +31,9 @@ class CharacteristicState {
     this.isSubscribed = false,
     this.log = const [],
     this.error,
+    this.descriptorValues = const {},
+    this.readingDescriptors = const {},
+    this.failedDescriptors = const {},
   });
 
   CharacteristicState copyWith({
@@ -37,6 +43,9 @@ class CharacteristicState {
     bool? isSubscribed,
     List<LogEntry>? log,
     String? error,
+    Map<String, Uint8List>? descriptorValues,
+    Set<String>? readingDescriptors,
+    Set<String>? failedDescriptors,
   }) {
     return CharacteristicState(
       characteristic: characteristic,
@@ -46,6 +55,9 @@ class CharacteristicState {
       isSubscribed: isSubscribed ?? this.isSubscribed,
       log: log ?? this.log,
       error: error,
+      descriptorValues: descriptorValues ?? this.descriptorValues,
+      readingDescriptors: readingDescriptors ?? this.readingDescriptors,
+      failedDescriptors: failedDescriptors ?? this.failedDescriptors,
     );
   }
 }

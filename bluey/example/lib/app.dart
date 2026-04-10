@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'scanner/presentation/scanner_screen.dart';
-import 'server/presentation/server_screen.dart';
+import 'features/scanner/presentation/scanner_screen.dart';
+import 'features/server/presentation/server_screen.dart';
 
 /// The main application widget.
 class BlueyExampleApp extends StatelessWidget {

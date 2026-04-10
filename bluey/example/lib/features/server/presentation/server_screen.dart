@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../../core/di/service_locator.dart';
-import '../../core/widgets/bluetooth_state_chip.dart';
-import '../../core/widgets/error_snackbar.dart';
-import '../domain/server_repository.dart';
+import '../../../shared/di/service_locator.dart';
+import '../../../shared/presentation/bluetooth_state_chip.dart';
+import '../../../shared/presentation/error_snackbar.dart';
+import '../domain/use_cases/check_server_support.dart';
 import '../domain/use_cases/start_advertising.dart';
 import '../domain/use_cases/stop_advertising.dart';
 import '../domain/use_cases/add_service.dart';
 import '../domain/use_cases/send_notification.dart';
+import '../domain/use_cases/observe_connections.dart';
+import '../domain/use_cases/disconnect_central.dart';
+import '../domain/use_cases/dispose_server.dart';
 import 'server_cubit.dart';
 import 'server_state.dart';
 
@@ -21,11 +24,14 @@ class ServerScreen extends StatelessWidget {
     return BlocProvider(
       create:
           (context) => ServerCubit(
-            repository: getIt<ServerRepository>(),
+            checkServerSupport: getIt<CheckServerSupport>(),
             startAdvertising: getIt<StartAdvertising>(),
             stopAdvertising: getIt<StopAdvertising>(),
             addService: getIt<AddService>(),
             sendNotification: getIt<SendNotification>(),
+            observeConnections: getIt<ObserveConnections>(),
+            disconnectCentral: getIt<DisconnectCentral>(),
+            disposeServer: getIt<DisposeServer>(),
           )..initialize(),
       child: const ScaffoldMessenger(child: _ServerView()),
     );

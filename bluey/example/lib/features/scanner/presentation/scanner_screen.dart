@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../../core/di/service_locator.dart';
-import '../../core/widgets/bluetooth_state_chip.dart';
-import '../../core/widgets/error_snackbar.dart';
+import '../../../shared/di/service_locator.dart';
+import '../../../shared/presentation/bluetooth_state_chip.dart';
+import '../../../shared/presentation/error_snackbar.dart';
 import '../../connection/presentation/connection_screen.dart';
 import '../domain/use_cases/scan_for_devices.dart';
 import '../domain/use_cases/stop_scan.dart';

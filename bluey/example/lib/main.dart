@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bluey/bluey.dart';
 
-import 'core/di/service_locator.dart';
+import 'shared/di/service_locator.dart';
 import 'app.dart';
 
 void main() async {

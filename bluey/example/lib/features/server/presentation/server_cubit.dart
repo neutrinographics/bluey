@@ -4,20 +4,26 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
-import '../domain/server_repository.dart';
+import '../domain/use_cases/check_server_support.dart';
 import '../domain/use_cases/start_advertising.dart';
 import '../domain/use_cases/stop_advertising.dart';
 import '../domain/use_cases/add_service.dart';
 import '../domain/use_cases/send_notification.dart';
+import '../domain/use_cases/observe_connections.dart';
+import '../domain/use_cases/disconnect_central.dart';
+import '../domain/use_cases/dispose_server.dart';
 import 'server_state.dart';
 
 /// Cubit for managing server state.
 class ServerCubit extends Cubit<ServerScreenState> {
-  final ServerRepository _repository;
+  final CheckServerSupport _checkServerSupport;
   final StartAdvertising _startAdvertising;
   final StopAdvertising _stopAdvertising;
   final AddService _addService;
   final SendNotification _sendNotification;
+  final ObserveConnections _observeConnections;
+  final DisconnectCentral _disconnectCentral;
+  final DisposeServer _disposeServer;
 
   StreamSubscription<Central>? _connectionSubscription;
 
@@ -26,30 +32,34 @@ class ServerCubit extends Cubit<ServerScreenState> {
   static final demoCharUuid = UUID('12345678-1234-1234-1234-123456789abd');
 
   ServerCubit({
-    required ServerRepository repository,
+    required CheckServerSupport checkServerSupport,
     required StartAdvertising startAdvertising,
     required StopAdvertising stopAdvertising,
     required AddService addService,
     required SendNotification sendNotification,
-  }) : _repository = repository,
+    required ObserveConnections observeConnections,
+    required DisconnectCentral disconnectCentral,
+    required DisposeServer disposeServer,
+  }) : _checkServerSupport = checkServerSupport,
        _startAdvertising = startAdvertising,
        _stopAdvertising = stopAdvertising,
        _addService = addService,
        _sendNotification = sendNotification,
+       _observeConnections = observeConnections,
+       _disconnectCentral = disconnectCentral,
+       _disposeServer = disposeServer,
        super(const ServerScreenState());
 
   /// Initializes the server.
   Future<void> initialize() async {
-    final server = _repository.getServer();
-
-    if (server == null) {
+    if (!_checkServerSupport()) {
       _addLog('Server', 'Peripheral role not supported on this platform');
       emit(state.copyWith(isSupported: false));
       return;
     }
 
     // Listen for central connections
-    _connectionSubscription = _repository.connections.listen(
+    _connectionSubscription = _observeConnections().listen(
       (central) {
         final centrals = [...state.connectedCentrals, central];
         emit(state.copyWith(connectedCentrals: centrals));
@@ -130,7 +140,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   /// Disconnects a specific central.
   Future<void> disconnectCentral(Central central) async {
     try {
-      await _repository.disconnectCentral(central);
+      await _disconnectCentral(central);
       final centrals =
           state.connectedCentrals.where((c) => c.id != central.id).toList();
       emit(state.copyWith(connectedCentrals: centrals));
@@ -159,7 +169,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   @override
   Future<void> close() {
     _connectionSubscription?.cancel();
-    _repository.dispose();
+    _disposeServer();
     return super.close();
   }
 }
