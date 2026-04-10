@@ -13,7 +13,7 @@ class MockRemoteDescriptor extends Mock implements RemoteDescriptor {}
 
 class MockServer extends Mock implements Server {}
 
-class MockCentral extends Mock implements Central {}
+class MockClient extends Mock implements Client {}
 
 /// Fake classes for registerFallbackValue
 class FakeDevice extends Fake implements Device {}

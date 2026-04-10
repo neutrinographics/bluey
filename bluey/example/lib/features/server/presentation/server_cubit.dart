@@ -10,9 +10,9 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
-import '../application/disconnect_central.dart';
+import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
-import '../application/get_connected_centrals.dart';
+import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
 import 'server_state.dart';
@@ -25,14 +25,14 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final AddService _addService;
   final SendNotification _sendNotification;
   final ObserveConnections _observeConnections;
-  final DisconnectCentral _disconnectCentral;
+  final DisconnectClient _disconnectClient;
   final DisposeServer _disposeServer;
-  final GetConnectedCentrals _getConnectedCentrals;
+  final GetConnectedClients _getConnectedClients;
   final ObserveDisconnections _observeDisconnections;
   final ObserveReadRequests _observeReadRequests;
   final ObserveWriteRequests _observeWriteRequests;
 
-  StreamSubscription<Central>? _connectionSubscription;
+  StreamSubscription<Client>? _connectionSubscription;
   StreamSubscription<String>? _disconnectionSubscription;
   StreamSubscription<ReadRequest>? _readRequestSubscription;
   StreamSubscription<WriteRequest>? _writeRequestSubscription;
@@ -52,9 +52,9 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required AddService addService,
     required SendNotification sendNotification,
     required ObserveConnections observeConnections,
-    required DisconnectCentral disconnectCentral,
+    required DisconnectClient disconnectClient,
     required DisposeServer disposeServer,
-    required GetConnectedCentrals getConnectedCentrals,
+    required GetConnectedClients getConnectedClients,
     required ObserveDisconnections observeDisconnections,
     required ObserveReadRequests observeReadRequests,
     required ObserveWriteRequests observeWriteRequests,
@@ -64,9 +64,9 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _addService = addService,
        _sendNotification = sendNotification,
        _observeConnections = observeConnections,
-       _disconnectCentral = disconnectCentral,
+       _disconnectClient = disconnectClient,
        _disposeServer = disposeServer,
-       _getConnectedCentrals = getConnectedCentrals,
+       _getConnectedClients = getConnectedClients,
        _observeDisconnections = observeDisconnections,
        _observeReadRequests = observeReadRequests,
        _observeWriteRequests = observeWriteRequests,
@@ -83,9 +83,9 @@ class ServerCubit extends Cubit<ServerScreenState> {
     // Listen for central connection/disconnection events and refresh
     // the list from the library's authoritative state each time.
     _connectionSubscription = _observeConnections().listen(
-      (central) {
-        _refreshConnectedCentrals();
-        _addLog('Connection', 'Central connected: ${central.id}');
+      (client) {
+        _refreshConnectedClients();
+        _addLog('Connection', 'Client connected: ${client.id}');
       },
       onError: (error) {
         _addLog('Error', 'Connection stream error: $error');
@@ -95,16 +95,16 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
     // Listen for central disconnections and refresh the list.
     _disconnectionSubscription = _observeDisconnections().listen(
-      (centralId) {
-        _refreshConnectedCentrals();
-        _addLog('Connection', 'Central disconnected: $centralId');
+      (clientId) {
+        _refreshConnectedClients();
+        _addLog('Connection', 'Client disconnected: $clientId');
       },
     );
 
     // Listen for read requests and respond with the current value.
     _readRequestSubscription = _observeReadRequests().listen(
       (request) async {
-        _addLog('Read', 'From ${_shortId(request.central.id)}');
+        _addLog('Read', 'From ${_shortId(request.client.id)}');
         try {
           await _observeReadRequests.respond(
             request,
@@ -123,7 +123,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
         _characteristicValue = request.value;
         _addLog(
           'Write',
-          'From ${_shortId(request.central.id)}: '
+          'From ${_shortId(request.client.id)}: '
           '${_formatHex(request.value)}',
         );
         if (request.responseNeeded) {
@@ -187,10 +187,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
     }
   }
 
-  /// Sends a notification to all connected centrals.
+  /// Sends a notification to all connected clients.
   Future<void> sendNotification() async {
-    if (state.connectedCentrals.isEmpty) {
-      emit(state.copyWith(error: 'No centrals connected'));
+    if (state.connectedClients.isEmpty) {
+      emit(state.copyWith(error: 'No clients connected'));
       return;
     }
 
@@ -205,12 +205,12 @@ class ServerCubit extends Cubit<ServerScreenState> {
     }
   }
 
-  /// Disconnects a specific central.
-  Future<void> disconnectCentral(Central central) async {
+  /// Disconnects a specific client.
+  Future<void> disconnectClient(Client client) async {
     try {
-      await _disconnectCentral(central);
-      _refreshConnectedCentrals();
-      _addLog('Connection', 'Disconnected central: ${central.id}');
+      await _disconnectClient(client);
+      _refreshConnectedClients();
+      _addLog('Connection', 'Disconnected client: ${client.id}');
     } catch (e) {
       emit(state.copyWith(error: 'Failed to disconnect: $e'));
     }
@@ -226,8 +226,8 @@ class ServerCubit extends Cubit<ServerScreenState> {
     emit(state.copyWith(error: null));
   }
 
-  void _refreshConnectedCentrals() {
-    emit(state.copyWith(connectedCentrals: _getConnectedCentrals()));
+  void _refreshConnectedClients() {
+    emit(state.copyWith(connectedClients: _getConnectedClients()));
   }
 
   void _addLog(String tag, String message) {

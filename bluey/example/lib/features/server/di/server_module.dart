@@ -9,9 +9,9 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
-import '../application/disconnect_central.dart';
+import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
-import '../application/get_connected_centrals.dart';
+import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
 
@@ -38,14 +38,14 @@ void registerServerDependencies(GetIt getIt) {
   getIt.registerFactory<ObserveConnections>(
     () => ObserveConnections(getIt<ServerRepository>()),
   );
-  getIt.registerFactory<DisconnectCentral>(
-    () => DisconnectCentral(getIt<ServerRepository>()),
+  getIt.registerFactory<DisconnectClient>(
+    () => DisconnectClient(getIt<ServerRepository>()),
   );
   getIt.registerFactory<DisposeServer>(
     () => DisposeServer(getIt<ServerRepository>()),
   );
-  getIt.registerFactory<GetConnectedCentrals>(
-    () => GetConnectedCentrals(getIt<ServerRepository>()),
+  getIt.registerFactory<GetConnectedClients>(
+    () => GetConnectedClients(getIt<ServerRepository>()),
   );
   getIt.registerFactory<ObserveDisconnections>(
     () => ObserveDisconnections(getIt<ServerRepository>()),

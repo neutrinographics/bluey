@@ -200,6 +200,7 @@ These terms are used consistently throughout the codebase, documentation, and AP
 | **Device** | A discovered BLE peripheral with advertisement data | `device.name`, `device.rssi` |
 | **Connection** | An active link to a device with GATT access | `await device.connect()` |
 | **Server** | Local GATT server for peripheral role | `bluey.server()` |
+| **Client** | A device connected to your server | `server.connections.listen((client) { ... })` |
 | **Service** | A collection of related characteristics | `connection.service(uuid)` |
 | **Characteristic** | A readable/writable/notifiable data point | `char.read()`, `char.write(data)` |
 | **Descriptor** | Metadata about a characteristic | `char.descriptor(uuid)` |
@@ -215,6 +216,7 @@ These terms are used consistently throughout the codebase, documentation, and AP
 | Avoid | Use Instead | Reason |
 |-------|-------------|--------|
 | CentralManager | `Bluey`, `Scanner` | Too low-level |
+| Central | `Client` | Pairs naturally with Server |
 | PeripheralManager | `Server` | Clearer intent |
 | GATT | (implicit) | Implementation detail |
 | CBPeripheral / BluetoothDevice | `Device` | Platform-specific |

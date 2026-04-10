@@ -9,7 +9,7 @@ import 'package:bluey/bluey.dart';
 ///
 /// These tests run on a real device and verify the actual BLE functionality.
 /// Note: Some tests may require manual interaction or a second device to
-/// act as a central.
+/// act as a client.
 ///
 /// Run with: flutter test integration_test/server_test.dart
 void main() {
@@ -39,7 +39,7 @@ void main() {
     testWidgets('server starts with no connected centrals', (tester) async {
       final server = bluey.server();
 
-      expect(server.connectedCentrals, isEmpty);
+      expect(server.connectedClients, isEmpty);
 
       await server.dispose();
     });
@@ -232,7 +232,7 @@ void main() {
     testWidgets('connections stream is available', (tester) async {
       final server = bluey.server();
 
-      expect(server.connections, isA<Stream<Central>>());
+      expect(server.connections, isA<Stream<Client>>());
 
       await server.dispose();
     });
@@ -242,7 +242,7 @@ void main() {
       final serviceUuid = UUID('12345678-1234-1234-1234-123456789abc');
 
       // Set up listener before advertising
-      final centrals = <Central>[];
+      final centrals = <Client>[];
       final subscription = server.connections.listen((central) {
         centrals.add(central);
       });

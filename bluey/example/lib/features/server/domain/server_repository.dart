@@ -21,22 +21,22 @@ abstract class ServerRepository {
   /// Adds a hosted service to the server.
   Future<void> addService(HostedService service);
 
-  /// Sends a notification to all connected centrals.
+  /// Sends a notification to all connected clients.
   Future<void> notify(UUID characteristicUuid, Uint8List data);
 
-  /// Stream of central device connections.
-  Stream<Central> get connections;
+  /// Stream of client device connections.
+  Stream<Client> get connections;
 
-  /// Stream of central device disconnections (emits central ID).
+  /// Stream of client device disconnections (emits central ID).
   Stream<String> get disconnections;
 
-  /// Returns the currently connected centrals.
-  List<Central> get connectedCentrals;
+  /// Returns the currently connected clients.
+  List<Client> get connectedClients;
 
-  /// Stream of read requests from connected centrals.
+  /// Stream of read requests from connected clients.
   Stream<ReadRequest> get readRequests;
 
-  /// Stream of write requests from connected centrals.
+  /// Stream of write requests from connected clients.
   Stream<WriteRequest> get writeRequests;
 
   /// Responds to a read request.
@@ -52,8 +52,8 @@ abstract class ServerRepository {
     required GattResponseStatus status,
   });
 
-  /// Disconnects a specific central device.
-  Future<void> disconnectCentral(Central central);
+  /// Disconnects a specific client device.
+  Future<void> disconnectClient(Client central);
 
   /// Disposes the server resources.
   Future<void> dispose();

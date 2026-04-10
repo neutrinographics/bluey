@@ -385,7 +385,7 @@ class Bluey {
   /// Create a GATT server for peripheral role.
   ///
   /// Returns a [Server] for advertising services and handling requests
-  /// from central devices.
+  /// from client devices.
   ///
   /// Returns null on platforms that don't support peripheral role.
   /// Check [capabilities.canAdvertise] before calling.

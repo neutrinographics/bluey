@@ -4,7 +4,7 @@ import 'package:bluey/bluey.dart';
 class ServerScreenState {
   final bool isSupported;
   final bool isAdvertising;
-  final List<Central> connectedCentrals;
+  final List<Client> connectedClients;
   final List<ServerLogEntry> log;
   final int notificationCount;
   final String? error;
@@ -12,7 +12,7 @@ class ServerScreenState {
   const ServerScreenState({
     this.isSupported = true,
     this.isAdvertising = false,
-    this.connectedCentrals = const [],
+    this.connectedClients = const [],
     this.log = const [],
     this.notificationCount = 0,
     this.error,
@@ -21,7 +21,7 @@ class ServerScreenState {
   ServerScreenState copyWith({
     bool? isSupported,
     bool? isAdvertising,
-    List<Central>? connectedCentrals,
+    List<Client>? connectedClients,
     List<ServerLogEntry>? log,
     int? notificationCount,
     String? error,
@@ -29,7 +29,7 @@ class ServerScreenState {
     return ServerScreenState(
       isSupported: isSupported ?? this.isSupported,
       isAdvertising: isAdvertising ?? this.isAdvertising,
-      connectedCentrals: connectedCentrals ?? this.connectedCentrals,
+      connectedClients: connectedClients ?? this.connectedClients,
       log: log ?? this.log,
       notificationCount: notificationCount ?? this.notificationCount,
       error: error,

@@ -25,9 +25,9 @@ import 'package:bluey_example/features/server/application/add_service.dart';
 import 'package:bluey_example/features/server/application/send_notification.dart';
 import 'package:bluey_example/features/server/application/check_server_support.dart';
 import 'package:bluey_example/features/server/application/observe_connections.dart';
-import 'package:bluey_example/features/server/application/disconnect_central.dart';
+import 'package:bluey_example/features/server/application/disconnect_client.dart';
 import 'package:bluey_example/features/server/application/dispose_server.dart';
-import 'package:bluey_example/features/server/application/get_connected_centrals.dart';
+import 'package:bluey_example/features/server/application/get_connected_clients.dart';
 import 'package:bluey_example/features/server/application/observe_disconnections.dart';
 import 'package:bluey_example/features/server/application/handle_requests.dart';
 
@@ -72,11 +72,11 @@ class MockCheckServerSupport extends Mock implements CheckServerSupport {}
 
 class MockObserveConnections extends Mock implements ObserveConnections {}
 
-class MockDisconnectCentral extends Mock implements DisconnectCentral {}
+class MockDisconnectClient extends Mock implements DisconnectClient {}
 
 class MockDisposeServer extends Mock implements DisposeServer {}
 
-class MockGetConnectedCentrals extends Mock implements GetConnectedCentrals {}
+class MockGetConnectedClients extends Mock implements GetConnectedClients {}
 
 class MockObserveDisconnections extends Mock implements ObserveDisconnections {}
 

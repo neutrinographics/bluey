@@ -251,14 +251,14 @@ void main() {
       });
     });
 
-    group('Central Connections', () {
+    group('Client Connections', () {
       test('receives central connection event', () async {
         final bluey = Bluey();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
 
-        final connections = <Central>[];
+        final connections = <Client>[];
         final subscription = server.connections.listen(connections.add);
 
         // Act: Simulate central connecting
@@ -284,7 +284,7 @@ void main() {
 
         await server.startAdvertising(name: 'Test Device');
 
-        expect(server.connectedCentrals, isEmpty);
+        expect(server.connectedClients, isEmpty);
 
         // Connect a central
         fakePlatform.simulateCentralConnection(
@@ -294,7 +294,7 @@ void main() {
         await Future.delayed(Duration.zero);
 
         // Assert
-        expect(server.connectedCentrals, hasLength(1));
+        expect(server.connectedClients, hasLength(1));
 
         await server.dispose();
         await bluey.dispose();
@@ -313,14 +313,14 @@ void main() {
         );
         await Future.delayed(Duration.zero);
 
-        expect(server.connectedCentrals, hasLength(1));
+        expect(server.connectedClients, hasLength(1));
 
-        // Act: Central disconnects
+        // Act: Client disconnects
         fakePlatform.simulateCentralDisconnection('AA:BB:CC:DD:EE:01');
         await Future.delayed(Duration.zero);
 
         // Assert
-        expect(server.connectedCentrals, isEmpty);
+        expect(server.connectedClients, isEmpty);
 
         await server.dispose();
         await bluey.dispose();
@@ -349,7 +349,7 @@ void main() {
         await Future.delayed(Duration.zero);
 
         // Assert
-        expect(server.connectedCentrals, hasLength(3));
+        expect(server.connectedClients, hasLength(3));
 
         await server.dispose();
         await bluey.dispose();
@@ -371,16 +371,16 @@ void main() {
         );
         await Future.delayed(Duration.zero);
 
-        expect(server.connectedCentrals, hasLength(2));
+        expect(server.connectedClients, hasLength(2));
 
         // Act: Disconnect one central
-        final centralToDisconnect = server.connectedCentrals.first;
+        final centralToDisconnect = server.connectedClients.first;
         await centralToDisconnect.disconnect();
 
         await Future.delayed(Duration.zero);
 
         // Assert: Only one central remains
-        expect(server.connectedCentrals, hasLength(1));
+        expect(server.connectedClients, hasLength(1));
 
         await server.dispose();
         await bluey.dispose();
@@ -446,9 +446,9 @@ void main() {
         await Future.delayed(Duration.zero);
 
         // Act: Send notification to specific central
-        final targetCentral = server.connectedCentrals.first;
+        final targetClient = server.connectedClients.first;
         final data = Uint8List.fromList([0x00, 80]);
-        await server.notifyTo(targetCentral, charUuid, data: data);
+        await server.notifyTo(targetClient, charUuid, data: data);
 
         // Assert: No exception thrown
         expect(true, isTrue);

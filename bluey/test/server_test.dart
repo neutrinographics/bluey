@@ -183,21 +183,21 @@ void main() {
     });
   });
 
-  group('Central', () {
+  group('Client', () {
     test('has id property', () {
-      final central = MockCentral(id: UUID.short(0x1234), mtu: 23);
+      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
 
       expect(central.id, equals(UUID.short(0x1234)));
     });
 
     test('has mtu property', () {
-      final central = MockCentral(id: UUID.short(0x1234), mtu: 512);
+      final central = MockClient(id: UUID.short(0x1234), mtu: 512);
 
       expect(central.mtu, equals(512));
     });
 
     test('can disconnect', () async {
-      final central = MockCentral(id: UUID.short(0x1234), mtu: 23);
+      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
 
       await expectLater(central.disconnect(), completes);
     });
@@ -215,11 +215,11 @@ void main() {
     });
 
     test('has connections stream', () {
-      expect(server.connections, isA<Stream<Central>>());
+      expect(server.connections, isA<Stream<Client>>());
     });
 
-    test('has connectedCentrals list', () {
-      expect(server.connectedCentrals, isA<List<Central>>());
+    test('has connectedClients list', () {
+      expect(server.connectedClients, isA<List<Client>>());
     });
 
     test('can add service', () {
@@ -263,7 +263,7 @@ void main() {
     });
 
     test('can notify specific central', () async {
-      final central = MockCentral(id: UUID.short(0x1234), mtu: 23);
+      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
       final data = Uint8List.fromList([0x01, 0x02]);
       await expectLater(
         server.notifyTo(central, UUID.short(0x2A37), data: data),
@@ -277,8 +277,8 @@ void main() {
   });
 }
 
-/// Mock implementation of Central for testing.
-class MockCentral implements Central {
+/// Mock implementation of Client for testing.
+class MockClient implements Client {
   @override
   final UUID id;
 
@@ -287,7 +287,7 @@ class MockCentral implements Central {
 
   bool disconnected = false;
 
-  MockCentral({required this.id, required this.mtu});
+  MockClient({required this.id, required this.mtu});
 
   @override
   Future<void> disconnect() async {
@@ -299,20 +299,20 @@ class MockCentral implements Central {
 class MockServer implements Server {
   final List<HostedService> _services = [];
   bool _isAdvertising = false;
-  final _connectionsController = StreamController<Central>.broadcast();
+  final _connectionsController = StreamController<Client>.broadcast();
   final _disconnectionsController = StreamController<String>.broadcast();
 
   @override
   bool get isAdvertising => _isAdvertising;
 
   @override
-  Stream<Central> get connections => _connectionsController.stream;
+  Stream<Client> get connections => _connectionsController.stream;
 
   @override
   Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override
-  List<Central> get connectedCentrals => [];
+  List<Client> get connectedClients => [];
 
   List<HostedService> get services => _services;
 
@@ -346,7 +346,7 @@ class MockServer implements Server {
 
   @override
   Future<void> notifyTo(
-    Central central,
+    Client central,
     UUID characteristic, {
     required Uint8List data,
   }) async {}
@@ -356,7 +356,7 @@ class MockServer implements Server {
 
   @override
   Future<void> indicateTo(
-    Central central,
+    Client central,
     UUID characteristic, {
     required Uint8List data,
   }) async {}

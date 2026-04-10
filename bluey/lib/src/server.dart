@@ -9,7 +9,7 @@ import 'uuid.dart';
 
 /// Permissions for GATT characteristic and descriptor values.
 ///
-/// These control what operations centrals can perform on local attributes.
+/// These control what operations clients can perform on local attributes.
 enum GattPermission {
   /// Allow reading the attribute value.
   read,
@@ -73,7 +73,7 @@ class HostedDescriptor {
 
 /// A characteristic hosted by this device's GATT server.
 ///
-/// Characteristics are the primary way centrals interact with a peripheral.
+/// Characteristics are the primary way clients interact with a peripheral.
 /// They can be read, written, or subscribed to for notifications.
 @immutable
 class HostedCharacteristic {
@@ -129,7 +129,7 @@ class HostedCharacteristic {
 
   /// Creates a notifiable characteristic.
   ///
-  /// Notifiable characteristics can push updates to subscribed centrals.
+  /// Notifiable characteristics can push updates to subscribed clients.
   factory HostedCharacteristic.notifiable({
     required UUID uuid,
     List<HostedDescriptor> descriptors = const [],
@@ -162,7 +162,7 @@ class HostedService {
 
   /// Whether this is a primary service.
   ///
-  /// Primary services are discoverable by centrals. Secondary services
+  /// Primary services are discoverable by clients. Secondary services
   /// can only be included by other services.
   final bool isPrimary;
 
@@ -191,7 +191,7 @@ class HostedService {
 
 /// Response status for GATT operations.
 ///
-/// Used when responding to read or write requests from centrals.
+/// Used when responding to read or write requests from clients.
 enum GattResponseStatus {
   /// Operation completed successfully.
   success,
@@ -218,14 +218,14 @@ enum GattResponseStatus {
   requestNotSupported,
 }
 
-/// A read request from a connected central.
+/// A read request from a connected client.
 ///
-/// When a central reads a characteristic value, a [ReadRequest] is emitted
+/// When a client reads a characteristic value, a [ReadRequest] is emitted
 /// on [Server.readRequests]. The server must respond using [Server.respondToRead].
 @immutable
 class ReadRequest {
-  /// The central that initiated this request.
-  final Central central;
+  /// The client that initiated this request.
+  final Client client;
 
   /// The characteristic being read.
   final UUID characteristicId;
@@ -239,22 +239,22 @@ class ReadRequest {
 
   /// Creates a read request.
   const ReadRequest({
-    required this.central,
+    required this.client,
     required this.characteristicId,
     required this.offset,
     required this.internalRequestId,
   });
 }
 
-/// A write request from a connected central.
+/// A write request from a connected client.
 ///
-/// When a central writes to a characteristic, a [WriteRequest] is emitted
+/// When a client writes to a characteristic, a [WriteRequest] is emitted
 /// on [Server.writeRequests]. If [responseNeeded] is true, the server must
 /// respond using [Server.respondToWrite].
 @immutable
 class WriteRequest {
-  /// The central that initiated this request.
-  final Central central;
+  /// The client that initiated this request.
+  final Client client;
 
   /// The characteristic being written.
   final UUID characteristicId;
@@ -277,7 +277,7 @@ class WriteRequest {
 
   /// Creates a write request.
   const WriteRequest({
-    required this.central,
+    required this.client,
     required this.characteristicId,
     required this.value,
     required this.offset,
@@ -286,26 +286,26 @@ class WriteRequest {
   });
 }
 
-/// A connected central device (from the server's perspective).
+/// A connected client device (from the server's perspective).
 ///
-/// When a central connects to this peripheral, a [Central] instance is
+/// When a client connects to this peripheral, a [Client] instance is
 /// created to represent it. Use this to send notifications to specific
-/// centrals or to disconnect them.
-abstract class Central {
-  /// The unique identifier of this central.
+/// clients or to disconnect them.
+abstract class Client {
+  /// The unique identifier of this client.
   UUID get id;
 
   /// The current MTU for this connection.
   int get mtu;
 
-  /// Disconnect this central.
+  /// Disconnect this client.
   Future<void> disconnect();
 }
 
 /// GATT server for peripheral role.
 ///
 /// The Server allows this device to act as a BLE peripheral, advertising
-/// services and responding to requests from centrals.
+/// services and responding to requests from clients.
 ///
 /// Example:
 /// ```dart
@@ -327,26 +327,26 @@ abstract class Central {
 /// await server.startAdvertising(name: 'My Device');
 ///
 /// // Listen for connections
-/// server.connections.listen((central) {
-///   print('Central connected: ${central.id}');
+/// server.connections.listen((client) {
+///   print('Client connected: ${client.id}');
 /// });
 /// ```
 abstract class Server {
   /// Whether advertising is currently active.
   bool get isAdvertising;
 
-  /// Stream of connected central devices.
+  /// Stream of connected client devices.
   ///
-  /// Emits when a central connects to this peripheral.
-  Stream<Central> get connections;
+  /// Emits when a client connects to this peripheral.
+  Stream<Client> get connections;
 
-  /// Stream of disconnected central device IDs.
+  /// Stream of disconnected client device IDs.
   ///
-  /// Emits the ID of a central when it disconnects from this peripheral.
+  /// Emits the ID of a client when it disconnects from this peripheral.
   Stream<String> get disconnections;
 
-  /// Currently connected centrals.
-  List<Central> get connectedCentrals;
+  /// Currently connected clients.
+  List<Client> get connectedClients;
 
   /// Add a service to the GATT database.
   ///
@@ -381,7 +381,7 @@ abstract class Server {
   /// Stop advertising.
   Future<void> stopAdvertising();
 
-  /// Send a notification to all subscribed centrals.
+  /// Send a notification to all subscribed clients.
   ///
   /// [characteristic] - The characteristic UUID to notify.
   /// [data] - The data to send.
@@ -389,41 +389,41 @@ abstract class Server {
   /// Returns after the notification is sent (with flow control).
   Future<void> notify(UUID characteristic, {required Uint8List data});
 
-  /// Send a notification to a specific central.
+  /// Send a notification to a specific client.
   Future<void> notifyTo(
-    Central central,
+    Client client,
     UUID characteristic, {
     required Uint8List data,
   });
 
-  /// Send an indication to all subscribed centrals.
+  /// Send an indication to all subscribed clients.
   ///
-  /// Unlike notifications, indications require acknowledgment from the central
+  /// Unlike notifications, indications require acknowledgment from the client
   /// before returning. Use this for data that must be reliably delivered.
   ///
   /// [characteristic] - The characteristic UUID to indicate.
   /// [data] - The data to send.
   Future<void> indicate(UUID characteristic, {required Uint8List data});
 
-  /// Send an indication to a specific central.
+  /// Send an indication to a specific client.
   ///
-  /// Unlike notifications, indications require acknowledgment from the central
+  /// Unlike notifications, indications require acknowledgment from the client
   /// before returning. Use this for data that must be reliably delivered.
   Future<void> indicateTo(
-    Central central,
+    Client client,
     UUID characteristic, {
     required Uint8List data,
   });
 
-  /// Stream of read requests from centrals.
+  /// Stream of read requests from clients.
   ///
-  /// When a central reads a characteristic value, a [ReadRequest] is emitted.
+  /// When a client reads a characteristic value, a [ReadRequest] is emitted.
   /// The server must respond using [respondToRead].
   Stream<ReadRequest> get readRequests;
 
-  /// Stream of write requests from centrals.
+  /// Stream of write requests from clients.
   ///
-  /// When a central writes to a characteristic, a [WriteRequest] is emitted.
+  /// When a client writes to a characteristic, a [WriteRequest] is emitted.
   /// If [WriteRequest.responseNeeded] is true, the server must respond using
   /// [respondToWrite].
   Stream<WriteRequest> get writeRequests;

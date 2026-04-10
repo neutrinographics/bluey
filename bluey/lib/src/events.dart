@@ -326,13 +326,13 @@ final class AdvertisingStoppedEvent extends BlueyEvent {
   String toString() => '[Server] Advertising stopped';
 }
 
-/// Central connected to server.
-final class CentralConnectedEvent extends BlueyEvent {
-  final String centralId;
+/// Client connected to server.
+final class ClientConnectedEvent extends BlueyEvent {
+  final String clientId;
   final int? mtu;
 
-  const CentralConnectedEvent({
-    required this.centralId,
+  const ClientConnectedEvent({
+    required this.clientId,
     this.mtu,
     super.source,
   });
@@ -340,7 +340,7 @@ final class CentralConnectedEvent extends BlueyEvent {
   @override
   String toString() {
     final m = mtu != null ? ' mtu=$mtu' : '';
-    return '[Server] Central connected: ${_shortId(centralId)}$m';
+    return '[Server] Client connected: ${_shortId(clientId)}$m';
   }
 
   String _shortId(String id) {
@@ -351,14 +351,14 @@ final class CentralConnectedEvent extends BlueyEvent {
   }
 }
 
-/// Central disconnected from server.
-final class CentralDisconnectedEvent extends BlueyEvent {
-  final String centralId;
+/// Client disconnected from server.
+final class ClientDisconnectedEvent extends BlueyEvent {
+  final String clientId;
 
-  const CentralDisconnectedEvent({required this.centralId, super.source});
+  const ClientDisconnectedEvent({required this.clientId, super.source});
 
   @override
-  String toString() => '[Server] Central disconnected: ${_shortId(centralId)}';
+  String toString() => '[Server] Client disconnected: ${_shortId(clientId)}';
 
   String _shortId(String id) {
     if (id.length > 8) {
@@ -368,13 +368,13 @@ final class CentralDisconnectedEvent extends BlueyEvent {
   }
 }
 
-/// Read request received from central.
+/// Read request received from client.
 final class ReadRequestEvent extends BlueyEvent {
-  final String centralId;
+  final String clientId;
   final UUID characteristicId;
 
   const ReadRequestEvent({
-    required this.centralId,
+    required this.clientId,
     required this.characteristicId,
     super.source,
   });
@@ -384,14 +384,14 @@ final class ReadRequestEvent extends BlueyEvent {
       '[Server] Read request for ${characteristicId.toShortString()}';
 }
 
-/// Write request received from central.
+/// Write request received from client.
 final class WriteRequestEvent extends BlueyEvent {
-  final String centralId;
+  final String clientId;
   final UUID characteristicId;
   final int valueLength;
 
   const WriteRequestEvent({
-    required this.centralId,
+    required this.clientId,
     required this.characteristicId,
     required this.valueLength,
     super.source,
@@ -402,22 +402,22 @@ final class WriteRequestEvent extends BlueyEvent {
       '[Server] Write request for ${characteristicId.toShortString()} ($valueLength bytes)';
 }
 
-/// Notification sent to central(s).
+/// Notification sent to client(s).
 final class NotificationSentEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
-  final String? centralId; // null means broadcast to all
+  final String? clientId; // null means broadcast to all
 
   const NotificationSentEvent({
     required this.characteristicId,
     required this.valueLength,
-    this.centralId,
+    this.clientId,
     super.source,
   });
 
   @override
   String toString() {
-    final target = centralId != null ? ' to ${_shortId(centralId!)}' : '';
+    final target = clientId != null ? ' to ${_shortId(clientId!)}' : '';
     return '[Server] Sent notification$target ($valueLength bytes)';
   }
 
@@ -429,24 +429,24 @@ final class NotificationSentEvent extends BlueyEvent {
   }
 }
 
-/// Indication sent to central(s).
+/// Indication sent to client(s).
 ///
-/// Indications are like notifications but require acknowledgment from the central.
+/// Indications are like notifications but require acknowledgment from the client.
 final class IndicationSentEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
-  final String? centralId; // null means broadcast to all
+  final String? clientId; // null means broadcast to all
 
   const IndicationSentEvent({
     required this.characteristicId,
     required this.valueLength,
-    this.centralId,
+    this.clientId,
     super.source,
   });
 
   @override
   String toString() {
-    final target = centralId != null ? ' to ${_shortId(centralId!)}' : '';
+    final target = clientId != null ? ' to ${_shortId(clientId!)}' : '';
     return '[Server] Sent indication$target ($valueLength bytes)';
   }
 

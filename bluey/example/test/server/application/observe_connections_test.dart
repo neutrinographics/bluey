@@ -17,7 +17,7 @@ void main() {
 
   group('ObserveConnections', () {
     test('should return connections stream from repository', () {
-      final central = MockCentral();
+      final central = MockClient();
       when(() => mockRepository.connections).thenAnswer(
         (_) => Stream.value(central),
       );

@@ -10,7 +10,7 @@ class ObserveReadRequests {
 
   ObserveReadRequests(this._repository);
 
-  /// Returns a stream of read requests from connected centrals.
+  /// Returns a stream of read requests from connected clients.
   Stream<ReadRequest> call() {
     return _repository.readRequests;
   }
@@ -31,7 +31,7 @@ class ObserveWriteRequests {
 
   ObserveWriteRequests(this._repository);
 
-  /// Returns a stream of write requests from connected centrals.
+  /// Returns a stream of write requests from connected clients.
   Stream<WriteRequest> call() {
     return _repository.writeRequests;
   }

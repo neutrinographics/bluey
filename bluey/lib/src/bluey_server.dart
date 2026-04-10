@@ -16,10 +16,10 @@ class BlueyServer implements Server {
   final BlueyEventBus _eventBus;
 
   bool _isAdvertising = false;
-  final Map<String, BlueyCentral> _connectedCentrals = {};
+  final Map<String, BlueyClient> _connectedClients = {};
 
-  final StreamController<Central> _connectionsController =
-      StreamController<Central>.broadcast();
+  final StreamController<Client> _connectionsController =
+      StreamController<Client>.broadcast();
   final StreamController<String> _disconnectionsController =
       StreamController<String>.broadcast();
 
@@ -33,29 +33,29 @@ class BlueyServer implements Server {
       platformCentral,
     ) {
       _emitEvent(
-        CentralConnectedEvent(
-          centralId: platformCentral.id,
+        ClientConnectedEvent(
+          clientId: platformCentral.id,
           mtu: platformCentral.mtu,
           source: 'BlueyServer',
         ),
       );
-      final central = BlueyCentral(
+      final client = BlueyClient(
         platform: _platform,
         id: platformCentral.id,
         mtu: platformCentral.mtu,
       );
-      _connectedCentrals[platformCentral.id] = central;
-      _connectionsController.add(central);
+      _connectedClients[platformCentral.id] = client;
+      _connectionsController.add(client);
     });
 
     _centralDisconnectionsSub = _platform.centralDisconnections.listen((
-      centralId,
+      clientId,
     ) {
       _emitEvent(
-        CentralDisconnectedEvent(centralId: centralId, source: 'BlueyServer'),
+        ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
-      _connectedCentrals.remove(centralId);
-      _disconnectionsController.add(centralId);
+      _connectedClients.remove(clientId);
+      _disconnectionsController.add(clientId);
     });
   }
 
@@ -63,13 +63,13 @@ class BlueyServer implements Server {
   bool get isAdvertising => _isAdvertising;
 
   @override
-  Stream<Central> get connections => _connectionsController.stream;
+  Stream<Client> get connections => _connectionsController.stream;
 
   @override
   Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override
-  List<Central> get connectedCentrals => _connectedCentrals.values.toList();
+  List<Client> get connectedClients => _connectedClients.values.toList();
 
   @override
   Future<void> addService(HostedService service) async {
@@ -132,13 +132,13 @@ class BlueyServer implements Server {
 
   @override
   Future<void> notifyTo(
-    Central central,
+    Client client,
     UUID characteristic, {
     required Uint8List data,
   }) async {
-    final blueyCentral = central as BlueyCentral;
+    final blueyClient = client as BlueyClient;
     await _platform.notifyCharacteristicTo(
-      blueyCentral.platformId,
+      blueyClient.platformId,
       characteristic.toString(),
       data,
     );
@@ -146,7 +146,7 @@ class BlueyServer implements Server {
       NotificationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        centralId: blueyCentral.platformId,
+        clientId: blueyClient.platformId,
         source: 'BlueyServer',
       ),
     );
@@ -166,13 +166,13 @@ class BlueyServer implements Server {
 
   @override
   Future<void> indicateTo(
-    Central central,
+    Client client,
     UUID characteristic, {
     required Uint8List data,
   }) async {
-    final blueyCentral = central as BlueyCentral;
+    final blueyClient = client as BlueyClient;
     await _platform.indicateCharacteristicTo(
-      blueyCentral.platformId,
+      blueyClient.platformId,
       characteristic.toString(),
       data,
     );
@@ -180,7 +180,7 @@ class BlueyServer implements Server {
       IndicationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        centralId: blueyCentral.platformId,
+        clientId: blueyClient.platformId,
         source: 'BlueyServer',
       ),
     );
@@ -189,14 +189,14 @@ class BlueyServer implements Server {
   @override
   Stream<ReadRequest> get readRequests {
     return _platform.readRequests.map((platformRequest) {
-      final central = _connectedCentrals[platformRequest.centralId];
-      if (central == null) {
+      final client = _connectedClients[platformRequest.centralId];
+      if (client == null) {
         throw StateError(
-          'Read request from unknown central: ${platformRequest.centralId}',
+          'Read request from unknown client: ${platformRequest.centralId}',
         );
       }
       return ReadRequest(
-        central: central,
+        client: client,
         characteristicId: UUID(platformRequest.characteristicUuid),
         offset: platformRequest.offset,
         internalRequestId: platformRequest.requestId,
@@ -207,14 +207,14 @@ class BlueyServer implements Server {
   @override
   Stream<WriteRequest> get writeRequests {
     return _platform.writeRequests.map((platformRequest) {
-      final central = _connectedCentrals[platformRequest.centralId];
-      if (central == null) {
+      final client = _connectedClients[platformRequest.centralId];
+      if (client == null) {
         throw StateError(
-          'Write request from unknown central: ${platformRequest.centralId}',
+          'Write request from unknown client: ${platformRequest.centralId}',
         );
       }
       return WriteRequest(
-        central: central,
+        client: client,
         characteristicId: UUID(platformRequest.characteristicUuid),
         value: platformRequest.value,
         offset: platformRequest.offset,
@@ -254,7 +254,7 @@ class BlueyServer implements Server {
       await stopAdvertising();
     }
 
-    // Close the GATT server and disconnect all centrals
+    // Close the GATT server and disconnect all clients
     // This is important on Android to prevent zombie BLE connections
     await _platform.closeServer();
 
@@ -263,7 +263,7 @@ class BlueyServer implements Server {
     await _connectionsController.close();
     await _disconnectionsController.close();
 
-    _connectedCentrals.clear();
+    _connectedClients.clear();
   }
 
   // === Private mapping methods ===
@@ -359,13 +359,13 @@ class BlueyServer implements Server {
   }
 }
 
-/// Concrete implementation of [Central].
-class BlueyCentral implements Central {
+/// Concrete implementation of [Client].
+class BlueyClient implements Client {
   final platform.BlueyPlatform _platform;
   final String platformId;
   final int _mtu;
 
-  BlueyCentral({
+  BlueyClient({
     required platform.BlueyPlatform platform,
     required String id,
     required int mtu,

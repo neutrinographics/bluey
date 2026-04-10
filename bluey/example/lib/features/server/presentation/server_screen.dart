@@ -11,9 +11,9 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
-import '../application/disconnect_central.dart';
+import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
-import '../application/get_connected_centrals.dart';
+import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
 import 'server_cubit.dart';
@@ -33,9 +33,9 @@ class ServerScreen extends StatelessWidget {
             addService: getIt<AddService>(),
             sendNotification: getIt<SendNotification>(),
             observeConnections: getIt<ObserveConnections>(),
-            disconnectCentral: getIt<DisconnectCentral>(),
+            disconnectClient: getIt<DisconnectClient>(),
             disposeServer: getIt<DisposeServer>(),
-            getConnectedCentrals: getIt<GetConnectedCentrals>(),
+            getConnectedClients: getIt<GetConnectedClients>(),
             observeDisconnections: getIt<ObserveDisconnections>(),
             observeReadRequests: getIt<ObserveReadRequests>(),
             observeWriteRequests: getIt<ObserveWriteRequests>(),
@@ -104,7 +104,7 @@ class _ServerView extends StatelessWidget {
           body: Column(
             children: [
               _ServiceInfoCard(state: state),
-              _ConnectedCentralsSection(state: state),
+              _ConnectedClientsSection(state: state),
               const Divider(),
               _LogSection(log: state.log),
             ],
@@ -219,7 +219,7 @@ class _ServiceInfoCard extends StatelessWidget {
                 ),
                 FilledButton.tonalIcon(
                   onPressed:
-                      state.connectedCentrals.isNotEmpty
+                      state.connectedClients.isNotEmpty
                           ? cubit.sendNotification
                           : null,
                   icon: const Icon(Icons.send),
@@ -234,10 +234,10 @@ class _ServiceInfoCard extends StatelessWidget {
   }
 }
 
-class _ConnectedCentralsSection extends StatelessWidget {
+class _ConnectedClientsSection extends StatelessWidget {
   final ServerScreenState state;
 
-  const _ConnectedCentralsSection({required this.state});
+  const _ConnectedClientsSection({required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -250,13 +250,13 @@ class _ConnectedCentralsSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Text('Connected Centrals', style: theme.textTheme.titleMedium),
+              Text('Connected Clients', style: theme.textTheme.titleMedium),
               const SizedBox(width: 8),
               CircleAvatar(
                 radius: 12,
                 backgroundColor: theme.colorScheme.primaryContainer,
                 child: Text(
-                  '${state.connectedCentrals.length}',
+                  '${state.connectedClients.length}',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onPrimaryContainer,
                   ),
@@ -265,11 +265,11 @@ class _ConnectedCentralsSection extends StatelessWidget {
             ],
           ),
         ),
-        if (state.connectedCentrals.isEmpty)
+        if (state.connectedClients.isEmpty)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'No centrals connected',
+              'No clients connected',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -281,10 +281,10 @@ class _ConnectedCentralsSection extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: state.connectedCentrals.length,
+              itemCount: state.connectedClients.length,
               itemBuilder: (context, index) {
-                final central = state.connectedCentrals[index];
-                return _CentralChip(central: central);
+                final client = state.connectedClients[index];
+                return _ClientChip(client: client);
               },
             ),
           ),
@@ -293,10 +293,10 @@ class _ConnectedCentralsSection extends StatelessWidget {
   }
 }
 
-class _CentralChip extends StatelessWidget {
-  final Central central;
+class _ClientChip extends StatelessWidget {
+  final Client client;
 
-  const _CentralChip({required this.central});
+  const _ClientChip({required this.client});
 
   @override
   Widget build(BuildContext context) {
@@ -321,18 +321,18 @@ class _CentralChip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  central.id.toString().substring(0, 8),
+                  client.id.toString().substring(0, 8),
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontFamily: 'monospace',
                   ),
                 ),
-                Text('MTU: ${central.mtu}', style: theme.textTheme.labelSmall),
+                Text('MTU: ${client.mtu}', style: theme.textTheme.labelSmall),
               ],
             ),
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.close, size: 18),
-              onPressed: () => cubit.disconnectCentral(central),
+              onPressed: () => cubit.disconnectClient(client),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               tooltip: 'Disconnect',

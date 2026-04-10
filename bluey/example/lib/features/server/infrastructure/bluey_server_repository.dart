@@ -56,7 +56,7 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
-  Stream<Central> get connections {
+  Stream<Client> get connections {
     final server = getServer();
     if (server == null) {
       return const Stream.empty();
@@ -74,8 +74,8 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
-  List<Central> get connectedCentrals {
-    return getServer()?.connectedCentrals ?? [];
+  List<Client> get connectedClients {
+    return getServer()?.connectedClients ?? [];
   }
 
   @override
@@ -114,8 +114,8 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
-  Future<void> disconnectCentral(Central central) async {
-    await central.disconnect();
+  Future<void> disconnectClient(Client client) async {
+    await client.disconnect();
   }
 
   @override

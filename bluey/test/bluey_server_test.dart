@@ -23,7 +23,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   final List<IndicateToCall> indicateToCalls = [];
   final List<RespondToReadCall> respondToReadCalls = [];
   final List<RespondToWriteCall> respondToWriteCalls = [];
-  final List<String> disconnectedCentrals = [];
+  final List<String> disconnectedClients = [];
 
   // Stream controllers for server events
   final _centralConnectionsController =
@@ -306,7 +306,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> disconnectCentral(String centralId) async {
-    disconnectedCentrals.add(centralId);
+    disconnectedClients.add(centralId);
   }
 
   @override
@@ -544,7 +544,7 @@ void main() {
       test('connections stream emits when central connects', () async {
         final server = bluey.server()!;
 
-        final centrals = <Central>[];
+        final centrals = <Client>[];
         final subscription = server.connections.listen(centrals.add);
 
         mockPlatform.emitCentralConnected(
@@ -560,7 +560,7 @@ void main() {
         expect(centrals.first.mtu, equals(512));
       });
 
-      test('connectedCentrals returns list of connected centrals', () async {
+      test('connectedClients returns list of connected centrals', () async {
         final server = bluey.server()!;
 
         // Listen to keep track of connections
@@ -575,7 +575,7 @@ void main() {
 
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(server.connectedCentrals, hasLength(2));
+        expect(server.connectedClients, hasLength(2));
       });
 
       test('central is removed from list when disconnected', () async {
@@ -588,12 +588,12 @@ void main() {
         );
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(server.connectedCentrals, hasLength(1));
+        expect(server.connectedClients, hasLength(1));
 
         mockPlatform.emitCentralDisconnected('central-1');
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(server.connectedCentrals, isEmpty);
+        expect(server.connectedClients, isEmpty);
       });
     });
 
@@ -623,7 +623,7 @@ void main() {
         );
         await Future.delayed(Duration(milliseconds: 10));
 
-        final central = server.connectedCentrals.first;
+        final central = server.connectedClients.first;
         final charUuid = UUID.short(0x2A19);
         final data = Uint8List.fromList([99]);
 
@@ -661,7 +661,7 @@ void main() {
         );
         await Future.delayed(Duration(milliseconds: 10));
 
-        final central = server.connectedCentrals.first;
+        final central = server.connectedClients.first;
         final charUuid = UUID.short(0x2A19);
         final data = Uint8List.fromList([99]);
 
@@ -686,10 +686,10 @@ void main() {
         );
         await Future.delayed(Duration(milliseconds: 10));
 
-        final central = server.connectedCentrals.first;
+        final central = server.connectedClients.first;
         await central.disconnect();
 
-        expect(mockPlatform.disconnectedCentrals, contains('central-1'));
+        expect(mockPlatform.disconnectedClients, contains('central-1'));
       });
     });
 
@@ -732,7 +732,7 @@ void main() {
         await subscription.cancel();
 
         expect(requests, hasLength(1));
-        expect(requests.first.central, isNotNull);
+        expect(requests.first.client, isNotNull);
         expect(requests.first.characteristicId, equals(UUID.short(0x2A19)));
         expect(requests.first.offset, equals(0));
       });
@@ -810,7 +810,7 @@ void main() {
         await subscription.cancel();
 
         expect(requests, hasLength(1));
-        expect(requests.first.central, isNotNull);
+        expect(requests.first.client, isNotNull);
         expect(requests.first.characteristicId, equals(UUID.short(0x2A19)));
         expect(requests.first.value, equals(writeValue));
         expect(requests.first.offset, equals(0));
