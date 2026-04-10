@@ -206,6 +206,22 @@ class PeripheralManagerImpl: NSObject {
         completion(.success(()))
     }
 
+    // MARK: - Central Tracking
+
+    /// Tracks a central and notifies Flutter if this is the first time we see it.
+    /// iOS does not provide a connection state callback, so we infer connections
+    /// from subscribe, read, and write events.
+    private func trackCentralIfNeeded(_ central: CBCentral) {
+        let centralId = central.identifier.uuidString.lowercased()
+        let isNew = centrals[centralId] == nil
+        centrals[centralId] = central
+
+        if isNew {
+            let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
+            flutterApi.onCentralConnected(central: centralDto) { _ in }
+        }
+    }
+
     // MARK: - CBPeripheralManagerDelegate callbacks
 
     func didUpdateState(peripheral: CBPeripheralManager) {
@@ -245,15 +261,11 @@ class PeripheralManagerImpl: NSObject {
         let centralId = central.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
 
-        // Track the central
-        centrals[centralId] = central
+        // Track the central and notify Flutter if this is the first time we see it
+        trackCentralIfNeeded(central)
 
         // Track subscription
         subscribedCentrals[charUuid, default: []].insert(centralId)
-
-        // Notify Flutter
-        let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
-        flutterApi.onCentralConnected(central: centralDto) { _ in }
         flutterApi.onCharacteristicSubscribed(centralId: centralId, characteristicUuid: charUuid) { _ in }
     }
 
@@ -279,8 +291,8 @@ class PeripheralManagerImpl: NSObject {
         let centralId = request.central.identifier.uuidString.lowercased()
         let charUuid = request.characteristic.uuid.uuidString.lowercased()
 
-        // Track the central
-        centrals[centralId] = request.central
+        // Track the central and notify Flutter if this is the first time we see it
+        trackCentralIfNeeded(request.central)
 
         // Store request for later response
         let requestId = nextRequestId
@@ -302,8 +314,8 @@ class PeripheralManagerImpl: NSObject {
 
         let centralId = firstRequest.central.identifier.uuidString.lowercased()
 
-        // Track the central
-        centrals[centralId] = firstRequest.central
+        // Track the central and notify Flutter if this is the first time we see it
+        trackCentralIfNeeded(firstRequest.central)
 
         // Store requests for later response
         let requestId = nextRequestId

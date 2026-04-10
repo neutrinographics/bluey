@@ -354,17 +354,20 @@ class GattServer(
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
-                    Log.d("GattServer", "Central connected: $deviceId")
+                    val isNew = connectedCentrals[deviceId] == null
+                    Log.d("GattServer", "Central connected: $deviceId (new=$isNew)")
                     connectedCentrals[deviceId] = device
                     centralMtus[deviceId] = DEFAULT_MTU
 
-                    val central = CentralDto(
-                        id = deviceId,
-                        mtu = DEFAULT_MTU.toLong()
-                    )
-                    // Must dispatch to main thread for Flutter platform channel
-                    handler.post {
-                        flutterApi.onCentralConnected(central) {}
+                    if (isNew) {
+                        val central = CentralDto(
+                            id = deviceId,
+                            mtu = DEFAULT_MTU.toLong()
+                        )
+                        // Must dispatch to main thread for Flutter platform channel
+                        handler.post {
+                            flutterApi.onCentralConnected(central) {}
+                        }
                     }
                 }
 
