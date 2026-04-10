@@ -176,9 +176,11 @@ class Scanner(
         }
 
         // Create device DTO
+        // Prefer the advertised local name from the scan record over the
+        // cached name from BluetoothDevice, which may be stale or missing.
         val deviceDto = DeviceDto(
             id = device.address,
-            name = device.name,
+            name = scanRecord?.deviceName ?: device.name,
             rssi = result.rssi.toLong(),
             serviceUuids = serviceUuids,
             manufacturerDataCompanyId = manufacturerDataCompanyId,

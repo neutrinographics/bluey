@@ -56,7 +56,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act
@@ -105,7 +105,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act
@@ -149,7 +149,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act & Assert
@@ -196,7 +196,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act
@@ -243,7 +243,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act
@@ -287,7 +287,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act & Assert
@@ -331,7 +331,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act
@@ -394,7 +394,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Act & Assert

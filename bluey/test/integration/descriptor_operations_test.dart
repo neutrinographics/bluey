@@ -58,7 +58,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         expect(characteristic.descriptors, hasLength(1));
@@ -100,7 +100,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
         final descriptor = characteristic.descriptors.first;
 
@@ -145,7 +145,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         expect(characteristic.descriptors, hasLength(3));
@@ -191,7 +191,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
         final cccd = characteristic.descriptors.first;
 
@@ -232,7 +232,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
         final cccd = characteristic.descriptors.first;
 
@@ -273,7 +273,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
         final cccd = characteristic.descriptors.first;
 
@@ -319,7 +319,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Find CCCD by UUID
@@ -360,7 +360,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         expect(

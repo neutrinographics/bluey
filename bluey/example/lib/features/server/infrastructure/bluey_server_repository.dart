@@ -65,6 +65,55 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
+  Stream<String> get disconnections {
+    final server = getServer();
+    if (server == null) {
+      return const Stream.empty();
+    }
+    return server.disconnections;
+  }
+
+  @override
+  List<Central> get connectedCentrals {
+    return getServer()?.connectedCentrals ?? [];
+  }
+
+  @override
+  Stream<ReadRequest> get readRequests {
+    final server = getServer();
+    if (server == null) {
+      return const Stream.empty();
+    }
+    return server.readRequests;
+  }
+
+  @override
+  Stream<WriteRequest> get writeRequests {
+    final server = getServer();
+    if (server == null) {
+      return const Stream.empty();
+    }
+    return server.writeRequests;
+  }
+
+  @override
+  Future<void> respondToRead(
+    ReadRequest request, {
+    required GattResponseStatus status,
+    Uint8List? value,
+  }) async {
+    await getServer()?.respondToRead(request, status: status, value: value);
+  }
+
+  @override
+  Future<void> respondToWrite(
+    WriteRequest request, {
+    required GattResponseStatus status,
+  }) async {
+    await getServer()?.respondToWrite(request, status: status);
+  }
+
+  @override
   Future<void> disconnectCentral(Central central) async {
     await central.disconnect();
   }

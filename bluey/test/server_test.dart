@@ -300,12 +300,16 @@ class MockServer implements Server {
   final List<HostedService> _services = [];
   bool _isAdvertising = false;
   final _connectionsController = StreamController<Central>.broadcast();
+  final _disconnectionsController = StreamController<String>.broadcast();
 
   @override
   bool get isAdvertising => _isAdvertising;
 
   @override
   Stream<Central> get connections => _connectionsController.stream;
+
+  @override
+  Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override
   List<Central> get connectedCentrals => [];

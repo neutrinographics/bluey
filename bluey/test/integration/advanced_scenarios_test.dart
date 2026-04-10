@@ -51,7 +51,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Indication should allow subscription
@@ -91,7 +91,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         final values = <Uint8List>[];
@@ -141,7 +141,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         expect(characteristic.properties.canNotify, isTrue);
@@ -392,7 +392,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         final values = <Uint8List>[];
@@ -448,7 +448,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         final values = <Uint8List>[];
@@ -502,7 +502,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         final values = <int>[];
@@ -686,7 +686,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Send 100 writes without response (like streaming audio/video data)
@@ -732,7 +732,7 @@ void main() {
           final bluey = Bluey();
           final device = await bluey.scan().first;
           final connection = await bluey.connect(device);
-          final services = await connection.services;
+          final services = await connection.services();
           final characteristic = services.first.characteristics.first;
 
           // Both should work
@@ -904,7 +904,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Read initial value
@@ -955,7 +955,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Multiple writes
@@ -1007,7 +1007,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Launch multiple concurrent reads
@@ -1067,7 +1067,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final char1 = services.first.characteristics[0];
         final char2 = services.first.characteristics[1];
 
@@ -1120,7 +1120,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final services = await connection.services;
+        final services = await connection.services();
         final characteristic = services.first.characteristics.first;
 
         // Interleaved operations - order matters for correctness
@@ -1157,7 +1157,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Discover services
-        final services = await connection.services;
+        final services = await connection.services();
         expect(services, hasLength(1));
 
         await connection.disconnect();
@@ -1182,11 +1182,11 @@ void main() {
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
-        // Multiple calls should return same services
-        final services1 = await connection.services;
-        final services2 = await connection.services;
+        // First call discovers, second call uses cache
+        final services1 = await connection.services();
+        final services2 = await connection.services(cache: true);
 
-        expect(services1, equals(services2));
+        expect(identical(services1, services2), isTrue);
 
         await connection.disconnect();
         await bluey.dispose();

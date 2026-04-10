@@ -20,6 +20,8 @@ class BlueyServer implements Server {
 
   final StreamController<Central> _connectionsController =
       StreamController<Central>.broadcast();
+  final StreamController<String> _disconnectionsController =
+      StreamController<String>.broadcast();
 
   StreamSubscription? _centralConnectionsSub;
   StreamSubscription? _centralDisconnectionsSub;
@@ -53,6 +55,7 @@ class BlueyServer implements Server {
         CentralDisconnectedEvent(centralId: centralId, source: 'BlueyServer'),
       );
       _connectedCentrals.remove(centralId);
+      _disconnectionsController.add(centralId);
     });
   }
 
@@ -61,6 +64,9 @@ class BlueyServer implements Server {
 
   @override
   Stream<Central> get connections => _connectionsController.stream;
+
+  @override
+  Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override
   List<Central> get connectedCentrals => _connectedCentrals.values.toList();
@@ -255,6 +261,7 @@ class BlueyServer implements Server {
     await _centralConnectionsSub?.cancel();
     await _centralDisconnectionsSub?.cancel();
     await _connectionsController.close();
+    await _disconnectionsController.close();
 
     _connectedCentrals.clear();
   }

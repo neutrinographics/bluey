@@ -86,7 +86,7 @@ void main() {
         expect(connection, isNotNull);
 
         // Discover services
-        final services = await connection.services;
+        final services = await connection.services();
         expect(services, hasLength(1));
 
         await connection.disconnect();

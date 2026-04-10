@@ -12,6 +12,9 @@ import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
 import '../application/disconnect_central.dart';
 import '../application/dispose_server.dart';
+import '../application/get_connected_centrals.dart';
+import '../application/observe_disconnections.dart';
+import '../application/handle_requests.dart';
 import 'server_state.dart';
 
 /// Cubit for managing server state.
@@ -24,12 +27,23 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final ObserveConnections _observeConnections;
   final DisconnectCentral _disconnectCentral;
   final DisposeServer _disposeServer;
+  final GetConnectedCentrals _getConnectedCentrals;
+  final ObserveDisconnections _observeDisconnections;
+  final ObserveReadRequests _observeReadRequests;
+  final ObserveWriteRequests _observeWriteRequests;
 
   StreamSubscription<Central>? _connectionSubscription;
+  StreamSubscription<String>? _disconnectionSubscription;
+  StreamSubscription<ReadRequest>? _readRequestSubscription;
+  StreamSubscription<WriteRequest>? _writeRequestSubscription;
 
-  // Demo service UUIDs
+  // Demo configuration
+  static const advertisedName = 'Bluey Demo';
   static final demoServiceUuid = UUID('12345678-1234-1234-1234-123456789abc');
   static final demoCharUuid = UUID('12345678-1234-1234-1234-123456789abd');
+
+  // Stored characteristic value (updated by writes, returned on reads)
+  Uint8List _characteristicValue = Uint8List.fromList([0x00]);
 
   ServerCubit({
     required CheckServerSupport checkServerSupport,
@@ -40,6 +54,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required ObserveConnections observeConnections,
     required DisconnectCentral disconnectCentral,
     required DisposeServer disposeServer,
+    required GetConnectedCentrals getConnectedCentrals,
+    required ObserveDisconnections observeDisconnections,
+    required ObserveReadRequests observeReadRequests,
+    required ObserveWriteRequests observeWriteRequests,
   }) : _checkServerSupport = checkServerSupport,
        _startAdvertising = startAdvertising,
        _stopAdvertising = stopAdvertising,
@@ -48,6 +66,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _observeConnections = observeConnections,
        _disconnectCentral = disconnectCentral,
        _disposeServer = disposeServer,
+       _getConnectedCentrals = getConnectedCentrals,
+       _observeDisconnections = observeDisconnections,
+       _observeReadRequests = observeReadRequests,
+       _observeWriteRequests = observeWriteRequests,
        super(const ServerScreenState());
 
   /// Initializes the server.
@@ -58,16 +80,62 @@ class ServerCubit extends Cubit<ServerScreenState> {
       return;
     }
 
-    // Listen for central connections
+    // Listen for central connection/disconnection events and refresh
+    // the list from the library's authoritative state each time.
     _connectionSubscription = _observeConnections().listen(
       (central) {
-        final centrals = [...state.connectedCentrals, central];
-        emit(state.copyWith(connectedCentrals: centrals));
+        _refreshConnectedCentrals();
         _addLog('Connection', 'Central connected: ${central.id}');
       },
       onError: (error) {
         _addLog('Error', 'Connection stream error: $error');
         emit(state.copyWith(error: 'Connection error: $error'));
+      },
+    );
+
+    // Listen for central disconnections and refresh the list.
+    _disconnectionSubscription = _observeDisconnections().listen(
+      (centralId) {
+        _refreshConnectedCentrals();
+        _addLog('Connection', 'Central disconnected: $centralId');
+      },
+    );
+
+    // Listen for read requests and respond with the current value.
+    _readRequestSubscription = _observeReadRequests().listen(
+      (request) async {
+        _addLog('Read', 'From ${_shortId(request.central.id)}');
+        try {
+          await _observeReadRequests.respond(
+            request,
+            status: GattResponseStatus.success,
+            value: _characteristicValue,
+          );
+        } catch (e) {
+          _addLog('Error', 'Failed to respond to read: $e');
+        }
+      },
+    );
+
+    // Listen for write requests, store the value, and respond.
+    _writeRequestSubscription = _observeWriteRequests().listen(
+      (request) async {
+        _characteristicValue = request.value;
+        _addLog(
+          'Write',
+          'From ${_shortId(request.central.id)}: '
+          '${_formatHex(request.value)}',
+        );
+        if (request.responseNeeded) {
+          try {
+            await _observeWriteRequests.respond(
+              request,
+              status: GattResponseStatus.success,
+            );
+          } catch (e) {
+            _addLog('Error', 'Failed to respond to write: $e');
+          }
+        }
       },
     );
 
@@ -100,7 +168,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   /// Starts advertising.
   Future<void> startAdvertising() async {
     try {
-      await _startAdvertising(name: 'Bluey Demo', services: [demoServiceUuid]);
+      await _startAdvertising(name: advertisedName, services: [demoServiceUuid]);
       emit(state.copyWith(isAdvertising: true));
       _addLog('Advertising', 'Started advertising');
     } catch (e) {
@@ -141,9 +209,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   Future<void> disconnectCentral(Central central) async {
     try {
       await _disconnectCentral(central);
-      final centrals =
-          state.connectedCentrals.where((c) => c.id != central.id).toList();
-      emit(state.copyWith(connectedCentrals: centrals));
+      _refreshConnectedCentrals();
       _addLog('Connection', 'Disconnected central: ${central.id}');
     } catch (e) {
       emit(state.copyWith(error: 'Failed to disconnect: $e'));
@@ -160,15 +226,27 @@ class ServerCubit extends Cubit<ServerScreenState> {
     emit(state.copyWith(error: null));
   }
 
+  void _refreshConnectedCentrals() {
+    emit(state.copyWith(connectedCentrals: _getConnectedCentrals()));
+  }
+
   void _addLog(String tag, String message) {
     final log = [ServerLogEntry(tag, message), ...state.log];
     if (log.length > 100) log.removeLast();
     emit(state.copyWith(log: log));
   }
 
+  String _shortId(UUID id) => id.toString().substring(0, 8);
+
+  String _formatHex(Uint8List bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+
   @override
   Future<void> close() {
     _connectionSubscription?.cancel();
+    _disconnectionSubscription?.cancel();
+    _readRequestSubscription?.cancel();
+    _writeRequestSubscription?.cancel();
     _disposeServer();
     return super.close();
   }

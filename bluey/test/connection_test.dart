@@ -65,14 +65,14 @@ class MockConnection implements Connection {
   }
 
   @override
-  Future<List<RemoteService>> get services async {
+  Future<List<RemoteService>> services({bool cache = false}) async {
     _servicesDiscovered = true;
     return _services;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
-    final svcs = await services;
+    final svcs = await services();
     return svcs.any((s) => s.uuid == uuid);
   }
 
@@ -215,7 +215,7 @@ void main() {
 
     group('Services', () {
       test('returns empty list when no services', () async {
-        final svcs = await connection.services;
+        final svcs = await connection.services();
         expect(svcs, isEmpty);
       });
 
@@ -228,7 +228,7 @@ void main() {
           ],
         );
 
-        final svcs = await connection.services;
+        final svcs = await connection.services();
         expect(svcs, hasLength(2));
       });
 

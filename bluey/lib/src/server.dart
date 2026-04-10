@@ -340,6 +340,11 @@ abstract class Server {
   /// Emits when a central connects to this peripheral.
   Stream<Central> get connections;
 
+  /// Stream of disconnected central device IDs.
+  ///
+  /// Emits the ID of a central when it disconnects from this peripheral.
+  Stream<String> get disconnections;
+
   /// Currently connected centrals.
   List<Central> get connectedCentrals;
 
@@ -356,7 +361,11 @@ abstract class Server {
 
   /// Start advertising.
   ///
-  /// [name] - The device name to advertise.
+  /// [name] - The device name to include in the advertisement. On iOS, this
+  /// sets the local name in the advertisement packet (foreground only). On
+  /// Android, the system Bluetooth adapter name is always used instead;
+  /// this parameter is included in the scan response header but does not
+  /// override the adapter name.
   /// [services] - Service UUIDs to include in the advertisement.
   /// [manufacturerData] - Manufacturer-specific data.
   /// [timeout] - Stop advertising after this duration.

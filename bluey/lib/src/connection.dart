@@ -159,10 +159,12 @@ abstract class Connection {
 
   /// Get all services on the device.
   ///
-  /// Triggers service discovery if not already done.
+  /// By default, this always performs service discovery on the device.
+  /// Set [cache] to true to return previously discovered services if
+  /// available, which avoids the round-trip to the device.
   ///
   /// Throws [DisconnectedException] if not connected.
-  Future<List<RemoteService>> get services;
+  Future<List<RemoteService>> services({bool cache = false});
 
   /// Check if a service exists on the device.
   ///

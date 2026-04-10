@@ -13,6 +13,9 @@ import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
 import '../application/disconnect_central.dart';
 import '../application/dispose_server.dart';
+import '../application/get_connected_centrals.dart';
+import '../application/observe_disconnections.dart';
+import '../application/handle_requests.dart';
 import 'server_cubit.dart';
 import 'server_state.dart';
 
@@ -32,6 +35,10 @@ class ServerScreen extends StatelessWidget {
             observeConnections: getIt<ObserveConnections>(),
             disconnectCentral: getIt<DisconnectCentral>(),
             disposeServer: getIt<DisposeServer>(),
+            getConnectedCentrals: getIt<GetConnectedCentrals>(),
+            observeDisconnections: getIt<ObserveDisconnections>(),
+            observeReadRequests: getIt<ObserveReadRequests>(),
+            observeWriteRequests: getIt<ObserveWriteRequests>(),
           )..initialize(),
       child: const ScaffoldMessenger(child: _ServerView()),
     );
@@ -140,22 +147,49 @@ class _ServiceInfoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bluey Demo Service',
+                        ServerCubit.advertisedName,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        ServerCubit.demoServiceUuid.toString(),
+                        'Advertised name',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                          fontSize: 10,
+                          color: theme.colorScheme.outline,
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Service UUID',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    ServerCubit.demoServiceUuid.toString(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const Divider(height: 24),
             Wrap(

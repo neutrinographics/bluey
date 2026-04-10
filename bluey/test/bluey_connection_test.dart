@@ -409,7 +409,7 @@ void main() {
           ),
         ];
 
-        final services = await connection.services;
+        final services = await connection.services();
 
         expect(services, hasLength(2));
         expect(services[0].uuid, equals(UUID.short(0x180D)));
@@ -427,7 +427,7 @@ void main() {
         ];
 
         // Trigger service discovery
-        await connection.services;
+        await connection.services();
 
         final svc = connection.service(UUID.short(0x180D));
         expect(svc.uuid, equals(UUID.short(0x180D)));
@@ -437,7 +437,7 @@ void main() {
         'service() throws ServiceNotFoundException when not found',
         () async {
           mockPlatform.mockServices = [];
-          await connection.services;
+          await connection.services();
 
           expect(
             () => connection.service(UUID.short(0x180D)),
@@ -459,15 +459,13 @@ void main() {
           ),
         ];
 
-        // First call
-        await connection.services;
-        // Second call should use cache
-        await connection.services;
+        // First call discovers
+        await connection.services();
+        // Second call uses cache
+        await connection.services(cache: true);
 
-        // discoverServices was called, but the result was cached
-        // We can't easily track call count with this mock, but the test
-        // verifies the API works correctly
-        expect(await connection.services, hasLength(1));
+        // Verify cached result is correct
+        expect(await connection.services(cache: true), hasLength(1));
       });
     });
 
@@ -499,7 +497,7 @@ void main() {
           60,
         ]); // Heart rate 60 bpm
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -533,7 +531,7 @@ void main() {
             ),
           ];
 
-          await connection.services;
+          await connection.services();
           final svc = connection.service(UUID.short(0x180D));
           final char = svc.characteristic(UUID(charUuid));
 
@@ -569,7 +567,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -606,7 +604,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -641,7 +639,7 @@ void main() {
             ),
           ];
 
-          await connection.services;
+          await connection.services();
           final svc = connection.service(UUID.short(0x180D));
           final char = svc.characteristic(UUID(charUuid));
 
@@ -677,7 +675,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -730,7 +728,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -766,7 +764,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
 
@@ -827,7 +825,7 @@ void main() {
           0x00,
         ]);
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
         final desc = char.descriptor(UUID(descUuid));
@@ -861,7 +859,7 @@ void main() {
           ),
         ];
 
-        await connection.services;
+        await connection.services();
         final svc = connection.service(UUID.short(0x180D));
         final char = svc.characteristic(UUID(charUuid));
         final desc = char.descriptor(UUID(descUuid));

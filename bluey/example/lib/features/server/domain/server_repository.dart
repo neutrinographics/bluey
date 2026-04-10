@@ -27,6 +27,31 @@ abstract class ServerRepository {
   /// Stream of central device connections.
   Stream<Central> get connections;
 
+  /// Stream of central device disconnections (emits central ID).
+  Stream<String> get disconnections;
+
+  /// Returns the currently connected centrals.
+  List<Central> get connectedCentrals;
+
+  /// Stream of read requests from connected centrals.
+  Stream<ReadRequest> get readRequests;
+
+  /// Stream of write requests from connected centrals.
+  Stream<WriteRequest> get writeRequests;
+
+  /// Responds to a read request.
+  Future<void> respondToRead(
+    ReadRequest request, {
+    required GattResponseStatus status,
+    Uint8List? value,
+  });
+
+  /// Responds to a write request.
+  Future<void> respondToWrite(
+    WriteRequest request, {
+    required GattResponseStatus status,
+  });
+
   /// Disconnects a specific central device.
   Future<void> disconnectCentral(Central central);
 

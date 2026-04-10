@@ -21,6 +21,10 @@ void main() {
   late MockObserveConnections mockObserveConnections;
   late MockDisconnectCentral mockDisconnectCentral;
   late MockDisposeServer mockDisposeServer;
+  late MockGetConnectedCentrals mockGetConnectedCentrals;
+  late MockObserveDisconnections mockObserveDisconnections;
+  late MockObserveReadRequests mockObserveReadRequests;
+  late MockObserveWriteRequests mockObserveWriteRequests;
 
   setUpAll(() {
     registerFallbackValue(FakeHostedService());
@@ -39,8 +43,16 @@ void main() {
     mockObserveConnections = MockObserveConnections();
     mockDisconnectCentral = MockDisconnectCentral();
     mockDisposeServer = MockDisposeServer();
+    mockGetConnectedCentrals = MockGetConnectedCentrals();
+    mockObserveDisconnections = MockObserveDisconnections();
+    mockObserveReadRequests = MockObserveReadRequests();
+    mockObserveWriteRequests = MockObserveWriteRequests();
 
     when(() => mockDisposeServer()).thenAnswer((_) async {});
+    when(() => mockGetConnectedCentrals()).thenReturn([]);
+    when(() => mockObserveDisconnections()).thenAnswer((_) => const Stream.empty());
+    when(() => mockObserveReadRequests()).thenAnswer((_) => const Stream.empty());
+    when(() => mockObserveWriteRequests()).thenAnswer((_) => const Stream.empty());
   });
 
   ServerCubit createCubit() {
@@ -53,6 +65,10 @@ void main() {
       observeConnections: mockObserveConnections,
       disconnectCentral: mockDisconnectCentral,
       disposeServer: mockDisposeServer,
+      getConnectedCentrals: mockGetConnectedCentrals,
+      observeDisconnections: mockObserveDisconnections,
+      observeReadRequests: mockObserveReadRequests,
+      observeWriteRequests: mockObserveWriteRequests,
     );
   }
 
@@ -229,9 +245,10 @@ void main() {
     );
 
     blocTest<ServerCubit, ServerScreenState>(
-      'disconnectCentral removes central from list',
+      'disconnectCentral refreshes centrals list',
       setUp: () {
         when(() => mockDisconnectCentral(any())).thenAnswer((_) async {});
+        when(() => mockGetConnectedCentrals()).thenReturn([]);
       },
       build: createCubit,
       seed: () {
@@ -248,6 +265,7 @@ void main() {
       verify: (cubit) {
         expect(cubit.state.connectedCentrals, isEmpty);
         verify(() => mockDisconnectCentral(any())).called(1);
+        verify(() => mockGetConnectedCentrals()).called(greaterThanOrEqualTo(1));
       },
     );
 
@@ -297,7 +315,7 @@ void main() {
     );
 
     blocTest<ServerCubit, ServerScreenState>(
-      'initialize adds connected central from stream',
+      'initialize refreshes centrals from library when stream emits',
       setUp: () {
         final central = MockCentral();
         when(() => central.id).thenReturn(
@@ -307,15 +325,16 @@ void main() {
         when(() => mockObserveConnections())
             .thenAnswer((_) => Stream.value(central));
         when(() => mockAddService(any())).thenAnswer((_) async {});
+        when(() => mockGetConnectedCentrals()).thenReturn([central]);
       },
       build: createCubit,
       act: (cubit) async {
         await cubit.initialize();
-        // Allow stream event to propagate
         await Future.delayed(const Duration(milliseconds: 10));
       },
       verify: (cubit) {
         expect(cubit.state.connectedCentrals, hasLength(1));
+        verify(() => mockGetConnectedCentrals()).called(greaterThanOrEqualTo(1));
       },
     );
 

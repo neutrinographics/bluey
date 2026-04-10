@@ -421,7 +421,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Trigger service discovery
-        final services = await connection.services;
+        final services = await connection.services();
 
         // Connection should still be valid
         expect(connection.state, equals(ConnectionState.connected));

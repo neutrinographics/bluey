@@ -20,6 +20,6 @@ class BlueyConnectionRepository implements ConnectionRepository {
 
   @override
   Future<List<RemoteService>> getServices(Connection connection) async {
-    return await connection.services;
+    return await connection.services();
   }
 }

@@ -54,7 +54,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
 
         // Assert
         expect(discoveredServices, hasLength(1));
@@ -99,7 +99,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
 
         // Assert
         expect(discoveredServices, hasLength(3));
@@ -153,7 +153,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
         final characteristics = discoveredServices.first.characteristics;
 
         // Assert
@@ -199,7 +199,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
         final descriptors =
             discoveredServices.first.characteristics.first.descriptors;
 
@@ -246,7 +246,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
         final char = discoveredServices.first.characteristics.first;
 
         // Assert
@@ -287,7 +287,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
         final char = discoveredServices.first.characteristics.first;
 
         // Assert
@@ -329,7 +329,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
         final char = discoveredServices.first.characteristics.first;
 
         // Assert
@@ -361,7 +361,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Trigger service discovery
-        await connection.services;
+        await connection.services();
 
         // Act: Access service by UUID
         final heartRateService = connection.service(
@@ -395,7 +395,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Trigger service discovery
-        await connection.services;
+        await connection.services();
 
         // Act & Assert
         expect(
@@ -483,7 +483,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
 
         // Assert
         expect(discoveredServices, isEmpty);
@@ -509,7 +509,7 @@ void main() {
         final bluey = Bluey();
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
-        final discoveredServices = await connection.services;
+        final discoveredServices = await connection.services();
 
         // Assert
         expect(discoveredServices, hasLength(1));
@@ -537,11 +537,11 @@ void main() {
         final device = await bluey.scan().first;
         final connection = await bluey.connect(device);
 
-        // Act: Access services twice
-        final services1 = await connection.services;
-        final services2 = await connection.services;
+        // Act: Discover once, then access cached
+        final services1 = await connection.services();
+        final services2 = await connection.services(cache: true);
 
-        // Assert: Same instance returned
+        // Assert: Cached call returns same instance
         expect(identical(services1, services2), isTrue);
 
         await connection.disconnect();

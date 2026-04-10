@@ -11,6 +11,9 @@ import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
 import '../application/disconnect_central.dart';
 import '../application/dispose_server.dart';
+import '../application/get_connected_centrals.dart';
+import '../application/observe_disconnections.dart';
+import '../application/handle_requests.dart';
 
 void registerServerDependencies(GetIt getIt) {
   getIt.registerLazySingleton<ServerRepository>(
@@ -40,5 +43,17 @@ void registerServerDependencies(GetIt getIt) {
   );
   getIt.registerFactory<DisposeServer>(
     () => DisposeServer(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<GetConnectedCentrals>(
+    () => GetConnectedCentrals(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<ObserveDisconnections>(
+    () => ObserveDisconnections(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<ObserveReadRequests>(
+    () => ObserveReadRequests(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<ObserveWriteRequests>(
+    () => ObserveWriteRequests(getIt<ServerRepository>()),
   );
 }

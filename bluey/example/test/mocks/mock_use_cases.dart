@@ -27,6 +27,9 @@ import 'package:bluey_example/features/server/application/check_server_support.d
 import 'package:bluey_example/features/server/application/observe_connections.dart';
 import 'package:bluey_example/features/server/application/disconnect_central.dart';
 import 'package:bluey_example/features/server/application/dispose_server.dart';
+import 'package:bluey_example/features/server/application/get_connected_centrals.dart';
+import 'package:bluey_example/features/server/application/observe_disconnections.dart';
+import 'package:bluey_example/features/server/application/handle_requests.dart';
 
 // Scanner Mocks
 class MockScanForDevices extends Mock implements ScanForDevices {}
@@ -72,3 +75,11 @@ class MockObserveConnections extends Mock implements ObserveConnections {}
 class MockDisconnectCentral extends Mock implements DisconnectCentral {}
 
 class MockDisposeServer extends Mock implements DisposeServer {}
+
+class MockGetConnectedCentrals extends Mock implements GetConnectedCentrals {}
+
+class MockObserveDisconnections extends Mock implements ObserveDisconnections {}
+
+class MockObserveReadRequests extends Mock implements ObserveReadRequests {}
+
+class MockObserveWriteRequests extends Mock implements ObserveWriteRequests {}

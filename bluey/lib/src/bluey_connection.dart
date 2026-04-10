@@ -139,8 +139,8 @@ class BlueyConnection implements Connection {
   }
 
   @override
-  Future<List<RemoteService>> get services async {
-    if (_cachedServices != null) {
+  Future<List<RemoteService>> services({bool cache = false}) async {
+    if (cache && _cachedServices != null) {
       return _cachedServices!;
     }
 
@@ -151,7 +151,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<bool> hasService(UUID uuid) async {
-    final svcs = await services;
+    final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
 
