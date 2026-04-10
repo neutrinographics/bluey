@@ -28,7 +28,7 @@ class ScannerScreen extends StatelessWidget {
             requestPermissions: getIt<RequestPermissions>(),
             requestEnable: getIt<RequestEnable>(),
           )..initialize(),
-      child: const _ScannerView(),
+      child: const ScaffoldMessenger(child: _ScannerView()),
     );
   }
 }

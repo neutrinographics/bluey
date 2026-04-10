@@ -27,7 +27,7 @@ class ServerScreen extends StatelessWidget {
             addService: getIt<AddService>(),
             sendNotification: getIt<SendNotification>(),
           )..initialize(),
-      child: const _ServerView(),
+      child: const ScaffoldMessenger(child: _ServerView()),
     );
   }
 }
