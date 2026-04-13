@@ -1,9 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bluey/src/scan_result.dart';
-import 'package:bluey/src/device.dart';
-import 'package:bluey/src/advertisement.dart';
-import 'package:bluey/src/uuid.dart';
-import 'package:bluey/src/well_known_uuids.dart';
+import 'package:bluey/bluey.dart';
 
 void main() {
   group('ScanResult', () {
