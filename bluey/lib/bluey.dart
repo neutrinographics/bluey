@@ -23,6 +23,8 @@ export 'src/connection.dart';
 
 // Server (Peripheral role)
 export 'src/server.dart';
+export 'src/hosted_gatt.dart';
+export 'src/gatt_request.dart';
 
 // Well-known UUIDs
 export 'src/well_known_uuids.dart';
