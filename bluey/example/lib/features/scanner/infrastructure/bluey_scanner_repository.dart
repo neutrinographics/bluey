@@ -15,7 +15,7 @@ class BlueyScannerRepository implements ScannerRepository {
   Stream<BluetoothState> get stateStream => _bluey.stateStream;
 
   @override
-  Stream<Device> scan({Duration? timeout}) {
+  Stream<ScanResult> scan({Duration? timeout}) {
     return _bluey.scan(timeout: timeout);
   }
 

@@ -27,9 +27,6 @@ void main() {
         id: UUID('00000000-0000-0000-0000-000000000001'),
         address: '00:11:22:33:44:55',
         name: 'Test Device',
-        rssi: -50,
-        advertisement: Advertisement.empty(),
-        lastSeen: DateTime.now(),
       );
       final mockConnection = MockConnection();
 
@@ -51,9 +48,6 @@ void main() {
         id: UUID('00000000-0000-0000-0000-000000000001'),
         address: '00:11:22:33:44:55',
         name: 'Test Device',
-        rssi: -50,
-        advertisement: Advertisement.empty(),
-        lastSeen: DateTime.now(),
       );
       final mockConnection = MockConnection();
       const timeout = Duration(seconds: 30);

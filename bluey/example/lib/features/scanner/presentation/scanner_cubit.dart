@@ -19,7 +19,7 @@ class ScannerCubit extends Cubit<ScannerState> {
   final RequestEnable _requestEnable;
 
   StreamSubscription<BluetoothState>? _stateSubscription;
-  StreamSubscription<Device>? _scanSubscription;
+  StreamSubscription<ScanResult>? _scanSubscription;
 
   ScannerCubit({
     required ScanForDevices scanForDevices,
@@ -63,22 +63,22 @@ class ScannerCubit extends Cubit<ScannerState> {
       return;
     }
 
-    emit(state.copyWith(devices: [], isScanning: true, error: null));
+    emit(state.copyWith(scanResults: [], isScanning: true, error: null));
 
-    final devices = <Device>[];
+    final results = <ScanResult>[];
 
     _scanSubscription = _scanForDevices(timeout: timeout).listen(
-      (device) {
-        // Update existing device or add new one
-        final index = devices.indexWhere((d) => d.id == device.id);
+      (result) {
+        // Update existing result or add new one
+        final index = results.indexWhere((r) => r.device.id == result.device.id);
         if (index >= 0) {
-          devices[index] = device;
+          results[index] = result;
         } else {
-          devices.add(device);
+          results.add(result);
         }
         // Sort by RSSI (strongest first)
-        devices.sort((a, b) => b.rssi.compareTo(a.rssi));
-        emit(state.copyWith(devices: List.from(devices)));
+        results.sort((a, b) => b.rssi.compareTo(a.rssi));
+        emit(state.copyWith(scanResults: List.from(results)));
       },
       onDone: () {
         emit(state.copyWith(isScanning: false));

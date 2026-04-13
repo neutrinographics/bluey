@@ -96,10 +96,12 @@ void main() {
           () => mockGetBluetoothState(),
         ).thenAnswer((_) => const Stream.empty());
 
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-000000000001'),
-          address: '00:11:22:33:44:55',
-          name: 'Test Device',
+        final scanResult = ScanResult(
+          device: Device(
+            id: UUID('00000000-0000-0000-0000-000000000001'),
+            address: '00:11:22:33:44:55',
+            name: 'Test Device',
+          ),
           rssi: -50,
           advertisement: Advertisement.empty(),
           lastSeen: DateTime.now(),
@@ -107,7 +109,7 @@ void main() {
 
         when(
           () => mockScanForDevices(timeout: any(named: 'timeout')),
-        ).thenAnswer((_) => Stream.value(device));
+        ).thenAnswer((_) => Stream.value(scanResult));
       },
       build: createCubit,
       seed: () => const ScannerState(bluetoothState: BluetoothState.on),
@@ -116,13 +118,13 @@ void main() {
           () => [
             const ScannerState(
               bluetoothState: BluetoothState.on,
-              devices: [],
+              scanResults: [],
               isScanning: true,
             ),
             isA<ScannerState>()
-                .having((s) => s.devices.length, 'devices.length', 1)
+                .having((s) => s.scanResults.length, 'scanResults.length', 1)
                 .having(
-                  (s) => s.devices.first.name,
+                  (s) => s.scanResults.first.device.name,
                   'first device name',
                   'Test Device',
                 ),

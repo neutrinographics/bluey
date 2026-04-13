@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/device.dart';
+import 'package:bluey/src/advertisement.dart';
+import 'package:bluey/src/manufacturer_data.dart';
 import 'package:bluey/src/uuid.dart';
 import 'package:bluey/src/well_known_uuids.dart';
 
@@ -155,34 +157,20 @@ void main() {
 
   group('Device', () {
     final testUuid = UUID.short(0x1234);
-    final testAdvertisement = Advertisement(
-      serviceUuids: [Services.heartRate],
-      serviceData: {},
-      isConnectable: true,
-    );
 
     group('Construction', () {
       test('creates with all fields', () {
         final device = Device(
           id: testUuid,
           name: 'Heart Monitor',
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
         expect(device.id, equals(testUuid));
         expect(device.name, equals('Heart Monitor'));
-        expect(device.rssi, equals(-60));
-        expect(device.advertisement, equals(testAdvertisement));
-        expect(device.lastSeen, isNotNull);
       });
 
       test('address defaults to id.toString() when not provided', () {
-        final device = Device(
-          id: testUuid,
-          rssi: -60,
-          advertisement: testAdvertisement,
-        );
+        final device = Device(id: testUuid);
 
         expect(device.address, equals(testUuid.toString()));
       });
@@ -192,8 +180,6 @@ void main() {
         final device = Device(
           id: testUuid,
           address: macAddress,
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
         expect(device.address, equals(macAddress));
@@ -201,44 +187,9 @@ void main() {
       });
 
       test('creates without name', () {
-        final device = Device(
-          id: testUuid,
-          rssi: -60,
-          advertisement: testAdvertisement,
-        );
+        final device = Device(id: testUuid);
 
         expect(device.name, isNull);
-      });
-
-      test('lastSeen defaults to now', () {
-        final before = DateTime.now();
-        final device = Device(
-          id: testUuid,
-          rssi: -60,
-          advertisement: testAdvertisement,
-        );
-        final after = DateTime.now();
-
-        expect(
-          device.lastSeen.isAfter(before.subtract(Duration(seconds: 1))),
-          isTrue,
-        );
-        expect(
-          device.lastSeen.isBefore(after.add(Duration(seconds: 1))),
-          isTrue,
-        );
-      });
-
-      test('accepts custom lastSeen', () {
-        final customTime = DateTime(2024, 1, 1, 12, 0, 0);
-        final device = Device(
-          id: testUuid,
-          rssi: -60,
-          advertisement: testAdvertisement,
-          lastSeen: customTime,
-        );
-
-        expect(device.lastSeen, equals(customTime));
       });
     });
 
@@ -247,15 +198,11 @@ void main() {
         final device1 = Device(
           id: testUuid,
           name: 'Device 1',
-          rssi: -50,
-          advertisement: testAdvertisement,
         );
 
         final device2 = Device(
           id: testUuid,
           name: 'Device 2',
-          rssi: -70,
-          advertisement: Advertisement.empty(),
         );
 
         // Same ID = equal devices (entity equality)
@@ -264,17 +211,9 @@ void main() {
       });
 
       test('different IDs are not equal', () {
-        final device1 = Device(
-          id: UUID.short(0x1234),
-          rssi: -60,
-          advertisement: testAdvertisement,
-        );
+        final device1 = Device(id: UUID.short(0x1234));
 
-        final device2 = Device(
-          id: UUID.short(0x5678),
-          rssi: -60,
-          advertisement: testAdvertisement,
-        );
+        final device2 = Device(id: UUID.short(0x5678));
 
         expect(device1, isNot(equals(device2)));
       });
@@ -285,8 +224,6 @@ void main() {
         final device = Device(
           id: testUuid,
           name: 'Test',
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
         // All fields are final - this is enforced at compile time
@@ -295,43 +232,34 @@ void main() {
     });
 
     group('CopyWith', () {
-      test('creates copy with updated fields', () {
+      test('creates copy with updated name', () {
         final original = Device(
           id: testUuid,
           name: 'Original',
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
-        final updated = original.copyWith(name: 'Updated', rssi: -50);
+        final updated = original.copyWith(name: 'Updated');
 
         expect(updated.id, equals(original.id));
         expect(updated.name, equals('Updated'));
-        expect(updated.rssi, equals(-50));
-        expect(updated.advertisement, equals(original.advertisement));
       });
 
       test('copyWith without arguments returns equal device', () {
         final original = Device(
           id: testUuid,
           name: 'Test',
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
         final copy = original.copyWith();
 
         expect(copy.id, equals(original.id));
         expect(copy.name, equals(original.name));
-        expect(copy.rssi, equals(original.rssi));
       });
 
       test('copyWith can clear name', () {
         final original = Device(
           id: testUuid,
           name: 'Test',
-          rssi: -60,
-          advertisement: testAdvertisement,
         );
 
         final updated = original.copyWith(name: null);

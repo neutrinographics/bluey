@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -29,12 +30,6 @@ void main() {
           id: UUID('00000000-0000-0000-0000-000000000001'),
           address: 'FF:FF:FF:FF:FF:FF',
           name: 'Unknown Device',
-          rssi: -100,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            isConnectable: true,
-          ),
         );
 
         expect(
@@ -75,7 +70,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Disconnect first
@@ -120,7 +115,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.disconnect();
 
@@ -154,7 +149,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Try to read a characteristic that doesn't exist
@@ -199,7 +194,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         final value = await fakePlatform.readCharacteristic(
@@ -352,7 +347,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Bluetooth turns off - this should trigger disconnection
@@ -395,7 +390,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Set up notification listener
@@ -428,7 +423,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         final states = <ConnectionState>[];
@@ -574,7 +569,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
 
         // Rapid connect/disconnect cycles
         for (var i = 0; i < 5; i++) {
@@ -600,7 +595,7 @@ void main() {
 
         // Multiple scans in sequence
         for (var i = 0; i < 3; i++) {
-          final devices = <Device>[];
+          final devices = <ScanResult>[];
           final subscription = bluey.scan().listen(devices.add);
           await Future.delayed(Duration.zero);
           await subscription.cancel();
@@ -615,7 +610,7 @@ void main() {
         final bluey = Bluey();
 
         // First scan - no devices
-        var devices = <Device>[];
+        var devices = <ScanResult>[];
         var subscription = bluey.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
@@ -628,7 +623,7 @@ void main() {
         );
 
         // Second scan - device present
-        devices = <Device>[];
+        devices = <ScanResult>[];
         subscription = bluey.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
@@ -638,7 +633,7 @@ void main() {
         fakePlatform.removePeripheral('AA:BB:CC:DD:EE:01');
 
         // Third scan - no devices again
-        devices = <Device>[];
+        devices = <ScanResult>[];
         subscription = bluey.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
@@ -674,7 +669,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Write empty data
@@ -715,7 +710,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Write large data (512 bytes)

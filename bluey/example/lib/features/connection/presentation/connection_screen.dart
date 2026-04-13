@@ -271,7 +271,7 @@ class _DeviceInfoCard extends StatelessWidget {
                 _InfoItem(
                   icon: Icons.signal_cellular_alt,
                   label: 'RSSI',
-                  value: '${device.rssi} dBm',
+                  value: 'N/A',
                 ),
                 _InfoItem(
                   icon: Icons.data_usage,

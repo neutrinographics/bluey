@@ -24,8 +24,6 @@ void main() {
     test('returns a Connection object', () async {
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        rssi: -60,
-        advertisement: Advertisement.empty(),
       );
 
       final connection = await bluey.connect(device);
@@ -37,8 +35,6 @@ void main() {
     test('connection is connected after connect completes', () async {
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        rssi: -60,
-        advertisement: Advertisement.empty(),
       );
 
       final connection = await bluey.connect(device);
@@ -50,8 +46,6 @@ void main() {
     test('connection state changes are emitted', () async {
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        rssi: -60,
-        advertisement: Advertisement.empty(),
       );
 
       final connection = await bluey.connect(device);
@@ -72,8 +66,6 @@ void main() {
     test('disconnect closes the connection', () async {
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        rssi: -60,
-        advertisement: Advertisement.empty(),
       );
 
       final connection = await bluey.connect(device);

@@ -404,15 +404,15 @@ void main() {
           ),
         ];
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final results = <ScanResult>[];
+        final subscription = bluey.scan().listen(results.add);
 
         await Future.delayed(Duration(milliseconds: 50));
         await subscription.cancel();
 
-        expect(devices, hasLength(1));
-        expect(devices.first.name, equals('Test Device'));
-        expect(devices.first.rssi, equals(-60));
+        expect(results, hasLength(1));
+        expect(results.first.device.name, equals('Test Device'));
+        expect(results.first.rssi, equals(-60));
       });
 
       test('converts manufacturer data correctly', () async {
@@ -427,13 +427,13 @@ void main() {
           ),
         ];
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final results = <ScanResult>[];
+        final subscription = bluey.scan().listen(results.add);
 
         await Future.delayed(Duration(milliseconds: 50));
         await subscription.cancel();
 
-        final manufacturerData = devices.first.advertisement.manufacturerData;
+        final manufacturerData = results.first.advertisement.manufacturerData;
         expect(manufacturerData, isNotNull);
         expect(manufacturerData!.companyId, equals(0x004C));
         expect(manufacturerData.data, equals([10, 20, 30]));
@@ -454,13 +454,13 @@ void main() {
           ),
         ];
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final results = <ScanResult>[];
+        final subscription = bluey.scan().listen(results.add);
 
         await Future.delayed(Duration(milliseconds: 50));
         await subscription.cancel();
 
-        final serviceUuids = devices.first.advertisement.serviceUuids;
+        final serviceUuids = results.first.advertisement.serviceUuids;
         expect(serviceUuids, hasLength(2));
         expect(serviceUuids[0], equals(Services.heartRate));
         expect(serviceUuids[1], equals(Services.battery));
@@ -489,8 +489,6 @@ void main() {
       test('returns Connection object', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         final connection = await bluey.connect(device);
@@ -502,8 +500,6 @@ void main() {
       test('connection emits state changes', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         final states = <ConnectionState>[];
@@ -531,8 +527,6 @@ void main() {
       test('disconnects from device via Connection', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         // Connect and get Connection object
