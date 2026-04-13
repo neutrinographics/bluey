@@ -1,8 +1,4 @@
-import 'dart:async';
-
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/scanner.dart';
-import 'package:bluey/src/well_known_uuids.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
