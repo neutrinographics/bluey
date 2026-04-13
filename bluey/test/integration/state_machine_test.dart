@@ -381,22 +381,26 @@ void main() {
         final bluey = Bluey();
 
         // Start scan
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
 
         await Future.delayed(Duration.zero);
 
         // Cancel scan
         await subscription.cancel();
+        scanner.dispose();
 
         // Device should still be in the found list
         expect(results, hasLength(1));
 
         // Can start another scan
+        final scanner2 = bluey.scanner();
         final results2 = <ScanResult>[];
-        final subscription2 = bluey.scan().listen(results2.add);
+        final subscription2 = scanner2.scan().listen(results2.add);
         await Future.delayed(Duration.zero);
         await subscription2.cancel();
+        scanner2.dispose();
 
         expect(results2, hasLength(1));
 

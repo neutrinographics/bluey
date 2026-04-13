@@ -17,6 +17,7 @@ export 'src/characteristic_properties.dart';
 
 // Scanning
 export 'src/scan.dart';
+export 'src/scanner.dart';
 
 // GATT interfaces
 export 'src/gatt.dart';

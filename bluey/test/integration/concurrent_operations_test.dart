@@ -31,17 +31,21 @@ void main() {
 
         final bluey = Bluey();
 
-        // Start two concurrent scans
+        // Start two concurrent scans via separate scanners
+        final scanner1 = bluey.scanner();
+        final scanner2 = bluey.scanner();
         final results1 = <ScanResult>[];
         final results2 = <ScanResult>[];
 
-        final subscription1 = bluey.scan().listen(results1.add);
-        final subscription2 = bluey.scan().listen(results2.add);
+        final subscription1 = scanner1.scan().listen(results1.add);
+        final subscription2 = scanner2.scan().listen(results2.add);
 
         await Future.delayed(Duration.zero);
 
         await subscription1.cancel();
         await subscription2.cancel();
+        scanner1.dispose();
+        scanner2.dispose();
 
         // Both should have found the device
         expect(results1, hasLength(1));
@@ -58,16 +62,19 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner1 = bluey.scanner();
+        final scanner2 = bluey.scanner();
         final results1 = <ScanResult>[];
         final results2 = <ScanResult>[];
 
-        final subscription1 = bluey.scan().listen(results1.add);
-        final subscription2 = bluey.scan().listen(results2.add);
+        final subscription1 = scanner1.scan().listen(results1.add);
+        final subscription2 = scanner2.scan().listen(results2.add);
 
         await Future.delayed(Duration.zero);
 
         // Cancel first listener
         await subscription1.cancel();
+        scanner1.dispose();
 
         // Add another device
         fakePlatform.simulatePeripheral(
@@ -76,12 +83,15 @@ void main() {
         );
 
         // Need to trigger another scan for the new device
+        final scanner3 = bluey.scanner();
         final results3 = <ScanResult>[];
-        final subscription3 = bluey.scan().listen(results3.add);
+        final subscription3 = scanner3.scan().listen(results3.add);
         await Future.delayed(Duration.zero);
 
         await subscription2.cancel();
         await subscription3.cancel();
+        scanner2.dispose();
+        scanner3.dispose();
 
         // Third listener should find both devices
         expect(results3, hasLength(2));
@@ -108,10 +118,12 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(results, hasLength(3));
 
@@ -143,10 +155,12 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
+        final scanner = bluey.scanner();
         final scanResults = <ScanResult>[];
-        final subscription = bluey.scan().listen(scanResults.add);
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Remove one device before connecting (simulate connection failure)
         fakePlatform.removePeripheral('AA:BB:CC:DD:EE:02');

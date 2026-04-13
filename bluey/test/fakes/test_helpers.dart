@@ -199,6 +199,8 @@ class TestData {
 /// Convenience helper for integration tests that need a [Device]
 /// from a scan but don't care about transient observation data.
 Future<Device> scanFirstDevice(Bluey bluey) async {
-  final result = await bluey.scan().first;
+  final scanner = bluey.scanner();
+  final result = await scanner.scan().first;
+  scanner.dispose();
   return result.device;
 }

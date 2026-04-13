@@ -36,12 +36,14 @@ void main() {
         final bluey = Bluey();
 
         // Act: Scan for devices
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
 
         // Wait for scan to emit
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Assert
         expect(results, hasLength(1));
@@ -67,13 +69,15 @@ void main() {
         final bluey = Bluey();
 
         // Act: Scan filtering for heart rate service
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey
+        final subscription = scanner
             .scan(services: [UUID('0000180d-0000-1000-8000-00805f9b34fb')])
             .listen(results.add);
 
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Assert: Only heart rate device found
         expect(results, hasLength(1));
@@ -188,10 +192,12 @@ void main() {
         final bluey = Bluey();
 
         // Collect all scan results
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Act: Connect to both
         final connection1 = await bluey.connect(

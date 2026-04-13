@@ -175,10 +175,12 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(results, hasLength(3));
 
@@ -211,10 +213,12 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Filter devices with RSSI >= -70 (close enough)
         const rssiThreshold = -70;
@@ -556,10 +560,12 @@ void main() {
         );
 
         // Scan while connected - should find both
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Should find both devices
         expect(results, hasLength(2));
@@ -584,10 +590,12 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
+        final scanner = bluey.scanner();
         final scanResults = <ScanResult>[];
-        final subscription = bluey.scan().listen(scanResults.add);
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(scanResults, hasLength(2));
 
@@ -617,10 +625,12 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey.scan().listen(results.add);
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Device should appear only once per scan
         expect(results, hasLength(1));
@@ -644,12 +654,14 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner = bluey.scanner();
         final deviceIds = <String>{};
-        final subscription = bluey.scan().listen((result) {
+        final subscription = scanner.scan().listen((result) {
           deviceIds.add(result.device.address);
         });
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(deviceIds, hasLength(3));
 
@@ -826,7 +838,9 @@ void main() {
         final bluey = Bluey();
 
         // First scan
-        final result1 = await bluey.scan().first;
+        final scanner1 = bluey.scanner();
+        final result1 = await scanner1.scan().first;
+        scanner1.dispose();
         expect(result1.device.name, equals('Device v1'));
         expect(result1.rssi, equals(-60));
 
@@ -840,7 +854,9 @@ void main() {
         );
 
         // Second scan should show updated data
-        final result2 = await bluey.scan().first;
+        final scanner2 = bluey.scanner();
+        final result2 = await scanner2.scan().first;
+        scanner2.dispose();
         expect(result2.device.name, equals('Device v2'));
         expect(result2.rssi, equals(-45));
 
@@ -861,7 +877,9 @@ void main() {
             rssi: rssi,
           );
 
-          final result = await bluey.scan().first;
+          final scanner = bluey.scanner();
+          final result = await scanner.scan().first;
+          scanner.dispose();
           recordedRssi.add(result.rssi);
         }
 

@@ -71,13 +71,15 @@ void main() {
         final bluey = Bluey();
 
         // Scan for heart rate monitors only
+        final scanner = bluey.scanner();
         final results = <ScanResult>[];
-        final subscription = bluey
+        final subscription = scanner
             .scan(services: [UUID(heartRateServiceUuid)])
             .listen(results.add);
 
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(results, hasLength(1));
         expect(results.first.device.name, equals('HR Monitor'));
@@ -654,10 +656,12 @@ void main() {
         final bluey = Bluey();
 
         // Discover all devices
+        final scanner = bluey.scanner();
         final scanResults = <ScanResult>[];
-        final subscription = bluey.scan().listen(scanResults.add);
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(scanResults, hasLength(3));
 

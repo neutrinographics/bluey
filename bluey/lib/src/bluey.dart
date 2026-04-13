@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:typed_data';
+
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'advertisement.dart';
 import 'bluey_connection.dart';
+import 'bluey_scanner.dart';
 import 'bluey_server.dart';
 import 'connection.dart';
 import 'connection_state.dart';
@@ -12,12 +12,12 @@ import 'device.dart';
 import 'event_bus.dart';
 import 'events.dart';
 import 'exceptions.dart';
-import 'manufacturer_data.dart';
-import 'scan_result.dart';
+import 'scanner.dart';
 import 'server.dart';
 import 'uuid.dart';
 
 export 'events.dart';
+export 'scanner.dart';
 
 /// The state of the Bluetooth adapter.
 enum BluetoothState {
@@ -72,9 +72,10 @@ enum BluetoothState {
 /// }
 ///
 /// // Scan for devices
-/// await for (final device in bluey.scan()) {
-///   print('Found: ${device.name}');
-/// }
+/// final scanner = bluey.scanner();
+/// scanner.scan().listen((result) {
+///   print('Found: ${result.device.name}');
+/// });
 /// ```
 class Bluey {
   /// Shared instance for simple apps.
@@ -278,53 +279,22 @@ class Bluey {
     }
   }
 
-  /// Scan for nearby BLE devices.
+  /// Create a Scanner for discovering nearby BLE devices.
   ///
-  /// Returns a stream of [ScanResult]s. Each result pairs a stable [Device]
-  /// identity with transient observation data (rssi, advertisement, lastSeen).
-  /// The stream completes when scanning stops (timeout or [stopScan] called).
-  ///
-  /// [services] - Optional list of service UUIDs to filter by.
-  /// [timeout] - Optional timeout duration.
+  /// Returns a [Scanner] aggregate root for the Discovery bounded context.
+  /// Call [Scanner.dispose] when done to release resources.
   ///
   /// Example:
   /// ```dart
-  /// await for (final result in bluey.scan(timeout: Duration(seconds: 10))) {
+  /// final scanner = bluey.scanner();
+  /// final subscription = scanner.scan().listen((result) {
   ///   print('Found: ${result.device.name} at ${result.rssi} dBm');
-  /// }
+  /// });
+  /// // ...
+  /// scanner.dispose();
   /// ```
-  Stream<ScanResult> scan({List<UUID>? services, Duration? timeout}) {
-    final config = platform.PlatformScanConfig(
-      serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
-      timeoutMs: timeout?.inMilliseconds,
-    );
-
-    _emitEvent(ScanStartedEvent(serviceFilter: services, timeout: timeout));
-
-    return _platform
-        .scan(config)
-        .map((platformDevice) {
-          final result = _mapScanResult(platformDevice);
-          _emitEvent(
-            DeviceDiscoveredEvent(
-              deviceId: result.device.id,
-              name: result.device.name,
-              rssi: result.rssi,
-            ),
-          );
-          return result;
-        })
-        .handleError((error) => throw _wrapError(error));
-  }
-
-  /// Stop scanning for devices.
-  Future<void> stopScan() async {
-    try {
-      await _platform.stopScan();
-      _emitEvent(ScanStoppedEvent());
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Scanner scanner() {
+    return BlueyScanner(_platform, _eventBus);
   }
 
   /// Connect to a device.
@@ -474,46 +444,6 @@ class Bluey {
       case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
     }
-  }
-
-  ScanResult _mapScanResult(platform.PlatformDevice platformDevice) {
-    // Convert manufacturer data
-    ManufacturerData? manufacturerData;
-    if (platformDevice.manufacturerDataCompanyId != null &&
-        platformDevice.manufacturerData != null) {
-      manufacturerData = ManufacturerData(
-        platformDevice.manufacturerDataCompanyId!,
-        Uint8List.fromList(platformDevice.manufacturerData!),
-      );
-    }
-
-    // Convert service UUIDs
-    final serviceUuids =
-        platformDevice.serviceUuids.map((s) => UUID(s)).toList();
-
-    // Create advertisement
-    final advertisement = Advertisement(
-      serviceUuids: serviceUuids,
-      serviceData: {}, // TODO: Add service data when platform supports it
-      manufacturerData: manufacturerData,
-      isConnectable: true, // TODO: Get from platform when available
-    );
-
-    // Create device (identity only)
-    // Note: On Android, the device ID is a MAC address, not a UUID.
-    // We create a UUID from the MAC by padding it, but preserve the original
-    // address for connections.
-    final device = Device(
-      id: _deviceIdToUuid(platformDevice.id),
-      address: platformDevice.id, // Keep original for platform calls
-      name: platformDevice.name,
-    );
-
-    return ScanResult(
-      device: device,
-      rssi: platformDevice.rssi,
-      advertisement: advertisement,
-    );
   }
 
   /// Converts a platform device ID to a UUID.

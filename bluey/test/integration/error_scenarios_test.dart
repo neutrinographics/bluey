@@ -595,10 +595,12 @@ void main() {
 
         // Multiple scans in sequence
         for (var i = 0; i < 3; i++) {
+          final scanner = bluey.scanner();
           final devices = <ScanResult>[];
-          final subscription = bluey.scan().listen(devices.add);
+          final subscription = scanner.scan().listen(devices.add);
           await Future.delayed(Duration.zero);
           await subscription.cancel();
+          scanner.dispose();
 
           expect(devices, hasLength(1));
         }
@@ -610,10 +612,12 @@ void main() {
         final bluey = Bluey();
 
         // First scan - no devices
+        var scanner = bluey.scanner();
         var devices = <ScanResult>[];
-        var subscription = bluey.scan().listen(devices.add);
+        var subscription = scanner.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
         expect(devices, isEmpty);
 
         // Add a device
@@ -623,20 +627,24 @@ void main() {
         );
 
         // Second scan - device present
+        scanner = bluey.scanner();
         devices = <ScanResult>[];
-        subscription = bluey.scan().listen(devices.add);
+        subscription = scanner.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
         expect(devices, hasLength(1));
 
         // Remove the device
         fakePlatform.removePeripheral('AA:BB:CC:DD:EE:01');
 
         // Third scan - no devices again
+        scanner = bluey.scanner();
         devices = <ScanResult>[];
-        subscription = bluey.scan().listen(devices.add);
+        subscription = scanner.scan().listen(devices.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
         expect(devices, isEmpty);
 
         await bluey.dispose();
