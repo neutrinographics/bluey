@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import 'characteristic_properties.dart';
 import 'device.dart';

@@ -1,7 +1,17 @@
 import 'dart:collection';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 import 'uuid.dart';
+
+bool _listEquals<T>(List<T>? a, List<T>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (int i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
 
 /// Manufacturer-specific advertisement data.
 ///
@@ -23,7 +33,7 @@ class ManufacturerData {
     if (identical(this, other)) return true;
     return other is ManufacturerData &&
         other.companyId == companyId &&
-        listEquals(other.data, data);
+        _listEquals(other.data, data);
   }
 
   @override
@@ -68,7 +78,7 @@ class Advertisement {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is Advertisement &&
-        listEquals(other.serviceUuids, serviceUuids) &&
+        _listEquals(other.serviceUuids, serviceUuids) &&
         _mapsEqual(other.serviceData, serviceData) &&
         other.manufacturerData == manufacturerData &&
         other.txPowerLevel == txPowerLevel &&
@@ -101,7 +111,7 @@ class Advertisement {
     if (a.length != b.length) return false;
     for (final key in a.keys) {
       if (!b.containsKey(key)) return false;
-      if (!listEquals(a[key], b[key])) return false;
+      if (!_listEquals(a[key], b[key])) return false;
     }
     return true;
   }

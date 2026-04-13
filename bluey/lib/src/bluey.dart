@@ -317,7 +317,7 @@ class Bluey {
   Future<void> stopScan() async {
     try {
       await _platform.stopScan();
-      _emitEvent(const ScanStoppedEvent());
+      _emitEvent(ScanStoppedEvent());
     } catch (e) {
       throw _wrapError(e);
     }

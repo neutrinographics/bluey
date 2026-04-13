@@ -46,7 +46,7 @@ class BlueyServer implements Server {
     this._eventBus, {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
   }) : _lifecycleInterval = lifecycleInterval {
-    _emitEvent(const ServerStartedEvent(source: 'BlueyServer'));
+    _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
 
     _centralConnectionsSub = _platform.centralConnections.listen((
       platformCentral,
@@ -157,7 +157,7 @@ class BlueyServer implements Server {
   Future<void> stopAdvertising() async {
     await _platform.stopAdvertising();
     _isAdvertising = false;
-    _emitEvent(const AdvertisingStoppedEvent(source: 'BlueyServer'));
+    _emitEvent(AdvertisingStoppedEvent(source: 'BlueyServer'));
   }
 
   @override
