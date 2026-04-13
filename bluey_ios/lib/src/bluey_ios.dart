@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'ios_scanner.dart';
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
@@ -13,11 +14,10 @@ final class BlueyIos extends BlueyPlatform {
 
   final BlueyHostApi _hostApi = BlueyHostApi();
   final _BlueyFlutterApiImpl _flutterApi = _BlueyFlutterApiImpl();
+  late final IosScanner _scanner = IosScanner(_hostApi);
 
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-  final StreamController<PlatformDevice> _scanController =
-      StreamController<PlatformDevice>.broadcast();
   final Map<String, StreamController<PlatformConnectionState>>
   _connectionStateControllers = {};
   final Map<String, StreamController<PlatformNotification>>
@@ -50,13 +50,9 @@ final class BlueyIos extends BlueyPlatform {
       _stateController.add(_mapBluetoothState(state));
     };
 
-    _flutterApi.onDeviceDiscoveredCallback = (device) {
-      _scanController.add(_mapDevice(device));
-    };
+    _flutterApi.onDeviceDiscoveredCallback = _scanner.onDeviceDiscovered;
 
-    _flutterApi.onScanCompleteCallback = () {
-      // Scan completed
-    };
+    _flutterApi.onScanCompleteCallback = _scanner.onScanComplete;
 
     _flutterApi.onConnectionStateChangedCallback = (event) {
       final controller = _connectionStateControllers[event.deviceId];
@@ -183,20 +179,13 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
     _ensureInitialized();
-    final dto = ScanConfigDto(
-      serviceUuids: config.serviceUuids,
-      timeoutMs: config.timeoutMs,
-    );
-
-    _hostApi.startScan(dto);
-
-    return _scanController.stream;
+    return _scanner.scan(config);
   }
 
   @override
   Future<void> stopScan() async {
     _ensureInitialized();
-    await _hostApi.stopScan();
+    await _scanner.stopScan();
   }
 
   @override
@@ -570,18 +559,6 @@ final class BlueyIos extends BlueyPlatform {
       case ConnectionStateDto.disconnecting:
         return PlatformConnectionState.disconnecting;
     }
-  }
-
-  PlatformDevice _mapDevice(DeviceDto dto) {
-    return PlatformDevice(
-      id: dto.id,
-      name: dto.name,
-      rssi: dto.rssi,
-      // Expand short UUIDs from CoreBluetooth to full 128-bit format
-      serviceUuids: dto.serviceUuids.map(expandUuid).toList(),
-      manufacturerDataCompanyId: dto.manufacturerDataCompanyId,
-      manufacturerData: dto.manufacturerData,
-    );
   }
 
   PlatformService _mapService(ServiceDto dto) {
