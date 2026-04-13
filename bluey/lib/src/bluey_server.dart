@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'device.dart';
+import 'manufacturer_data.dart';
 import 'event_bus.dart';
 import 'events.dart';
 import 'lifecycle.dart' as lifecycle;

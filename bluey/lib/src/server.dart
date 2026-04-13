@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 
 import 'characteristic_properties.dart';
-import 'device.dart';
+import 'manufacturer_data.dart';
 import 'uuid.dart';
 
 /// Permissions for GATT characteristic and descriptor values.

@@ -10,6 +10,8 @@ export 'src/bluey.dart';
 // Core value objects
 export 'src/uuid.dart';
 export 'src/device.dart';
+export 'src/advertisement.dart';
+export 'src/manufacturer_data.dart';
 export 'src/characteristic_properties.dart';
 
 // Scanning
