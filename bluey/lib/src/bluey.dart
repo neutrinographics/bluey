@@ -18,7 +18,6 @@ import 'server.dart';
 import 'uuid.dart';
 
 export 'events.dart';
-export 'scan_result.dart';
 
 /// The state of the Bluetooth adapter.
 enum BluetoothState {
