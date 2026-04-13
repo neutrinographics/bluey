@@ -2,6 +2,17 @@ import Foundation
 import CoreBluetooth
 import Flutter
 
+/// Default timeout values for BLE operations (in seconds).
+private enum BleTimeout {
+    static let connect: TimeInterval = 30.0
+    static let discoverServices: TimeInterval = 15.0
+    static let readCharacteristic: TimeInterval = 10.0
+    static let writeCharacteristic: TimeInterval = 10.0
+    static let readDescriptor: TimeInterval = 10.0
+    static let writeDescriptor: TimeInterval = 10.0
+    static let readRssi: TimeInterval = 5.0
+}
+
 /// Implementation of the Central (client) role BLE operations.
 class CentralManagerImpl: NSObject {
     private let flutterApi: BlueyFlutterApi
@@ -124,6 +135,18 @@ class CentralManagerImpl: NSObject {
         }
 
         centralManager.connect(peripheral, options: nil)
+
+        // Schedule timeout
+        let timeoutSeconds = config.timeoutMs != nil
+            ? TimeInterval(config.timeoutMs!) / 1000.0
+            : BleTimeout.connect
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.connectCompletions.removeValue(forKey: deviceId) {
+                self.centralManager.cancelPeripheralConnection(peripheral)
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -151,6 +174,16 @@ class CentralManagerImpl: NSObject {
 
         discoverServicesCompletions[deviceId] = completion
         peripheral.discoverServices(nil)
+
+        // Schedule timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.discoverServices) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.discoverServicesCompletions.removeValue(forKey: deviceId) {
+                self.pendingServiceDiscovery.removeValue(forKey: deviceId)
+                self.pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     // MARK: - Characteristic Operations
@@ -170,6 +203,14 @@ class CentralManagerImpl: NSObject {
         let cacheKey = characteristic.uuid.uuidString.lowercased()
         readCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.readValue(for: characteristic)
+
+        // Schedule timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readCharacteristic) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.readCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -189,6 +230,14 @@ class CentralManagerImpl: NSObject {
         if withResponse {
             let cacheKey = characteristic.uuid.uuidString.lowercased()
             writeCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
+
+            // Schedule timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.writeCharacteristic) { [weak self] in
+                guard let self = self else { return }
+                if let pendingCompletion = self.writeCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
+                    pendingCompletion(.failure(BlueyError.timeout))
+                }
+            }
         }
 
         peripheral.writeValue(value.data, for: characteristic, type: type)
@@ -257,6 +306,14 @@ class CentralManagerImpl: NSObject {
         let cacheKey = descriptor.uuid.uuidString.lowercased()
         readDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.readValue(for: descriptor)
+
+        // Schedule timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readDescriptor) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.readDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -274,6 +331,14 @@ class CentralManagerImpl: NSObject {
         let cacheKey = descriptor.uuid.uuidString.lowercased()
         writeDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
         peripheral.writeValue(value.data, for: descriptor)
+
+        // Schedule timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.writeDescriptor) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.writeDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     /// Finds a descriptor by UUID, handling both short and full UUID formats.
@@ -317,6 +382,14 @@ class CentralManagerImpl: NSObject {
 
         readRssiCompletions[deviceId] = completion
         peripheral.readRSSI()
+
+        // Schedule timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readRssi) { [weak self] in
+            guard let self = self else { return }
+            if let pendingCompletion = self.readRssiCompletions.removeValue(forKey: deviceId) {
+                pendingCompletion(.failure(BlueyError.timeout))
+            }
+        }
     }
 
     // MARK: - CBCentralManagerDelegate callbacks

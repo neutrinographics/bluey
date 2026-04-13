@@ -1,0 +1,286 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+
+import 'messages.g.dart';
+import 'uuid_utils.dart';
+
+/// Handles BLE connection management, GATT client operations, bonding, PHY,
+/// and connection parameter stubs for the iOS platform.
+///
+/// Delegates to [BlueyHostApi] for native communication and manages
+/// per-device streams for connection state and notifications. Unlike Android,
+/// iOS auto-negotiates MTU and does not expose bonding, PHY, or connection
+/// parameter APIs.
+class IosConnectionManager {
+  final BlueyHostApi _hostApi;
+
+  final Map<String, StreamController<PlatformConnectionState>>
+      _connectionStateControllers = {};
+  final Map<String, StreamController<PlatformNotification>>
+      _notificationControllers = {};
+
+  IosConnectionManager(this._hostApi);
+
+  // === Connection ===
+
+  /// Connects to a device and creates per-device streams.
+  Future<String> connect(
+    String deviceId,
+    PlatformConnectConfig config,
+  ) async {
+    final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
+
+    _connectionStateControllers[deviceId] =
+        StreamController<PlatformConnectionState>.broadcast();
+    _notificationControllers[deviceId] =
+        StreamController<PlatformNotification>.broadcast();
+
+    return await _hostApi.connect(deviceId, dto);
+  }
+
+  /// Disconnects from a device and cleans up per-device streams.
+  Future<void> disconnect(String deviceId) async {
+    await _hostApi.disconnect(deviceId);
+
+    final stateController = _connectionStateControllers.remove(deviceId);
+    await stateController?.close();
+
+    final notificationController = _notificationControllers.remove(deviceId);
+    await notificationController?.close();
+  }
+
+  /// Returns the connection state stream for a connected device.
+  Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
+    final controller = _connectionStateControllers[deviceId];
+    if (controller == null) {
+      return Stream.error(StateError('Device not connected: $deviceId'));
+    }
+    return controller.stream;
+  }
+
+  /// Returns the notification stream for a connected device.
+  Stream<PlatformNotification> notificationStream(String deviceId) {
+    final controller = _notificationControllers[deviceId];
+    if (controller == null) {
+      return Stream.error(StateError('Device not connected: $deviceId'));
+    }
+    return controller.stream;
+  }
+
+  // === Callback Handlers ===
+
+  /// Handles connection state change events from the platform.
+  void onConnectionStateChanged(ConnectionStateEventDto event) {
+    final controller = _connectionStateControllers[event.deviceId];
+    if (controller != null) {
+      controller.add(_mapConnectionState(event.state));
+    }
+  }
+
+  /// Handles notification events from the platform, expanding short UUIDs.
+  void onNotification(NotificationEventDto event) {
+    final controller = _notificationControllers[event.deviceId];
+    if (controller != null) {
+      controller.add(
+        PlatformNotification(
+          deviceId: event.deviceId,
+          characteristicUuid: expandUuid(event.characteristicUuid),
+          value: event.value,
+        ),
+      );
+    }
+  }
+
+  /// Handles MTU change events from the platform.
+  void onMtuChanged(MtuChangedEventDto event) {
+    // MTU change callback - no action needed on iOS
+  }
+
+  // === GATT Client Operations ===
+
+  /// Discovers services on a connected device, expanding short UUIDs.
+  Future<List<PlatformService>> discoverServices(String deviceId) async {
+    final services = await _hostApi.discoverServices(deviceId);
+    return services.map(_mapService).toList();
+  }
+
+  /// Reads a characteristic value from a connected device.
+  Future<Uint8List> readCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+  ) async {
+    return await _hostApi.readCharacteristic(deviceId, characteristicUuid);
+  }
+
+  /// Writes a characteristic value on a connected device.
+  Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) async {
+    await _hostApi.writeCharacteristic(
+      deviceId,
+      characteristicUuid,
+      value,
+      withResponse,
+    );
+  }
+
+  /// Enables or disables notifications for a characteristic.
+  Future<void> setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) async {
+    await _hostApi.setNotification(deviceId, characteristicUuid, enable);
+  }
+
+  /// Reads a descriptor value from a connected device.
+  Future<Uint8List> readDescriptor(
+    String deviceId,
+    String descriptorUuid,
+  ) async {
+    return await _hostApi.readDescriptor(deviceId, descriptorUuid);
+  }
+
+  /// Writes a descriptor value on a connected device.
+  Future<void> writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+  ) async {
+    await _hostApi.writeDescriptor(deviceId, descriptorUuid, value);
+  }
+
+  /// Reads the current RSSI for a connected device.
+  Future<int> readRssi(String deviceId) async {
+    return await _hostApi.readRssi(deviceId);
+  }
+
+  /// iOS automatically negotiates MTU; requesting a specific MTU is
+  /// not supported.
+  Future<int> requestMtu(String deviceId, int mtu) async {
+    throw UnsupportedError(
+      'iOS does not support requesting a specific MTU. '
+      'MTU is automatically negotiated by the system.',
+    );
+  }
+
+  // === Bonding (iOS handles automatically) ===
+
+  /// iOS does not expose bond state; always returns [PlatformBondState.none].
+  Future<PlatformBondState> getBondState(String deviceId) async {
+    return PlatformBondState.none;
+  }
+
+  /// iOS does not expose bond state changes; returns an empty stream.
+  Stream<PlatformBondState> bondStateStream(String deviceId) {
+    return const Stream.empty();
+  }
+
+  /// iOS handles bonding automatically when accessing encrypted
+  /// characteristics. This is a no-op.
+  Future<void> bond(String deviceId) async {
+    // No-op on iOS
+  }
+
+  /// iOS does not allow programmatic bond removal.
+  Future<void> removeBond(String deviceId) async {
+    throw UnsupportedError(
+      'iOS does not support removing bonds programmatically. '
+      'Users must remove the device from Settings > Bluetooth.',
+    );
+  }
+
+  /// iOS does not provide a list of bonded devices.
+  Future<List<PlatformDevice>> getBondedDevices() async {
+    return [];
+  }
+
+  // === PHY (limited iOS support) ===
+
+  /// iOS does not expose PHY information.
+  Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
+    throw UnsupportedError('iOS does not support reading PHY information.');
+  }
+
+  /// iOS does not expose PHY changes; returns an empty stream.
+  Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
+    return const Stream.empty();
+  }
+
+  /// iOS does not support requesting PHY settings.
+  Future<void> requestPhy(
+    String deviceId,
+    PlatformPhy? txPhy,
+    PlatformPhy? rxPhy,
+  ) async {
+    throw UnsupportedError('iOS does not support requesting PHY settings.');
+  }
+
+  // === Connection Parameters (not available on iOS) ===
+
+  /// iOS does not support reading connection parameters.
+  Future<PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) async {
+    throw UnsupportedError(
+      'iOS does not support reading connection parameters.',
+    );
+  }
+
+  /// iOS does not support requesting connection parameters.
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters params,
+  ) async {
+    throw UnsupportedError(
+      'iOS does not support requesting connection parameters.',
+    );
+  }
+
+  // === DTO Mapping ===
+
+  PlatformConnectionState _mapConnectionState(ConnectionStateDto dto) {
+    switch (dto) {
+      case ConnectionStateDto.disconnected:
+        return PlatformConnectionState.disconnected;
+      case ConnectionStateDto.connecting:
+        return PlatformConnectionState.connecting;
+      case ConnectionStateDto.connected:
+        return PlatformConnectionState.connected;
+      case ConnectionStateDto.disconnecting:
+        return PlatformConnectionState.disconnecting;
+    }
+  }
+
+  PlatformService _mapService(ServiceDto dto) {
+    return PlatformService(
+      uuid: expandUuid(dto.uuid),
+      isPrimary: dto.isPrimary,
+      characteristics: dto.characteristics.map(_mapCharacteristic).toList(),
+      includedServices: dto.includedServices.map(_mapService).toList(),
+    );
+  }
+
+  PlatformCharacteristic _mapCharacteristic(CharacteristicDto dto) {
+    return PlatformCharacteristic(
+      uuid: expandUuid(dto.uuid),
+      properties: PlatformCharacteristicProperties(
+        canRead: dto.properties.canRead,
+        canWrite: dto.properties.canWrite,
+        canWriteWithoutResponse: dto.properties.canWriteWithoutResponse,
+        canNotify: dto.properties.canNotify,
+        canIndicate: dto.properties.canIndicate,
+      ),
+      descriptors: dto.descriptors.map(_mapDescriptor).toList(),
+    );
+  }
+
+  PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
+    return PlatformDescriptor(uuid: expandUuid(dto.uuid));
+  }
+}

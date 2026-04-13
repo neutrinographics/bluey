@@ -7,6 +7,7 @@ enum BlueyError: Error {
     case unsupported
     case notConnected
     case notFound
+    case timeout
 }
 
 extension BlueyError: LocalizedError {
@@ -22,6 +23,8 @@ extension BlueyError: LocalizedError {
             return "Device not connected"
         case .notFound:
             return "Resource not found"
+        case .timeout:
+            return "Operation timed out"
         }
     }
 }
