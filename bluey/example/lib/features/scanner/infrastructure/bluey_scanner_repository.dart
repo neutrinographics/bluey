@@ -5,6 +5,7 @@ import '../domain/scanner_repository.dart';
 /// Implementation of [ScannerRepository] using the Bluey library.
 class BlueyScannerRepository implements ScannerRepository {
   final Bluey _bluey;
+  Scanner? _scanner;
 
   BlueyScannerRepository(this._bluey);
 
@@ -15,13 +16,17 @@ class BlueyScannerRepository implements ScannerRepository {
   Stream<BluetoothState> get stateStream => _bluey.stateStream;
 
   @override
-  Stream<Device> scan({Duration? timeout}) {
-    return _bluey.scan(timeout: timeout);
+  Stream<ScanResult> scan({Duration? timeout}) {
+    _scanner?.dispose();
+    _scanner = _bluey.scanner();
+    return _scanner!.scan(timeout: timeout);
   }
 
   @override
   Future<void> stopScan() async {
-    await _bluey.stopScan();
+    await _scanner?.stop();
+    _scanner?.dispose();
+    _scanner = null;
   }
 
   @override

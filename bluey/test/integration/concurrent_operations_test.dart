@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -30,21 +31,25 @@ void main() {
 
         final bluey = Bluey();
 
-        // Start two concurrent scans
-        final devices1 = <Device>[];
-        final devices2 = <Device>[];
+        // Start two concurrent scans via separate scanners
+        final scanner1 = bluey.scanner();
+        final scanner2 = bluey.scanner();
+        final results1 = <ScanResult>[];
+        final results2 = <ScanResult>[];
 
-        final subscription1 = bluey.scan().listen(devices1.add);
-        final subscription2 = bluey.scan().listen(devices2.add);
+        final subscription1 = scanner1.scan().listen(results1.add);
+        final subscription2 = scanner2.scan().listen(results2.add);
 
         await Future.delayed(Duration.zero);
 
         await subscription1.cancel();
         await subscription2.cancel();
+        scanner1.dispose();
+        scanner2.dispose();
 
         // Both should have found the device
-        expect(devices1, hasLength(1));
-        expect(devices2, hasLength(1));
+        expect(results1, hasLength(1));
+        expect(results2, hasLength(1));
 
         await bluey.dispose();
       });
@@ -57,16 +62,19 @@ void main() {
 
         final bluey = Bluey();
 
-        final devices1 = <Device>[];
-        final devices2 = <Device>[];
+        final scanner1 = bluey.scanner();
+        final scanner2 = bluey.scanner();
+        final results1 = <ScanResult>[];
+        final results2 = <ScanResult>[];
 
-        final subscription1 = bluey.scan().listen(devices1.add);
-        final subscription2 = bluey.scan().listen(devices2.add);
+        final subscription1 = scanner1.scan().listen(results1.add);
+        final subscription2 = scanner2.scan().listen(results2.add);
 
         await Future.delayed(Duration.zero);
 
         // Cancel first listener
         await subscription1.cancel();
+        scanner1.dispose();
 
         // Add another device
         fakePlatform.simulatePeripheral(
@@ -75,15 +83,18 @@ void main() {
         );
 
         // Need to trigger another scan for the new device
-        final devices3 = <Device>[];
-        final subscription3 = bluey.scan().listen(devices3.add);
+        final scanner3 = bluey.scanner();
+        final results3 = <ScanResult>[];
+        final subscription3 = scanner3.scan().listen(results3.add);
         await Future.delayed(Duration.zero);
 
         await subscription2.cancel();
         await subscription3.cancel();
+        scanner2.dispose();
+        scanner3.dispose();
 
         // Third listener should find both devices
-        expect(devices3, hasLength(2));
+        expect(results3, hasLength(2));
 
         await bluey.dispose();
       });
@@ -107,15 +118,17 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
-        expect(devices, hasLength(3));
+        expect(results, hasLength(3));
 
         // Connect to all three in parallel
-        final connectionFutures = devices.map((d) => bluey.connect(d)).toList();
+        final connectionFutures = results.map((r) => bluey.connect(r.device)).toList();
         final connections = await Future.wait(connectionFutures);
 
         expect(connections, hasLength(3));
@@ -142,19 +155,21 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final scanResults = <ScanResult>[];
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Remove one device before connecting (simulate connection failure)
         fakePlatform.removePeripheral('AA:BB:CC:DD:EE:02');
 
         // Try to connect to both
         final results = await Future.wait(
-          devices.map((d) async {
+          scanResults.map((r) async {
             try {
-              return await bluey.connect(d);
+              return await bluey.connect(r.device);
             } catch (e) {
               return null;
             }
@@ -217,7 +232,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Read both characteristics in parallel
@@ -276,7 +291,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Write to both characteristics in parallel
@@ -341,7 +356,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Interleave multiple read/write operations
@@ -418,7 +433,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Subscribe to notifications
@@ -485,7 +500,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         final notifications = <platform.PlatformNotification>[];
@@ -698,7 +713,7 @@ void main() {
         await server.startAdvertising(name: 'My Server');
 
         // Connect as client to remote device
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Read from remote device (as client)

@@ -3,26 +3,26 @@ import 'package:bluey/bluey.dart';
 /// State for the scanner feature.
 class ScannerState {
   final BluetoothState bluetoothState;
-  final List<Device> devices;
+  final List<ScanResult> scanResults;
   final bool isScanning;
   final String? error;
 
   const ScannerState({
     this.bluetoothState = BluetoothState.unknown,
-    this.devices = const [],
+    this.scanResults = const [],
     this.isScanning = false,
     this.error,
   });
 
   ScannerState copyWith({
     BluetoothState? bluetoothState,
-    List<Device>? devices,
+    List<ScanResult>? scanResults,
     bool? isScanning,
     String? error,
   }) {
     return ScannerState(
       bluetoothState: bluetoothState ?? this.bluetoothState,
-      devices: devices ?? this.devices,
+      scanResults: scanResults ?? this.scanResults,
       isScanning: isScanning ?? this.isScanning,
       error: error,
     );
@@ -33,7 +33,7 @@ class ScannerState {
     if (identical(this, other)) return true;
     return other is ScannerState &&
         other.bluetoothState == bluetoothState &&
-        _listEquals(other.devices, devices) &&
+        _listEquals(other.scanResults, scanResults) &&
         other.isScanning == isScanning &&
         other.error == error;
   }
@@ -42,7 +42,7 @@ class ScannerState {
   int get hashCode {
     return Object.hash(
       bluetoothState,
-      Object.hashAll(devices),
+      Object.hashAll(scanResults),
       isScanning,
       error,
     );

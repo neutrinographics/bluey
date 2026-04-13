@@ -11,6 +11,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  meta: ^1.11.0
   bluey_platform_interface:
     path: ../bluey_platform_interface
   bluey_android:

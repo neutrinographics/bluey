@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
 /// Common UUIDs used in tests.
@@ -191,4 +192,15 @@ class TestData {
 
   /// Creates a battery level packet.
   static Uint8List batteryLevel(int percent) => bytes([percent]);
+}
+
+/// Scans for the first device, unwrapping the [ScanResult].
+///
+/// Convenience helper for integration tests that need a [Device]
+/// from a scan but don't care about transient observation data.
+Future<Device> scanFirstDevice(Bluey bluey) async {
+  final scanner = bluey.scanner();
+  final result = await scanner.scan().first;
+  scanner.dispose();
+  return result.device;
 }

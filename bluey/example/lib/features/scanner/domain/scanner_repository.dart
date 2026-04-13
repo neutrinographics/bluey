@@ -9,8 +9,8 @@ abstract class ScannerRepository {
   Stream<BluetoothState> get stateStream;
 
   /// Starts scanning for BLE devices.
-  /// Returns a stream of discovered devices.
-  Stream<Device> scan({Duration? timeout});
+  /// Returns a stream of discovered scan results.
+  Stream<ScanResult> scan({Duration? timeout});
 
   /// Stops the current scan.
   Future<void> stopScan();

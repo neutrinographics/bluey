@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -35,17 +36,19 @@ void main() {
         final bluey = Bluey();
 
         // Act: Scan for devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
 
         // Wait for scan to emit
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Assert
-        expect(devices, hasLength(1));
-        expect(devices.first.name, equals('Test Device'));
-        expect(devices.first.rssi, equals(-45));
+        expect(results, hasLength(1));
+        expect(results.first.device.name, equals('Test Device'));
+        expect(results.first.rssi, equals(-45));
 
         await bluey.dispose();
       });
@@ -66,17 +69,19 @@ void main() {
         final bluey = Bluey();
 
         // Act: Scan filtering for heart rate service
-        final devices = <Device>[];
-        final subscription = bluey
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner
             .scan(services: [UUID('0000180d-0000-1000-8000-00805f9b34fb')])
-            .listen(devices.add);
+            .listen(results.add);
 
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Assert: Only heart rate device found
-        expect(devices, hasLength(1));
-        expect(devices.first.name, equals('Heart Rate Monitor'));
+        expect(results, hasLength(1));
+        expect(results.first.device.name, equals('Heart Rate Monitor'));
 
         await bluey.dispose();
       });
@@ -99,7 +104,7 @@ void main() {
         final bluey = Bluey();
 
         // Discover device first
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
 
         // Act: Connect
         final connection = await bluey.connect(device);
@@ -118,12 +123,6 @@ void main() {
           id: UUID('00000000-0000-0000-0000-000000000000'),
           address: 'FF:FF:FF:FF:FF:FF',
           name: 'Ghost Device',
-          rssi: -100,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            isConnectable: true,
-          ),
         );
 
         // Act & Assert
@@ -142,7 +141,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Act
@@ -162,7 +161,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Act: Server disconnects us
@@ -192,18 +191,20 @@ void main() {
 
         final bluey = Bluey();
 
-        // Collect all devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        // Collect all scan results
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Act: Connect to both
         final connection1 = await bluey.connect(
-          devices.firstWhere((d) => d.name == 'Device 1'),
+          results.firstWhere((r) => r.device.name == 'Device 1').device,
         );
         final connection2 = await bluey.connect(
-          devices.firstWhere((d) => d.name == 'Device 2'),
+          results.firstWhere((r) => r.device.name == 'Device 2').device,
         );
 
         // Assert
@@ -225,7 +226,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
 
         // First connection
         final connection1 = await bluey.connect(device);
@@ -249,7 +250,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
 
         // First connection
         await bluey.connect(device);

@@ -1,44 +1,25 @@
 import 'dart:async';
-import 'dart:typed_data';
+
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'bluey_connection.dart';
-import 'bluey_server.dart';
-import 'connection.dart';
-import 'connection_state.dart';
-import 'device.dart';
+import 'connection/bluey_connection.dart';
+import 'connection/connection.dart';
+import 'connection/connection_state.dart';
+import 'discovery/bluey_scanner.dart';
+import 'discovery/device.dart';
+import 'discovery/scanner.dart';
 import 'event_bus.dart';
 import 'events.dart';
-import 'exceptions.dart';
-import 'server.dart';
-import 'uuid.dart';
+import 'gatt_server/bluey_server.dart';
+import 'gatt_server/server.dart';
+import 'platform/bluetooth_state.dart';
+import 'shared/exceptions.dart';
+import 'shared/uuid.dart';
 
 export 'events.dart';
-
-/// The state of the Bluetooth adapter.
-enum BluetoothState {
-  /// Initial state before platform reports.
-  unknown,
-
-  /// Device doesn't support BLE.
-  unsupported,
-
-  /// Permission not granted.
-  unauthorized,
-
-  /// Bluetooth is disabled.
-  off,
-
-  /// Bluetooth is ready to use.
-  on;
-
-  /// Whether Bluetooth is ready for use.
-  bool get isReady => this == BluetoothState.on;
-
-  /// Whether Bluetooth can be enabled (only true when off).
-  bool get canBeEnabled => this == BluetoothState.off;
-}
+export 'discovery/scanner.dart';
+export 'platform/bluetooth_state.dart';
 
 /// The main entry point to Bluey.
 ///
@@ -69,9 +50,10 @@ enum BluetoothState {
 /// }
 ///
 /// // Scan for devices
-/// await for (final device in bluey.scan()) {
-///   print('Found: ${device.name}');
-/// }
+/// final scanner = bluey.scanner();
+/// scanner.scan().listen((result) {
+///   print('Found: ${result.device.name}');
+/// });
 /// ```
 class Bluey {
   /// Shared instance for simple apps.
@@ -275,52 +257,22 @@ class Bluey {
     }
   }
 
-  /// Scan for nearby BLE devices.
+  /// Create a Scanner for discovering nearby BLE devices.
   ///
-  /// Returns a stream of discovered [Device]s. The stream completes when
-  /// scanning stops (timeout or [stopScan] called).
-  ///
-  /// [services] - Optional list of service UUIDs to filter by.
-  /// [timeout] - Optional timeout duration.
+  /// Returns a [Scanner] aggregate root for the Discovery bounded context.
+  /// Call [Scanner.dispose] when done to release resources.
   ///
   /// Example:
   /// ```dart
-  /// await for (final device in bluey.scan(timeout: Duration(seconds: 10))) {
-  ///   print('Found: ${device.name}');
-  /// }
+  /// final scanner = bluey.scanner();
+  /// final subscription = scanner.scan().listen((result) {
+  ///   print('Found: ${result.device.name} at ${result.rssi} dBm');
+  /// });
+  /// // ...
+  /// scanner.dispose();
   /// ```
-  Stream<Device> scan({List<UUID>? services, Duration? timeout}) {
-    final config = platform.PlatformScanConfig(
-      serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
-      timeoutMs: timeout?.inMilliseconds,
-    );
-
-    _emitEvent(ScanStartedEvent(serviceFilter: services, timeout: timeout));
-
-    return _platform
-        .scan(config)
-        .map((platformDevice) {
-          final device = _mapDevice(platformDevice);
-          _emitEvent(
-            DeviceDiscoveredEvent(
-              deviceId: device.id,
-              name: device.name,
-              rssi: device.rssi,
-            ),
-          );
-          return device;
-        })
-        .handleError((error) => throw _wrapError(error));
-  }
-
-  /// Stop scanning for devices.
-  Future<void> stopScan() async {
-    try {
-      await _platform.stopScan();
-      _emitEvent(const ScanStoppedEvent());
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Scanner scanner() {
+    return BlueyScanner(_platform, _eventBus);
   }
 
   /// Connect to a device.
@@ -380,6 +332,15 @@ class Bluey {
     } catch (e) {
       throw _wrapError(e);
     }
+  }
+
+  /// Maps a platform device to a domain Device (identity only).
+  Device _mapDevice(platform.PlatformDevice platformDevice) {
+    return Device(
+      id: _deviceIdToUuid(platformDevice.id),
+      address: platformDevice.id,
+      name: platformDevice.name,
+    );
   }
 
   /// Create a GATT server for peripheral role.
@@ -461,42 +422,6 @@ class Bluey {
       case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
     }
-  }
-
-  Device _mapDevice(platform.PlatformDevice platformDevice) {
-    // Convert manufacturer data
-    ManufacturerData? manufacturerData;
-    if (platformDevice.manufacturerDataCompanyId != null &&
-        platformDevice.manufacturerData != null) {
-      manufacturerData = ManufacturerData(
-        platformDevice.manufacturerDataCompanyId!,
-        Uint8List.fromList(platformDevice.manufacturerData!),
-      );
-    }
-
-    // Convert service UUIDs
-    final serviceUuids =
-        platformDevice.serviceUuids.map((s) => UUID(s)).toList();
-
-    // Create advertisement
-    final advertisement = Advertisement(
-      serviceUuids: serviceUuids,
-      serviceData: {}, // TODO: Add service data when platform supports it
-      manufacturerData: manufacturerData,
-      isConnectable: true, // TODO: Get from platform when available
-    );
-
-    // Create device
-    // Note: On Android, the device ID is a MAC address, not a UUID.
-    // We create a UUID from the MAC by padding it, but preserve the original
-    // address for connections.
-    return Device(
-      id: _deviceIdToUuid(platformDevice.id),
-      address: platformDevice.id, // Keep original for platform calls
-      name: platformDevice.name,
-      rssi: platformDevice.rssi,
-      advertisement: advertisement,
-    );
   }
 
   /// Converts a platform device ID to a UUID.

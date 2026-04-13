@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
-import 'uuid.dart';
+import 'shared/uuid.dart';
 
 /// Base class for all Bluey diagnostic events.
 ///
@@ -14,8 +14,8 @@ sealed class BlueyEvent {
   /// Optional source component that generated this event.
   final String? source;
 
-  const BlueyEvent({DateTime? timestamp, this.source})
-    : timestamp = timestamp ?? const _Now();
+  BlueyEvent({DateTime? timestamp, this.source})
+    : timestamp = timestamp ?? DateTime.now();
 
   @override
   String toString() => '[$runtimeType] ${_formatTime(timestamp)}';
@@ -28,65 +28,6 @@ sealed class BlueyEvent {
   }
 }
 
-// Helper class for default timestamp
-class _Now implements DateTime {
-  const _Now();
-
-  DateTime get _now => DateTime.now();
-
-  @override
-  int get year => _now.year;
-  @override
-  int get month => _now.month;
-  @override
-  int get day => _now.day;
-  @override
-  int get hour => _now.hour;
-  @override
-  int get minute => _now.minute;
-  @override
-  int get second => _now.second;
-  @override
-  int get millisecond => _now.millisecond;
-  @override
-  int get microsecond => _now.microsecond;
-  @override
-  int get weekday => _now.weekday;
-  @override
-  bool get isUtc => _now.isUtc;
-  @override
-  String get timeZoneName => _now.timeZoneName;
-  @override
-  Duration get timeZoneOffset => _now.timeZoneOffset;
-  @override
-  int get millisecondsSinceEpoch => _now.millisecondsSinceEpoch;
-  @override
-  int get microsecondsSinceEpoch => _now.microsecondsSinceEpoch;
-
-  @override
-  DateTime add(Duration duration) => _now.add(duration);
-  @override
-  DateTime subtract(Duration duration) => _now.subtract(duration);
-  @override
-  Duration difference(DateTime other) => _now.difference(other);
-  @override
-  bool isAfter(DateTime other) => _now.isAfter(other);
-  @override
-  bool isBefore(DateTime other) => _now.isBefore(other);
-  @override
-  bool isAtSameMomentAs(DateTime other) => _now.isAtSameMomentAs(other);
-  @override
-  int compareTo(DateTime other) => _now.compareTo(other);
-  @override
-  DateTime toLocal() => _now.toLocal();
-  @override
-  DateTime toUtc() => _now.toUtc();
-  @override
-  String toIso8601String() => _now.toIso8601String();
-  @override
-  String toString() => _now.toString();
-}
-
 // === Scan Events ===
 
 /// Scan started.
@@ -94,7 +35,7 @@ final class ScanStartedEvent extends BlueyEvent {
   final List<UUID>? serviceFilter;
   final Duration? timeout;
 
-  const ScanStartedEvent({this.serviceFilter, this.timeout, super.source});
+  ScanStartedEvent({this.serviceFilter, this.timeout, super.source});
 
   @override
   String toString() {
@@ -113,7 +54,7 @@ final class DeviceDiscoveredEvent extends BlueyEvent {
   final String? name;
   final int? rssi;
 
-  const DeviceDiscoveredEvent({
+  DeviceDiscoveredEvent({
     required this.deviceId,
     this.name,
     this.rssi,
@@ -132,7 +73,7 @@ final class DeviceDiscoveredEvent extends BlueyEvent {
 final class ScanStoppedEvent extends BlueyEvent {
   final String? reason;
 
-  const ScanStoppedEvent({this.reason, super.source});
+  ScanStoppedEvent({this.reason, super.source});
 
   @override
   String toString() {
@@ -147,7 +88,7 @@ final class ScanStoppedEvent extends BlueyEvent {
 final class ConnectingEvent extends BlueyEvent {
   final UUID deviceId;
 
-  const ConnectingEvent({required this.deviceId, super.source});
+  ConnectingEvent({required this.deviceId, super.source});
 
   @override
   String toString() => '[Connection] Connecting to ${deviceId.toShortString()}';
@@ -157,7 +98,7 @@ final class ConnectingEvent extends BlueyEvent {
 final class ConnectedEvent extends BlueyEvent {
   final UUID deviceId;
 
-  const ConnectedEvent({required this.deviceId, super.source});
+  ConnectedEvent({required this.deviceId, super.source});
 
   @override
   String toString() => '[Connection] Connected to ${deviceId.toShortString()}';
@@ -168,7 +109,7 @@ final class DisconnectedEvent extends BlueyEvent {
   final UUID deviceId;
   final String? reason;
 
-  const DisconnectedEvent({required this.deviceId, this.reason, super.source});
+  DisconnectedEvent({required this.deviceId, this.reason, super.source});
 
   @override
   String toString() {
@@ -183,7 +124,7 @@ final class DisconnectedEvent extends BlueyEvent {
 final class DiscoveringServicesEvent extends BlueyEvent {
   final UUID deviceId;
 
-  const DiscoveringServicesEvent({required this.deviceId, super.source});
+  DiscoveringServicesEvent({required this.deviceId, super.source});
 
   @override
   String toString() =>
@@ -195,7 +136,7 @@ final class ServicesDiscoveredEvent extends BlueyEvent {
   final UUID deviceId;
   final int serviceCount;
 
-  const ServicesDiscoveredEvent({
+  ServicesDiscoveredEvent({
     required this.deviceId,
     required this.serviceCount,
     super.source,
@@ -212,7 +153,7 @@ final class CharacteristicReadEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
 
-  const CharacteristicReadEvent({
+  CharacteristicReadEvent({
     required this.deviceId,
     required this.characteristicId,
     required this.valueLength,
@@ -231,7 +172,7 @@ final class CharacteristicWrittenEvent extends BlueyEvent {
   final int valueLength;
   final bool withResponse;
 
-  const CharacteristicWrittenEvent({
+  CharacteristicWrittenEvent({
     required this.deviceId,
     required this.characteristicId,
     required this.valueLength,
@@ -252,7 +193,7 @@ final class NotificationReceivedEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
 
-  const NotificationReceivedEvent({
+  NotificationReceivedEvent({
     required this.deviceId,
     required this.characteristicId,
     required this.valueLength,
@@ -270,7 +211,7 @@ final class NotificationSubscriptionEvent extends BlueyEvent {
   final UUID characteristicId;
   final bool enabled;
 
-  const NotificationSubscriptionEvent({
+  NotificationSubscriptionEvent({
     required this.deviceId,
     required this.characteristicId,
     required this.enabled,
@@ -288,7 +229,7 @@ final class NotificationSubscriptionEvent extends BlueyEvent {
 
 /// Server started.
 final class ServerStartedEvent extends BlueyEvent {
-  const ServerStartedEvent({super.source});
+  ServerStartedEvent({super.source});
 
   @override
   String toString() => '[Server] Started';
@@ -298,7 +239,7 @@ final class ServerStartedEvent extends BlueyEvent {
 final class ServiceAddedEvent extends BlueyEvent {
   final UUID serviceId;
 
-  const ServiceAddedEvent({required this.serviceId, super.source});
+  ServiceAddedEvent({required this.serviceId, super.source});
 
   @override
   String toString() => '[Server] Added service ${serviceId.toShortString()}';
@@ -309,7 +250,7 @@ final class AdvertisingStartedEvent extends BlueyEvent {
   final String? name;
   final List<UUID>? services;
 
-  const AdvertisingStartedEvent({this.name, this.services, super.source});
+  AdvertisingStartedEvent({this.name, this.services, super.source});
 
   @override
   String toString() {
@@ -320,7 +261,7 @@ final class AdvertisingStartedEvent extends BlueyEvent {
 
 /// Advertising stopped.
 final class AdvertisingStoppedEvent extends BlueyEvent {
-  const AdvertisingStoppedEvent({super.source});
+  AdvertisingStoppedEvent({super.source});
 
   @override
   String toString() => '[Server] Advertising stopped';
@@ -331,7 +272,7 @@ final class ClientConnectedEvent extends BlueyEvent {
   final String clientId;
   final int? mtu;
 
-  const ClientConnectedEvent({
+  ClientConnectedEvent({
     required this.clientId,
     this.mtu,
     super.source,
@@ -355,7 +296,7 @@ final class ClientConnectedEvent extends BlueyEvent {
 final class ClientDisconnectedEvent extends BlueyEvent {
   final String clientId;
 
-  const ClientDisconnectedEvent({required this.clientId, super.source});
+  ClientDisconnectedEvent({required this.clientId, super.source});
 
   @override
   String toString() => '[Server] Client disconnected: ${_shortId(clientId)}';
@@ -373,7 +314,7 @@ final class ReadRequestEvent extends BlueyEvent {
   final String clientId;
   final UUID characteristicId;
 
-  const ReadRequestEvent({
+  ReadRequestEvent({
     required this.clientId,
     required this.characteristicId,
     super.source,
@@ -390,7 +331,7 @@ final class WriteRequestEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
 
-  const WriteRequestEvent({
+  WriteRequestEvent({
     required this.clientId,
     required this.characteristicId,
     required this.valueLength,
@@ -408,7 +349,7 @@ final class NotificationSentEvent extends BlueyEvent {
   final int valueLength;
   final String? clientId; // null means broadcast to all
 
-  const NotificationSentEvent({
+  NotificationSentEvent({
     required this.characteristicId,
     required this.valueLength,
     this.clientId,
@@ -437,7 +378,7 @@ final class IndicationSentEvent extends BlueyEvent {
   final int valueLength;
   final String? clientId; // null means broadcast to all
 
-  const IndicationSentEvent({
+  IndicationSentEvent({
     required this.characteristicId,
     required this.valueLength,
     this.clientId,
@@ -465,7 +406,7 @@ final class ErrorEvent extends BlueyEvent {
   final String message;
   final Object? error;
 
-  const ErrorEvent({required this.message, this.error, super.source});
+  ErrorEvent({required this.message, this.error, super.source});
 
   @override
   String toString() => '[Error] $message';
@@ -477,7 +418,7 @@ final class ErrorEvent extends BlueyEvent {
 final class DebugEvent extends BlueyEvent {
   final String message;
 
-  const DebugEvent({required this.message, super.source});
+  DebugEvent({required this.message, super.source});
 
   @override
   String toString() => '[Debug] $message';

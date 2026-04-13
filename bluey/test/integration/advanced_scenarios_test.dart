@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -49,7 +50,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -89,7 +90,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -139,7 +140,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -174,18 +175,20 @@ void main() {
 
         final bluey = Bluey();
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
-        expect(devices, hasLength(3));
+        expect(results, hasLength(3));
 
         // Find the closest device (highest RSSI)
-        devices.sort((a, b) => b.rssi.compareTo(a.rssi));
-        final closest = devices.first;
+        results.sort((a, b) => b.rssi.compareTo(a.rssi));
+        final closest = results.first;
 
-        expect(closest.name, equals('Close Device'));
+        expect(closest.device.name, equals('Close Device'));
         expect(closest.rssi, equals(-40));
 
         await bluey.dispose();
@@ -210,19 +213,21 @@ void main() {
 
         final bluey = Bluey();
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Filter devices with RSSI >= -70 (close enough)
         const rssiThreshold = -70;
-        final nearbyDevices =
-            devices.where((d) => d.rssi >= rssiThreshold).toList();
+        final nearbyResults =
+            results.where((r) => r.rssi >= rssiThreshold).toList();
 
-        expect(nearbyDevices, hasLength(2));
+        expect(nearbyResults, hasLength(2));
         expect(
-          nearbyDevices.map((d) => d.name),
+          nearbyResults.map((r) => r.device.name),
           containsAll(['Close Enough', 'Very Close']),
         );
 
@@ -258,7 +263,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Default MTU is 23, payload is 20 bytes
@@ -310,7 +315,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Request larger MTU
@@ -343,7 +348,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         expect(connection.state, equals(ConnectionState.connected));
@@ -390,7 +395,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -446,7 +451,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -500,7 +505,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -544,7 +549,7 @@ void main() {
         final bluey = Bluey();
 
         // Connect to first device
-        final device1 = await bluey.scan().first;
+        final device1 = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device1);
         expect(connection.state, equals(ConnectionState.connected));
 
@@ -555,13 +560,15 @@ void main() {
         );
 
         // Scan while connected - should find both
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Should find both devices
-        expect(devices, hasLength(2));
+        expect(results, hasLength(2));
 
         // Original connection should still be active
         expect(connection.state, equals(ConnectionState.connected));
@@ -583,18 +590,20 @@ void main() {
         final bluey = Bluey();
 
         // Discover devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final scanResults = <ScanResult>[];
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
-        expect(devices, hasLength(2));
+        expect(scanResults, hasLength(2));
 
         // Connect to first
-        final connection1 = await bluey.connect(devices[0]);
+        final connection1 = await bluey.connect(scanResults[0].device);
 
         // Connect to second while first is connected
-        final connection2 = await bluey.connect(devices[1]);
+        final connection2 = await bluey.connect(scanResults[1].device);
 
         expect(connection1.state, equals(ConnectionState.connected));
         expect(connection2.state, equals(ConnectionState.connected));
@@ -616,13 +625,15 @@ void main() {
 
         final bluey = Bluey();
 
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         // Device should appear only once per scan
-        expect(devices, hasLength(1));
+        expect(results, hasLength(1));
 
         await bluey.dispose();
       });
@@ -643,12 +654,14 @@ void main() {
 
         final bluey = Bluey();
 
+        final scanner = bluey.scanner();
         final deviceIds = <String>{};
-        final subscription = bluey.scan().listen((device) {
-          deviceIds.add(device.address);
+        final subscription = scanner.scan().listen((result) {
+          deviceIds.add(result.device.address);
         });
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
         expect(deviceIds, hasLength(3));
 
@@ -684,7 +697,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -730,7 +743,7 @@ void main() {
           );
 
           final bluey = Bluey();
-          final device = await bluey.scan().first;
+          final device = await scanFirstDevice(bluey);
           final connection = await bluey.connect(device);
           final services = await connection.services();
           final characteristic = services.first.characteristics.first;
@@ -759,7 +772,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         expect(connection.state, equals(ConnectionState.connected));
@@ -789,7 +802,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Initially connected
@@ -825,9 +838,11 @@ void main() {
         final bluey = Bluey();
 
         // First scan
-        final device1 = await bluey.scan().first;
-        expect(device1.name, equals('Device v1'));
-        expect(device1.rssi, equals(-60));
+        final scanner1 = bluey.scanner();
+        final result1 = await scanner1.scan().first;
+        scanner1.dispose();
+        expect(result1.device.name, equals('Device v1'));
+        expect(result1.rssi, equals(-60));
 
         // Update the peripheral (simulating advertisement data change)
         fakePlatform.simulatePeripheral(
@@ -839,9 +854,11 @@ void main() {
         );
 
         // Second scan should show updated data
-        final device2 = await bluey.scan().first;
-        expect(device2.name, equals('Device v2'));
-        expect(device2.rssi, equals(-45));
+        final scanner2 = bluey.scanner();
+        final result2 = await scanner2.scan().first;
+        scanner2.dispose();
+        expect(result2.device.name, equals('Device v2'));
+        expect(result2.rssi, equals(-45));
 
         await bluey.dispose();
       });
@@ -860,8 +877,10 @@ void main() {
             rssi: rssi,
           );
 
-          final device = await bluey.scan().first;
-          recordedRssi.add(device.rssi);
+          final scanner = bluey.scanner();
+          final result = await scanner.scan().first;
+          scanner.dispose();
+          recordedRssi.add(result.rssi);
         }
 
         // Verify RSSI values were tracked correctly
@@ -902,7 +921,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -953,7 +972,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -1005,7 +1024,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -1065,7 +1084,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final char1 = services.first.characteristics[0];
@@ -1118,7 +1137,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
         final characteristic = services.first.characteristics.first;
@@ -1153,7 +1172,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Discover services
@@ -1179,7 +1198,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // First call discovers, second call uses cache

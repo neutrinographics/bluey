@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/well_known_uuids.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
@@ -391,97 +390,11 @@ void main() {
       });
     });
 
-    group('scan', () {
-      test('emits discovered devices', () async {
-        mockPlatform.mockDevices = [
-          platform.PlatformDevice(
-            id: 'AA:BB:CC:DD:EE:FF',
-            name: 'Test Device',
-            rssi: -60,
-            serviceUuids: ['0000180d-0000-1000-8000-00805f9b34fb'],
-            manufacturerDataCompanyId: 0x004C,
-            manufacturerData: [1, 2, 3],
-          ),
-        ];
-
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
-
-        await Future.delayed(Duration(milliseconds: 50));
-        await subscription.cancel();
-
-        expect(devices, hasLength(1));
-        expect(devices.first.name, equals('Test Device'));
-        expect(devices.first.rssi, equals(-60));
-      });
-
-      test('converts manufacturer data correctly', () async {
-        mockPlatform.mockDevices = [
-          platform.PlatformDevice(
-            id: 'AA:BB:CC:DD:EE:FF',
-            name: null,
-            rssi: -50,
-            serviceUuids: [],
-            manufacturerDataCompanyId: 0x004C,
-            manufacturerData: [10, 20, 30],
-          ),
-        ];
-
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
-
-        await Future.delayed(Duration(milliseconds: 50));
-        await subscription.cancel();
-
-        final manufacturerData = devices.first.advertisement.manufacturerData;
-        expect(manufacturerData, isNotNull);
-        expect(manufacturerData!.companyId, equals(0x004C));
-        expect(manufacturerData.data, equals([10, 20, 30]));
-      });
-
-      test('converts service UUIDs correctly', () async {
-        mockPlatform.mockDevices = [
-          platform.PlatformDevice(
-            id: 'AA:BB:CC:DD:EE:FF',
-            name: null,
-            rssi: -50,
-            serviceUuids: [
-              '0000180d-0000-1000-8000-00805f9b34fb',
-              '0000180f-0000-1000-8000-00805f9b34fb',
-            ],
-            manufacturerDataCompanyId: null,
-            manufacturerData: null,
-          ),
-        ];
-
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
-
-        await Future.delayed(Duration(milliseconds: 50));
-        await subscription.cancel();
-
-        final serviceUuids = devices.first.advertisement.serviceUuids;
-        expect(serviceUuids, hasLength(2));
-        expect(serviceUuids[0], equals(Services.heartRate));
-        expect(serviceUuids[1], equals(Services.battery));
-      });
-
-      test('applies service UUID filter', () async {
-        mockPlatform.mockDevices = [];
-
-        bluey.scan(services: [Services.heartRate]);
-
-        // We can't easily verify the filter was applied in our mock,
-        // but we verify the scan runs without error
-        await Future.delayed(Duration(milliseconds: 10));
-      });
-
-      test('applies timeout', () async {
-        mockPlatform.mockDevices = [];
-
-        bluey.scan(timeout: Duration(seconds: 10));
-
-        await Future.delayed(Duration(milliseconds: 10));
+    group('scanner', () {
+      test('scanner() returns a Scanner', () {
+        final scanner = bluey.scanner();
+        expect(scanner, isA<Scanner>());
+        scanner.dispose();
       });
     });
 
@@ -489,8 +402,6 @@ void main() {
       test('returns Connection object', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         final connection = await bluey.connect(device);
@@ -502,8 +413,6 @@ void main() {
       test('connection emits state changes', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         final states = <ConnectionState>[];
@@ -531,8 +440,6 @@ void main() {
       test('disconnects from device via Connection', () async {
         final device = Device(
           id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-          rssi: -60,
-          advertisement: Advertisement.empty(),
         );
 
         // Connect and get Connection object

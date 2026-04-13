@@ -62,12 +62,12 @@ class _ScannerView extends StatelessWidget {
               if (state.isScanning) const LinearProgressIndicator(),
               Expanded(
                 child:
-                    state.devices.isEmpty
+                    state.scanResults.isEmpty
                         ? _EmptyState(
                           bluetoothState: state.bluetoothState,
                           isScanning: state.isScanning,
                         )
-                        : _DeviceList(devices: state.devices),
+                        : _ScanResultList(scanResults: state.scanResults),
               ),
             ],
           ),
@@ -210,33 +210,33 @@ class _BluetoothOffState extends StatelessWidget {
   }
 }
 
-class _DeviceList extends StatelessWidget {
-  final List<Device> devices;
+class _ScanResultList extends StatelessWidget {
+  final List<ScanResult> scanResults;
 
-  const _DeviceList({required this.devices});
+  const _ScanResultList({required this.scanResults});
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 80),
-      itemCount: devices.length,
+      itemCount: scanResults.length,
       itemBuilder: (context, index) {
-        final device = devices[index];
-        return _DeviceCard(device: device);
+        final result = scanResults[index];
+        return _ScanResultCard(result: result);
       },
     );
   }
 }
 
-class _DeviceCard extends StatelessWidget {
-  final Device device;
+class _ScanResultCard extends StatelessWidget {
+  final ScanResult result;
 
-  const _DeviceCard({required this.device});
+  const _ScanResultCard({required this.result});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final rssiColor = _getRssiColor(device.rssi);
+    final rssiColor = _getRssiColor(result.rssi);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -249,7 +249,7 @@ class _DeviceCard extends StatelessWidget {
           ),
         ),
         title: Text(
-          device.name ?? 'Unknown Device',
+          result.device.name ?? 'Unknown Device',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -258,7 +258,7 @@ class _DeviceCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              device.id.toString(),
+              result.device.id.toString(),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontFamily: 'monospace',
               ),
@@ -269,10 +269,10 @@ class _DeviceCard extends StatelessWidget {
                 Icon(Icons.signal_cellular_alt, size: 16, color: rssiColor),
                 const SizedBox(width: 4),
                 Text(
-                  '${device.rssi} dBm',
+                  '${result.rssi} dBm',
                   style: theme.textTheme.bodySmall?.copyWith(color: rssiColor),
                 ),
-                if (device.advertisement.serviceUuids.isNotEmpty) ...[
+                if (result.advertisement.serviceUuids.isNotEmpty) ...[
                   const SizedBox(width: 16),
                   Icon(
                     Icons.widgets_outlined,
@@ -281,7 +281,7 @@ class _DeviceCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '${device.advertisement.serviceUuids.length} services',
+                    '${result.advertisement.serviceUuids.length} services',
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -290,7 +290,7 @@ class _DeviceCard extends StatelessWidget {
           ],
         ),
         trailing: Icon(Icons.chevron_right, color: theme.colorScheme.outline),
-        onTap: () => _connectToDevice(context, device),
+        onTap: () => _connectToDevice(context, result.device),
         isThreeLine: true,
       ),
     );

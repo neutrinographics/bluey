@@ -16,12 +16,14 @@ void main() {
   });
 
   group('ScanForDevices', () {
-    test('should call repository.scan and return device stream', () async {
+    test('should call repository.scan and return scan result stream', () async {
       // Arrange
-      final mockDevice = Device(
-        id: UUID('00000000-0000-0000-0000-000000000001'),
-        address: '00:11:22:33:44:55',
-        name: 'Test Device',
+      final mockResult = ScanResult(
+        device: Device(
+          id: UUID('00000000-0000-0000-0000-000000000001'),
+          address: '00:11:22:33:44:55',
+          name: 'Test Device',
+        ),
         rssi: -50,
         advertisement: Advertisement.empty(),
         lastSeen: DateTime.now(),
@@ -29,14 +31,14 @@ void main() {
 
       when(
         () => mockRepository.scan(timeout: any(named: 'timeout')),
-      ).thenAnswer((_) => Stream.value(mockDevice));
+      ).thenAnswer((_) => Stream.value(mockResult));
 
       // Act
       final result = useCase(timeout: const Duration(seconds: 10));
-      final devices = await result.toList();
+      final results = await result.toList();
 
       // Assert
-      expect(devices, [mockDevice]);
+      expect(results, [mockResult]);
       verify(
         () => mockRepository.scan(timeout: const Duration(seconds: 10)),
       ).called(1);

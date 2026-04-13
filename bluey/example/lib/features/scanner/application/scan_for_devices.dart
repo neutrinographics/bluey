@@ -10,9 +10,9 @@ class ScanForDevices {
 
   /// Starts scanning for BLE devices.
   ///
-  /// Returns a stream of discovered [Device] objects.
+  /// Returns a stream of discovered [ScanResult] objects.
   /// The scan will automatically stop after [timeout] if provided.
-  Stream<Device> call({Duration? timeout}) {
+  Stream<ScanResult> call({Duration? timeout}) {
     return _repository.scan(timeout: timeout);
   }
 }

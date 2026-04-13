@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -94,7 +95,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         final states = <ConnectionState>[];
@@ -122,7 +123,7 @@ void main() {
           );
 
           final bluey = Bluey();
-          final device = await bluey.scan().first;
+          final device = await scanFirstDevice(bluey);
           final connection = await bluey.connect(device);
 
           final states = <ConnectionState>[];
@@ -170,7 +171,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Perform operations
@@ -279,7 +280,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // First disconnect succeeds
@@ -380,24 +381,28 @@ void main() {
         final bluey = Bluey();
 
         // Start scan
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner.scan().listen(results.add);
 
         await Future.delayed(Duration.zero);
 
         // Cancel scan
         await subscription.cancel();
+        scanner.dispose();
 
         // Device should still be in the found list
-        expect(devices, hasLength(1));
+        expect(results, hasLength(1));
 
         // Can start another scan
-        final devices2 = <Device>[];
-        final subscription2 = bluey.scan().listen(devices2.add);
+        final scanner2 = bluey.scanner();
+        final results2 = <ScanResult>[];
+        final subscription2 = scanner2.scan().listen(results2.add);
         await Future.delayed(Duration.zero);
         await subscription2.cancel();
+        scanner2.dispose();
 
-        expect(devices2, hasLength(1));
+        expect(results2, hasLength(1));
 
         await bluey.dispose();
       });
@@ -417,7 +422,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Trigger service discovery
@@ -438,7 +443,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Request MTU change
@@ -507,7 +512,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         expect(device.name, equals('Test Device'));
 
         await bluey.dispose();
@@ -520,7 +525,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
 
         // Connect
         final connection1 = await bluey.connect(device);

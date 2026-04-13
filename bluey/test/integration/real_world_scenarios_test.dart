@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -70,19 +71,21 @@ void main() {
         final bluey = Bluey();
 
         // Scan for heart rate monitors only
-        final devices = <Device>[];
-        final subscription = bluey
+        final scanner = bluey.scanner();
+        final results = <ScanResult>[];
+        final subscription = scanner
             .scan(services: [UUID(heartRateServiceUuid)])
-            .listen(devices.add);
+            .listen(results.add);
 
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
-        expect(devices, hasLength(1));
-        expect(devices.first.name, equals('HR Monitor'));
+        expect(results, hasLength(1));
+        expect(results.first.device.name, equals('HR Monitor'));
 
         // Connect
-        final connection = await bluey.connect(devices.first);
+        final connection = await bluey.connect(results.first.device);
         expect(connection, isNotNull);
 
         // Discover services
@@ -123,7 +126,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         final location = await fakePlatform.readCharacteristic(
@@ -164,7 +167,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Enable notifications
@@ -254,7 +257,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
         // Request larger MTU for faster transfer
@@ -342,7 +345,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Poll 3 times
@@ -416,7 +419,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         // Read current lock state
@@ -464,7 +467,7 @@ void main() {
         );
 
         final bluey = Bluey();
-        final device = await bluey.scan().first;
+        final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
         await fakePlatform.setNotification(
@@ -653,17 +656,19 @@ void main() {
         final bluey = Bluey();
 
         // Discover all devices
-        final devices = <Device>[];
-        final subscription = bluey.scan().listen(devices.add);
+        final scanner = bluey.scanner();
+        final scanResults = <ScanResult>[];
+        final subscription = scanner.scan().listen(scanResults.add);
         await Future.delayed(Duration.zero);
         await subscription.cancel();
+        scanner.dispose();
 
-        expect(devices, hasLength(3));
+        expect(scanResults, hasLength(3));
 
         // Connect to all devices
         final connections = <Connection>[];
-        for (final device in devices) {
-          final connection = await bluey.connect(device);
+        for (final result in scanResults) {
+          final connection = await bluey.connect(result.device);
           connections.add(connection);
         }
 

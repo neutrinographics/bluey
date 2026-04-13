@@ -269,11 +269,6 @@ class _DeviceInfoCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _InfoItem(
-                  icon: Icons.signal_cellular_alt,
-                  label: 'RSSI',
-                  value: '${device.rssi} dBm',
-                ),
-                _InfoItem(
                   icon: Icons.data_usage,
                   label: 'MTU',
                   value: '${connection.mtu}',

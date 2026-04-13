@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/server.dart';
+import 'package:bluey/src/gatt_server/server.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';

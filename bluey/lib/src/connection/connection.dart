@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
+import '../gatt_client/gatt.dart';
+import '../shared/uuid.dart';
 import 'connection_state.dart';
-import 'gatt.dart';
-import 'uuid.dart';
 
 export 'connection_state.dart';
 
@@ -39,7 +39,7 @@ class ConnectionParameters {
   /// Smaller values provide lower latency but higher power consumption.
   final double intervalMs;
 
-  /// Slave latency (0 to 499).
+  /// Peripheral latency (0 to 499).
   ///
   /// The number of connection events the peripheral can skip if it has
   /// no data to send. Higher values save power but increase latency for

@@ -4,26 +4,36 @@
 /// Domain-Driven Design and Clean Architecture principles.
 library bluey;
 
-// Main entry point
+// Application facade
 export 'src/bluey.dart';
 
-// Core value objects
-export 'src/uuid.dart';
-export 'src/device.dart';
-export 'src/characteristic_properties.dart';
+// Shared kernel
+export 'src/shared/uuid.dart';
+export 'src/shared/manufacturer_data.dart';
+export 'src/shared/characteristic_properties.dart';
+export 'src/shared/exceptions.dart';
 
-// Scanning
-export 'src/scan.dart';
+// Discovery bounded context
+export 'src/discovery/scanner.dart';
+export 'src/discovery/device.dart';
+export 'src/discovery/advertisement.dart';
+export 'src/discovery/scan_result.dart';
+export 'src/discovery/scan.dart';
 
-// GATT interfaces
-export 'src/gatt.dart';
-export 'src/connection.dart';
+// Connection bounded context
+export 'src/connection/connection.dart';
 
-// Server (Peripheral role)
-export 'src/server.dart';
+// GATT Client bounded context
+export 'src/gatt_client/gatt.dart';
+export 'src/gatt_client/well_known_uuids.dart';
 
-// Well-known UUIDs
-export 'src/well_known_uuids.dart';
+// GATT Server bounded context
+export 'src/gatt_server/server.dart';
+export 'src/gatt_server/hosted_gatt.dart';
+export 'src/gatt_server/gatt_request.dart';
 
-// Exception hierarchy
-export 'src/exceptions.dart';
+// Platform bounded context
+export 'src/platform/bluetooth_state.dart';
+
+// Domain events
+export 'src/events.dart';
