@@ -180,7 +180,7 @@ class BlueyServer implements Server {
   }) async {
     final blueyClient = client as BlueyClient;
     await _platform.notifyCharacteristicTo(
-      blueyClient.platformId,
+      blueyClient._platformId,
       characteristic.toString(),
       data,
     );
@@ -188,7 +188,7 @@ class BlueyServer implements Server {
       NotificationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient.platformId,
+        clientId: blueyClient._platformId,
         source: 'BlueyServer',
       ),
     );
@@ -214,7 +214,7 @@ class BlueyServer implements Server {
   }) async {
     final blueyClient = client as BlueyClient;
     await _platform.indicateCharacteristicTo(
-      blueyClient.platformId,
+      blueyClient._platformId,
       characteristic.toString(),
       data,
     );
@@ -222,7 +222,7 @@ class BlueyServer implements Server {
       IndicationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient.platformId,
+        clientId: blueyClient._platformId,
         source: 'BlueyServer',
       ),
     );
@@ -522,7 +522,7 @@ class BlueyServer implements Server {
 /// Concrete implementation of [Client].
 class BlueyClient implements Client {
   final platform.BlueyPlatform _platform;
-  final String platformId;
+  final String _platformId;
   final int _mtu;
 
   BlueyClient({
@@ -530,18 +530,18 @@ class BlueyClient implements Client {
     required String id,
     required int mtu,
   }) : _platform = platform,
-       platformId = id,
+       _platformId = id,
        _mtu = mtu;
 
   @override
   UUID get id {
     // Convert the platform ID to a UUID
     // If it's already a UUID format, use it directly
-    if (platformId.length == 36 && platformId.contains('-')) {
-      return UUID(platformId);
+    if (_platformId.length == 36 && _platformId.contains('-')) {
+      return UUID(_platformId);
     }
     // Otherwise, create a UUID from the string by padding
-    final bytes = platformId.codeUnits;
+    final bytes = _platformId.codeUnits;
     final padded = List<int>.filled(16, 0);
     for (var i = 0; i < bytes.length && i < 16; i++) {
       padded[i] = bytes[i];
@@ -556,6 +556,6 @@ class BlueyClient implements Client {
 
   @override
   Future<void> disconnect() async {
-    await _platform.disconnectCentral(platformId);
+    await _platform.disconnectCentral(_platformId);
   }
 }

@@ -17,7 +17,7 @@ import 'uuid.dart';
 /// directly by users.
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
-  final String _deviceAddress;
+  final String _connectionId;
 
   @override
   final UUID deviceId;
@@ -61,10 +61,10 @@ class BlueyConnection implements Connection {
     required String connectionId,
     required this.deviceId,
   }) : _platform = platformInstance,
-       _deviceAddress = connectionId {
+       _connectionId = connectionId {
     // Subscribe to platform connection state changes
     _platformStateSubscription = _platform
-        .connectionStateStream(_deviceAddress)
+        .connectionStateStream(_connectionId)
         .listen(
           (platformState) {
             _state = _mapConnectionState(platformState);
@@ -77,7 +77,7 @@ class BlueyConnection implements Connection {
 
     // Subscribe to platform bond state changes
     _platformBondStateSubscription = _platform
-        .bondStateStream(_deviceAddress)
+        .bondStateStream(_connectionId)
         .listen(
           (platformBondState) {
             _bondState = _mapBondState(platformBondState);
@@ -89,13 +89,13 @@ class BlueyConnection implements Connection {
         );
 
     // Initialize bond state
-    _platform.getBondState(_deviceAddress).then((platformBondState) {
+    _platform.getBondState(_connectionId).then((platformBondState) {
       _bondState = _mapBondState(platformBondState);
     });
 
     // Subscribe to platform PHY changes
     _platformPhySubscription = _platform
-        .phyStream(_deviceAddress)
+        .phyStream(_connectionId)
         .listen(
           (platformPhy) {
             _txPhy = _mapPhy(platformPhy.tx);
@@ -108,13 +108,13 @@ class BlueyConnection implements Connection {
         );
 
     // Initialize PHY
-    _platform.getPhy(_deviceAddress).then((platformPhy) {
+    _platform.getPhy(_connectionId).then((platformPhy) {
       _txPhy = _mapPhy(platformPhy.tx);
       _rxPhy = _mapPhy(platformPhy.rx);
     });
 
     // Initialize connection parameters
-    _platform.getConnectionParameters(_deviceAddress).then((params) {
+    _platform.getConnectionParameters(_connectionId).then((params) {
       _connectionParameters = _mapConnectionParameters(params);
     });
   }
@@ -152,7 +152,7 @@ class BlueyConnection implements Connection {
       return _cachedServices!;
     }
 
-    final platformServices = await _platform.discoverServices(_deviceAddress);
+    final platformServices = await _platform.discoverServices(_connectionId);
     final allServices =
         platformServices.map((ps) => _mapService(ps)).toList();
 
@@ -176,14 +176,14 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
-    final negotiatedMtu = await _platform.requestMtu(_deviceAddress, mtu);
+    final negotiatedMtu = await _platform.requestMtu(_connectionId, mtu);
     _mtu = negotiatedMtu;
     return _mtu;
   }
 
   @override
   Future<int> readRssi() async {
-    return await _platform.readRssi(_deviceAddress);
+    return await _platform.readRssi(_connectionId);
   }
 
   @override
@@ -201,7 +201,7 @@ class BlueyConnection implements Connection {
     // clean up immediately. Best-effort — the connection may already be lost.
     await _sendDisconnectCommand();
 
-    await _platform.disconnect(_deviceAddress);
+    await _platform.disconnect(_connectionId);
 
     _state = ConnectionState.disconnected;
     _stateController.add(_state);
@@ -219,12 +219,12 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> bond() async {
-    await _platform.bond(_deviceAddress);
+    await _platform.bond(_connectionId);
   }
 
   @override
   Future<void> removeBond() async {
-    await _platform.removeBond(_deviceAddress);
+    await _platform.removeBond(_connectionId);
   }
 
   // === PHY ===
@@ -241,7 +241,7 @@ class BlueyConnection implements Connection {
   @override
   Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
     await _platform.requestPhy(
-      _deviceAddress,
+      _connectionId,
       txPhy != null ? _mapPhyToPlatform(txPhy) : null,
       rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
     );
@@ -255,7 +255,7 @@ class BlueyConnection implements Connection {
   @override
   Future<void> requestConnectionParameters(ConnectionParameters params) async {
     await _platform.requestConnectionParameters(
-      _deviceAddress,
+      _connectionId,
       platform.PlatformConnectionParameters(
         intervalMs: params.intervalMs,
         latency: params.latency,
@@ -299,7 +299,7 @@ class BlueyConnection implements Connection {
     // Read the interval, then start heartbeat at half the server's interval
     if (intervalChar != null) {
       _platform
-          .readCharacteristic(_deviceAddress, intervalChar.uuid.toString())
+          .readCharacteristic(_connectionId, intervalChar.uuid.toString())
           .then((bytes) {
         final serverInterval = lifecycle.decodeInterval(bytes);
         final heartbeatInterval = Duration(
@@ -340,7 +340,7 @@ class BlueyConnection implements Connection {
 
     _platform
         .writeCharacteristic(
-          _deviceAddress,
+          _connectionId,
           charUuid,
           lifecycle.heartbeatValue,
           false, // write without response
@@ -357,7 +357,7 @@ class BlueyConnection implements Connection {
 
     try {
       await _platform.writeCharacteristic(
-        _deviceAddress,
+        _connectionId,
         charUuid,
         lifecycle.disconnectValue,
         false, // write without response
@@ -441,7 +441,7 @@ class BlueyConnection implements Connection {
   BlueyRemoteService _mapService(platform.PlatformService ps) {
     return BlueyRemoteService(
       platform: _platform,
-      deviceAddress: _deviceAddress,
+      connectionId: _connectionId,
       uuid: UUID(ps.uuid),
       isPrimary: ps.isPrimary,
       characteristics:
@@ -456,7 +456,7 @@ class BlueyConnection implements Connection {
   ) {
     return BlueyRemoteCharacteristic(
       platform: _platform,
-      deviceAddress: _deviceAddress,
+      connectionId: _connectionId,
       uuid: UUID(pc.uuid),
       properties: CharacteristicProperties(
         canRead: pc.properties.canRead,
@@ -472,7 +472,7 @@ class BlueyConnection implements Connection {
   BlueyRemoteDescriptor _mapDescriptor(platform.PlatformDescriptor pd) {
     return BlueyRemoteDescriptor(
       platform: _platform,
-      deviceAddress: _deviceAddress,
+      connectionId: _connectionId,
       uuid: UUID(pd.uuid),
     );
   }
@@ -494,7 +494,7 @@ class BlueyRemoteService implements RemoteService {
 
   BlueyRemoteService({
     required platform.BlueyPlatform platform,
-    required String deviceAddress,
+    required String connectionId,
     required this.uuid,
     required this.isPrimary,
     required this.characteristics,
@@ -515,7 +515,7 @@ class BlueyRemoteService implements RemoteService {
 /// Internal implementation of [RemoteCharacteristic].
 class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final platform.BlueyPlatform _platform;
-  final String _deviceAddress;
+  final String _connectionId;
 
   @override
   final UUID uuid;
@@ -531,19 +531,19 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   BlueyRemoteCharacteristic({
     required platform.BlueyPlatform platform,
-    required String deviceAddress,
+    required String connectionId,
     required this.uuid,
     required this.properties,
     required this.descriptors,
   }) : _platform = platform,
-       _deviceAddress = deviceAddress;
+       _connectionId = connectionId;
 
   @override
   Future<Uint8List> read() async {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    return await _platform.readCharacteristic(_deviceAddress, uuid.toString());
+    return await _platform.readCharacteristic(_connectionId, uuid.toString());
   }
 
   @override
@@ -555,7 +555,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
     await _platform.writeCharacteristic(
-      _deviceAddress,
+      _connectionId,
       uuid.toString(),
       value,
       withResponse,
@@ -581,11 +581,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   void _onFirstListen() {
     // Enable notifications on the platform
-    _platform.setNotification(_deviceAddress, uuid.toString(), true);
+    _platform.setNotification(_connectionId, uuid.toString(), true);
 
     // Subscribe to platform notifications
     _notificationSubscription = _platform
-        .notificationStream(_deviceAddress)
+        .notificationStream(_connectionId)
         .where(
           (n) =>
               n.characteristicUuid.toLowerCase() ==
@@ -603,7 +603,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   void _onLastCancel() {
     // Disable notifications on the platform
-    _platform.setNotification(_deviceAddress, uuid.toString(), false);
+    _platform.setNotification(_connectionId, uuid.toString(), false);
 
     // Cancel subscription
     _notificationSubscription?.cancel();
@@ -624,25 +624,25 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 /// Internal implementation of [RemoteDescriptor].
 class BlueyRemoteDescriptor implements RemoteDescriptor {
   final platform.BlueyPlatform _platform;
-  final String _deviceAddress;
+  final String _connectionId;
 
   @override
   final UUID uuid;
 
   BlueyRemoteDescriptor({
     required platform.BlueyPlatform platform,
-    required String deviceAddress,
+    required String connectionId,
     required this.uuid,
   }) : _platform = platform,
-       _deviceAddress = deviceAddress;
+       _connectionId = connectionId;
 
   @override
   Future<Uint8List> read() async {
-    return await _platform.readDescriptor(_deviceAddress, uuid.toString());
+    return await _platform.readDescriptor(_connectionId, uuid.toString());
   }
 
   @override
   Future<void> write(Uint8List value) async {
-    await _platform.writeDescriptor(_deviceAddress, uuid.toString(), value);
+    await _platform.writeDescriptor(_connectionId, uuid.toString(), value);
   }
 }

@@ -117,14 +117,13 @@ class Advertisement {
   }
 }
 
-/// A snapshot of a discovered BLE device at a point in time.
+/// A BLE device with a stable identity.
 ///
-/// This is a value object representing device state when discovered or updated.
-/// Two snapshots with the same [id] are considered equal, even if other
-/// properties differ (e.g., RSSI changed). This enables deduplication in
-/// collections while preserving the latest snapshot data.
+/// This is an entity — two devices with the same [id] are considered equal,
+/// even if other properties differ (e.g., name changed). This enables
+/// deduplication in collections.
 ///
-/// Immutable - use [copyWith] to create updated snapshots.
+/// Immutable — use [copyWith] to create updated instances.
 @immutable
 class Device {
   /// Unique device identifier as a UUID.
