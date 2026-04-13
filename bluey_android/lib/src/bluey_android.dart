@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'android_scanner.dart';
 import 'messages.g.dart';
 
 /// Android implementation of [BlueyPlatform].
@@ -12,11 +13,10 @@ final class BlueyAndroid extends BlueyPlatform {
 
   final BlueyHostApi _hostApi = BlueyHostApi();
   final _BlueyFlutterApiImpl _flutterApi = _BlueyFlutterApiImpl();
+  late final AndroidScanner _scanner = AndroidScanner(_hostApi);
 
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-  final StreamController<PlatformDevice> _scanController =
-      StreamController<PlatformDevice>.broadcast();
   final Map<String, StreamController<PlatformConnectionState>>
   _connectionStateControllers = {};
   final Map<String, StreamController<PlatformNotification>>
@@ -52,11 +52,11 @@ final class BlueyAndroid extends BlueyPlatform {
     };
 
     _flutterApi.onDeviceDiscoveredCallback = (device) {
-      _scanController.add(_mapDevice(device));
+      _scanner.onDeviceDiscovered(device);
     };
 
     _flutterApi.onScanCompleteCallback = () {
-      // Scan completed - close and recreate the controller for next scan
+      _scanner.onScanComplete();
     };
 
     _flutterApi.onConnectionStateChangedCallback = (event) {
@@ -180,21 +180,13 @@ final class BlueyAndroid extends BlueyPlatform {
   @override
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
     _ensureInitialized();
-    final dto = ScanConfigDto(
-      serviceUuids: config.serviceUuids,
-      timeoutMs: config.timeoutMs,
-    );
-
-    // Start scan (async, doesn't block)
-    _hostApi.startScan(dto);
-
-    return _scanController.stream;
+    return _scanner.scan(config);
   }
 
   @override
   Future<void> stopScan() async {
     _ensureInitialized();
-    await _hostApi.stopScan();
+    await _scanner.stopScan();
   }
 
   @override
@@ -574,17 +566,6 @@ final class BlueyAndroid extends BlueyPlatform {
       case ConnectionStateDto.disconnecting:
         return PlatformConnectionState.disconnecting;
     }
-  }
-
-  PlatformDevice _mapDevice(DeviceDto dto) {
-    return PlatformDevice(
-      id: dto.id,
-      name: dto.name,
-      rssi: dto.rssi,
-      serviceUuids: dto.serviceUuids,
-      manufacturerDataCompanyId: dto.manufacturerDataCompanyId,
-      manufacturerData: dto.manufacturerData,
-    );
   }
 
   PlatformService _mapService(ServiceDto dto) {
