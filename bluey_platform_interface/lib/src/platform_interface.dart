@@ -1,8 +1,19 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'capabilities.dart';
+
+/// Value equality for lists (replaces flutter/foundation listEquals).
+bool _listEquals<T>(List<T>? a, List<T>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (int i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
 
 /// Bluetooth adapter state.
 enum BluetoothState {
@@ -62,7 +73,7 @@ class PlatformScanConfig {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is PlatformScanConfig &&
-        listEquals(other.serviceUuids, serviceUuids) &&
+        _listEquals(other.serviceUuids, serviceUuids) &&
         other.timeoutMs == timeoutMs;
   }
 
@@ -186,9 +197,9 @@ class PlatformDevice {
         other.id == id &&
         other.name == name &&
         other.rssi == rssi &&
-        listEquals(other.serviceUuids, serviceUuids) &&
+        _listEquals(other.serviceUuids, serviceUuids) &&
         other.manufacturerDataCompanyId == manufacturerDataCompanyId &&
-        listEquals(other.manufacturerData, manufacturerData);
+        _listEquals(other.manufacturerData, manufacturerData);
   }
 
   @override
