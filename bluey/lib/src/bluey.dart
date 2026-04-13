@@ -3,45 +3,23 @@ import 'dart:async';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'bluey_connection.dart';
-import 'bluey_scanner.dart';
-import 'bluey_server.dart';
-import 'connection.dart';
-import 'connection_state.dart';
-import 'device.dart';
+import 'connection/bluey_connection.dart';
+import 'connection/connection.dart';
+import 'connection/connection_state.dart';
+import 'discovery/bluey_scanner.dart';
+import 'discovery/device.dart';
+import 'discovery/scanner.dart';
 import 'event_bus.dart';
 import 'events.dart';
-import 'exceptions.dart';
-import 'scanner.dart';
-import 'server.dart';
-import 'uuid.dart';
+import 'gatt_server/bluey_server.dart';
+import 'gatt_server/server.dart';
+import 'platform/bluetooth_state.dart';
+import 'shared/exceptions.dart';
+import 'shared/uuid.dart';
 
 export 'events.dart';
-export 'scanner.dart';
-
-/// The state of the Bluetooth adapter.
-enum BluetoothState {
-  /// Initial state before platform reports.
-  unknown,
-
-  /// Device doesn't support BLE.
-  unsupported,
-
-  /// Permission not granted.
-  unauthorized,
-
-  /// Bluetooth is disabled.
-  off,
-
-  /// Bluetooth is ready to use.
-  on;
-
-  /// Whether Bluetooth is ready for use.
-  bool get isReady => this == BluetoothState.on;
-
-  /// Whether Bluetooth can be enabled (only true when off).
-  bool get canBeEnabled => this == BluetoothState.off;
-}
+export 'discovery/scanner.dart';
+export 'platform/bluetooth_state.dart';
 
 /// The main entry point to Bluey.
 ///

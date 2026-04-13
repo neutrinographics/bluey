@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import 'characteristic_properties.dart';
-import 'uuid.dart';
+import '../shared/characteristic_properties.dart';
+import '../shared/uuid.dart';
 
 /// Permissions for GATT characteristic and descriptor values.
 ///

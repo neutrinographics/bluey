@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bluey/src/device.dart';
-import 'package:bluey/src/advertisement.dart';
-import 'package:bluey/src/manufacturer_data.dart';
-import 'package:bluey/src/uuid.dart';
-import 'package:bluey/src/well_known_uuids.dart';
+import 'package:bluey/src/discovery/device.dart';
+import 'package:bluey/src/discovery/advertisement.dart';
+import 'package:bluey/src/shared/manufacturer_data.dart';
+import 'package:bluey/src/shared/uuid.dart';
+import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 
 void main() {
   group('Advertisement', () {

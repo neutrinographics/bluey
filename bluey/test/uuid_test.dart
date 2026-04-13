@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bluey/src/uuid.dart';
-import 'package:bluey/src/well_known_uuids.dart';
+import 'package:bluey/src/shared/uuid.dart';
+import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 
 void main() {
   group('UUID', () {

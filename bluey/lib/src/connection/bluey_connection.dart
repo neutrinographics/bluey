@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'characteristic_properties.dart';
+import '../gatt_client/gatt.dart';
+import '../lifecycle.dart' as lifecycle;
+import '../shared/characteristic_properties.dart';
+import '../shared/exceptions.dart';
+import '../shared/uuid.dart';
 import 'connection.dart';
 import 'connection_state.dart';
-import 'exceptions.dart';
-import 'gatt.dart';
-import 'lifecycle.dart' as lifecycle;
-import 'uuid.dart';
 
 /// Internal implementation of [Connection] that wraps platform calls.
 ///

@@ -1,5 +1,5 @@
+import '../shared/uuid.dart';
 import 'scan_result.dart';
-import 'uuid.dart';
 
 /// Aggregate root for the Discovery bounded context.
 ///

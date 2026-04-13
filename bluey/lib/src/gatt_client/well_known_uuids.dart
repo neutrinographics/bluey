@@ -1,4 +1,4 @@
-import 'uuid.dart';
+import '../shared/uuid.dart';
 
 /// Standard Bluetooth SIG service UUIDs.
 ///

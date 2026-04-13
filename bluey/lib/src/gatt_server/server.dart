@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'manufacturer_data.dart';
-import 'uuid.dart';
+import '../shared/manufacturer_data.dart';
+import '../shared/uuid.dart';
 import 'gatt_request.dart';
 import 'hosted_gatt.dart';
 

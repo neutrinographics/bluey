@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import 'uuid.dart';
+import '../shared/uuid.dart';
 
 /// A BLE device with a stable identity.
 ///

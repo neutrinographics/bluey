@@ -1,8 +1,8 @@
 import 'package:meta/meta.dart';
 
+import '../gatt_client/gatt.dart';
+import '../shared/uuid.dart';
 import 'connection_state.dart';
-import 'gatt.dart';
-import 'uuid.dart';
 
 export 'connection_state.dart';
 

@@ -3,14 +3,14 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
+import '../event_bus.dart';
+import '../events.dart';
+import '../shared/manufacturer_data.dart';
+import '../shared/uuid.dart';
 import 'advertisement.dart';
 import 'device.dart';
-import 'event_bus.dart';
-import 'events.dart';
-import 'manufacturer_data.dart';
 import 'scan_result.dart';
 import 'scanner.dart';
-import 'uuid.dart';
 
 /// Concrete implementation of [Scanner] that delegates to the platform.
 class BlueyScanner implements Scanner {

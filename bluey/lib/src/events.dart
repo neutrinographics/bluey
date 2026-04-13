@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import 'uuid.dart';
+import 'shared/uuid.dart';
 
 /// Base class for all Bluey diagnostic events.
 ///

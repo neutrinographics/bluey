@@ -4,12 +4,12 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import 'manufacturer_data.dart';
-import 'event_bus.dart';
-import 'events.dart';
-import 'lifecycle.dart' as lifecycle;
+import '../event_bus.dart';
+import '../events.dart';
+import '../lifecycle.dart' as lifecycle;
+import '../shared/manufacturer_data.dart';
+import '../shared/uuid.dart';
 import 'server.dart';
-import 'uuid.dart';
 
 /// Concrete implementation of [Server] that delegates to the platform.
 class BlueyServer implements Server {

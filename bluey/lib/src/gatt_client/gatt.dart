@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-import 'characteristic_properties.dart';
-import 'uuid.dart';
+import '../shared/characteristic_properties.dart';
+import '../shared/uuid.dart';
 
 /// A descriptor on a connected device.
 ///
