@@ -2,45 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'messages.g.dart';
-
-/// Bluetooth SIG base UUID suffix for short UUID expansion.
-const _bluetoothBaseUuidSuffix = '-0000-1000-8000-00805f9b34fb';
-
-/// Expands a short UUID (4 or 8 hex chars) to full 128-bit UUID string.
-///
-/// CoreBluetooth may return UUIDs in short form. This function normalizes
-/// them to the full 128-bit format expected by the domain layer.
-///
-/// Examples:
-/// - "180F" -> "0000180f-0000-1000-8000-00805f9b34fb"
-/// - "12345678" -> "12345678-0000-1000-8000-00805f9b34fb"
-/// - Full UUID -> returned as-is (lowercased with hyphens)
-String _expandUuid(String uuid) {
-  // Remove any existing hyphens and lowercase
-  final clean = uuid.replaceAll('-', '').toLowerCase();
-
-  // 16-bit short UUID (4 hex chars)
-  if (clean.length == 4) {
-    return '0000$clean$_bluetoothBaseUuidSuffix';
-  }
-
-  // 32-bit short UUID (8 hex chars)
-  if (clean.length == 8) {
-    return '$clean$_bluetoothBaseUuidSuffix';
-  }
-
-  // Full 128-bit UUID (32 hex chars) - add hyphens in standard format
-  if (clean.length == 32) {
-    return '${clean.substring(0, 8)}-'
-        '${clean.substring(8, 12)}-'
-        '${clean.substring(12, 16)}-'
-        '${clean.substring(16, 20)}-'
-        '${clean.substring(20, 32)}';
-  }
-
-  // Unknown format - return as-is and let the domain layer handle validation
-  return uuid.toLowerCase();
-}
+import 'uuid_utils.dart';
 
 /// iOS implementation of [BlueyPlatform].
 final class BlueyIos extends BlueyPlatform {
@@ -109,7 +71,7 @@ final class BlueyIos extends BlueyPlatform {
         controller.add(
           PlatformNotification(
             deviceId: event.deviceId,
-            characteristicUuid: _expandUuid(event.characteristicUuid),
+            characteristicUuid: expandUuid(event.characteristicUuid),
             value: event.value,
           ),
         );
@@ -136,7 +98,7 @@ final class BlueyIos extends BlueyPlatform {
         PlatformReadRequest(
           requestId: request.requestId,
           centralId: request.centralId,
-          characteristicUuid: _expandUuid(request.characteristicUuid),
+          characteristicUuid: expandUuid(request.characteristicUuid),
           offset: request.offset,
         ),
       );
@@ -147,7 +109,7 @@ final class BlueyIos extends BlueyPlatform {
         PlatformWriteRequest(
           requestId: request.requestId,
           centralId: request.centralId,
-          characteristicUuid: _expandUuid(request.characteristicUuid),
+          characteristicUuid: expandUuid(request.characteristicUuid),
           value: request.value,
           offset: request.offset,
           responseNeeded: request.responseNeeded,
@@ -160,7 +122,7 @@ final class BlueyIos extends BlueyPlatform {
       characteristicUuid,
     ) {
       // Could expose this as a stream if needed
-      // Note: characteristicUuid would need _expandUuid if exposed
+      // Note: characteristicUuid would need expandUuid if exposed
     };
 
     _flutterApi.onCharacteristicUnsubscribedCallback = (
@@ -168,7 +130,7 @@ final class BlueyIos extends BlueyPlatform {
       characteristicUuid,
     ) {
       // Could expose this as a stream if needed
-      // Note: characteristicUuid would need _expandUuid if exposed
+      // Note: characteristicUuid would need expandUuid if exposed
     };
   }
 
@@ -616,7 +578,7 @@ final class BlueyIos extends BlueyPlatform {
       name: dto.name,
       rssi: dto.rssi,
       // Expand short UUIDs from CoreBluetooth to full 128-bit format
-      serviceUuids: dto.serviceUuids.map(_expandUuid).toList(),
+      serviceUuids: dto.serviceUuids.map(expandUuid).toList(),
       manufacturerDataCompanyId: dto.manufacturerDataCompanyId,
       manufacturerData: dto.manufacturerData,
     );
@@ -624,7 +586,7 @@ final class BlueyIos extends BlueyPlatform {
 
   PlatformService _mapService(ServiceDto dto) {
     return PlatformService(
-      uuid: _expandUuid(dto.uuid),
+      uuid: expandUuid(dto.uuid),
       isPrimary: dto.isPrimary,
       characteristics: dto.characteristics.map(_mapCharacteristic).toList(),
       includedServices: dto.includedServices.map(_mapService).toList(),
@@ -633,7 +595,7 @@ final class BlueyIos extends BlueyPlatform {
 
   PlatformCharacteristic _mapCharacteristic(CharacteristicDto dto) {
     return PlatformCharacteristic(
-      uuid: _expandUuid(dto.uuid),
+      uuid: expandUuid(dto.uuid),
       properties: PlatformCharacteristicProperties(
         canRead: dto.properties.canRead,
         canWrite: dto.properties.canWrite,
@@ -646,7 +608,7 @@ final class BlueyIos extends BlueyPlatform {
   }
 
   PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
-    return PlatformDescriptor(uuid: _expandUuid(dto.uuid));
+    return PlatformDescriptor(uuid: expandUuid(dto.uuid));
   }
 
   // Mapping functions for Server types
