@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'android_connection_manager.dart';
 import 'android_scanner.dart';
+import 'android_server.dart';
 import 'messages.g.dart';
 
 /// Android implementation of [BlueyPlatform].
@@ -17,19 +18,10 @@ final class BlueyAndroid extends BlueyPlatform {
   late final AndroidScanner _scanner = AndroidScanner(_hostApi);
   late final AndroidConnectionManager _connectionManager =
       AndroidConnectionManager(_hostApi);
+  late final AndroidServer _server = AndroidServer(_hostApi);
 
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-
-  // Server (peripheral) streams
-  final StreamController<PlatformCentral> _centralConnectionsController =
-      StreamController<PlatformCentral>.broadcast();
-  final StreamController<String> _centralDisconnectionsController =
-      StreamController<String>.broadcast();
-  final StreamController<PlatformReadRequest> _readRequestsController =
-      StreamController<PlatformReadRequest>.broadcast();
-  final StreamController<PlatformWriteRequest> _writeRequestsController =
-      StreamController<PlatformWriteRequest>.broadcast();
 
   bool _isInitialized = false;
 
@@ -72,37 +64,19 @@ final class BlueyAndroid extends BlueyPlatform {
 
     // Server (peripheral) callbacks
     _flutterApi.onCentralConnectedCallback = (central) {
-      _centralConnectionsController.add(
-        PlatformCentral(id: central.id, mtu: central.mtu),
-      );
+      _server.onCentralConnected(central);
     };
 
     _flutterApi.onCentralDisconnectedCallback = (centralId) {
-      _centralDisconnectionsController.add(centralId);
+      _server.onCentralDisconnected(centralId);
     };
 
     _flutterApi.onReadRequestCallback = (request) {
-      _readRequestsController.add(
-        PlatformReadRequest(
-          requestId: request.requestId,
-          centralId: request.centralId,
-          characteristicUuid: request.characteristicUuid,
-          offset: request.offset,
-        ),
-      );
+      _server.onReadRequest(request);
     };
 
     _flutterApi.onWriteRequestCallback = (request) {
-      _writeRequestsController.add(
-        PlatformWriteRequest(
-          requestId: request.requestId,
-          centralId: request.centralId,
-          characteristicUuid: request.characteristicUuid,
-          value: request.value,
-          offset: request.offset,
-          responseNeeded: request.responseNeeded,
-        ),
-      );
+      _server.onWriteRequest(request);
     };
 
     _flutterApi.onCharacteristicSubscribedCallback = (
@@ -355,46 +329,25 @@ final class BlueyAndroid extends BlueyPlatform {
   @override
   Future<void> addService(PlatformLocalService service) async {
     _ensureInitialized();
-    final dto = _mapLocalServiceToDto(service);
-    await _hostApi.addService(dto);
+    await _server.addService(service);
   }
 
   @override
   Future<void> removeService(String serviceUuid) async {
     _ensureInitialized();
-    await _hostApi.removeService(serviceUuid);
+    await _server.removeService(serviceUuid);
   }
 
   @override
   Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
     _ensureInitialized();
-    final dto = AdvertiseConfigDto(
-      name: config.name,
-      serviceUuids: config.serviceUuids,
-      manufacturerDataCompanyId: config.manufacturerDataCompanyId,
-      manufacturerData: config.manufacturerData,
-      timeoutMs: config.timeoutMs,
-      mode: _mapAdvertiseModeToDto(config.mode),
-    );
-    await _hostApi.startAdvertising(dto);
-  }
-
-  AdvertiseModeDto? _mapAdvertiseModeToDto(PlatformAdvertiseMode? mode) {
-    if (mode == null) return null;
-    switch (mode) {
-      case PlatformAdvertiseMode.lowPower:
-        return AdvertiseModeDto.lowPower;
-      case PlatformAdvertiseMode.balanced:
-        return AdvertiseModeDto.balanced;
-      case PlatformAdvertiseMode.lowLatency:
-        return AdvertiseModeDto.lowLatency;
-    }
+    await _server.startAdvertising(config);
   }
 
   @override
   Future<void> stopAdvertising() async {
     _ensureInitialized();
-    await _hostApi.stopAdvertising();
+    await _server.stopAdvertising();
   }
 
   @override
@@ -403,7 +356,7 @@ final class BlueyAndroid extends BlueyPlatform {
     Uint8List value,
   ) async {
     _ensureInitialized();
-    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+    await _server.notifyCharacteristic(characteristicUuid, value);
   }
 
   @override
@@ -413,7 +366,7 @@ final class BlueyAndroid extends BlueyPlatform {
     Uint8List value,
   ) async {
     _ensureInitialized();
-    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+    await _server.notifyCharacteristicTo(centralId, characteristicUuid, value);
   }
 
   @override
@@ -422,9 +375,7 @@ final class BlueyAndroid extends BlueyPlatform {
     Uint8List value,
   ) async {
     _ensureInitialized();
-    // Android uses the same API for notifications and indications
-    // The characteristic's properties determine which is used
-    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+    await _server.indicateCharacteristic(characteristicUuid, value);
   }
 
   @override
@@ -434,31 +385,31 @@ final class BlueyAndroid extends BlueyPlatform {
     Uint8List value,
   ) async {
     _ensureInitialized();
-    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+    await _server.indicateCharacteristicTo(centralId, characteristicUuid, value);
   }
 
   @override
   Stream<PlatformCentral> get centralConnections {
     _ensureInitialized();
-    return _centralConnectionsController.stream;
+    return _server.centralConnections;
   }
 
   @override
   Stream<String> get centralDisconnections {
     _ensureInitialized();
-    return _centralDisconnectionsController.stream;
+    return _server.centralDisconnections;
   }
 
   @override
   Stream<PlatformReadRequest> get readRequests {
     _ensureInitialized();
-    return _readRequestsController.stream;
+    return _server.readRequests;
   }
 
   @override
   Stream<PlatformWriteRequest> get writeRequests {
     _ensureInitialized();
-    return _writeRequestsController.stream;
+    return _server.writeRequests;
   }
 
   @override
@@ -468,11 +419,7 @@ final class BlueyAndroid extends BlueyPlatform {
     Uint8List? value,
   ) async {
     _ensureInitialized();
-    await _hostApi.respondToReadRequest(
-      requestId,
-      _mapGattStatusToDto(status),
-      value,
-    );
+    await _server.respondToReadRequest(requestId, status, value);
   }
 
   @override
@@ -481,22 +428,19 @@ final class BlueyAndroid extends BlueyPlatform {
     PlatformGattStatus status,
   ) async {
     _ensureInitialized();
-    await _hostApi.respondToWriteRequest(
-      requestId,
-      _mapGattStatusToDto(status),
-    );
+    await _server.respondToWriteRequest(requestId, status);
   }
 
   @override
   Future<void> disconnectCentral(String centralId) async {
     _ensureInitialized();
-    await _hostApi.disconnectCentral(centralId);
+    await _server.disconnectCentral(centralId);
   }
 
   @override
   Future<void> closeServer() async {
     _ensureInitialized();
-    await _hostApi.closeServer();
+    await _server.closeServer();
   }
 
   // Mapping functions from DTOs to platform interface types
@@ -513,83 +457,6 @@ final class BlueyAndroid extends BlueyPlatform {
         return BluetoothState.off;
       case BluetoothStateDto.on:
         return BluetoothState.on;
-    }
-  }
-
-  // Mapping functions for Server types
-
-  LocalServiceDto _mapLocalServiceToDto(PlatformLocalService service) {
-    return LocalServiceDto(
-      uuid: service.uuid,
-      isPrimary: service.isPrimary,
-      characteristics:
-          service.characteristics.map(_mapLocalCharacteristicToDto).toList(),
-      includedServices:
-          service.includedServices.map(_mapLocalServiceToDto).toList(),
-    );
-  }
-
-  LocalCharacteristicDto _mapLocalCharacteristicToDto(
-    PlatformLocalCharacteristic characteristic,
-  ) {
-    return LocalCharacteristicDto(
-      uuid: characteristic.uuid,
-      properties: CharacteristicPropertiesDto(
-        canRead: characteristic.properties.canRead,
-        canWrite: characteristic.properties.canWrite,
-        canWriteWithoutResponse:
-            characteristic.properties.canWriteWithoutResponse,
-        canNotify: characteristic.properties.canNotify,
-        canIndicate: characteristic.properties.canIndicate,
-      ),
-      permissions:
-          characteristic.permissions.map(_mapGattPermissionToDto).toList(),
-      descriptors:
-          characteristic.descriptors.map(_mapLocalDescriptorToDto).toList(),
-    );
-  }
-
-  LocalDescriptorDto _mapLocalDescriptorToDto(
-    PlatformLocalDescriptor descriptor,
-  ) {
-    return LocalDescriptorDto(
-      uuid: descriptor.uuid,
-      permissions: descriptor.permissions.map(_mapGattPermissionToDto).toList(),
-      value: descriptor.value,
-    );
-  }
-
-  GattPermissionDto _mapGattPermissionToDto(PlatformGattPermission permission) {
-    switch (permission) {
-      case PlatformGattPermission.read:
-        return GattPermissionDto.read;
-      case PlatformGattPermission.readEncrypted:
-        return GattPermissionDto.readEncrypted;
-      case PlatformGattPermission.write:
-        return GattPermissionDto.write;
-      case PlatformGattPermission.writeEncrypted:
-        return GattPermissionDto.writeEncrypted;
-    }
-  }
-
-  GattStatusDto _mapGattStatusToDto(PlatformGattStatus status) {
-    switch (status) {
-      case PlatformGattStatus.success:
-        return GattStatusDto.success;
-      case PlatformGattStatus.readNotPermitted:
-        return GattStatusDto.readNotPermitted;
-      case PlatformGattStatus.writeNotPermitted:
-        return GattStatusDto.writeNotPermitted;
-      case PlatformGattStatus.invalidOffset:
-        return GattStatusDto.invalidOffset;
-      case PlatformGattStatus.invalidAttributeLength:
-        return GattStatusDto.invalidAttributeLength;
-      case PlatformGattStatus.insufficientAuthentication:
-        return GattStatusDto.insufficientAuthentication;
-      case PlatformGattStatus.insufficientEncryption:
-        return GattStatusDto.insufficientEncryption;
-      case PlatformGattStatus.requestNotSupported:
-        return GattStatusDto.requestNotSupported;
     }
   }
 }
