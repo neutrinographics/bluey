@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'ios_connection_manager.dart';
 import 'ios_scanner.dart';
 import 'messages.g.dart';
 import 'uuid_utils.dart';
@@ -15,13 +16,11 @@ final class BlueyIos extends BlueyPlatform {
   final BlueyHostApi _hostApi = BlueyHostApi();
   final _BlueyFlutterApiImpl _flutterApi = _BlueyFlutterApiImpl();
   late final IosScanner _scanner = IosScanner(_hostApi);
+  late final IosConnectionManager _connectionManager =
+      IosConnectionManager(_hostApi);
 
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-  final Map<String, StreamController<PlatformConnectionState>>
-  _connectionStateControllers = {};
-  final Map<String, StreamController<PlatformNotification>>
-  _notificationControllers = {};
 
   // Server (peripheral) streams
   final StreamController<PlatformCentral> _centralConnectionsController =
@@ -54,29 +53,12 @@ final class BlueyIos extends BlueyPlatform {
 
     _flutterApi.onScanCompleteCallback = _scanner.onScanComplete;
 
-    _flutterApi.onConnectionStateChangedCallback = (event) {
-      final controller = _connectionStateControllers[event.deviceId];
-      if (controller != null) {
-        controller.add(_mapConnectionState(event.state));
-      }
-    };
+    _flutterApi.onConnectionStateChangedCallback =
+        _connectionManager.onConnectionStateChanged;
 
-    _flutterApi.onNotificationCallback = (event) {
-      final controller = _notificationControllers[event.deviceId];
-      if (controller != null) {
-        controller.add(
-          PlatformNotification(
-            deviceId: event.deviceId,
-            characteristicUuid: expandUuid(event.characteristicUuid),
-            value: event.value,
-          ),
-        );
-      }
-    };
+    _flutterApi.onNotificationCallback = _connectionManager.onNotification;
 
-    _flutterApi.onMtuChangedCallback = (event) {
-      // MTU change callback
-    };
+    _flutterApi.onMtuChangedCallback = _connectionManager.onMtuChanged;
 
     // Server (peripheral) callbacks
     _flutterApi.onCentralConnectedCallback = (central) {
@@ -191,40 +173,19 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     _ensureInitialized();
-    final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
-
-    // Create connection state controller for this device
-    _connectionStateControllers[deviceId] =
-        StreamController<PlatformConnectionState>.broadcast();
-
-    // Create notification controller for this device
-    _notificationControllers[deviceId] =
-        StreamController<PlatformNotification>.broadcast();
-
-    return await _hostApi.connect(deviceId, dto);
+    return await _connectionManager.connect(deviceId, config);
   }
 
   @override
   Future<void> disconnect(String deviceId) async {
     _ensureInitialized();
-    await _hostApi.disconnect(deviceId);
-
-    // Clean up controllers
-    final stateController = _connectionStateControllers.remove(deviceId);
-    await stateController?.close();
-
-    final notificationController = _notificationControllers.remove(deviceId);
-    await notificationController?.close();
+    await _connectionManager.disconnect(deviceId);
   }
 
   @override
   Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
     _ensureInitialized();
-    final controller = _connectionStateControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
+    return _connectionManager.connectionStateStream(deviceId);
   }
 
   // === GATT Operations ===
@@ -232,8 +193,7 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Future<List<PlatformService>> discoverServices(String deviceId) async {
     _ensureInitialized();
-    final services = await _hostApi.discoverServices(deviceId);
-    return services.map(_mapService).toList();
+    return await _connectionManager.discoverServices(deviceId);
   }
 
   @override
@@ -242,7 +202,10 @@ final class BlueyIos extends BlueyPlatform {
     String characteristicUuid,
   ) async {
     _ensureInitialized();
-    return await _hostApi.readCharacteristic(deviceId, characteristicUuid);
+    return await _connectionManager.readCharacteristic(
+      deviceId,
+      characteristicUuid,
+    );
   }
 
   @override
@@ -253,7 +216,7 @@ final class BlueyIos extends BlueyPlatform {
     bool withResponse,
   ) async {
     _ensureInitialized();
-    await _hostApi.writeCharacteristic(
+    await _connectionManager.writeCharacteristic(
       deviceId,
       characteristicUuid,
       value,
@@ -268,17 +231,17 @@ final class BlueyIos extends BlueyPlatform {
     bool enable,
   ) async {
     _ensureInitialized();
-    await _hostApi.setNotification(deviceId, characteristicUuid, enable);
+    await _connectionManager.setNotification(
+      deviceId,
+      characteristicUuid,
+      enable,
+    );
   }
 
   @override
   Stream<PlatformNotification> notificationStream(String deviceId) {
     _ensureInitialized();
-    final controller = _notificationControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
+    return _connectionManager.notificationStream(deviceId);
   }
 
   @override
@@ -287,7 +250,7 @@ final class BlueyIos extends BlueyPlatform {
     String descriptorUuid,
   ) async {
     _ensureInitialized();
-    return await _hostApi.readDescriptor(deviceId, descriptorUuid);
+    return await _connectionManager.readDescriptor(deviceId, descriptorUuid);
   }
 
   @override
@@ -297,71 +260,57 @@ final class BlueyIos extends BlueyPlatform {
     Uint8List value,
   ) async {
     _ensureInitialized();
-    await _hostApi.writeDescriptor(deviceId, descriptorUuid, value);
+    await _connectionManager.writeDescriptor(deviceId, descriptorUuid, value);
   }
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async {
-    // iOS automatically negotiates MTU, cannot request specific MTU
-    throw UnsupportedError(
-      'iOS does not support requesting a specific MTU. '
-      'MTU is automatically negotiated by the system.',
-    );
+    return await _connectionManager.requestMtu(deviceId, mtu);
   }
 
   @override
   Future<int> readRssi(String deviceId) async {
     _ensureInitialized();
-    return await _hostApi.readRssi(deviceId);
+    return await _connectionManager.readRssi(deviceId);
   }
 
   // === Bonding (iOS handles automatically) ===
 
   @override
   Future<PlatformBondState> getBondState(String deviceId) async {
-    // iOS doesn't expose bond state
-    return PlatformBondState.none;
+    return await _connectionManager.getBondState(deviceId);
   }
 
   @override
   Stream<PlatformBondState> bondStateStream(String deviceId) {
-    // iOS doesn't expose bond state changes
-    return const Stream.empty();
+    return _connectionManager.bondStateStream(deviceId);
   }
 
   @override
   Future<void> bond(String deviceId) async {
-    // iOS handles bonding automatically when accessing encrypted characteristics
-    // No-op on iOS
+    await _connectionManager.bond(deviceId);
   }
 
   @override
   Future<void> removeBond(String deviceId) async {
-    // iOS doesn't allow programmatic bond removal
-    throw UnsupportedError(
-      'iOS does not support removing bonds programmatically. '
-      'Users must remove the device from Settings > Bluetooth.',
-    );
+    await _connectionManager.removeBond(deviceId);
   }
 
   @override
   Future<List<PlatformDevice>> getBondedDevices() async {
-    // iOS doesn't provide a list of bonded devices
-    return [];
+    return await _connectionManager.getBondedDevices();
   }
 
   // === PHY (limited iOS support) ===
 
   @override
   Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
-    // iOS doesn't expose PHY information
-    throw UnsupportedError('iOS does not support reading PHY information.');
+    return await _connectionManager.getPhy(deviceId);
   }
 
   @override
   Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
-    // iOS doesn't expose PHY changes
-    return const Stream.empty();
+    return _connectionManager.phyStream(deviceId);
   }
 
   @override
@@ -370,8 +319,7 @@ final class BlueyIos extends BlueyPlatform {
     PlatformPhy? txPhy,
     PlatformPhy? rxPhy,
   ) async {
-    // iOS doesn't support requesting PHY
-    throw UnsupportedError('iOS does not support requesting PHY settings.');
+    await _connectionManager.requestPhy(deviceId, txPhy, rxPhy);
   }
 
   // === Connection Parameters (not available on iOS) ===
@@ -380,9 +328,7 @@ final class BlueyIos extends BlueyPlatform {
   Future<PlatformConnectionParameters> getConnectionParameters(
     String deviceId,
   ) async {
-    throw UnsupportedError(
-      'iOS does not support reading connection parameters.',
-    );
+    return await _connectionManager.getConnectionParameters(deviceId);
   }
 
   @override
@@ -390,9 +336,7 @@ final class BlueyIos extends BlueyPlatform {
     String deviceId,
     PlatformConnectionParameters params,
   ) async {
-    throw UnsupportedError(
-      'iOS does not support requesting connection parameters.',
-    );
+    await _connectionManager.requestConnectionParameters(deviceId, params);
   }
 
   // === Server (Peripheral) Operations ===
@@ -546,46 +490,6 @@ final class BlueyIos extends BlueyPlatform {
       case BluetoothStateDto.on:
         return BluetoothState.on;
     }
-  }
-
-  PlatformConnectionState _mapConnectionState(ConnectionStateDto dto) {
-    switch (dto) {
-      case ConnectionStateDto.disconnected:
-        return PlatformConnectionState.disconnected;
-      case ConnectionStateDto.connecting:
-        return PlatformConnectionState.connecting;
-      case ConnectionStateDto.connected:
-        return PlatformConnectionState.connected;
-      case ConnectionStateDto.disconnecting:
-        return PlatformConnectionState.disconnecting;
-    }
-  }
-
-  PlatformService _mapService(ServiceDto dto) {
-    return PlatformService(
-      uuid: expandUuid(dto.uuid),
-      isPrimary: dto.isPrimary,
-      characteristics: dto.characteristics.map(_mapCharacteristic).toList(),
-      includedServices: dto.includedServices.map(_mapService).toList(),
-    );
-  }
-
-  PlatformCharacteristic _mapCharacteristic(CharacteristicDto dto) {
-    return PlatformCharacteristic(
-      uuid: expandUuid(dto.uuid),
-      properties: PlatformCharacteristicProperties(
-        canRead: dto.properties.canRead,
-        canWrite: dto.properties.canWrite,
-        canWriteWithoutResponse: dto.properties.canWriteWithoutResponse,
-        canNotify: dto.properties.canNotify,
-        canIndicate: dto.properties.canIndicate,
-      ),
-      descriptors: dto.descriptors.map(_mapDescriptor).toList(),
-    );
-  }
-
-  PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
-    return PlatformDescriptor(uuid: expandUuid(dto.uuid));
   }
 
   // Mapping functions for Server types
