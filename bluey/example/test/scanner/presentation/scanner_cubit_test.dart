@@ -193,21 +193,22 @@ void main() {
       build: createCubit,
       seed: () => const ScannerState(bluetoothState: BluetoothState.on),
       act: (cubit) => cubit.startScan(),
-      expect: () => [
-        const ScannerState(
-          bluetoothState: BluetoothState.on,
-          scanResults: [],
-          isScanning: true,
-        ),
-        isA<ScannerState>()
-            .having((s) => s.scanResults.length, 'scanResults.length', 1)
-            .having((s) => s.isScanning, 'isScanning', true),
-        isA<ScannerState>().having(
-          (s) => s.isScanning,
-          'isScanning',
-          false,
-        ),
-      ],
+      expect:
+          () => [
+            const ScannerState(
+              bluetoothState: BluetoothState.on,
+              scanResults: [],
+              isScanning: true,
+            ),
+            isA<ScannerState>()
+                .having((s) => s.scanResults.length, 'scanResults.length', 1)
+                .having((s) => s.isScanning, 'isScanning', true),
+            isA<ScannerState>().having(
+              (s) => s.isScanning,
+              'isScanning',
+              false,
+            ),
+          ],
     );
 
     blocTest<ScannerCubit, ScannerState>(
@@ -436,18 +437,20 @@ void main() {
           ).thenAnswer((_) => const Stream.empty());
         },
         build: createCubit,
-        seed: () => ScannerState(
-          bluetoothState: BluetoothState.on,
-          scanResults: [deviceB, deviceA],
-        ),
+        seed:
+            () => ScannerState(
+              bluetoothState: BluetoothState.on,
+              scanResults: [deviceB, deviceA],
+            ),
         act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect: () => [
-          isA<ScannerState>().having(
-            (s) => s.sortMode,
-            'sortMode',
-            SortMode.name,
-          ),
-        ],
+        expect:
+            () => [
+              isA<ScannerState>().having(
+                (s) => s.sortMode,
+                'sortMode',
+                SortMode.name,
+              ),
+            ],
       );
 
       blocTest<ScannerCubit, ScannerState>(
@@ -461,18 +464,20 @@ void main() {
           ).thenAnswer((_) => const Stream.empty());
         },
         build: createCubit,
-        seed: () => ScannerState(
-          bluetoothState: BluetoothState.on,
-          scanResults: [deviceB, deviceA],
-        ),
+        seed:
+            () => ScannerState(
+              bluetoothState: BluetoothState.on,
+              scanResults: [deviceB, deviceA],
+            ),
         act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect: () => [
-          isA<ScannerState>().having(
-            (s) => s.scanResults.map((r) => r.device.name).toList(),
-            'device names',
-            ['Alpha Device', 'Beta Device'],
-          ),
-        ],
+        expect:
+            () => [
+              isA<ScannerState>().having(
+                (s) => s.scanResults.map((r) => r.device.name).toList(),
+                'device names',
+                ['Alpha Device', 'Beta Device'],
+              ),
+            ],
       );
 
       blocTest<ScannerCubit, ScannerState>(
@@ -486,18 +491,20 @@ void main() {
           ).thenAnswer((_) => const Stream.empty());
         },
         build: createCubit,
-        seed: () => ScannerState(
-          bluetoothState: BluetoothState.on,
-          scanResults: [unnamed, deviceA],
-        ),
+        seed:
+            () => ScannerState(
+              bluetoothState: BluetoothState.on,
+              scanResults: [unnamed, deviceA],
+            ),
         act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect: () => [
-          isA<ScannerState>().having(
-            (s) => s.scanResults.map((r) => r.device.name).toList(),
-            'device names',
-            ['Alpha Device', null],
-          ),
-        ],
+        expect:
+            () => [
+              isA<ScannerState>().having(
+                (s) => s.scanResults.map((r) => r.device.name).toList(),
+                'device names',
+                ['Alpha Device', null],
+              ),
+            ],
       );
 
       blocTest<ScannerCubit, ScannerState>(
@@ -511,19 +518,21 @@ void main() {
           ).thenAnswer((_) => const Stream.empty());
         },
         build: createCubit,
-        seed: () => ScannerState(
-          bluetoothState: BluetoothState.on,
-          sortMode: SortMode.name,
-          scanResults: [deviceA, deviceB],
-        ),
+        seed:
+            () => ScannerState(
+              bluetoothState: BluetoothState.on,
+              sortMode: SortMode.name,
+              scanResults: [deviceA, deviceB],
+            ),
         act: (cubit) => cubit.setSortMode(SortMode.signalStrength),
-        expect: () => [
-          isA<ScannerState>().having(
-            (s) => s.scanResults.map((r) => r.rssi).toList(),
-            'rssi values',
-            [-40, -80],
-          ),
-        ],
+        expect:
+            () => [
+              isA<ScannerState>().having(
+                (s) => s.scanResults.map((r) => r.rssi).toList(),
+                'rssi values',
+                [-40, -80],
+              ),
+            ],
       );
 
       blocTest<ScannerCubit, ScannerState>(
@@ -537,21 +546,24 @@ void main() {
           ).thenAnswer((_) => const Stream.empty());
         },
         build: createCubit,
-        seed: () => ScannerState(
-          bluetoothState: BluetoothState.on,
-          scanResults: [deviceB, deviceA],
-        ),
+        seed:
+            () => ScannerState(
+              bluetoothState: BluetoothState.on,
+              scanResults: [deviceB, deviceA],
+            ),
         act: (cubit) => cubit.setSortMode(SortMode.deviceId),
-        expect: () => [
-          isA<ScannerState>().having(
-            (s) => s.scanResults.map((r) => r.device.id.toString()).toList(),
-            'device ids',
-            [
-              '00000000-0000-0000-0000-000000000001',
-              '00000000-0000-0000-0000-000000000002',
+        expect:
+            () => [
+              isA<ScannerState>().having(
+                (s) =>
+                    s.scanResults.map((r) => r.device.id.toString()).toList(),
+                'device ids',
+                [
+                  '00000000-0000-0000-0000-000000000001',
+                  '00000000-0000-0000-0000-000000000002',
+                ],
+              ),
             ],
-          ),
-        ],
       );
     });
   });

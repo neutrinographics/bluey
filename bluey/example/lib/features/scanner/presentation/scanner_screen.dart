@@ -379,13 +379,14 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           PopupMenuButton<SortMode>(
-            onSelected: (mode) =>
-                context.read<ScannerCubit>().setSortMode(mode),
-            itemBuilder: (context) => [
-              _sortMenuItem(SortMode.signalStrength, 'Signal Strength'),
-              _sortMenuItem(SortMode.name, 'Name'),
-              _sortMenuItem(SortMode.deviceId, 'Device ID'),
-            ],
+            onSelected:
+                (mode) => context.read<ScannerCubit>().setSortMode(mode),
+            itemBuilder:
+                (context) => [
+                  _sortMenuItem(SortMode.signalStrength, 'Signal Strength'),
+                  _sortMenuItem(SortMode.name, 'Name'),
+                  _sortMenuItem(SortMode.deviceId, 'Device ID'),
+                ],
             child: Icon(Icons.sort, size: 16, color: _kTextMedium),
           ),
         ],

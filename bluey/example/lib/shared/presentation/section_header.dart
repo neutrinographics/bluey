@@ -48,12 +48,13 @@ class SectionHeader extends StatelessWidget {
               SizedBox(
                 width: 16,
                 height: 16,
-                child: isRefreshing
-                    ? const CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: _kAccent,
-                      )
-                    : const Icon(Icons.refresh, color: _kLight, size: 16),
+                child:
+                    isRefreshing
+                        ? const CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: _kAccent,
+                        )
+                        : const Icon(Icons.refresh, color: _kLight, size: 16),
               ),
               const SizedBox(width: 8),
               Container(

@@ -60,20 +60,21 @@ class ServerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ServerCubit(
-        checkServerSupport: getIt<CheckServerSupport>(),
-        startAdvertising: getIt<StartAdvertising>(),
-        stopAdvertising: getIt<StopAdvertising>(),
-        addService: getIt<AddService>(),
-        sendNotification: getIt<SendNotification>(),
-        observeConnections: getIt<ObserveConnections>(),
-        disconnectClient: getIt<DisconnectClient>(),
-        disposeServer: getIt<DisposeServer>(),
-        getConnectedClients: getIt<GetConnectedClients>(),
-        observeDisconnections: getIt<ObserveDisconnections>(),
-        observeReadRequests: getIt<ObserveReadRequests>(),
-        observeWriteRequests: getIt<ObserveWriteRequests>(),
-      )..initialize(),
+      create:
+          (context) => ServerCubit(
+            checkServerSupport: getIt<CheckServerSupport>(),
+            startAdvertising: getIt<StartAdvertising>(),
+            stopAdvertising: getIt<StopAdvertising>(),
+            addService: getIt<AddService>(),
+            sendNotification: getIt<SendNotification>(),
+            observeConnections: getIt<ObserveConnections>(),
+            disconnectClient: getIt<DisconnectClient>(),
+            disposeServer: getIt<DisposeServer>(),
+            getConnectedClients: getIt<GetConnectedClients>(),
+            observeDisconnections: getIt<ObserveDisconnections>(),
+            observeReadRequests: getIt<ObserveReadRequests>(),
+            observeWriteRequests: getIt<ObserveWriteRequests>(),
+          )..initialize(),
       child: const ScaffoldMessenger(child: _ServerView()),
     );
   }
@@ -85,8 +86,9 @@ class _ServerView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<ServerCubit, ServerScreenState>(
-      listenWhen: (previous, current) =>
-          previous.error != current.error && current.error != null,
+      listenWhen:
+          (previous, current) =>
+              previous.error != current.error && current.error != null,
       listener: (context, state) {
         if (state.error != null) {
           ErrorSnackbar.show(context, state.error!);
@@ -102,9 +104,10 @@ class _ServerView extends StatelessWidget {
               children: [
                 const _TopBar(),
                 Expanded(
-                  child: state.isSupported
-                      ? _ServerContent(state: state)
-                      : const _UnsupportedState(),
+                  child:
+                      state.isSupported
+                          ? _ServerContent(state: state)
+                          : const _UnsupportedState(),
                 ),
               ],
             ),
@@ -168,12 +171,7 @@ class _ServerContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 32,
-        bottom: 128,
-      ),
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 32, bottom: 128),
       children: [
         _HeroCard(state: state),
         const SizedBox(height: 24),
@@ -266,21 +264,27 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(height: 32),
           // Action buttons
           _ActionButton(
-            label: state.isAdvertising ? 'Stop Advertising' : 'Start Advertising',
-            icon: state.isAdvertising ? Icons.stop_circle_outlined : Icons.play_arrow,
+            label:
+                state.isAdvertising ? 'Stop Advertising' : 'Start Advertising',
+            icon:
+                state.isAdvertising
+                    ? Icons.stop_circle_outlined
+                    : Icons.play_arrow,
             isPrimary: true,
-            onPressed: state.isAdvertising
-                ? cubit.stopAdvertising
-                : cubit.startAdvertising,
+            onPressed:
+                state.isAdvertising
+                    ? cubit.stopAdvertising
+                    : cubit.startAdvertising,
           ),
           const SizedBox(height: 16),
           _ActionButton(
             label: 'Send Notification',
             icon: Icons.notifications_active_outlined,
             isPrimary: false,
-            onPressed: state.connectedClients.isNotEmpty
-                ? cubit.sendNotification
-                : null,
+            onPressed:
+                state.connectedClients.isNotEmpty
+                    ? cubit.sendNotification
+                    : null,
           ),
         ],
       ),
@@ -359,9 +363,10 @@ class _ActionButton extends StatelessWidget {
             Icon(
               icon,
               size: 20,
-              color: onPressed != null
-                  ? _kTextDark
-                  : _kTextDark.withValues(alpha: 0.4),
+              color:
+                  onPressed != null
+                      ? _kTextDark
+                      : _kTextDark.withValues(alpha: 0.4),
             ),
             const SizedBox(width: 8),
             Text(
@@ -369,9 +374,10 @@ class _ActionButton extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: onPressed != null
-                    ? _kTextDark
-                    : _kTextDark.withValues(alpha: 0.4),
+                color:
+                    onPressed != null
+                        ? _kTextDark
+                        : _kTextDark.withValues(alpha: 0.4),
               ),
             ),
           ],
@@ -405,11 +411,7 @@ class _ActiveClientsCard extends StatelessWidget {
               shape: BoxShape.circle,
               color: _kGreenBg,
             ),
-            child: const Icon(
-              Icons.cell_tower,
-              size: 30,
-              color: _kGreen,
-            ),
+            child: const Icon(Icons.cell_tower, size: 30, color: _kGreen),
           ),
           const SizedBox(height: 16),
           Text(
@@ -611,10 +613,7 @@ class _LogSection extends StatelessWidget {
             child: Center(
               child: Text(
                 'No events yet',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: _kTextMedium,
-                ),
+                style: GoogleFonts.inter(fontSize: 14, color: _kTextMedium),
               ),
             ),
           )
@@ -655,9 +654,10 @@ class _LogEntry extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
         color: showTopBorder ? null : Colors.white,
-        border: showTopBorder
-            ? const Border(top: BorderSide(color: _kLogBorder))
-            : null,
+        border:
+            showTopBorder
+                ? const Border(top: BorderSide(color: _kLogBorder))
+                : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,12 +753,7 @@ class _UnsupportedState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 32,
-        bottom: 120,
-      ),
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 32, bottom: 120),
       children: [
         Container(
           constraints: const BoxConstraints(minHeight: 160),

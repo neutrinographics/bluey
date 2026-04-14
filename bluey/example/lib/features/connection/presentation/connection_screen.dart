@@ -42,12 +42,13 @@ class ConnectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ConnectionCubit(
-        device: device,
-        connectToDevice: getIt<ConnectToDevice>(),
-        disconnectDevice: getIt<DisconnectDevice>(),
-        getServices: getIt<GetServices>(),
-      )..connect(),
+      create:
+          (context) => ConnectionCubit(
+            device: device,
+            connectToDevice: getIt<ConnectToDevice>(),
+            disconnectDevice: getIt<DisconnectDevice>(),
+            getServices: getIt<GetServices>(),
+          )..connect(),
       child: const _ConnectionView(),
     );
   }
@@ -110,39 +111,42 @@ class _ConnectionView extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Disconnected',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'The device has been disconnected.',
-          style: GoogleFonts.inter(color: _kMid),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              Navigator.of(context).pop();
-            },
-            child: Text('OK', style: GoogleFonts.inter(color: _kMid)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.read<ConnectionCubit>().connect();
-            },
-            child: Text(
-              'Reconnect',
-              style: GoogleFonts.inter(
-                color: _kAccent,
-                fontWeight: FontWeight.w600,
-              ),
+      builder:
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
+            title: Text(
+              'Disconnected',
+              style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+            ),
+            content: Text(
+              'The device has been disconnected.',
+              style: GoogleFonts.inter(color: _kMid),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  Navigator.of(context).pop();
+                },
+                child: Text('OK', style: GoogleFonts.inter(color: _kMid)),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  context.read<ConnectionCubit>().connect();
+                },
+                child: Text(
+                  'Reconnect',
+                  style: GoogleFonts.inter(
+                    color: _kAccent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
@@ -211,10 +215,7 @@ class _ConnectingState extends StatelessWidget {
             const SizedBox(
               width: 48,
               height: 48,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: _kAccent,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 3, color: _kAccent),
             ),
             const SizedBox(height: 24),
             Text(
@@ -285,11 +286,7 @@ class _ErrorState extends StatelessWidget {
                   color: _kRedBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.error_outline,
-                  size: 32,
-                  color: _kRed,
-                ),
+                child: const Icon(Icons.error_outline, size: 32, color: _kRed),
               ),
               const SizedBox(height: 24),
               Text(
@@ -387,9 +384,7 @@ class _ConnectedContentState extends State<_ConnectedContent> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isRefreshing = false);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Refresh failed')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Refresh failed')));
     }
   }
 
@@ -437,20 +432,17 @@ class _ConnectedContentState extends State<_ConnectedContent> {
           )
         else
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final service = state.services![index];
-                final isLast = index == state.services!.length - 1;
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, isLast ? 128 : 12),
-                  child: _ServiceCard(
-                    service: service,
-                    onTap: () => _openService(context, service, state),
-                  ),
-                );
-              },
-              childCount: state.services!.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final service = state.services![index];
+              final isLast = index == state.services!.length - 1;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(24, 0, 24, isLast ? 128 : 12),
+                child: _ServiceCard(
+                  service: service,
+                  onTap: () => _openService(context, service, state),
+                ),
+              );
+            }, childCount: state.services!.length),
           ),
       ],
     );
@@ -464,20 +456,21 @@ class _ConnectedContentState extends State<_ConnectedContent> {
     final cubit = context.read<ConnectionCubit>();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ServiceScreen(
-          connection: state.connection!,
-          service: service,
-          onRefresh: () async {
-            await cubit.loadServices();
-            final services = cubit.state.services;
-            if (services == null) return null;
-            try {
-              return services.firstWhere((s) => s.uuid == service.uuid);
-            } catch (_) {
-              return null;
-            }
-          },
-        ),
+        builder:
+            (context) => ServiceScreen(
+              connection: state.connection!,
+              service: service,
+              onRefresh: () async {
+                await cubit.loadServices();
+                final services = cubit.state.services;
+                if (services == null) return null;
+                try {
+                  return services.firstWhere((s) => s.uuid == service.uuid);
+                } catch (_) {
+                  return null;
+                }
+              },
+            ),
       ),
     );
   }
@@ -730,10 +723,7 @@ class _ServiceCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${service.characteristics.length} characteristics',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: _kMid,
-                    ),
+                    style: GoogleFonts.inter(fontSize: 11, color: _kMid),
                   ),
                 ],
               ),

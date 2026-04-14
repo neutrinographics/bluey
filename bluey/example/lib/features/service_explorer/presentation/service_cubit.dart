@@ -37,18 +37,23 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
   /// Silently reads the Characteristic User Description descriptor (0x2901)
   /// and stores its UTF-8 value as the display name. Failures are ignored.
   void _autoReadUserDescription() async {
-    final descriptor = state.characteristic.descriptors
-        .where((d) => d.uuid == Descriptors.characteristicUserDescription)
-        .firstOrNull;
+    final descriptor =
+        state.characteristic.descriptors
+            .where((d) => d.uuid == Descriptors.characteristicUserDescription)
+            .firstOrNull;
     if (descriptor == null) return;
     try {
       final bytes = await _readDescriptor(descriptor);
-      final name = utf8
-          .decode(bytes, allowMalformed: true)
-          .replaceAll('\u0000', '') // null terminators
-          .replaceAll('\uFEFF', '') // BOM
-          .replaceAll('\uFFFD', '') // replacement character from malformed bytes
-          .trim();
+      final name =
+          utf8
+              .decode(bytes, allowMalformed: true)
+              .replaceAll('\u0000', '') // null terminators
+              .replaceAll('\uFEFF', '') // BOM
+              .replaceAll(
+                '\uFFFD',
+                '',
+              ) // replacement character from malformed bytes
+              .trim();
       if (name.isNotEmpty && !isClosed) {
         emit(state.copyWith(userDescription: name));
       }

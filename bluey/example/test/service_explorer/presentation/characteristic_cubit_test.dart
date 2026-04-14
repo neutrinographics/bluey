@@ -267,14 +267,10 @@ void main() {
         when(
           () => descriptor.uuid,
         ).thenReturn(Descriptors.characteristicUserDescription);
-        when(
-          () => mockCharacteristic.descriptors,
-        ).thenReturn([descriptor]);
+        when(() => mockCharacteristic.descriptors).thenReturn([descriptor]);
         when(
           () => mockReadDescriptor(descriptor),
-        ).thenAnswer(
-          (_) async => Uint8List.fromList('Sensor Temp'.codeUnits),
-        );
+        ).thenAnswer((_) async => Uint8List.fromList('Sensor Temp'.codeUnits));
 
         final cubit = createCubit();
         // Allow the async constructor body to complete.
@@ -292,9 +288,7 @@ void main() {
         when(
           () => descriptor.uuid,
         ).thenReturn(Descriptors.characteristicUserDescription);
-        when(
-          () => mockCharacteristic.descriptors,
-        ).thenReturn([descriptor]);
+        when(() => mockCharacteristic.descriptors).thenReturn([descriptor]);
         when(
           () => mockReadDescriptor(descriptor),
         ).thenThrow(Exception('Read failed'));

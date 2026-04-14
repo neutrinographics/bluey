@@ -139,10 +139,12 @@ class ScannerCubit extends Cubit<ScannerState> {
 
   /// Changes the sort order of scan results.
   void setSortMode(SortMode mode) {
-    emit(state.copyWith(
-      sortMode: mode,
-      scanResults: _sorted(state.scanResults, mode),
-    ));
+    emit(
+      state.copyWith(
+        sortMode: mode,
+        scanResults: _sorted(state.scanResults, mode),
+      ),
+    );
   }
 
   List<ScanResult> _sorted(List<ScanResult> results, [SortMode? override]) {

@@ -44,7 +44,6 @@ const _kActionActiveText = Color(0xFF23486C);
 const _kActionInactiveBg = Color(0xFFEAEFF2);
 const _kActionInactiveText = Color(0x80747C80); // rgba(116,124,128,0.5)
 
-
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 class ServiceScreen extends StatefulWidget {
@@ -98,9 +97,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isRefreshing = false);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Refresh failed')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Refresh failed')));
     }
   }
 
@@ -148,24 +145,20 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 )
               else
                 SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final isLast =
-                          index == _service.characteristics.length - 1;
-                      return Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          24,
-                          0,
-                          24,
-                          isLast ? 128 : 16,
-                        ),
-                        child: _CharacteristicCard(
-                          characteristic: _service.characteristics[index],
-                        ),
-                      );
-                    },
-                    childCount: _service.characteristics.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final isLast = index == _service.characteristics.length - 1;
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        24,
+                        0,
+                        24,
+                        isLast ? 128 : 16,
+                      ),
+                      child: _CharacteristicCard(
+                        characteristic: _service.characteristics[index],
+                      ),
+                    );
+                  }, childCount: _service.characteristics.length),
                 ),
             ],
           ),
@@ -253,7 +246,11 @@ class _ServiceIdentityCard extends StatelessWidget {
                   color: _kIconBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.hub_outlined, color: _kAccent, size: 20),
+                child: const Icon(
+                  Icons.hub_outlined,
+                  color: _kAccent,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -355,7 +352,6 @@ class _CharacteristicCardContent extends StatefulWidget {
 
 class _CharacteristicCardContentState
     extends State<_CharacteristicCardContent> {
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CharacteristicCubit, CharacteristicState>(
@@ -370,9 +366,10 @@ class _CharacteristicCardContentState
       builder: (context, state) {
         final char = state.characteristic;
         final props = char.properties;
-        final name = state.userDescription
-            ?? UuidNames.getCharacteristicName(char.uuid)
-            ?? 'Characteristic';
+        final name =
+            state.userDescription ??
+            UuidNames.getCharacteristicName(char.uuid) ??
+            'Characteristic';
         final shortCode = char.uuid.shortString.toUpperCase();
         final hasReadWrite =
             props.canRead || props.canWrite || props.canWriteWithoutResponse;
@@ -437,21 +434,13 @@ class _CharacteristicCardContentState
                       if (hasNotify)
                         _PropertyBadge(
                           'NOTIFY',
-                          state.isSubscribed
-                              ? _kNotifyActiveBg
-                              : _kReadBadgeBg,
+                          state.isSubscribed ? _kNotifyActiveBg : _kReadBadgeBg,
                           _kReadBadgeText,
                         ),
                     ],
                   ),
                 ],
               ),
-
-              // Value display (shown after a read)
-              if (state.value != null) ...[
-                const SizedBox(height: 12),
-                _ValueBox(value: state.value!),
-              ],
 
               // Read / Write action buttons
               if (hasReadWrite) ...[
@@ -475,11 +464,11 @@ class _CharacteristicCardContentState
                       child: _ActionButton(
                         label: 'WRITE',
                         icon: Icons.edit_outlined,
-                        active:
-                            props.canWrite || props.canWriteWithoutResponse,
+                        active: props.canWrite || props.canWriteWithoutResponse,
                         isLoading: state.isWriting,
                         onTap:
-                            ((props.canWrite || props.canWriteWithoutResponse) &&
+                            ((props.canWrite ||
+                                        props.canWriteWithoutResponse) &&
                                     !state.isWriting)
                                 ? () => _showWriteDialog(context)
                                 : null,
@@ -502,17 +491,13 @@ class _CharacteristicCardContentState
               // Log section
               if (state.log.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Divider(
-                  height: 1,
-                  color: Colors.black.withValues(alpha: 0.04),
-                ),
+                Divider(height: 1, color: Colors.black.withValues(alpha: 0.04)),
                 const SizedBox(height: 16),
                 _CharacteristicLogSection(
                   log: state.log,
                   onClear: context.read<CharacteristicCubit>().clearLog,
                 ),
               ],
-
             ],
           ),
         );
@@ -559,57 +544,6 @@ class _PropertyBadge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: textColor,
         ),
-      ),
-    );
-  }
-}
-
-// ─── Value Box ────────────────────────────────────────────────────────────────
-
-class _ValueBox extends StatelessWidget {
-  final Uint8List value;
-  const _ValueBox({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _kUuidBg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'HEX',
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: _kLight,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            ValueFormatters.formatHex(value),
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: _kDark,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'ASCII: ${ValueFormatters.formatAscii(value)}',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 11,
-              color: _kMid,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -703,9 +637,7 @@ class _SubscribeButton extends StatelessWidget {
               isSubscribed ? Icons.notifications_off : Icons.notifications,
               size: 12,
               color:
-                  isSubscribed
-                      ? const Color(0xFFF7F9FF)
-                      : _kActionActiveText,
+                  isSubscribed ? const Color(0xFFF7F9FF) : _kActionActiveText,
             ),
             const SizedBox(width: 6),
             Text(
@@ -714,9 +646,7 @@ class _SubscribeButton extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color:
-                    isSubscribed
-                        ? const Color(0xFFF7F9FF)
-                        : _kActionActiveText,
+                    isSubscribed ? const Color(0xFFF7F9FF) : _kActionActiveText,
                 letterSpacing: 0.275,
               ),
             ),
@@ -747,10 +677,7 @@ class _CharacteristicLogSection extends StatelessWidget {
   final List<LogEntry> log;
   final VoidCallback onClear;
 
-  const _CharacteristicLogSection({
-    required this.log,
-    required this.onClear,
-  });
+  const _CharacteristicLogSection({required this.log, required this.onClear});
 
   @override
   Widget build(BuildContext context) {
@@ -810,10 +737,7 @@ class _CharacteristicLogSection extends StatelessWidget {
             child: Column(
               children: [
                 for (var i = 0; i < log.length; i++)
-                  _CharacteristicLogEntry(
-                    entry: log[i],
-                    showTopBorder: i > 0,
-                  ),
+                  _CharacteristicLogEntry(entry: log[i], showTopBorder: i > 0),
               ],
             ),
           ),
@@ -838,9 +762,10 @@ class _CharacteristicLogEntry extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: showTopBorder ? null : Colors.white,
-        border: showTopBorder
-            ? const Border(top: BorderSide(color: Color(0xFFDCE4E8)))
-            : null,
+        border:
+            showTopBorder
+                ? const Border(top: BorderSide(color: Color(0xFFDCE4E8)))
+                : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
