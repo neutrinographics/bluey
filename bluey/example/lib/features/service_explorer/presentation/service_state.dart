@@ -13,51 +13,47 @@ class ServiceScreenState {
 /// State for an individual characteristic card.
 class CharacteristicState {
   final RemoteCharacteristic characteristic;
+
+  /// Human-readable name sourced from the Characteristic User Description
+  /// descriptor (0x2901), if present and successfully read.
+  final String? userDescription;
+
   final Uint8List? value;
   final bool isReading;
   final bool isWriting;
   final bool isSubscribed;
   final List<LogEntry> log;
   final String? error;
-  final Map<String, Uint8List> descriptorValues;
-  final Set<String> readingDescriptors;
-  final Set<String> failedDescriptors;
 
   const CharacteristicState({
     required this.characteristic,
+    this.userDescription,
     this.value,
     this.isReading = false,
     this.isWriting = false,
     this.isSubscribed = false,
     this.log = const [],
     this.error,
-    this.descriptorValues = const {},
-    this.readingDescriptors = const {},
-    this.failedDescriptors = const {},
   });
 
   CharacteristicState copyWith({
+    String? userDescription,
     Uint8List? value,
     bool? isReading,
     bool? isWriting,
     bool? isSubscribed,
     List<LogEntry>? log,
     String? error,
-    Map<String, Uint8List>? descriptorValues,
-    Set<String>? readingDescriptors,
-    Set<String>? failedDescriptors,
   }) {
     return CharacteristicState(
       characteristic: characteristic,
+      userDescription: userDescription ?? this.userDescription,
       value: value ?? this.value,
       isReading: isReading ?? this.isReading,
       isWriting: isWriting ?? this.isWriting,
       isSubscribed: isSubscribed ?? this.isSubscribed,
       log: log ?? this.log,
       error: error,
-      descriptorValues: descriptorValues ?? this.descriptorValues,
-      readingDescriptors: readingDescriptors ?? this.readingDescriptors,
-      failedDescriptors: failedDescriptors ?? this.failedDescriptors,
     );
   }
 }

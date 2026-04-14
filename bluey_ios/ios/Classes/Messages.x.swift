@@ -221,12 +221,28 @@ extension LocalCharacteristicDto {
 
 extension LocalDescriptorDto {
     func toMutableDescriptor() -> CBMutableDescriptor {
-        // Note: Only certain descriptor types can be created on iOS
-        // CBUUIDCharacteristicUserDescriptionString is the most common
-        return CBMutableDescriptor(
-            type: uuid.toCBUUID(),
-            value: value?.data
-        )
+        // CoreBluetooth requires type-specific value objects for certain
+        // well-known descriptors. Passing NSData where NSString is expected
+        // raises NSInternalInconsistencyException at runtime.
+        let cbValue: Any? = descriptorValue(uuid: uuid, data: value?.data)
+        return CBMutableDescriptor(type: uuid.toCBUUID(), value: cbValue)
+    }
+
+    /// Returns the correct Objective-C value type for a given descriptor UUID.
+    ///
+    /// CoreBluetooth enforces type requirements for standard descriptors:
+    /// - 0x2901 (User Description): NSString (UTF-8)
+    /// - 0x2902 (CCCD): NSNumber (UInt16 bit field) — normally managed by the stack
+    /// - 0x2904 (Presentation Format): NSData (7-byte struct)
+    /// - All others: NSData
+    private func descriptorValue(uuid: String, data: Data?) -> Any? {
+        guard let data = data else { return nil }
+        let cbUuid = CBUUID(string: uuid)
+        if cbUuid == CBUUID(string: CBUUIDCharacteristicUserDescriptionString) {
+            // 0x2901 requires NSString, not NSData
+            return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        }
+        return data
     }
 }
 

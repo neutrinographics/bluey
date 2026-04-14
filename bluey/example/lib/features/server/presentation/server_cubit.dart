@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -85,7 +86,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
     _connectionSubscription = _observeConnections().listen(
       (client) {
         _refreshConnectedClients();
-        _addLog('Connection', 'Client connected: ${client.id}');
+        _addLog('Connection', 'Client connected: ${_shortId(client.id)}');
       },
       onError: (error) {
         _addLog('Error', 'Connection stream error: $error');
@@ -96,7 +97,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
     // Listen for central disconnections and refresh the list.
     _disconnectionSubscription = _observeDisconnections().listen((clientId) {
       _refreshConnectedClients();
-      _addLog('Connection', 'Client disconnected: $clientId');
+      _addLog('Connection', 'Client disconnected: ${clientId.substring(0, 8)}');
     });
 
     // Listen for read requests and respond with the current value.
@@ -148,6 +149,12 @@ class ServerCubit extends Cubit<ServerScreenState> {
                 canNotify: true,
               ),
               permissions: const [GattPermission.read, GattPermission.write],
+              descriptors: [
+                HostedDescriptor.immutable(
+                  uuid: Descriptors.characteristicUserDescription,
+                  value: Uint8List.fromList(utf8.encode('Demo Characteristic')),
+                ),
+              ],
             ),
           ],
         ),

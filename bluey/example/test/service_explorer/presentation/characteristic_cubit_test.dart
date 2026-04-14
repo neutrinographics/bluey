@@ -260,53 +260,64 @@ void main() {
       },
     );
 
-    blocTest<CharacteristicCubit, CharacteristicState>(
-      'readDescriptor succeeds and stores value',
-      setUp: () {
+    test(
+      'auto-reads User Description descriptor on construction and sets userDescription',
+      () async {
         final descriptor = MockRemoteDescriptor();
         when(
           () => descriptor.uuid,
-        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
+        ).thenReturn(Descriptors.characteristicUserDescription);
         when(
-          () => mockReadDescriptor(any()),
-        ).thenAnswer((_) async => Uint8List.fromList([0x01, 0x00]));
-      },
-      build: createCubit,
-      act: (cubit) {
-        final descriptor = MockRemoteDescriptor();
+          () => mockCharacteristic.descriptors,
+        ).thenReturn([descriptor]);
         when(
-          () => descriptor.uuid,
-        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
-        return cubit.readDescriptor(descriptor);
-      },
-      verify: (cubit) {
-        final key = '00002902-0000-1000-8000-00805f9b34fb';
-        expect(cubit.state.descriptorValues[key], isNotNull);
-        expect(cubit.state.readingDescriptors, isEmpty);
-        expect(cubit.state.failedDescriptors, isEmpty);
+          () => mockReadDescriptor(descriptor),
+        ).thenAnswer(
+          (_) async => Uint8List.fromList('Sensor Temp'.codeUnits),
+        );
+
+        final cubit = createCubit();
+        // Allow the async constructor body to complete.
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        expect(cubit.state.userDescription, 'Sensor Temp');
+        cubit.close();
       },
     );
 
-    blocTest<CharacteristicCubit, CharacteristicState>(
-      'readDescriptor marks failed on error',
-      setUp: () {
-        when(
-          () => mockReadDescriptor(any()),
-        ).thenThrow(Exception('Descriptor error'));
-      },
-      build: createCubit,
-      act: (cubit) {
+    test(
+      'silently ignores User Description read failure on construction',
+      () async {
         final descriptor = MockRemoteDescriptor();
         when(
           () => descriptor.uuid,
-        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
-        return cubit.readDescriptor(descriptor);
+        ).thenReturn(Descriptors.characteristicUserDescription);
+        when(
+          () => mockCharacteristic.descriptors,
+        ).thenReturn([descriptor]);
+        when(
+          () => mockReadDescriptor(descriptor),
+        ).thenThrow(Exception('Read failed'));
+
+        final cubit = createCubit();
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        expect(cubit.state.userDescription, isNull);
+        expect(cubit.state.error, isNull);
+        cubit.close();
       },
-      verify: (cubit) {
-        final key = '00002902-0000-1000-8000-00805f9b34fb';
-        expect(cubit.state.failedDescriptors, contains(key));
-        expect(cubit.state.readingDescriptors, isEmpty);
-        expect(cubit.state.error, contains('Descriptor read failed'));
+    );
+
+    test(
+      'does not set userDescription when no User Description descriptor present',
+      () async {
+        when(() => mockCharacteristic.descriptors).thenReturn([]);
+
+        final cubit = createCubit();
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        expect(cubit.state.userDescription, isNull);
+        cubit.close();
       },
     );
 

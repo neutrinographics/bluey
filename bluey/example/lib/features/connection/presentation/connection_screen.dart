@@ -381,11 +381,24 @@ class _ServicesList extends StatelessWidget {
   }
 
   void _openService(BuildContext context, bluey.RemoteService service) {
+    final cubit = context.read<ConnectionCubit>();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
-            (context) =>
-                ServiceScreen(connection: connection, service: service),
+            (context) => ServiceScreen(
+              connection: connection,
+              service: service,
+              onRefresh: () async {
+                await cubit.loadServices();
+                final services = cubit.state.services;
+                if (services == null) return null;
+                try {
+                  return services.firstWhere((s) => s.uuid == service.uuid);
+                } catch (_) {
+                  return null;
+                }
+              },
+            ),
       ),
     );
   }

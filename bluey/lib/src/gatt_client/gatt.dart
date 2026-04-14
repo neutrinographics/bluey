@@ -3,11 +3,32 @@ import 'dart:typed_data';
 import '../shared/characteristic_properties.dart';
 import '../shared/uuid.dart';
 
-/// A descriptor on a connected device.
+/// A descriptor discovered on a connected remote device.
 ///
-/// Descriptors are metadata about characteristics, such as the Client
-/// Characteristic Configuration Descriptor (CCCD) used for enabling
-/// notifications.
+/// Descriptors are metadata attached to a [RemoteCharacteristic]. They are
+/// discovered automatically as part of service discovery and are available
+/// via [RemoteCharacteristic.descriptors].
+///
+/// ## Common descriptors
+///
+/// The most useful descriptors to be aware of:
+///
+/// - **User Description (0x2901):** A UTF-8 human-readable name for the
+///   characteristic. Decode with `utf8.decode(await descriptor.read())`.
+///   See [Descriptors.characteristicUserDescription].
+///
+/// - **CCCD (0x2902):** Controls notification/indication subscriptions. You
+///   do not read or write this directly; the platform manages it automatically
+///   when you call [Connection.subscribeToCharacteristic].
+///   See [Descriptors.clientCharacteristicConfiguration].
+///
+/// - **Presentation Format (0x2904):** Describes the data type, unit, and
+///   exponent of the characteristic value. Useful for vendor-specific numeric
+///   characteristics without a well-known UUID.
+///   See [Descriptors.characteristicPresentationFormat].
+///
+/// See [Descriptors] for the full list of standard descriptor UUIDs and their
+/// data formats.
 abstract class RemoteDescriptor {
   /// The UUID of this descriptor.
   UUID get uuid;

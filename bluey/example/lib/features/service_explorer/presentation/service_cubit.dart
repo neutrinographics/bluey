@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -29,7 +30,27 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
        _writeCharacteristic = writeCharacteristic,
        _subscribeToCharacteristic = subscribeToCharacteristic,
        _readDescriptor = readDescriptor,
-       super(CharacteristicState(characteristic: characteristic));
+       super(CharacteristicState(characteristic: characteristic)) {
+    _autoReadUserDescription();
+  }
+
+  /// Silently reads the Characteristic User Description descriptor (0x2901)
+  /// and stores its UTF-8 value as the display name. Failures are ignored.
+  void _autoReadUserDescription() async {
+    final descriptor = state.characteristic.descriptors
+        .where((d) => d.uuid == Descriptors.characteristicUserDescription)
+        .firstOrNull;
+    if (descriptor == null) return;
+    try {
+      final bytes = await _readDescriptor(descriptor);
+      final name = utf8.decode(bytes, allowMalformed: true).trim();
+      if (name.isNotEmpty && !isClosed) {
+        emit(state.copyWith(userDescription: name));
+      }
+    } catch (_) {
+      // Non-fatal — descriptor read failure does not affect characteristic use.
+    }
+  }
 
   /// Reads the characteristic value.
   Future<void> read() async {
@@ -102,35 +123,6 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
     _notificationSubscription?.cancel();
     _notificationSubscription = null;
     emit(state.copyWith(isSubscribed: false));
-  }
-
-  /// Reads a descriptor value.
-  Future<void> readDescriptor(RemoteDescriptor descriptor) async {
-    final key = descriptor.uuid.toString();
-    emit(
-      state.copyWith(
-        readingDescriptors: {...state.readingDescriptors, key},
-        failedDescriptors: Set.of(state.failedDescriptors)..remove(key),
-      ),
-    );
-
-    try {
-      final value = await _readDescriptor(descriptor);
-      emit(
-        state.copyWith(
-          descriptorValues: {...state.descriptorValues, key: value},
-          readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
-        ),
-      );
-    } catch (e) {
-      emit(
-        state.copyWith(
-          readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
-          failedDescriptors: {...state.failedDescriptors, key},
-          error: 'Descriptor read failed: $e',
-        ),
-      );
-    }
   }
 
   /// Clears the operation log.

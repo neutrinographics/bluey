@@ -13,6 +13,11 @@ const _controlServiceUuid = 'b1e70001-0000-1000-8000-00805f9b34fb';
 const _heartbeatCharUuid = 'b1e70002-0000-1000-8000-00805f9b34fb';
 const _intervalCharUuid = 'b1e70003-0000-1000-8000-00805f9b34fb';
 
+// Use proper UUID-format IDs so BlueyClient.id passes them through unchanged,
+// matching what real platforms (iOS UUIDs, Android MACs) provide.
+const _clientId1 = '00000000-0000-0000-0000-000000000001';
+const _clientId2 = '00000000-0000-0000-0000-000000000002';
+
 void main() {
   late FakeBlueyPlatform fakePlatform;
 
@@ -91,7 +96,7 @@ void main() {
       );
       await server.startAdvertising();
 
-      fakePlatform.simulateCentralConnection(centralId: 'client-1');
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
 
       final publicWrites = <WriteRequest>[];
       server.writeRequests.listen(publicWrites.add);
@@ -102,7 +107,7 @@ void main() {
       // Send a heartbeat write (should be filtered) — use responseNeeded: false
       // so the fake doesn't wait for a response
       await fakePlatform.simulateWriteRequest(
-        centralId: 'client-1',
+        centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
         value: Uint8List.fromList([0x01]),
         responseNeeded: false,
@@ -111,7 +116,7 @@ void main() {
 
       // Send a regular write (should appear)
       await fakePlatform.simulateWriteRequest(
-        centralId: 'client-1',
+        centralId: _clientId1,
         characteristicUuid: '12345678-1234-1234-1234-123456789abd',
         value: Uint8List.fromList([0xAA]),
         responseNeeded: false,
@@ -125,7 +130,8 @@ void main() {
       await bluey.dispose();
     });
 
-    test('heartbeat timeout fires disconnect', () {
+    test('heartbeat timeout fires disconnect after client opts into lifecycle',
+        () {
       fakeAsync((async) {
         final bluey = Bluey();
         final server = bluey.server(
@@ -138,13 +144,23 @@ void main() {
         final disconnections = <String>[];
         server.disconnections.listen(disconnections.add);
 
-        fakePlatform.simulateCentralConnection(centralId: 'client-1');
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
         async.elapse(Duration.zero);
 
-        // No heartbeat sent — wait for timeout
+        // First heartbeat opts the client into the lifecycle protocol and
+        // starts the timer.
+        fakePlatform.simulateWriteRequest(
+          centralId: _clientId1,
+          characteristicUuid: _heartbeatCharUuid,
+          value: Uint8List.fromList([0x01]),
+          responseNeeded: false,
+        );
+        async.elapse(Duration.zero);
+
+        // No further heartbeats — wait for timeout.
         async.elapse(const Duration(seconds: 5));
 
-        expect(disconnections, contains('client-1'));
+        expect(disconnections, contains(_clientId1));
         expect(server.connectedClients, isEmpty);
 
         server.dispose();
@@ -165,13 +181,13 @@ void main() {
         final disconnections = <String>[];
         server.disconnections.listen(disconnections.add);
 
-        fakePlatform.simulateCentralConnection(centralId: 'client-1');
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
         async.elapse(Duration.zero);
 
         // Send heartbeat at 3 seconds (before timeout)
         async.elapse(const Duration(seconds: 3));
         fakePlatform.simulateWriteRequest(
-          centralId: 'client-1',
+          centralId: _clientId1,
           characteristicUuid: _heartbeatCharUuid,
           value: Uint8List.fromList([0x01]),
           responseNeeded: false,
@@ -186,7 +202,7 @@ void main() {
 
         // Wait 2 more seconds (5 since last heartbeat) — should disconnect
         async.elapse(const Duration(seconds: 2));
-        expect(disconnections, contains('client-1'));
+        expect(disconnections, contains(_clientId1));
 
         server.dispose();
         bluey.dispose();
@@ -201,23 +217,53 @@ void main() {
       final disconnections = <String>[];
       server.disconnections.listen(disconnections.add);
 
-      fakePlatform.simulateCentralConnection(centralId: 'client-1');
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
       await Future.delayed(Duration.zero);
 
       // Send disconnect command
       await fakePlatform.simulateWriteRequest(
-        centralId: 'client-1',
+        centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
         value: Uint8List.fromList([0x00]),
         responseNeeded: false,
       );
       await Future.delayed(Duration.zero);
 
-      expect(disconnections, contains('client-1'));
+      expect(disconnections, contains(_clientId1));
       expect(server.connectedClients, isEmpty);
 
       await server.dispose();
       await bluey.dispose();
+    });
+
+    test('non-Bluey client that never heartbeats is not disconnected', () {
+      fakeAsync((async) {
+        final bluey = Bluey();
+        final server = bluey.server(
+          lifecycleInterval: const Duration(seconds: 5),
+        )!;
+
+        server.startAdvertising();
+        async.elapse(Duration.zero);
+
+        final disconnections = <String>[];
+        server.disconnections.listen(disconnections.add);
+
+        // A non-Bluey central connects but never writes to the heartbeat
+        // characteristic — it doesn't know about the lifecycle protocol.
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
+        async.elapse(Duration.zero);
+
+        // Wait well past the lifecycle interval.
+        async.elapse(const Duration(seconds: 30));
+
+        // Client must still be connected — it was never timed out.
+        expect(disconnections, isEmpty);
+        expect(server.connectedClients, hasLength(1));
+
+        server.dispose();
+        bluey.dispose();
+      });
     });
 
     test('filters interval reads from public readRequests', () async {
@@ -228,12 +274,12 @@ void main() {
       final publicReads = <ReadRequest>[];
       server.readRequests.listen(publicReads.add);
 
-      fakePlatform.simulateCentralConnection(centralId: 'client-1');
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
       await Future.delayed(Duration.zero);
 
       // Send a read to the interval characteristic (should be filtered)
       fakePlatform.simulateReadRequest(
-        centralId: 'client-1',
+        centralId: _clientId1,
         characteristicUuid: _intervalCharUuid,
       );
       await Future.delayed(Duration.zero);
@@ -257,11 +303,11 @@ void main() {
         final disconnections = <String>[];
         server.disconnections.listen(disconnections.add);
 
-        fakePlatform.simulateCentralConnection(centralId: 'client-1');
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
         async.elapse(Duration.zero);
 
         // Platform disconnect (Android's onConnectionStateChange)
-        fakePlatform.simulateCentralDisconnection('client-1');
+        fakePlatform.simulateCentralDisconnection(_clientId1);
         async.elapse(Duration.zero);
 
         expect(disconnections, hasLength(1));
@@ -285,8 +331,8 @@ void main() {
         server.startAdvertising();
         async.elapse(Duration.zero);
 
-        fakePlatform.simulateCentralConnection(centralId: 'client-1');
-        fakePlatform.simulateCentralConnection(centralId: 'client-2');
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
+        fakePlatform.simulateCentralConnection(centralId: _clientId2);
         async.elapse(Duration.zero);
 
         server.dispose();

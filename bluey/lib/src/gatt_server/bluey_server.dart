@@ -65,9 +65,10 @@ class BlueyServer implements Server {
       );
       _connectedClients[platformCentral.id] = client;
       _connectionsController.add(client);
-
-      // Start heartbeat timer for the new client
-      _startHeartbeatTimer(platformCentral.id);
+      // No heartbeat timer here. The timer starts only when the client sends
+      // its first heartbeat write, proving it speaks the lifecycle protocol.
+      // Clients that never heartbeat (non-Bluey centrals) are never timed out
+      // and remain connected until the platform reports a real disconnection.
     });
 
     _centralDisconnectionsSub = _platform.centralDisconnections.listen((
@@ -350,16 +351,6 @@ class BlueyServer implements Server {
     _controlServiceAdded = true;
   }
 
-  void _startHeartbeatTimer(String clientId) {
-    final interval = _lifecycleInterval;
-    if (interval == null) return;
-
-    _heartbeatTimers[clientId]?.cancel();
-    _heartbeatTimers[clientId] = Timer(interval, () {
-      _handleHeartbeatTimeout(clientId);
-    });
-  }
-
   void _resetHeartbeatTimer(String clientId) {
     final interval = _lifecycleInterval;
     if (interval == null) return;
@@ -382,11 +373,12 @@ class BlueyServer implements Server {
 
     // Only emit if the client was actually tracked
     if (_connectedClients.containsKey(clientId)) {
+      final client = _connectedClients[clientId]!;
       _emitEvent(
         ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
       _connectedClients.remove(clientId);
-      _disconnectionsController.add(clientId);
+      _disconnectionsController.add(client.id.toString());
     }
   }
 

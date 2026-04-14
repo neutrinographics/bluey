@@ -24,9 +24,33 @@ enum GattPermission {
 
 /// A descriptor hosted by this device's GATT server.
 ///
-/// Descriptors provide metadata about characteristics. The most common
-/// descriptor is the Client Characteristic Configuration Descriptor (CCCD)
-/// used to enable notifications.
+/// Descriptors provide metadata about a [HostedCharacteristic]. Add them to
+/// [HostedCharacteristic.descriptors] when constructing your service.
+///
+/// ## Which descriptors to add manually
+///
+/// **User Description (0x2901):** The most useful descriptor to add. Provides
+/// a human-readable name for the characteristic that central devices can
+/// discover and display. Set it once using [HostedDescriptor.immutable]:
+///
+/// ```dart
+/// HostedDescriptor.immutable(
+///   uuid: Descriptors.characteristicUserDescription,
+///   value: Uint8List.fromList(utf8.encode('Sensor Temperature')),
+/// )
+/// ```
+///
+/// **CCCD (0x2902) — do NOT add manually.** When a characteristic declares
+/// `canNotify: true` or `canIndicate: true`, the platform automatically adds
+/// and manages the Client Characteristic Configuration Descriptor. Adding one
+/// yourself may cause a runtime error on iOS and Android.
+///
+/// **Presentation Format (0x2904):** Useful when your characteristic carries a
+/// numeric value whose unit/scale is not implied by its UUID. The 7-byte format
+/// is defined by the Bluetooth SIG (format byte, exponent, unit UUID, namespace,
+/// description). See [Descriptors.characteristicPresentationFormat].
+///
+/// See [Descriptors] for the full list of standard descriptor UUIDs.
 @immutable
 class HostedDescriptor {
   /// The UUID of this descriptor.
@@ -36,9 +60,17 @@ class HostedDescriptor {
   final List<GattPermission> permissions;
 
   /// The static value of this descriptor (for immutable descriptors).
+  ///
+  /// When set, the platform serves this value directly for read requests
+  /// without forwarding them to the application. Use [HostedDescriptor.immutable]
+  /// to set this along with read-only permissions in one step.
   final Uint8List? value;
 
-  /// Creates a hosted descriptor with the given UUID and permissions.
+  /// Creates a hosted descriptor with the given UUID, permissions, and optional
+  /// static value.
+  ///
+  /// Prefer [HostedDescriptor.immutable] for descriptors with static values
+  /// (e.g., User Description).
   const HostedDescriptor({
     required this.uuid,
     required this.permissions,
@@ -47,8 +79,18 @@ class HostedDescriptor {
 
   /// Creates an immutable (read-only) descriptor with a static value.
   ///
-  /// Use this for descriptors whose value never changes, like
-  /// Characteristic User Description.
+  /// The platform serves the [value] automatically for read requests — no
+  /// application-side request handling is needed.
+  ///
+  /// Use this for descriptors whose value never changes, such as User
+  /// Description (0x2901):
+  ///
+  /// ```dart
+  /// HostedDescriptor.immutable(
+  ///   uuid: Descriptors.characteristicUserDescription,
+  ///   value: Uint8List.fromList(utf8.encode('Heart Rate')),
+  /// )
+  /// ```
   factory HostedDescriptor.immutable({
     required UUID uuid,
     required Uint8List value,
