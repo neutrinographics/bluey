@@ -220,6 +220,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun configure(config: BlueyConfigDto, callback: (Result<Unit>) -> Unit) {
         cleanupOnActivityDestroy = config.cleanupOnActivityDestroy
+        connectionManager?.configure(config)
         android.util.Log.d("BlueyPlugin", "Configured: cleanupOnActivityDestroy=$cleanupOnActivityDestroy")
         callback(Result.success(Unit))
     }

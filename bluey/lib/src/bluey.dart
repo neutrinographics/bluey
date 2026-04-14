@@ -15,6 +15,7 @@ import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'platform/bluetooth_state.dart';
 import 'shared/exceptions.dart';
+import 'shared/gatt_timeouts.dart';
 import 'shared/uuid.dart';
 
 export 'events.dart';
@@ -145,11 +146,21 @@ class Bluey {
   ///
   /// See also:
   /// - [Server.dispose] for manual cleanup of the GATT server.
-  Future<void> configure({bool cleanupOnActivityDestroy = true}) async {
+  Future<void> configure({
+    bool cleanupOnActivityDestroy = true,
+    GattTimeouts gattTimeouts = const GattTimeouts(),
+  }) async {
     try {
       await _platform.configure(
         platform.BlueyConfig(
           cleanupOnActivityDestroy: cleanupOnActivityDestroy,
+          discoverServicesTimeoutMs: gattTimeouts.discoverServices.inMilliseconds,
+          readCharacteristicTimeoutMs: gattTimeouts.readCharacteristic.inMilliseconds,
+          writeCharacteristicTimeoutMs: gattTimeouts.writeCharacteristic.inMilliseconds,
+          readDescriptorTimeoutMs: gattTimeouts.readDescriptor.inMilliseconds,
+          writeDescriptorTimeoutMs: gattTimeouts.writeDescriptor.inMilliseconds,
+          requestMtuTimeoutMs: gattTimeouts.requestMtu.inMilliseconds,
+          readRssiTimeoutMs: gattTimeouts.readRssi.inMilliseconds,
         ),
       );
     } catch (e) {

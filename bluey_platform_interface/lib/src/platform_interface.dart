@@ -238,20 +238,55 @@ class BlueyConfig {
   /// Default: `true`
   final bool cleanupOnActivityDestroy;
 
+  /// GATT operation timeout overrides (in milliseconds). Null means use
+  /// platform default.
+  final int? discoverServicesTimeoutMs;
+  final int? readCharacteristicTimeoutMs;
+  final int? writeCharacteristicTimeoutMs;
+  final int? readDescriptorTimeoutMs;
+  final int? writeDescriptorTimeoutMs;
+  final int? requestMtuTimeoutMs;
+  final int? readRssiTimeoutMs;
+
   /// Creates a configuration for the Bluey plugin.
   ///
   /// All parameters have sensible defaults and are optional.
-  const BlueyConfig({this.cleanupOnActivityDestroy = true});
+  const BlueyConfig({
+    this.cleanupOnActivityDestroy = true,
+    this.discoverServicesTimeoutMs,
+    this.readCharacteristicTimeoutMs,
+    this.writeCharacteristicTimeoutMs,
+    this.readDescriptorTimeoutMs,
+    this.writeDescriptorTimeoutMs,
+    this.requestMtuTimeoutMs,
+    this.readRssiTimeoutMs,
+  });
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is BlueyConfig &&
-        other.cleanupOnActivityDestroy == cleanupOnActivityDestroy;
+        other.cleanupOnActivityDestroy == cleanupOnActivityDestroy &&
+        other.discoverServicesTimeoutMs == discoverServicesTimeoutMs &&
+        other.readCharacteristicTimeoutMs == readCharacteristicTimeoutMs &&
+        other.writeCharacteristicTimeoutMs == writeCharacteristicTimeoutMs &&
+        other.readDescriptorTimeoutMs == readDescriptorTimeoutMs &&
+        other.writeDescriptorTimeoutMs == writeDescriptorTimeoutMs &&
+        other.requestMtuTimeoutMs == requestMtuTimeoutMs &&
+        other.readRssiTimeoutMs == readRssiTimeoutMs;
   }
 
   @override
-  int get hashCode => cleanupOnActivityDestroy.hashCode;
+  int get hashCode => Object.hash(
+        cleanupOnActivityDestroy,
+        discoverServicesTimeoutMs,
+        readCharacteristicTimeoutMs,
+        writeCharacteristicTimeoutMs,
+        readDescriptorTimeoutMs,
+        writeDescriptorTimeoutMs,
+        requestMtuTimeoutMs,
+        readRssiTimeoutMs,
+      );
 }
 
 /// Platform-specific implementation interface.

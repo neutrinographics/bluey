@@ -273,8 +273,22 @@ enum GattStatusDto {
 class BlueyConfigDto {
   /// Ignored on iOS (cleanup is handled automatically by the OS).
   final bool cleanupOnActivityDestroy;
+  final int? discoverServicesTimeoutMs;
+  final int? readCharacteristicTimeoutMs;
+  final int? writeCharacteristicTimeoutMs;
+  final int? readDescriptorTimeoutMs;
+  final int? writeDescriptorTimeoutMs;
+  final int? readRssiTimeoutMs;
 
-  BlueyConfigDto({this.cleanupOnActivityDestroy = true});
+  BlueyConfigDto({
+    this.cleanupOnActivityDestroy = true,
+    this.discoverServicesTimeoutMs,
+    this.readCharacteristicTimeoutMs,
+    this.writeCharacteristicTimeoutMs,
+    this.readDescriptorTimeoutMs,
+    this.writeDescriptorTimeoutMs,
+    this.readRssiTimeoutMs,
+  });
 }
 
 /// Host API - called from Dart to platform (iOS).
