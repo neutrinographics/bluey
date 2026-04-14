@@ -43,7 +43,12 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
     if (descriptor == null) return;
     try {
       final bytes = await _readDescriptor(descriptor);
-      final name = utf8.decode(bytes, allowMalformed: true).trim();
+      final name = utf8
+          .decode(bytes, allowMalformed: true)
+          .replaceAll('\u0000', '') // null terminators
+          .replaceAll('\uFEFF', '') // BOM
+          .replaceAll('\uFFFD', '') // replacement character from malformed bytes
+          .trim();
       if (name.isNotEmpty && !isClosed) {
         emit(state.copyWith(userDescription: name));
       }

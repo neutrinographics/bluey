@@ -15,7 +15,7 @@ class ScannerState {
     this.bluetoothState = BluetoothState.unknown,
     this.scanResults = const [],
     this.isScanning = false,
-    this.sortMode = SortMode.signalStrength,
+    this.sortMode = SortMode.name,
     this.error,
   });
 

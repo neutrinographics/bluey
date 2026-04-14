@@ -10,6 +10,7 @@ import '../../../shared/di/service_locator.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../../shared/domain/value_formatters.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/section_header.dart';
 import '../application/read_characteristic.dart';
 import '../application/write_characteristic.dart';
 import '../application/subscribe_to_characteristic.dart';
@@ -125,7 +126,8 @@ class _ServiceScreenState extends State<ServiceScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                  child: _CharacteristicsHeader(
+                  child: SectionHeader(
+                    title: 'Characteristics',
                     count: _service.characteristics.length,
                     isRefreshing: _isRefreshing,
                     onRefresh: widget.onRefresh != null ? _refresh : null,
@@ -317,71 +319,6 @@ class _ServiceIdentityCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Characteristics Header ───────────────────────────────────────────────────
-
-class _CharacteristicsHeader extends StatelessWidget {
-  final int count;
-  final bool isRefreshing;
-  final VoidCallback? onRefresh;
-
-  const _CharacteristicsHeader({
-    required this.count,
-    required this.isRefreshing,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          'Characteristics',
-          style: GoogleFonts.manrope(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: _kDark,
-          ),
-        ),
-        const Spacer(),
-        GestureDetector(
-          onTap: isRefreshing ? null : onRefresh,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: isRefreshing
-                    ? const CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: _kLight,
-                      )
-                    : const Icon(Icons.refresh, color: _kLight, size: 16),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _kBadgeBg,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${count.toString().padLeft(2, '0')} FOUND',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _kLight,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

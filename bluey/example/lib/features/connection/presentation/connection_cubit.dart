@@ -87,10 +87,13 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     final connection = state.connection;
     if (connection == null) return;
 
+    // Cancel the state listener first so the platform's disconnect event
+    // doesn't trigger the "Device disconnected" error path.
+    await _stateSubscription?.cancel();
+    _stateSubscription = null;
+
     try {
       await _disconnectDevice(connection);
-      await _stateSubscription?.cancel();
-      _stateSubscription = null;
       emit(state.withoutConnection());
     } catch (e) {
       emit(state.copyWith(error: 'Failed to disconnect: $e'));

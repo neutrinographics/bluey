@@ -412,7 +412,7 @@ void main() {
         lastSeen: DateTime(2024),
       );
 
-      test('initial sort mode is signalStrength', () {
+      test('initial sort mode is name', () {
         when(
           () => mockGetBluetoothState.current,
         ).thenReturn(BluetoothState.unknown);
@@ -421,7 +421,7 @@ void main() {
         ).thenAnswer((_) => const Stream.empty());
 
         final cubit = createCubit();
-        expect(cubit.state.sortMode, SortMode.signalStrength);
+        expect(cubit.state.sortMode, SortMode.name);
         cubit.close();
       });
 

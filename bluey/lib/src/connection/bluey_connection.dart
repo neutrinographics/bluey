@@ -288,6 +288,11 @@ class BlueyConnection implements Connection {
 
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
 
+    // Send the first heartbeat immediately so the server (especially iOS,
+    // which has no connection callback) learns about this client as soon as
+    // possible — before the interval read round-trip.
+    _sendHeartbeat();
+
     // Find the interval characteristic and read the server's interval
     final intervalChar = controlService.characteristics
         .where(
