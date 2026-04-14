@@ -78,9 +78,7 @@ class ScannerCubit extends Cubit<ScannerState> {
         } else {
           results.add(result);
         }
-        // Sort by RSSI (strongest first)
-        results.sort((a, b) => b.rssi.compareTo(a.rssi));
-        emit(state.copyWith(scanResults: List.from(results)));
+        emit(state.copyWith(scanResults: _sorted(results)));
       },
       onDone: () {
         emit(state.copyWith(isScanning: false));
@@ -137,6 +135,37 @@ class ScannerCubit extends Cubit<ScannerState> {
     } catch (e) {
       emit(state.copyWith(error: 'Failed to open settings: $e'));
     }
+  }
+
+  /// Changes the sort order of scan results.
+  void setSortMode(SortMode mode) {
+    emit(state.copyWith(
+      sortMode: mode,
+      scanResults: _sorted(state.scanResults, mode),
+    ));
+  }
+
+  List<ScanResult> _sorted(List<ScanResult> results, [SortMode? override]) {
+    final mode = override ?? state.sortMode;
+    final sorted = List<ScanResult>.from(results);
+    switch (mode) {
+      case SortMode.signalStrength:
+        sorted.sort((a, b) => b.rssi.compareTo(a.rssi));
+      case SortMode.name:
+        sorted.sort((a, b) {
+          final aName = a.device.name;
+          final bName = b.device.name;
+          if (aName == null && bName == null) return 0;
+          if (aName == null) return 1;
+          if (bName == null) return -1;
+          return aName.compareTo(bName);
+        });
+      case SortMode.deviceId:
+        sorted.sort(
+          (a, b) => a.device.id.toString().compareTo(b.device.id.toString()),
+        );
+    }
+    return sorted;
   }
 
   /// Clears any error message.

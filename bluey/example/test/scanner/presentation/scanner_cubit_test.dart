@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -162,6 +164,50 @@ void main() {
       verify: (_) {
         verify(() => mockStopScan()).called(1);
       },
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'startScan sets isScanning false when stream completes',
+      setUp: () {
+        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+
+        // Stream that emits one result then completes (as the library now does)
+        final result = ScanResult(
+          device: Device(
+            id: UUID('00000000-0000-0000-0000-000000000001'),
+            address: '00:11:22:33:44:55',
+            name: 'Test Device',
+          ),
+          rssi: -50,
+          advertisement: Advertisement.empty(),
+          lastSeen: DateTime.now(),
+        );
+
+        when(
+          () => mockScanForDevices(timeout: any(named: 'timeout')),
+        ).thenAnswer((_) => Stream.value(result));
+      },
+      build: createCubit,
+      seed: () => const ScannerState(bluetoothState: BluetoothState.on),
+      act: (cubit) => cubit.startScan(),
+      expect: () => [
+        const ScannerState(
+          bluetoothState: BluetoothState.on,
+          scanResults: [],
+          isScanning: true,
+        ),
+        isA<ScannerState>()
+            .having((s) => s.scanResults.length, 'scanResults.length', 1)
+            .having((s) => s.isScanning, 'isScanning', true),
+        isA<ScannerState>().having(
+          (s) => s.isScanning,
+          'isScanning',
+          false,
+        ),
+      ],
     );
 
     blocTest<ScannerCubit, ScannerState>(
@@ -332,5 +378,181 @@ void main() {
             ),
           ],
     );
+
+    group('sorting', () {
+      final deviceA = ScanResult(
+        device: Device(
+          id: UUID('00000000-0000-0000-0000-000000000001'),
+          address: '00:11:22:33:44:55',
+          name: 'Alpha Device',
+        ),
+        rssi: -80,
+        advertisement: Advertisement.empty(),
+        lastSeen: DateTime(2024),
+      );
+
+      final deviceB = ScanResult(
+        device: Device(
+          id: UUID('00000000-0000-0000-0000-000000000002'),
+          address: 'AA:BB:CC:DD:EE:FF',
+          name: 'Beta Device',
+        ),
+        rssi: -40,
+        advertisement: Advertisement.empty(),
+        lastSeen: DateTime(2024),
+      );
+
+      final unnamed = ScanResult(
+        device: Device(
+          id: UUID('00000000-0000-0000-0000-000000000003'),
+          address: 'FF:FF:FF:FF:FF:FF',
+        ),
+        rssi: -60,
+        advertisement: Advertisement.empty(),
+        lastSeen: DateTime(2024),
+      );
+
+      test('initial sort mode is signalStrength', () {
+        when(
+          () => mockGetBluetoothState.current,
+        ).thenReturn(BluetoothState.unknown);
+        when(
+          () => mockGetBluetoothState(),
+        ).thenAnswer((_) => const Stream.empty());
+
+        final cubit = createCubit();
+        expect(cubit.state.sortMode, SortMode.signalStrength);
+        cubit.close();
+      });
+
+      blocTest<ScannerCubit, ScannerState>(
+        'setSortMode emits state with new sort mode',
+        setUp: () {
+          when(
+            () => mockGetBluetoothState.current,
+          ).thenReturn(BluetoothState.on);
+          when(
+            () => mockGetBluetoothState(),
+          ).thenAnswer((_) => const Stream.empty());
+        },
+        build: createCubit,
+        seed: () => ScannerState(
+          bluetoothState: BluetoothState.on,
+          scanResults: [deviceB, deviceA],
+        ),
+        act: (cubit) => cubit.setSortMode(SortMode.name),
+        expect: () => [
+          isA<ScannerState>().having(
+            (s) => s.sortMode,
+            'sortMode',
+            SortMode.name,
+          ),
+        ],
+      );
+
+      blocTest<ScannerCubit, ScannerState>(
+        'sort by name orders alphabetically',
+        setUp: () {
+          when(
+            () => mockGetBluetoothState.current,
+          ).thenReturn(BluetoothState.on);
+          when(
+            () => mockGetBluetoothState(),
+          ).thenAnswer((_) => const Stream.empty());
+        },
+        build: createCubit,
+        seed: () => ScannerState(
+          bluetoothState: BluetoothState.on,
+          scanResults: [deviceB, deviceA],
+        ),
+        act: (cubit) => cubit.setSortMode(SortMode.name),
+        expect: () => [
+          isA<ScannerState>().having(
+            (s) => s.scanResults.map((r) => r.device.name).toList(),
+            'device names',
+            ['Alpha Device', 'Beta Device'],
+          ),
+        ],
+      );
+
+      blocTest<ScannerCubit, ScannerState>(
+        'sort by name places unnamed devices last',
+        setUp: () {
+          when(
+            () => mockGetBluetoothState.current,
+          ).thenReturn(BluetoothState.on);
+          when(
+            () => mockGetBluetoothState(),
+          ).thenAnswer((_) => const Stream.empty());
+        },
+        build: createCubit,
+        seed: () => ScannerState(
+          bluetoothState: BluetoothState.on,
+          scanResults: [unnamed, deviceA],
+        ),
+        act: (cubit) => cubit.setSortMode(SortMode.name),
+        expect: () => [
+          isA<ScannerState>().having(
+            (s) => s.scanResults.map((r) => r.device.name).toList(),
+            'device names',
+            ['Alpha Device', null],
+          ),
+        ],
+      );
+
+      blocTest<ScannerCubit, ScannerState>(
+        'sort by signalStrength orders by RSSI descending',
+        setUp: () {
+          when(
+            () => mockGetBluetoothState.current,
+          ).thenReturn(BluetoothState.on);
+          when(
+            () => mockGetBluetoothState(),
+          ).thenAnswer((_) => const Stream.empty());
+        },
+        build: createCubit,
+        seed: () => ScannerState(
+          bluetoothState: BluetoothState.on,
+          sortMode: SortMode.name,
+          scanResults: [deviceA, deviceB],
+        ),
+        act: (cubit) => cubit.setSortMode(SortMode.signalStrength),
+        expect: () => [
+          isA<ScannerState>().having(
+            (s) => s.scanResults.map((r) => r.rssi).toList(),
+            'rssi values',
+            [-40, -80],
+          ),
+        ],
+      );
+
+      blocTest<ScannerCubit, ScannerState>(
+        'sort by deviceId orders by UUID string',
+        setUp: () {
+          when(
+            () => mockGetBluetoothState.current,
+          ).thenReturn(BluetoothState.on);
+          when(
+            () => mockGetBluetoothState(),
+          ).thenAnswer((_) => const Stream.empty());
+        },
+        build: createCubit,
+        seed: () => ScannerState(
+          bluetoothState: BluetoothState.on,
+          scanResults: [deviceB, deviceA],
+        ),
+        act: (cubit) => cubit.setSortMode(SortMode.deviceId),
+        expect: () => [
+          isA<ScannerState>().having(
+            (s) => s.scanResults.map((r) => r.device.id.toString()).toList(),
+            'device ids',
+            [
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000002',
+            ],
+          ),
+        ],
+      );
+    });
   });
 }

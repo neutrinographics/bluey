@@ -131,7 +131,7 @@ void main() {
       expect(results.first.device.name, equals('Heart Rate Monitor'));
     });
 
-    test('scan with timeout', () async {
+    test('scan with timeout closes stream and stops scanning', () async {
       fakePlatform.simulatePeripheral(
         id: 'AA:BB:CC:DD:EE:FF',
         name: 'Test Device',
@@ -139,17 +139,27 @@ void main() {
 
       final scanner = bluey.scanner();
 
-      // Verify scan accepts timeout parameter without error
       final results = <ScanResult>[];
-      final subscription = scanner
-          .scan(timeout: Duration(seconds: 10))
-          .listen(results.add);
+      var streamDone = false;
 
+      scanner
+          .scan(timeout: Duration(milliseconds: 100))
+          .listen(
+            results.add,
+            onDone: () => streamDone = true,
+          );
+
+      // Results arrive before timeout
       await Future.delayed(Duration(milliseconds: 50));
-      await subscription.cancel();
-      scanner.dispose();
-
       expect(results, hasLength(1));
+      expect(scanner.isScanning, isTrue);
+
+      // After timeout, stream should close and scanning should stop
+      await Future.delayed(Duration(milliseconds: 150));
+      expect(streamDone, isTrue);
+      expect(scanner.isScanning, isFalse);
+
+      scanner.dispose();
     });
 
     test('dispose cleans up', () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
@@ -17,6 +18,8 @@ class BlueyScanner implements Scanner {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
   bool _isScanning = false;
+  Timer? _timeoutTimer;
+  StreamSubscription<platform.PlatformDevice>? _platformSubscription;
 
   BlueyScanner(this._platform, this._eventBus);
 
@@ -33,31 +36,64 @@ class BlueyScanner implements Scanner {
     _isScanning = true;
     _eventBus.emit(ScanStartedEvent(serviceFilter: services, timeout: timeout));
 
-    return _platform
-        .scan(config)
-        .map((platformDevice) {
-          final result = _mapScanResult(platformDevice);
-          _eventBus.emit(
-            DeviceDiscoveredEvent(
-              deviceId: result.device.id,
-              name: result.device.name,
-              rssi: result.rssi,
-            ),
-          );
-          return result;
-        });
+    final controller = StreamController<ScanResult>();
+
+    _platformSubscription = _platform.scan(config).listen(
+      (platformDevice) {
+        final result = _mapScanResult(platformDevice);
+        _eventBus.emit(
+          DeviceDiscoveredEvent(
+            deviceId: result.device.id,
+            name: result.device.name,
+            rssi: result.rssi,
+          ),
+        );
+        controller.add(result);
+      },
+      onDone: () {
+        _timeoutTimer?.cancel();
+        _finishScan(controller);
+      },
+      onError: (Object error) {
+        _timeoutTimer?.cancel();
+        controller.addError(error);
+        _finishScan(controller);
+      },
+    );
+
+    if (timeout != null) {
+      _timeoutTimer = Timer(timeout, () => stop().then((_) {
+        if (!controller.isClosed) {
+          controller.close();
+        }
+      }));
+    }
+
+    return controller.stream;
+  }
+
+  void _finishScan(StreamController<ScanResult> controller) {
+    _isScanning = false;
+    _eventBus.emit(ScanStoppedEvent());
+    if (!controller.isClosed) {
+      controller.close();
+    }
   }
 
   @override
   Future<void> stop() async {
+    _timeoutTimer?.cancel();
     if (!_isScanning) return;
     await _platform.stopScan();
+    _platformSubscription?.cancel();
     _isScanning = false;
     _eventBus.emit(ScanStoppedEvent());
   }
 
   @override
   void dispose() {
+    _timeoutTimer?.cancel();
+    _platformSubscription?.cancel();
     _isScanning = false;
   }
 

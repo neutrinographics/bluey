@@ -189,7 +189,7 @@ class _ScannerContent extends StatelessWidget {
         ),
         const SizedBox(height: 32),
         if (state.scanResults.isNotEmpty) ...[
-          const _SectionHeader(),
+          _SectionHeader(sortMode: state.sortMode),
           const SizedBox(height: 16),
           ...state.scanResults.map(
             (result) => Padding(
@@ -358,7 +358,9 @@ class _PulsingDotState extends State<_PulsingDot>
 // -- Section header --
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader();
+  final SortMode sortMode;
+
+  const _SectionHeader({required this.sortMode});
 
   @override
   Widget build(BuildContext context) {
@@ -376,13 +378,34 @@ class _SectionHeader extends StatelessWidget {
               letterSpacing: 1.2,
             ),
           ),
-          Row(
-            children: [
-              Icon(Icons.filter_list, size: 14, color: _kTextMedium),
-              const SizedBox(width: 8),
-              Icon(Icons.sort, size: 14, color: _kTextMedium),
+          PopupMenuButton<SortMode>(
+            onSelected: (mode) =>
+                context.read<ScannerCubit>().setSortMode(mode),
+            itemBuilder: (context) => [
+              _sortMenuItem(SortMode.signalStrength, 'Signal Strength'),
+              _sortMenuItem(SortMode.name, 'Name'),
+              _sortMenuItem(SortMode.deviceId, 'Device ID'),
             ],
+            child: Icon(Icons.sort, size: 16, color: _kTextMedium),
           ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuEntry<SortMode> _sortMenuItem(SortMode mode, String label) {
+    return PopupMenuItem(
+      value: mode,
+      child: Row(
+        children: [
+          if (sortMode == mode)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.check, size: 16),
+            )
+          else
+            const SizedBox(width: 24),
+          Text(label),
         ],
       ),
     );
