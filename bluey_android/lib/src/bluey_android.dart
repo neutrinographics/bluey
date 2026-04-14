@@ -102,6 +102,13 @@ final class BlueyAndroid extends BlueyPlatform {
     _ensureInitialized();
     final dto = BlueyConfigDto(
       cleanupOnActivityDestroy: config.cleanupOnActivityDestroy,
+      discoverServicesTimeoutMs: config.discoverServicesTimeoutMs,
+      readCharacteristicTimeoutMs: config.readCharacteristicTimeoutMs,
+      writeCharacteristicTimeoutMs: config.writeCharacteristicTimeoutMs,
+      readDescriptorTimeoutMs: config.readDescriptorTimeoutMs,
+      writeDescriptorTimeoutMs: config.writeDescriptorTimeoutMs,
+      requestMtuTimeoutMs: config.requestMtuTimeoutMs,
+      readRssiTimeoutMs: config.readRssiTimeoutMs,
     );
     await _hostApi.configure(dto);
   }

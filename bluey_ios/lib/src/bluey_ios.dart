@@ -82,6 +82,12 @@ final class BlueyIos extends BlueyPlatform {
     _ensureInitialized();
     final dto = BlueyConfigDto(
       cleanupOnActivityDestroy: config.cleanupOnActivityDestroy,
+      discoverServicesTimeoutMs: config.discoverServicesTimeoutMs,
+      readCharacteristicTimeoutMs: config.readCharacteristicTimeoutMs,
+      writeCharacteristicTimeoutMs: config.writeCharacteristicTimeoutMs,
+      readDescriptorTimeoutMs: config.readDescriptorTimeoutMs,
+      writeDescriptorTimeoutMs: config.writeDescriptorTimeoutMs,
+      readRssiTimeoutMs: config.readRssiTimeoutMs,
     );
     await _hostApi.configure(dto);
   }

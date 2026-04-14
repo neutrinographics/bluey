@@ -307,8 +307,24 @@ class BlueyConfigDto {
   /// This prevents "zombie" BLE connections that persist after the app is closed.
   /// Disable this if you want to manage cleanup manually via [BlueyHostApi.closeServer].
   final bool cleanupOnActivityDestroy;
+  final int? discoverServicesTimeoutMs;
+  final int? readCharacteristicTimeoutMs;
+  final int? writeCharacteristicTimeoutMs;
+  final int? readDescriptorTimeoutMs;
+  final int? writeDescriptorTimeoutMs;
+  final int? requestMtuTimeoutMs;
+  final int? readRssiTimeoutMs;
 
-  BlueyConfigDto({this.cleanupOnActivityDestroy = true});
+  BlueyConfigDto({
+    this.cleanupOnActivityDestroy = true,
+    this.discoverServicesTimeoutMs,
+    this.readCharacteristicTimeoutMs,
+    this.writeCharacteristicTimeoutMs,
+    this.readDescriptorTimeoutMs,
+    this.writeDescriptorTimeoutMs,
+    this.requestMtuTimeoutMs,
+    this.readRssiTimeoutMs,
+  });
 }
 
 /// Host API - called from Dart to platform.
