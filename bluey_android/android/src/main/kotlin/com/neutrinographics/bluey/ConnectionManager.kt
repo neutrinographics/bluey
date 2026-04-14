@@ -47,15 +47,25 @@ class ConnectionManager(
     // CCCD UUID for enabling notifications/indications
     companion object {
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+    }
 
-        // Default timeout values for GATT operations (in milliseconds)
-        private const val DISCOVER_SERVICES_TIMEOUT_MS = 15_000L
-        private const val READ_CHARACTERISTIC_TIMEOUT_MS = 10_000L
-        private const val WRITE_CHARACTERISTIC_TIMEOUT_MS = 10_000L
-        private const val READ_DESCRIPTOR_TIMEOUT_MS = 10_000L
-        private const val WRITE_DESCRIPTOR_TIMEOUT_MS = 10_000L
-        private const val MTU_REQUEST_TIMEOUT_MS = 10_000L
-        private const val READ_RSSI_TIMEOUT_MS = 5_000L
+    // Configurable timeout values — set via configure(), defaults match previous hardcoded values
+    private var discoverServicesTimeoutMs = 15_000L
+    private var readCharacteristicTimeoutMs = 10_000L
+    private var writeCharacteristicTimeoutMs = 10_000L
+    private var readDescriptorTimeoutMs = 10_000L
+    private var writeDescriptorTimeoutMs = 10_000L
+    private var requestMtuTimeoutMs = 10_000L
+    private var readRssiTimeoutMs = 5_000L
+
+    fun configure(config: BlueyConfigDto) {
+        config.discoverServicesTimeoutMs?.let { discoverServicesTimeoutMs = it }
+        config.readCharacteristicTimeoutMs?.let { readCharacteristicTimeoutMs = it }
+        config.writeCharacteristicTimeoutMs?.let { writeCharacteristicTimeoutMs = it }
+        config.readDescriptorTimeoutMs?.let { readDescriptorTimeoutMs = it }
+        config.writeDescriptorTimeoutMs?.let { writeDescriptorTimeoutMs = it }
+        config.requestMtuTimeoutMs?.let { requestMtuTimeoutMs = it }
+        config.readRssiTimeoutMs?.let { readRssiTimeoutMs = it }
     }
 
     fun setActivity(activity: Activity?) {
@@ -190,7 +200,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingServiceDiscovery.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Service discovery timed out")))
-                }, DISCOVER_SERVICES_TIMEOUT_MS)
+                }, discoverServicesTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingServiceDiscovery.remove(deviceId)
@@ -228,7 +238,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingReads.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Read characteristic timed out")))
-                }, READ_CHARACTERISTIC_TIMEOUT_MS)
+                }, readCharacteristicTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingReads.remove(key)
@@ -285,7 +295,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingWrites.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Write characteristic timed out")))
-                }, WRITE_CHARACTERISTIC_TIMEOUT_MS)
+                }, writeCharacteristicTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingWrites.remove(key)
@@ -385,7 +395,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingDescriptorReads.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Read descriptor timed out")))
-                }, READ_DESCRIPTOR_TIMEOUT_MS)
+                }, readDescriptorTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingDescriptorReads.remove(key)
@@ -432,7 +442,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingDescriptorWrites.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Write descriptor timed out")))
-                }, WRITE_DESCRIPTOR_TIMEOUT_MS)
+                }, writeDescriptorTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingDescriptorWrites.remove(key)
@@ -458,7 +468,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingMtuRequests.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("MTU request timed out")))
-                }, MTU_REQUEST_TIMEOUT_MS)
+                }, requestMtuTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingMtuRequests.remove(deviceId)
@@ -484,7 +494,7 @@ class ConnectionManager(
                 handler.postDelayed({
                     val pendingCallback = pendingRssiReads.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("RSSI read timed out")))
-                }, READ_RSSI_TIMEOUT_MS)
+                }, readRssiTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingRssiReads.remove(deviceId)
