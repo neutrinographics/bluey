@@ -35,7 +35,7 @@ class BlueyHostApiImpl: BlueyHostApi {
     // MARK: - Configuration
 
     func configure(config: BlueyConfigDto, completion: @escaping (Result<Void, any Error>) -> Void) {
-        // iOS doesn't need special configuration - cleanup is automatic
+        centralManager.configure(config: config)
         completion(.success(()))
     }
 

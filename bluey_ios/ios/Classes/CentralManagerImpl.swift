@@ -2,17 +2,6 @@ import Foundation
 import CoreBluetooth
 import Flutter
 
-/// Default timeout values for BLE operations (in seconds).
-private enum BleTimeout {
-    static let connect: TimeInterval = 30.0
-    static let discoverServices: TimeInterval = 15.0
-    static let readCharacteristic: TimeInterval = 10.0
-    static let writeCharacteristic: TimeInterval = 10.0
-    static let readDescriptor: TimeInterval = 10.0
-    static let writeDescriptor: TimeInterval = 10.0
-    static let readRssi: TimeInterval = 5.0
-}
-
 /// Implementation of the Central (client) role BLE operations.
 class CentralManagerImpl: NSObject {
     private let flutterApi: BlueyFlutterApi
@@ -49,6 +38,15 @@ class CentralManagerImpl: NSObject {
     private var writeDescriptorCompletions: [String: [String: (Result<Void, Error>) -> Void]] = [:]
     private var readRssiCompletions: [String: (Result<Int64, Error>) -> Void] = [:]
 
+    // Configurable timeout values — set via configure(), defaults match previous hardcoded values
+    private var connectTimeout: TimeInterval = 30.0
+    private var discoverServicesTimeout: TimeInterval = 15.0
+    private var readCharacteristicTimeout: TimeInterval = 10.0
+    private var writeCharacteristicTimeout: TimeInterval = 10.0
+    private var readDescriptorTimeout: TimeInterval = 10.0
+    private var writeDescriptorTimeout: TimeInterval = 10.0
+    private var readRssiTimeout: TimeInterval = 5.0
+
     // Service discovery tracking
     private var pendingServiceDiscovery: [String: Set<String>] = [:] // [deviceId: Set<serviceUuid>] - services waiting for characteristics
     private var pendingCharacteristicDiscovery: [String: Set<String>] = [:] // [deviceId: Set<charUuid>] - characteristics waiting for descriptors
@@ -58,6 +56,29 @@ class CentralManagerImpl: NSObject {
         centralManager = CBCentralManager(delegate: nil, queue: nil)
         super.init()
         centralManager.delegate = centralManagerDelegate
+    }
+
+    // MARK: - Configuration
+
+    func configure(config: BlueyConfigDto) {
+        if let ms = config.discoverServicesTimeoutMs {
+            discoverServicesTimeout = TimeInterval(ms) / 1000.0
+        }
+        if let ms = config.readCharacteristicTimeoutMs {
+            readCharacteristicTimeout = TimeInterval(ms) / 1000.0
+        }
+        if let ms = config.writeCharacteristicTimeoutMs {
+            writeCharacteristicTimeout = TimeInterval(ms) / 1000.0
+        }
+        if let ms = config.readDescriptorTimeoutMs {
+            readDescriptorTimeout = TimeInterval(ms) / 1000.0
+        }
+        if let ms = config.writeDescriptorTimeoutMs {
+            writeDescriptorTimeout = TimeInterval(ms) / 1000.0
+        }
+        if let ms = config.readRssiTimeoutMs {
+            readRssiTimeout = TimeInterval(ms) / 1000.0
+        }
     }
 
     // MARK: - State
@@ -139,7 +160,7 @@ class CentralManagerImpl: NSObject {
         // Schedule timeout
         let timeoutSeconds = config.timeoutMs != nil
             ? TimeInterval(config.timeoutMs!) / 1000.0
-            : BleTimeout.connect
+            : connectTimeout
         DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.connectCompletions.removeValue(forKey: deviceId) {
@@ -176,7 +197,7 @@ class CentralManagerImpl: NSObject {
         peripheral.discoverServices(nil)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.discoverServices) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + discoverServicesTimeout) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.discoverServicesCompletions.removeValue(forKey: deviceId) {
                 self.pendingServiceDiscovery.removeValue(forKey: deviceId)
@@ -205,7 +226,7 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: characteristic)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readCharacteristic) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + readCharacteristicTimeout) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.readCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
@@ -232,7 +253,7 @@ class CentralManagerImpl: NSObject {
             writeCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
 
             // Schedule timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.writeCharacteristic) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + writeCharacteristicTimeout) { [weak self] in
                 guard let self = self else { return }
                 if let pendingCompletion = self.writeCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                     pendingCompletion(.failure(BlueyError.timeout))
@@ -308,7 +329,7 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: descriptor)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readDescriptor) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + readDescriptorTimeout) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.readDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
@@ -333,7 +354,7 @@ class CentralManagerImpl: NSObject {
         peripheral.writeValue(value.data, for: descriptor)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.writeDescriptor) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + writeDescriptorTimeout) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.writeDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
@@ -384,7 +405,7 @@ class CentralManagerImpl: NSObject {
         peripheral.readRSSI()
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + BleTimeout.readRssi) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + readRssiTimeout) { [weak self] in
             guard let self = self else { return }
             if let pendingCompletion = self.readRssiCompletions.removeValue(forKey: deviceId) {
                 pendingCompletion(.failure(BlueyError.timeout))
