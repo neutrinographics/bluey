@@ -460,13 +460,17 @@ class _DescriptorTile extends StatelessWidget {
     final cubit = context.read<CharacteristicCubit>();
     final key = descriptor.uuid.toString();
 
-    return BlocSelector<CharacteristicCubit, CharacteristicState,
-        ({Uint8List? value, bool isReading, bool hasError})>(
-      selector: (state) => (
-        value: state.descriptorValues[key],
-        isReading: state.readingDescriptors.contains(key),
-        hasError: state.failedDescriptors.contains(key),
-      ),
+    return BlocSelector<
+      CharacteristicCubit,
+      CharacteristicState,
+      ({Uint8List? value, bool isReading, bool hasError})
+    >(
+      selector:
+          (state) => (
+            value: state.descriptorValues[key],
+            isReading: state.readingDescriptors.contains(key),
+            hasError: state.failedDescriptors.contains(key),
+          ),
       builder: (context, desc) {
         return ListTile(
           dense: true,

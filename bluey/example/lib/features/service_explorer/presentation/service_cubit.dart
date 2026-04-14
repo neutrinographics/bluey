@@ -107,23 +107,29 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
   /// Reads a descriptor value.
   Future<void> readDescriptor(RemoteDescriptor descriptor) async {
     final key = descriptor.uuid.toString();
-    emit(state.copyWith(
-      readingDescriptors: {...state.readingDescriptors, key},
-      failedDescriptors: Set.of(state.failedDescriptors)..remove(key),
-    ));
+    emit(
+      state.copyWith(
+        readingDescriptors: {...state.readingDescriptors, key},
+        failedDescriptors: Set.of(state.failedDescriptors)..remove(key),
+      ),
+    );
 
     try {
       final value = await _readDescriptor(descriptor);
-      emit(state.copyWith(
-        descriptorValues: {...state.descriptorValues, key: value},
-        readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
-      ));
+      emit(
+        state.copyWith(
+          descriptorValues: {...state.descriptorValues, key: value},
+          readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
-        failedDescriptors: {...state.failedDescriptors, key},
-        error: 'Descriptor read failed: $e',
-      ));
+      emit(
+        state.copyWith(
+          readingDescriptors: Set.of(state.readingDescriptors)..remove(key),
+          failedDescriptors: {...state.failedDescriptors, key},
+          error: 'Descriptor read failed: $e',
+        ),
+      );
     }
   }
 

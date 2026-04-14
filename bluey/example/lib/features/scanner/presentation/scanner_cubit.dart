@@ -70,7 +70,9 @@ class ScannerCubit extends Cubit<ScannerState> {
     _scanSubscription = _scanForDevices(timeout: timeout).listen(
       (result) {
         // Update existing result or add new one
-        final index = results.indexWhere((r) => r.device.id == result.device.id);
+        final index = results.indexWhere(
+          (r) => r.device.id == result.device.id,
+        );
         if (index >= 0) {
           results[index] = result;
         } else {

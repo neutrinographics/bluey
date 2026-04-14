@@ -94,50 +94,44 @@ class ServerCubit extends Cubit<ServerScreenState> {
     );
 
     // Listen for central disconnections and refresh the list.
-    _disconnectionSubscription = _observeDisconnections().listen(
-      (clientId) {
-        _refreshConnectedClients();
-        _addLog('Connection', 'Client disconnected: $clientId');
-      },
-    );
+    _disconnectionSubscription = _observeDisconnections().listen((clientId) {
+      _refreshConnectedClients();
+      _addLog('Connection', 'Client disconnected: $clientId');
+    });
 
     // Listen for read requests and respond with the current value.
-    _readRequestSubscription = _observeReadRequests().listen(
-      (request) async {
-        _addLog('Read', 'From ${_shortId(request.client.id)}');
-        try {
-          await _observeReadRequests.respond(
-            request,
-            status: GattResponseStatus.success,
-            value: _characteristicValue,
-          );
-        } catch (e) {
-          _addLog('Error', 'Failed to respond to read: $e');
-        }
-      },
-    );
+    _readRequestSubscription = _observeReadRequests().listen((request) async {
+      _addLog('Read', 'From ${_shortId(request.client.id)}');
+      try {
+        await _observeReadRequests.respond(
+          request,
+          status: GattResponseStatus.success,
+          value: _characteristicValue,
+        );
+      } catch (e) {
+        _addLog('Error', 'Failed to respond to read: $e');
+      }
+    });
 
     // Listen for write requests, store the value, and respond.
-    _writeRequestSubscription = _observeWriteRequests().listen(
-      (request) async {
-        _characteristicValue = request.value;
-        _addLog(
-          'Write',
-          'From ${_shortId(request.client.id)}: '
-          '${_formatHex(request.value)}',
-        );
-        if (request.responseNeeded) {
-          try {
-            await _observeWriteRequests.respond(
-              request,
-              status: GattResponseStatus.success,
-            );
-          } catch (e) {
-            _addLog('Error', 'Failed to respond to write: $e');
-          }
+    _writeRequestSubscription = _observeWriteRequests().listen((request) async {
+      _characteristicValue = request.value;
+      _addLog(
+        'Write',
+        'From ${_shortId(request.client.id)}: '
+            '${_formatHex(request.value)}',
+      );
+      if (request.responseNeeded) {
+        try {
+          await _observeWriteRequests.respond(
+            request,
+            status: GattResponseStatus.success,
+          );
+        } catch (e) {
+          _addLog('Error', 'Failed to respond to write: $e');
         }
-      },
-    );
+      }
+    });
 
     // Add demo service
     try {
@@ -168,7 +162,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
   /// Starts advertising.
   Future<void> startAdvertising() async {
     try {
-      await _startAdvertising(name: advertisedName, services: [demoServiceUuid]);
+      await _startAdvertising(
+        name: advertisedName,
+        services: [demoServiceUuid],
+      );
       emit(state.copyWith(isAdvertising: true));
       _addLog('Advertising', 'Started advertising');
     } catch (e) {
@@ -238,8 +235,9 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
   String _shortId(UUID id) => id.toString().substring(0, 8);
 
-  String _formatHex(Uint8List bytes) =>
-      bytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+  String _formatHex(Uint8List bytes) => bytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+      .join(' ');
 
   @override
   Future<void> close() {

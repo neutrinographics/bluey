@@ -8,7 +8,9 @@ import '../application/subscribe_to_characteristic.dart';
 import '../application/read_descriptor.dart';
 
 void registerServiceExplorerDependencies(GetIt getIt) {
-  getIt.registerLazySingleton<CharacteristicRepository>(() => BlueyCharacteristicRepository());
+  getIt.registerLazySingleton<CharacteristicRepository>(
+    () => BlueyCharacteristicRepository(),
+  );
 
   getIt.registerFactory<ReadCharacteristic>(
     () => ReadCharacteristic(getIt<CharacteristicRepository>()),

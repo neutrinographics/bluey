@@ -69,37 +69,51 @@ void main() {
       'read succeeds and updates value and log',
       setUp: () {
         final data = Uint8List.fromList([0x01, 0x02]);
-        when(() => mockReadCharacteristic(any()))
-            .thenAnswer((_) async => data);
+        when(() => mockReadCharacteristic(any())).thenAnswer((_) async => data);
       },
       build: createCubit,
       act: (cubit) => cubit.read(),
-      expect: () => [
-        isA<CharacteristicState>()
-            .having((s) => s.isReading, 'isReading', true)
-            .having((s) => s.error, 'error', isNull),
-        isA<CharacteristicState>()
-            .having((s) => s.isReading, 'isReading', false)
-            .having((s) => s.value, 'value', Uint8List.fromList([0x01, 0x02]))
-            .having((s) => s.log.length, 'log.length', 1)
-            .having((s) => s.log.first.operation, 'log[0].operation', 'Read'),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>()
+                .having((s) => s.isReading, 'isReading', true)
+                .having((s) => s.error, 'error', isNull),
+            isA<CharacteristicState>()
+                .having((s) => s.isReading, 'isReading', false)
+                .having(
+                  (s) => s.value,
+                  'value',
+                  Uint8List.fromList([0x01, 0x02]),
+                )
+                .having((s) => s.log.length, 'log.length', 1)
+                .having(
+                  (s) => s.log.first.operation,
+                  'log[0].operation',
+                  'Read',
+                ),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'read emits error on failure',
       setUp: () {
-        when(() => mockReadCharacteristic(any()))
-            .thenThrow(Exception('Read error'));
+        when(
+          () => mockReadCharacteristic(any()),
+        ).thenThrow(Exception('Read error'));
       },
       build: createCubit,
       act: (cubit) => cubit.read(),
-      expect: () => [
-        isA<CharacteristicState>().having((s) => s.isReading, 'isReading', true),
-        isA<CharacteristicState>()
-            .having((s) => s.isReading, 'isReading', false)
-            .having((s) => s.error, 'error', contains('Read failed')),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having(
+              (s) => s.isReading,
+              'isReading',
+              true,
+            ),
+            isA<CharacteristicState>()
+                .having((s) => s.isReading, 'isReading', false)
+                .having((s) => s.error, 'error', contains('Read failed')),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
@@ -115,15 +129,20 @@ void main() {
       },
       build: createCubit,
       act: (cubit) => cubit.write(Uint8List.fromList([0xAA])),
-      expect: () => [
-        isA<CharacteristicState>()
-            .having((s) => s.isWriting, 'isWriting', true)
-            .having((s) => s.error, 'error', isNull),
-        isA<CharacteristicState>()
-            .having((s) => s.isWriting, 'isWriting', false)
-            .having((s) => s.log.length, 'log.length', 1)
-            .having((s) => s.log.first.operation, 'log[0].operation', 'Write'),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>()
+                .having((s) => s.isWriting, 'isWriting', true)
+                .having((s) => s.error, 'error', isNull),
+            isA<CharacteristicState>()
+                .having((s) => s.isWriting, 'isWriting', false)
+                .having((s) => s.log.length, 'log.length', 1)
+                .having(
+                  (s) => s.log.first.operation,
+                  'log[0].operation',
+                  'Write',
+                ),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
@@ -139,36 +158,44 @@ void main() {
       },
       build: createCubit,
       act: (cubit) => cubit.write(Uint8List.fromList([0xAA])),
-      expect: () => [
-        isA<CharacteristicState>().having((s) => s.isWriting, 'isWriting', true),
-        isA<CharacteristicState>()
-            .having((s) => s.isWriting, 'isWriting', false)
-            .having((s) => s.error, 'error', contains('Write failed')),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having(
+              (s) => s.isWriting,
+              'isWriting',
+              true,
+            ),
+            isA<CharacteristicState>()
+                .having((s) => s.isWriting, 'isWriting', false)
+                .having((s) => s.error, 'error', contains('Write failed')),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'toggleNotifications subscribes and emits isSubscribed true',
       setUp: () {
-        when(() => mockSubscribeToCharacteristic(any()))
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockSubscribeToCharacteristic(any()),
+        ).thenAnswer((_) => const Stream.empty());
       },
       build: createCubit,
       act: (cubit) => cubit.toggleNotifications(),
-      expect: () => [
-        isA<CharacteristicState>().having(
-          (s) => s.isSubscribed,
-          'isSubscribed',
-          true,
-        ),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having(
+              (s) => s.isSubscribed,
+              'isSubscribed',
+              true,
+            ),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'toggleNotifications unsubscribes when already subscribed',
       setUp: () {
-        when(() => mockSubscribeToCharacteristic(any()))
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockSubscribeToCharacteristic(any()),
+        ).thenAnswer((_) => const Stream.empty());
       },
       build: createCubit,
       act: (cubit) {
@@ -176,26 +203,28 @@ void main() {
         cubit.toggleNotifications();
         cubit.toggleNotifications();
       },
-      expect: () => [
-        isA<CharacteristicState>().having(
-          (s) => s.isSubscribed,
-          'isSubscribed',
-          true,
-        ),
-        isA<CharacteristicState>().having(
-          (s) => s.isSubscribed,
-          'isSubscribed',
-          false,
-        ),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having(
+              (s) => s.isSubscribed,
+              'isSubscribed',
+              true,
+            ),
+            isA<CharacteristicState>().having(
+              (s) => s.isSubscribed,
+              'isSubscribed',
+              false,
+            ),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'notification stream updates value and log',
       setUp: () {
         final controller = StreamController<Uint8List>();
-        when(() => mockSubscribeToCharacteristic(any()))
-            .thenAnswer((_) => controller.stream);
+        when(
+          () => mockSubscribeToCharacteristic(any()),
+        ).thenAnswer((_) => controller.stream);
         // Schedule data emission after subscription
         Future.microtask(() {
           controller.add(Uint8List.fromList([0x42]));
@@ -209,18 +238,16 @@ void main() {
       },
       verify: (cubit) {
         expect(cubit.state.value, Uint8List.fromList([0x42]));
-        expect(
-          cubit.state.log.any((e) => e.operation == 'Notify'),
-          isTrue,
-        );
+        expect(cubit.state.log.any((e) => e.operation == 'Notify'), isTrue);
       },
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'notification stream error sets isSubscribed false',
       setUp: () {
-        when(() => mockSubscribeToCharacteristic(any()))
-            .thenAnswer((_) => Stream.error(Exception('Stream error')));
+        when(
+          () => mockSubscribeToCharacteristic(any()),
+        ).thenAnswer((_) => Stream.error(Exception('Stream error')));
       },
       build: createCubit,
       act: (cubit) async {
@@ -237,18 +264,19 @@ void main() {
       'readDescriptor succeeds and stores value',
       setUp: () {
         final descriptor = MockRemoteDescriptor();
-        when(() => descriptor.uuid).thenReturn(
-          UUID('00002902-0000-1000-8000-00805f9b34fb'),
-        );
-        when(() => mockReadDescriptor(any()))
-            .thenAnswer((_) async => Uint8List.fromList([0x01, 0x00]));
+        when(
+          () => descriptor.uuid,
+        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
+        when(
+          () => mockReadDescriptor(any()),
+        ).thenAnswer((_) async => Uint8List.fromList([0x01, 0x00]));
       },
       build: createCubit,
       act: (cubit) {
         final descriptor = MockRemoteDescriptor();
-        when(() => descriptor.uuid).thenReturn(
-          UUID('00002902-0000-1000-8000-00805f9b34fb'),
-        );
+        when(
+          () => descriptor.uuid,
+        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
         return cubit.readDescriptor(descriptor);
       },
       verify: (cubit) {
@@ -262,15 +290,16 @@ void main() {
     blocTest<CharacteristicCubit, CharacteristicState>(
       'readDescriptor marks failed on error',
       setUp: () {
-        when(() => mockReadDescriptor(any()))
-            .thenThrow(Exception('Descriptor error'));
+        when(
+          () => mockReadDescriptor(any()),
+        ).thenThrow(Exception('Descriptor error'));
       },
       build: createCubit,
       act: (cubit) {
         final descriptor = MockRemoteDescriptor();
-        when(() => descriptor.uuid).thenReturn(
-          UUID('00002902-0000-1000-8000-00805f9b34fb'),
-        );
+        when(
+          () => descriptor.uuid,
+        ).thenReturn(UUID('00002902-0000-1000-8000-00805f9b34fb'));
         return cubit.readDescriptor(descriptor);
       },
       verify: (cubit) {
@@ -284,27 +313,33 @@ void main() {
     blocTest<CharacteristicCubit, CharacteristicState>(
       'clearLog empties the log',
       build: createCubit,
-      seed: () => CharacteristicState(
-        characteristic: mockCharacteristic,
-        log: [LogEntry('Read', Uint8List.fromList([0x01]))],
-      ),
+      seed:
+          () => CharacteristicState(
+            characteristic: mockCharacteristic,
+            log: [
+              LogEntry('Read', Uint8List.fromList([0x01])),
+            ],
+          ),
       act: (cubit) => cubit.clearLog(),
-      expect: () => [
-        isA<CharacteristicState>().having((s) => s.log, 'log', isEmpty),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having((s) => s.log, 'log', isEmpty),
+          ],
     );
 
     blocTest<CharacteristicCubit, CharacteristicState>(
       'clearError clears the error',
       build: createCubit,
-      seed: () => CharacteristicState(
-        characteristic: mockCharacteristic,
-        error: 'Some error',
-      ),
+      seed:
+          () => CharacteristicState(
+            characteristic: mockCharacteristic,
+            error: 'Some error',
+          ),
       act: (cubit) => cubit.clearError(),
-      expect: () => [
-        isA<CharacteristicState>().having((s) => s.error, 'error', isNull),
-      ],
+      expect:
+          () => [
+            isA<CharacteristicState>().having((s) => s.error, 'error', isNull),
+          ],
     );
   });
 }

@@ -20,33 +20,28 @@ void main() {
   });
 
   group('GetServices', () {
-    test(
-      'should call repository.getServices and return services',
-      () async {
-        // Arrange
-        final mockConnection = MockConnection();
-        final mockService = MockRemoteService();
+    test('should call repository.getServices and return services', () async {
+      // Arrange
+      final mockConnection = MockConnection();
+      final mockService = MockRemoteService();
 
-        when(
-          () => mockRepository.getServices(any()),
-        ).thenAnswer((_) async => [mockService]);
+      when(
+        () => mockRepository.getServices(any()),
+      ).thenAnswer((_) async => [mockService]);
 
-        // Act
-        final result = await useCase(mockConnection);
+      // Act
+      final result = await useCase(mockConnection);
 
-        // Assert
-        expect(result, [mockService]);
-        verify(() => mockRepository.getServices(mockConnection)).called(1);
-      },
-    );
+      // Assert
+      expect(result, [mockService]);
+      verify(() => mockRepository.getServices(mockConnection)).called(1);
+    });
 
     test('should return empty list when no services found', () async {
       // Arrange
       final mockConnection = MockConnection();
 
-      when(
-        () => mockRepository.getServices(any()),
-      ).thenAnswer((_) async => []);
+      when(() => mockRepository.getServices(any())).thenAnswer((_) async => []);
 
       // Act
       final result = await useCase(mockConnection);

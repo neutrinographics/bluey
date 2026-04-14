@@ -22,8 +22,9 @@ void main() {
   group('DisconnectClient', () {
     test('should call repository.disconnectClient', () async {
       final central = MockClient();
-      when(() => mockRepository.disconnectClient(any()))
-          .thenAnswer((_) async {});
+      when(
+        () => mockRepository.disconnectClient(any()),
+      ).thenAnswer((_) async {});
 
       await useCase(central);
 

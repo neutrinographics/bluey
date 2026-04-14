@@ -50,9 +50,15 @@ void main() {
 
     when(() => mockDisposeServer()).thenAnswer((_) async {});
     when(() => mockGetConnectedClients()).thenReturn([]);
-    when(() => mockObserveDisconnections()).thenAnswer((_) => const Stream.empty());
-    when(() => mockObserveReadRequests()).thenAnswer((_) => const Stream.empty());
-    when(() => mockObserveWriteRequests()).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockObserveDisconnections(),
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockObserveReadRequests(),
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockObserveWriteRequests(),
+    ).thenAnswer((_) => const Stream.empty());
   });
 
   ServerCubit createCubit() {
@@ -101,8 +107,9 @@ void main() {
       'initialize succeeds when server is supported',
       setUp: () {
         when(() => mockCheckServerSupport()).thenReturn(true);
-        when(() => mockObserveConnections())
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
         when(() => mockAddService(any())).thenAnswer((_) async {});
       },
       build: createCubit,
@@ -121,10 +128,10 @@ void main() {
       'initialize emits error when addService fails',
       setUp: () {
         when(() => mockCheckServerSupport()).thenReturn(true);
-        when(() => mockObserveConnections())
-            .thenAnswer((_) => const Stream.empty());
-        when(() => mockAddService(any()))
-            .thenThrow(Exception('Failed to add'));
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockAddService(any())).thenThrow(Exception('Failed to add'));
       },
       build: createCubit,
       act: (cubit) => cubit.initialize(),
@@ -206,15 +213,14 @@ void main() {
     blocTest<ServerCubit, ServerScreenState>(
       'sendNotification succeeds and increments count',
       setUp: () {
-        when(() => mockSendNotification(any(), any()))
-            .thenAnswer((_) async {});
+        when(() => mockSendNotification(any(), any())).thenAnswer((_) async {});
       },
       build: createCubit,
       seed: () {
         final client = MockClient();
-        when(() => client.id).thenReturn(
-          UUID('00000000-0000-0000-0000-000000000001'),
-        );
+        when(
+          () => client.id,
+        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) => cubit.sendNotification(),
@@ -227,15 +233,16 @@ void main() {
     blocTest<ServerCubit, ServerScreenState>(
       'sendNotification emits error on failure',
       setUp: () {
-        when(() => mockSendNotification(any(), any()))
-            .thenThrow(Exception('Send failed'));
+        when(
+          () => mockSendNotification(any(), any()),
+        ).thenThrow(Exception('Send failed'));
       },
       build: createCubit,
       seed: () {
         final client = MockClient();
-        when(() => client.id).thenReturn(
-          UUID('00000000-0000-0000-0000-000000000001'),
-        );
+        when(
+          () => client.id,
+        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) => cubit.sendNotification(),
@@ -253,9 +260,9 @@ void main() {
       build: createCubit,
       seed: () {
         final client = MockClient();
-        when(() => client.id).thenReturn(
-          UUID('00000000-0000-0000-0000-000000000001'),
-        );
+        when(
+          () => client.id,
+        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) {
@@ -272,15 +279,16 @@ void main() {
     blocTest<ServerCubit, ServerScreenState>(
       'disconnectClient emits error on failure',
       setUp: () {
-        when(() => mockDisconnectClient(any()))
-            .thenThrow(Exception('Disconnect failed'));
+        when(
+          () => mockDisconnectClient(any()),
+        ).thenThrow(Exception('Disconnect failed'));
       },
       build: createCubit,
       seed: () {
         final client = MockClient();
-        when(() => client.id).thenReturn(
-          UUID('00000000-0000-0000-0000-000000000001'),
-        );
+        when(
+          () => client.id,
+        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) {
@@ -297,33 +305,32 @@ void main() {
       build: createCubit,
       seed: () => const ServerScreenState(error: 'Some error'),
       act: (cubit) => cubit.clearError(),
-      expect: () => [
-        isA<ServerScreenState>().having((s) => s.error, 'error', isNull),
-      ],
+      expect:
+          () => [
+            isA<ServerScreenState>().having((s) => s.error, 'error', isNull),
+          ],
     );
 
     blocTest<ServerCubit, ServerScreenState>(
       'clearLog clears the log',
       build: createCubit,
-      seed: () => ServerScreenState(
-        log: [ServerLogEntry('Test', 'message')],
-      ),
+      seed: () => ServerScreenState(log: [ServerLogEntry('Test', 'message')]),
       act: (cubit) => cubit.clearLog(),
-      expect: () => [
-        isA<ServerScreenState>().having((s) => s.log, 'log', isEmpty),
-      ],
+      expect:
+          () => [isA<ServerScreenState>().having((s) => s.log, 'log', isEmpty)],
     );
 
     blocTest<ServerCubit, ServerScreenState>(
       'initialize refreshes centrals from library when stream emits',
       setUp: () {
         final client = MockClient();
-        when(() => client.id).thenReturn(
-          UUID('00000000-0000-0000-0000-000000000001'),
-        );
+        when(
+          () => client.id,
+        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
         when(() => mockCheckServerSupport()).thenReturn(true);
-        when(() => mockObserveConnections())
-            .thenAnswer((_) => Stream.value(client));
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => Stream.value(client));
         when(() => mockAddService(any())).thenAnswer((_) async {});
         when(() => mockGetConnectedClients()).thenReturn([client]);
       },

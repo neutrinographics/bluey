@@ -18,18 +18,18 @@ void main() {
   group('ObserveConnections', () {
     test('should return connections stream from repository', () {
       final central = MockClient();
-      when(() => mockRepository.connections).thenAnswer(
-        (_) => Stream.value(central),
-      );
+      when(
+        () => mockRepository.connections,
+      ).thenAnswer((_) => Stream.value(central));
 
       expectLater(useCase(), emits(central));
       verify(() => mockRepository.connections).called(1);
     });
 
     test('should return empty stream when no connections', () {
-      when(() => mockRepository.connections).thenAnswer(
-        (_) => const Stream.empty(),
-      );
+      when(
+        () => mockRepository.connections,
+      ).thenAnswer((_) => const Stream.empty());
 
       expectLater(useCase(), emitsDone);
     });
