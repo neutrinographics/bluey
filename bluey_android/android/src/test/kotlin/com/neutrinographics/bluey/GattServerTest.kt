@@ -109,9 +109,6 @@ class GattServerTest {
         )
         gattServer.addService(service) {}
 
-        // Start advertising (required for connections to be reported to Flutter)
-        gattServer.onAdvertisingStarted()
-
         // Ensure callback was captured
         assertNotNull("Callback should be captured", capturedCallback)
 
@@ -148,9 +145,6 @@ class GattServerTest {
             includedServices = emptyList()
         )
         gattServer.addService(service) {}
-
-        // Start advertising (required for connections to be reported to Flutter)
-        gattServer.onAdvertisingStarted()
 
         val mockDevice = mockk<BluetoothDevice>(relaxed = true)
         every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"

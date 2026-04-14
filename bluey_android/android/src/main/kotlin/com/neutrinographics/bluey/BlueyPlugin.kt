@@ -264,7 +264,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
                 callback(Result.success(false))
             }
         } else {
-            // Android 13+ - user must enable manually via settings
+            // Android 13+ - open Bluetooth settings for the user
+            try {
+                val settingsIntent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                activity?.startActivity(settingsIntent)
+            } catch (_: Exception) {
+                // Settings activity unavailable
+            }
             callback(Result.success(false))
         }
     }
