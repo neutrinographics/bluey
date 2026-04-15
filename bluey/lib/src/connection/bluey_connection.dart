@@ -4,6 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../gatt_client/gatt.dart';
+import '../lifecycle.dart' as lifecycle;
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
@@ -117,6 +118,8 @@ class BlueyConnection implements Connection {
     });
 
     _lifecycle = LifecycleClient(
+      platformApi: _platform,
+      connectionId: _connectionId,
       onServerUnreachable: _handleServerUnreachable,
     );
   }
@@ -138,7 +141,7 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
-    if (LifecycleClient.isControlService(uuid.toString())) {
+    if (lifecycle.isControlService(uuid.toString())) {
       throw ServiceNotFoundException(uuid);
     }
     if (_cachedServices == null) {
@@ -165,22 +168,18 @@ class BlueyConnection implements Connection {
         platformServices.map((ps) => _mapService(ps)).toList();
 
     // Start lifecycle heartbeat if the server hosts the control service
-    _lifecycle.start(
-      allServices: allServices,
-      writeFn: (charUuid, value, withResponse) => _platform
-          .writeCharacteristic(_connectionId, charUuid, value, withResponse),
-      readFn: (charUuid) =>
-          _platform.readCharacteristic(_connectionId, charUuid),
-    );
+    _lifecycle.start(allServices: allServices);
 
     // Filter the control service from the public result
-    _cachedServices = LifecycleClient.filterControlServices(allServices);
+    _cachedServices = allServices
+        .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+        .toList();
     return _cachedServices!;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
-    if (LifecycleClient.isControlService(uuid.toString())) return false;
+    if (lifecycle.isControlService(uuid.toString())) return false;
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
