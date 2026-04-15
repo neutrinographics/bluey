@@ -153,7 +153,7 @@ class _TopBar extends StatelessWidget {
           child: Row(
             children: [
               const Icon(Icons.bluetooth, color: _kHeaderText, size: 20),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Text(
                 'Bluey',
                 style: GoogleFonts.manrope(
