@@ -70,6 +70,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   // === Test Helpers ===
 
+  /// When true, writeCharacteristic calls will throw to simulate a dead server.
+  bool simulateWriteFailure = false;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -363,6 +366,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
+    if (simulateWriteFailure) {
+      throw Exception('Write failed: server unreachable');
+    }
+
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
