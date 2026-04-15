@@ -44,6 +44,19 @@ class ConnectionManager(
     private val pendingMtuRequests = mutableMapOf<String, (Result<Long>) -> Unit>()
     private val pendingRssiReads = mutableMapOf<String, (Result<Long>) -> Unit>()
 
+    // Pending timeout Runnables — kept alongside each callback map so that a
+    // completed operation's timer can be cancelled. Without this, a stale
+    // timer from a finished operation will fire and cancel a newer
+    // operation that reuses the same key (e.g. same characteristic).
+    private val pendingConnectionTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingServiceDiscoveryTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingReadTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingWriteTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingDescriptorReadTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingDescriptorWriteTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingMtuTimeouts = mutableMapOf<String, Runnable>()
+    private val pendingRssiTimeouts = mutableMapOf<String, Runnable>()
+
     // CCCD UUID for enabling notifications/indications
     companion object {
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
@@ -124,7 +137,8 @@ class ConnectionManager(
 
                 // Set timeout if specified
                 config.timeoutMs?.let { timeout ->
-                    handler.postDelayed({
+                    val timeoutRunnable = Runnable {
+                        pendingConnectionTimeouts.remove(deviceId)
                         // If still connecting after timeout, fail the connection
                         val pendingCallback = pendingConnections.remove(deviceId)
                         if (pendingCallback != null) {
@@ -140,7 +154,9 @@ class ConnectionManager(
                             notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
                             pendingCallback(Result.failure(IllegalStateException("Connection timeout")))
                         }
-                    }, timeout)
+                    }
+                    pendingConnectionTimeouts[deviceId] = timeoutRunnable
+                    handler.postDelayed(timeoutRunnable, timeout)
                 }
                 // Don't call callback here - wait for onConnectionStateChange
             } else {
@@ -197,10 +213,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to start service discovery")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingServiceDiscoveryTimeouts.remove(deviceId)
                     val pendingCallback = pendingServiceDiscovery.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Service discovery timed out")))
-                }, discoverServicesTimeoutMs)
+                }
+                pendingServiceDiscoveryTimeouts[deviceId] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, discoverServicesTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingServiceDiscovery.remove(deviceId)
@@ -235,10 +254,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to read characteristic")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingReadTimeouts.remove(key)
                     val pendingCallback = pendingReads.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Read characteristic timed out")))
-                }, readCharacteristicTimeoutMs)
+                }
+                pendingReadTimeouts[key] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, readCharacteristicTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingReads.remove(key)
@@ -292,10 +314,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to write characteristic")))
             } else if (withResponse) {
                 // Schedule timeout (only for write-with-response)
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingWriteTimeouts.remove(key)
                     val pendingCallback = pendingWrites.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Write characteristic timed out")))
-                }, writeCharacteristicTimeoutMs)
+                }
+                pendingWriteTimeouts[key] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, writeCharacteristicTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingWrites.remove(key)
@@ -392,10 +417,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to read descriptor")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingDescriptorReadTimeouts.remove(key)
                     val pendingCallback = pendingDescriptorReads.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Read descriptor timed out")))
-                }, readDescriptorTimeoutMs)
+                }
+                pendingDescriptorReadTimeouts[key] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, readDescriptorTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingDescriptorReads.remove(key)
@@ -439,10 +467,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to write descriptor")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingDescriptorWriteTimeouts.remove(key)
                     val pendingCallback = pendingDescriptorWrites.remove(key)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("Write descriptor timed out")))
-                }, writeDescriptorTimeoutMs)
+                }
+                pendingDescriptorWriteTimeouts[key] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, writeDescriptorTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingDescriptorWrites.remove(key)
@@ -465,10 +496,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to request MTU")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingMtuTimeouts.remove(deviceId)
                     val pendingCallback = pendingMtuRequests.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("MTU request timed out")))
-                }, requestMtuTimeoutMs)
+                }
+                pendingMtuTimeouts[deviceId] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, requestMtuTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingMtuRequests.remove(deviceId)
@@ -491,10 +525,13 @@ class ConnectionManager(
                 callback(Result.failure(IllegalStateException("Failed to read RSSI")))
             } else {
                 // Schedule timeout
-                handler.postDelayed({
+                val timeoutRunnable = Runnable {
+                    pendingRssiTimeouts.remove(deviceId)
                     val pendingCallback = pendingRssiReads.remove(deviceId)
                     pendingCallback?.invoke(Result.failure(IllegalStateException("RSSI read timed out")))
-                }, readRssiTimeoutMs)
+                }
+                pendingRssiTimeouts[deviceId] = timeoutRunnable
+                handler.postDelayed(timeoutRunnable, readRssiTimeoutMs)
             }
         } catch (e: SecurityException) {
             pendingRssiReads.remove(deviceId)
@@ -514,6 +551,24 @@ class ConnectionManager(
         }
         connections.clear()
 
+        // Cancel all pending timeouts so they cannot fire after cleanup
+        pendingConnectionTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingServiceDiscoveryTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingReadTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingWriteTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingDescriptorReadTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingDescriptorWriteTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingMtuTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingRssiTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingConnectionTimeouts.clear()
+        pendingServiceDiscoveryTimeouts.clear()
+        pendingReadTimeouts.clear()
+        pendingWriteTimeouts.clear()
+        pendingDescriptorReadTimeouts.clear()
+        pendingDescriptorWriteTimeouts.clear()
+        pendingMtuTimeouts.clear()
+        pendingRssiTimeouts.clear()
+
         // Clear all pending callbacks
         pendingConnections.clear()
         pendingServiceDiscovery.clear()
@@ -523,6 +578,35 @@ class ConnectionManager(
         pendingDescriptorWrites.clear()
         pendingMtuRequests.clear()
         pendingRssiReads.clear()
+    }
+
+    /**
+     * Cancels all pending timeout Runnables scheduled for the given device.
+     *
+     * Called on disconnect so that stale timers from in-flight operations
+     * don't fire and corrupt a future operation that happens to reuse the
+     * same completion key (same characteristic/descriptor/device).
+     */
+    private fun cancelAllTimeouts(deviceId: String) {
+        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
+        pendingServiceDiscoveryTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
+        pendingMtuTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
+        pendingRssiTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
+
+        // Keyed maps: "$deviceId:$uuid" — remove any entries belonging to
+        // this device, cancelling each timer before removal.
+        val prefix = "$deviceId:"
+        cancelTimersWithPrefix(pendingReadTimeouts, prefix)
+        cancelTimersWithPrefix(pendingWriteTimeouts, prefix)
+        cancelTimersWithPrefix(pendingDescriptorReadTimeouts, prefix)
+        cancelTimersWithPrefix(pendingDescriptorWriteTimeouts, prefix)
+    }
+
+    private fun cancelTimersWithPrefix(map: MutableMap<String, Runnable>, prefix: String) {
+        val keys = map.keys.filter { it.startsWith(prefix) }
+        for (key in keys) {
+            map.remove(key)?.let { handler.removeCallbacks(it) }
+        }
     }
 
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
@@ -535,6 +619,8 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_CONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
+                        // Cancel the pending connect timeout
+                        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                         // Connection successful - invoke pending callback on main thread
                         val pendingCallback = pendingConnections.remove(deviceId)
                         if (pendingCallback != null) {
@@ -550,6 +636,9 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
+                        // Cancel any pending timeouts for this device so stale
+                        // timers cannot fire against a future operation.
+                        cancelAllTimeouts(deviceId)
                         // Connection failed or disconnected - invoke pending callback with error if present
                         val pendingCallback = pendingConnections.remove(deviceId)
                         if (pendingCallback != null) {
@@ -574,6 +663,8 @@ class ConnectionManager(
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                // Cancel the pending timeout since discovery resolved
+                pendingServiceDiscoveryTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                 val callback = pendingServiceDiscovery.remove(deviceId)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -592,6 +683,8 @@ class ConnectionManager(
                 status: Int
             ) {
                 val key = "$deviceId:${characteristic.uuid}"
+                // Cancel the pending timeout since the read resolved
+                pendingReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingReads.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -611,6 +704,8 @@ class ConnectionManager(
                 status: Int
             ) {
                 val key = "$deviceId:${characteristic.uuid}"
+                // Cancel the pending timeout since the read resolved
+                pendingReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingReads.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -628,6 +723,8 @@ class ConnectionManager(
                 status: Int
             ) {
                 val key = "$deviceId:${characteristic.uuid}"
+                // Cancel the pending timeout since the write resolved
+                pendingWriteTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingWrites.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -679,6 +776,8 @@ class ConnectionManager(
                 value: ByteArray
             ) {
                 val key = "$deviceId:${descriptor.uuid}"
+                // Cancel the pending timeout since the read resolved
+                pendingDescriptorReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingDescriptorReads.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -698,6 +797,8 @@ class ConnectionManager(
                 status: Int
             ) {
                 val key = "$deviceId:${descriptor.uuid}"
+                // Cancel the pending timeout since the read resolved
+                pendingDescriptorReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingDescriptorReads.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -715,6 +816,8 @@ class ConnectionManager(
                 status: Int
             ) {
                 val key = "$deviceId:${descriptor.uuid}"
+                // Cancel the pending timeout since the write resolved
+                pendingDescriptorWriteTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
                 val callback = pendingDescriptorWrites.remove(key)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -727,6 +830,8 @@ class ConnectionManager(
             }
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+                // Cancel the pending timeout since the MTU request resolved
+                pendingMtuTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                 val callback = pendingMtuRequests.remove(deviceId)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -746,6 +851,8 @@ class ConnectionManager(
             }
 
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+                // Cancel the pending timeout since the RSSI read resolved
+                pendingRssiTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                 val callback = pendingRssiReads.remove(deviceId)
                 if (callback != null) {
                     val result = if (status == BluetoothGatt.GATT_SUCCESS) {
