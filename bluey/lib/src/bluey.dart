@@ -290,10 +290,18 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
+  /// [maxFailedHeartbeats] controls how many consecutive heartbeat write
+  /// failures trigger a local disconnect. Defaults to 1 (fail-fast). Only
+  /// applies when connecting to a Bluey server that hosts the lifecycle
+  /// control service — for other devices, heartbeats are not sent.
   ///
   /// Returns a [Connection] for GATT operations.
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(Device device, {Duration? timeout}) async {
+  Future<Connection> connect(
+    Device device, {
+    Duration? timeout,
+    int maxFailedHeartbeats = 1,
+  }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
@@ -311,6 +319,7 @@ class Bluey {
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
+        maxFailedHeartbeats: maxFailedHeartbeats,
       );
     } catch (e) {
       _emitEvent(

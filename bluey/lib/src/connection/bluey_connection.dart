@@ -59,6 +59,7 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
+    int maxFailedHeartbeats = 1,
   }) : _platform = platformInstance,
        _connectionId = connectionId {
     // Subscribe to platform connection state changes
@@ -120,6 +121,7 @@ class BlueyConnection implements Connection {
     _lifecycle = LifecycleClient(
       platformApi: _platform,
       connectionId: _connectionId,
+      maxFailedHeartbeats: maxFailedHeartbeats,
       onServerUnreachable: _handleServerUnreachable,
     );
   }
