@@ -14,6 +14,7 @@ import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
 import 'connection_cubit.dart';
+import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ class ConnectionScreen extends StatelessWidget {
             connectToDevice: getIt<ConnectToDevice>(),
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
+            settings: getIt<ConnectionSettingsCubit>().state,
           )..connect(),
       child: const _ConnectionView(),
     );

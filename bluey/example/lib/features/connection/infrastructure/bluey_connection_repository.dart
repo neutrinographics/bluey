@@ -1,6 +1,7 @@
 import 'package:bluey/bluey.dart';
 
 import '../domain/connection_repository.dart';
+import '../domain/connection_settings.dart';
 
 /// Implementation of [ConnectionRepository] using the Bluey library.
 class BlueyConnectionRepository implements ConnectionRepository {
@@ -9,8 +10,17 @@ class BlueyConnectionRepository implements ConnectionRepository {
   BlueyConnectionRepository(this._bluey);
 
   @override
-  Future<Connection> connect(Device device, {Duration? timeout}) async {
-    return await _bluey.connect(device, timeout: timeout);
+  Future<Connection> connect(
+    Device device, {
+    Duration? timeout,
+    ConnectionSettings settings = const ConnectionSettings(),
+  }) async {
+    return await _bluey.connect(
+      device,
+      timeout: timeout,
+      maxFailedHeartbeats: settings.maxFailedHeartbeats,
+      requireLifecycle: settings.requireLifecycle,
+    );
   }
 
   @override

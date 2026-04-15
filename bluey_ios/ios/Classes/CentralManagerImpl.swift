@@ -38,6 +38,18 @@ class CentralManagerImpl: NSObject {
     private var writeDescriptorCompletions: [String: [String: (Result<Void, Error>) -> Void]] = [:]
     private var readRssiCompletions: [String: (Result<Int64, Error>) -> Void] = [:]
 
+    // Timeout work items — kept alongside completion maps so that a completed
+    // operation's timer can be cancelled. Without this, a stale timer from a
+    // finished operation will fire and cancel a newer operation that happens
+    // to reuse the same completion key (same characteristic/device).
+    private var connectTimers: [String: DispatchWorkItem] = [:]
+    private var discoverServicesTimers: [String: DispatchWorkItem] = [:]
+    private var readCharacteristicTimers: [String: [String: DispatchWorkItem]] = [:]
+    private var writeCharacteristicTimers: [String: [String: DispatchWorkItem]] = [:]
+    private var readDescriptorTimers: [String: [String: DispatchWorkItem]] = [:]
+    private var writeDescriptorTimers: [String: [String: DispatchWorkItem]] = [:]
+    private var readRssiTimers: [String: DispatchWorkItem] = [:]
+
     // Configurable timeout values — set via configure(), defaults match previous hardcoded values
     private var connectTimeout: TimeInterval = 30.0
     private var discoverServicesTimeout: TimeInterval = 15.0
@@ -161,13 +173,16 @@ class CentralManagerImpl: NSObject {
         let timeoutSeconds = config.timeoutMs != nil
             ? TimeInterval(config.timeoutMs!) / 1000.0
             : connectTimeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.connectTimers.removeValue(forKey: deviceId)
             if let pendingCompletion = self.connectCompletions.removeValue(forKey: deviceId) {
                 self.centralManager.cancelPeripheralConnection(peripheral)
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        connectTimers[deviceId] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds, execute: timer)
     }
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -197,14 +212,17 @@ class CentralManagerImpl: NSObject {
         peripheral.discoverServices(nil)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + discoverServicesTimeout) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.discoverServicesTimers.removeValue(forKey: deviceId)
             if let pendingCompletion = self.discoverServicesCompletions.removeValue(forKey: deviceId) {
                 self.pendingServiceDiscovery.removeValue(forKey: deviceId)
                 self.pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        discoverServicesTimers[deviceId] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + discoverServicesTimeout, execute: timer)
     }
 
     // MARK: - Characteristic Operations
@@ -226,12 +244,15 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: characteristic)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + readCharacteristicTimeout) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.readCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.readCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        readCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + readCharacteristicTimeout, execute: timer)
     }
 
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -253,12 +274,15 @@ class CentralManagerImpl: NSObject {
             writeCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
 
             // Schedule timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + writeCharacteristicTimeout) { [weak self] in
+            let timer = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
+                self.writeCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
                 if let pendingCompletion = self.writeCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                     pendingCompletion(.failure(BlueyError.timeout))
                 }
             }
+            writeCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
+            DispatchQueue.main.asyncAfter(deadline: .now() + writeCharacteristicTimeout, execute: timer)
         }
 
         peripheral.writeValue(value.data, for: characteristic, type: type)
@@ -329,12 +353,15 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: descriptor)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + readDescriptorTimeout) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.readDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.readDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        readDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + readDescriptorTimeout, execute: timer)
     }
 
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -354,12 +381,15 @@ class CentralManagerImpl: NSObject {
         peripheral.writeValue(value.data, for: descriptor)
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + writeDescriptorTimeout) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.writeDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.writeDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        writeDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + writeDescriptorTimeout, execute: timer)
     }
 
     /// Finds a descriptor by UUID, handling both short and full UUID formats.
@@ -405,12 +435,15 @@ class CentralManagerImpl: NSObject {
         peripheral.readRSSI()
 
         // Schedule timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + readRssiTimeout) { [weak self] in
+        let timer = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            self.readRssiTimers.removeValue(forKey: deviceId)
             if let pendingCompletion = self.readRssiCompletions.removeValue(forKey: deviceId) {
                 pendingCompletion(.failure(BlueyError.timeout))
             }
         }
+        readRssiTimers[deviceId] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + readRssiTimeout, execute: timer)
     }
 
     // MARK: - CBCentralManagerDelegate callbacks
@@ -440,6 +473,9 @@ class CentralManagerImpl: NSObject {
         let event = ConnectionStateEventDto(deviceId: deviceId, state: .connected)
         flutterApi.onConnectionStateChanged(event: event) { _ in }
 
+        // Cancel the pending timeout since the connection completed
+        connectTimers.removeValue(forKey: deviceId)?.cancel()
+
         // Complete the connection
         if let completion = connectCompletions.removeValue(forKey: deviceId) {
             completion(.success(()))
@@ -448,6 +484,9 @@ class CentralManagerImpl: NSObject {
 
     func didFailToConnect(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+
+        // Cancel the pending timeout since the connect attempt resolved
+        connectTimers.removeValue(forKey: deviceId)?.cancel()
 
         if let completion = connectCompletions.removeValue(forKey: deviceId) {
             completion(.failure(error ?? BlueyError.unknown))
@@ -494,6 +533,7 @@ class CentralManagerImpl: NSObject {
         }
 
         if let error = error {
+            discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
             let completion = discoverServicesCompletions.removeValue(forKey: deviceId)
             completion?(.failure(error))
             return
@@ -503,6 +543,7 @@ class CentralManagerImpl: NSObject {
 
         // If no services, complete immediately
         if cbServices.isEmpty {
+            discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
             let completion = discoverServicesCompletions.removeValue(forKey: deviceId)
             completion?(.success([]))
             return
@@ -599,6 +640,9 @@ class CentralManagerImpl: NSObject {
         pendingServiceDiscovery.removeValue(forKey: deviceId)
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
 
+        // Cancel the pending timeout since discovery completed
+        discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
+
         // Get the completion handler
         guard let completion = discoverServicesCompletions.removeValue(forKey: deviceId) else {
             return
@@ -621,6 +665,8 @@ class CentralManagerImpl: NSObject {
 
         // Check if this was a read request
         if let completion = readCharacteristicCompletions[deviceId]?.removeValue(forKey: charUuid) {
+            // Cancel the pending timeout since the read completed
+            readCharacteristicTimers[deviceId]?.removeValue(forKey: charUuid)?.cancel()
             if let error = error {
                 completion(.failure(error))
             } else {
@@ -645,6 +691,11 @@ class CentralManagerImpl: NSObject {
     func didWriteCharacteristicValue(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+
+        // Cancel the pending timeout since the write completed. Done
+        // unconditionally (even if there's no completion) to be defensive
+        // against delegate/cache ordering quirks.
+        writeCharacteristicTimers[deviceId]?.removeValue(forKey: charUuid)?.cancel()
 
         guard let completion = writeCharacteristicCompletions[deviceId]?.removeValue(forKey: charUuid) else {
             return
@@ -676,6 +727,9 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let descUuid = descriptor.uuid.uuidString.lowercased()
 
+        // Cancel the pending timeout since the read completed
+        readDescriptorTimers[deviceId]?.removeValue(forKey: descUuid)?.cancel()
+
         guard let completion = readDescriptorCompletions[deviceId]?.removeValue(forKey: descUuid) else {
             return
         }
@@ -703,6 +757,9 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let descUuid = descriptor.uuid.uuidString.lowercased()
 
+        // Cancel the pending timeout since the write completed
+        writeDescriptorTimers[deviceId]?.removeValue(forKey: descUuid)?.cancel()
+
         guard let completion = writeDescriptorCompletions[deviceId]?.removeValue(forKey: descUuid) else {
             return
         }
@@ -716,6 +773,9 @@ class CentralManagerImpl: NSObject {
 
     func didReadRSSI(peripheral: CBPeripheral, rssi: NSNumber, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+
+        // Cancel the pending timeout since the RSSI read completed
+        readRssiTimers.removeValue(forKey: deviceId)?.cancel()
 
         guard let completion = readRssiCompletions.removeValue(forKey: deviceId) else {
             return
@@ -731,6 +791,16 @@ class CentralManagerImpl: NSObject {
     // MARK: - Helpers
 
     private func clearPendingCompletions(for deviceId: String, error: Error) {
+        // Cancel all pending timers for this device so they cannot fire
+        // against a future operation that reuses the same key.
+        connectTimers.removeValue(forKey: deviceId)?.cancel()
+        discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
+        readCharacteristicTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
+        writeCharacteristicTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
+        readDescriptorTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
+        writeDescriptorTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
+        readRssiTimers.removeValue(forKey: deviceId)?.cancel()
+
         // Clear all pending completions for this device with error
         if let completions = readCharacteristicCompletions.removeValue(forKey: deviceId) {
             for (_, completion) in completions {

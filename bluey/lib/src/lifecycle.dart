@@ -25,7 +25,7 @@ const _intervalCharUuidString = 'b1e70003-0000-1000-8000-00805f9b34fb';
 /// UUID of the internal Bluey lifecycle control service.
 final controlServiceUuid = _controlServiceUuidString;
 
-/// UUID of the heartbeat characteristic (write-without-response).
+/// UUID of the heartbeat characteristic (write-with-response).
 final heartbeatCharUuid = _heartbeatCharUuidString;
 
 /// UUID of the interval characteristic (readable, returns server interval).
@@ -83,7 +83,7 @@ PlatformLocalService buildControlService() {
         properties: const PlatformCharacteristicProperties(
           canRead: false,
           canWrite: true,
-          canWriteWithoutResponse: true,
+          canWriteWithoutResponse: false,
           canNotify: false,
           canIndicate: false,
         ),

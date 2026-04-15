@@ -6,6 +6,7 @@ import 'package:bluey/bluey.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
+import '../domain/connection_settings.dart';
 import 'connection_state.dart';
 
 /// Cubit for managing connection state.
@@ -13,6 +14,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final ConnectToDevice _connectToDevice;
   final DisconnectDevice _disconnectDevice;
   final GetServices _getServices;
+  final ConnectionSettings _settings;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
 
@@ -21,9 +23,11 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required ConnectToDevice connectToDevice,
     required DisconnectDevice disconnectDevice,
     required GetServices getServices,
+    ConnectionSettings settings = const ConnectionSettings(),
   }) : _connectToDevice = connectToDevice,
        _disconnectDevice = disconnectDevice,
        _getServices = getServices,
+       _settings = settings,
        super(ConnectionScreenState(device: device));
 
   /// Connects to the device.
@@ -33,7 +37,10 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     );
 
     try {
-      final connection = await _connectToDevice(state.device);
+      final connection = await _connectToDevice(
+        state.device,
+        settings: _settings,
+      );
 
       _stateSubscription = connection.stateChanges.listen(
         (connectionState) {

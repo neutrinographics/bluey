@@ -68,7 +68,18 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   final Map<int, Completer<Uint8List>> _pendingReadRequests = {};
   final Map<int, Completer<void>> _pendingWriteRequests = {};
 
+  // === Observed responses (for tests that assert on response args) ===
+
+  /// Records every call to [respondToReadRequest] in order.
+  final List<RespondReadCall> respondReadCalls = [];
+
+  /// Records every call to [respondToWriteRequest] in order.
+  final List<RespondWriteCall> respondWriteCalls = [];
+
   // === Test Helpers ===
+
+  /// When true, writeCharacteristic calls will throw to simulate a dead server.
+  bool simulateWriteFailure = false;
 
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
@@ -363,6 +374,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
+    if (simulateWriteFailure) {
+      throw Exception('Write failed: server unreachable');
+    }
+
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
@@ -596,6 +611,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     PlatformGattStatus status,
     Uint8List? value,
   ) async {
+    respondReadCalls.add(
+      RespondReadCall(requestId: requestId, status: status, value: value),
+    );
     final completer = _pendingReadRequests.remove(requestId);
     if (completer != null) {
       if (status == PlatformGattStatus.success && value != null) {
@@ -611,6 +629,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     int requestId,
     PlatformGattStatus status,
   ) async {
+    respondWriteCalls.add(
+      RespondWriteCall(requestId: requestId, status: status),
+    );
     final completer = _pendingWriteRequests.remove(requestId);
     if (completer != null) {
       if (status == PlatformGattStatus.success) {
@@ -691,5 +712,29 @@ class _ConnectedCentral {
     required this.id,
     required this.mtu,
     required this.subscribedCharacteristics,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.respondToReadRequest].
+class RespondReadCall {
+  final int requestId;
+  final PlatformGattStatus status;
+  final Uint8List? value;
+
+  RespondReadCall({
+    required this.requestId,
+    required this.status,
+    required this.value,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.respondToWriteRequest].
+class RespondWriteCall {
+  final int requestId;
+  final PlatformGattStatus status;
+
+  RespondWriteCall({
+    required this.requestId,
+    required this.status,
   });
 }

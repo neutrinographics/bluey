@@ -9,18 +9,17 @@ import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
+import 'lifecycle_server.dart';
 import 'server.dart';
 
 /// Concrete implementation of [Server] that delegates to the platform.
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
-  final Duration? _lifecycleInterval;
+  late final LifecycleServer _lifecycle;
 
   bool _isAdvertising = false;
-  bool _controlServiceAdded = false;
   final Map<String, BlueyClient> _connectedClients = {};
-  final Map<String, Timer> _heartbeatTimers = {};
 
   final StreamController<Client> _connectionsController =
       StreamController<Client>.broadcast();
@@ -45,7 +44,13 @@ class BlueyServer implements Server {
     this._platform,
     this._eventBus, {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
-  }) : _lifecycleInterval = lifecycleInterval {
+  }) {
+    _lifecycle = LifecycleServer(
+      platformApi: _platform,
+      interval: lifecycleInterval,
+      onClientGone: _handleClientDisconnected,
+      onHeartbeatReceived: _trackClientIfNeeded,
+    );
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
 
     _centralConnectionsSub = _platform.centralConnections.listen((
@@ -81,17 +86,13 @@ class BlueyServer implements Server {
     // Control service requests are handled here; all others are forwarded
     // to the filtered controllers for the public API.
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
-      if (lifecycle.isControlServiceCharacteristic(req.characteristicUuid)) {
-        _handleControlRead(req);
-      } else {
+      if (!_lifecycle.handleReadRequest(req)) {
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
-      if (lifecycle.isControlServiceCharacteristic(req.characteristicUuid)) {
-        _handleControlWrite(req);
-      } else {
+      if (!_lifecycle.handleWriteRequest(req)) {
         _filteredWriteRequestsController.add(req);
       }
     });
@@ -133,7 +134,7 @@ class BlueyServer implements Server {
     // Add the internal control service before advertising if lifecycle is
     // enabled. This must happen before startAdvertising because on iOS,
     // services cannot be added while advertising.
-    await _addControlServiceIfNeeded();
+    await _lifecycle.addControlServiceIfNeeded();
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
@@ -297,11 +298,7 @@ class BlueyServer implements Server {
       await stopAdvertising();
     }
 
-    // Cancel all heartbeat timers
-    for (final timer in _heartbeatTimers.values) {
-      timer.cancel();
-    }
-    _heartbeatTimers.clear();
+    _lifecycle.dispose();
 
     // Close the GATT server and disconnect all clients
     // This is important on Android to prevent zombie BLE connections
@@ -345,31 +342,9 @@ class BlueyServer implements Server {
 
   // === Lifecycle management ===
 
-  Future<void> _addControlServiceIfNeeded() async {
-    if (_lifecycleInterval == null || _controlServiceAdded) return;
-    await _platform.addService(lifecycle.buildControlService());
-    _controlServiceAdded = true;
-  }
-
-  void _resetHeartbeatTimer(String clientId) {
-    final interval = _lifecycleInterval;
-    if (interval == null) return;
-
-    _heartbeatTimers[clientId]?.cancel();
-    _heartbeatTimers[clientId] = Timer(interval, () {
-      _handleHeartbeatTimeout(clientId);
-    });
-  }
-
-  void _handleHeartbeatTimeout(String clientId) {
-    _heartbeatTimers.remove(clientId);
-    _handleClientDisconnected(clientId);
-  }
-
   void _handleClientDisconnected(String clientId) {
     // Cancel any heartbeat timer for this client
-    _heartbeatTimers[clientId]?.cancel();
-    _heartbeatTimers.remove(clientId);
+    _lifecycle.cancelTimer(clientId);
 
     // Only emit if the client was actually tracked
     if (_connectedClients.containsKey(clientId)) {
@@ -380,42 +355,6 @@ class BlueyServer implements Server {
       _connectedClients.remove(clientId);
       _disconnectionsController.add(client.id.toString());
     }
-  }
-
-  void _handleControlWrite(platform.PlatformWriteRequest req) {
-    final clientId = req.centralId;
-
-    // Auto-respond if the platform requires it
-    if (req.responseNeeded) {
-      _platform.respondToWriteRequest(
-        req.requestId,
-        platform.PlatformGattStatus.success,
-      );
-    }
-
-    // Track the client if the platform didn't report the connection.
-    // This can happen when Android's onConnectionStateChange doesn't fire
-    // (e.g., cached connections) or on iOS where there's no connection
-    // callback at all. The heartbeat write proves the client is connected.
-    _trackClientIfNeeded(clientId);
-
-    if (req.value.isNotEmpty && req.value[0] == lifecycle.disconnectValue[0]) {
-      // Client is disconnecting cleanly
-      _handleClientDisconnected(clientId);
-    } else {
-      // Heartbeat — reset the timer
-      _resetHeartbeatTimer(clientId);
-    }
-  }
-
-  void _handleControlRead(platform.PlatformReadRequest req) {
-    // Respond with the lifecycle interval in milliseconds
-    final interval = _lifecycleInterval ?? lifecycle.defaultLifecycleInterval;
-    _platform.respondToReadRequest(
-      req.requestId,
-      platform.PlatformGattStatus.success,
-      lifecycle.encodeInterval(interval),
-    );
   }
 
   // === Private mapping methods ===
