@@ -104,13 +104,13 @@ void main() {
       // Wait for streams to connect
       await Future.delayed(Duration.zero);
 
-      // Send a heartbeat write (should be filtered) — use responseNeeded: false
-      // so the fake doesn't wait for a response
+      // Send a heartbeat write (should be filtered) — client now uses
+      // write-with-response so responseNeeded is true
       await fakePlatform.simulateWriteRequest(
         centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
         value: Uint8List.fromList([0x01]),
-        responseNeeded: false,
+        responseNeeded: true,
       );
       await Future.delayed(Duration.zero);
 
@@ -153,7 +153,7 @@ void main() {
           centralId: _clientId1,
           characteristicUuid: _heartbeatCharUuid,
           value: Uint8List.fromList([0x01]),
-          responseNeeded: false,
+          responseNeeded: true,
         );
         async.elapse(Duration.zero);
 
@@ -190,7 +190,7 @@ void main() {
           centralId: _clientId1,
           characteristicUuid: _heartbeatCharUuid,
           value: Uint8List.fromList([0x01]),
-          responseNeeded: false,
+          responseNeeded: true,
         );
         async.elapse(Duration.zero);
 

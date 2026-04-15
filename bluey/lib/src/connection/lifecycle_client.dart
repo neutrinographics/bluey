@@ -129,7 +129,7 @@ class LifecycleClient {
           _connectionId,
           charUuid,
           lifecycle.heartbeatValue,
-          false,
+          true,
         )
         .then((_) {
       _consecutiveFailures = 0;
