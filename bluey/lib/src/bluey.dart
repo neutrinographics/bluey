@@ -294,6 +294,13 @@ class Bluey {
   /// failures trigger a local disconnect. Defaults to 1 (fail-fast). Only
   /// applies when connecting to a Bluey server that hosts the lifecycle
   /// control service — for other devices, heartbeats are not sent.
+  /// [requireLifecycle] when true, requires the peer to host Bluey's
+  /// lifecycle control service. If the control service is absent after
+  /// service discovery, the connection is treated as unreachable and
+  /// disconnected. Use this when you only want to connect to other Bluey
+  /// servers — e.g., to reject stale/zombie advertisements from a
+  /// force-killed server. Defaults to false (permissive: any BLE peer
+  /// is accepted).
   ///
   /// Returns a [Connection] for GATT operations.
   /// Throws [ConnectionException] if connection fails.
@@ -301,6 +308,7 @@ class Bluey {
     Device device, {
     Duration? timeout,
     int maxFailedHeartbeats = 1,
+    bool requireLifecycle = false,
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -320,6 +328,7 @@ class Bluey {
         connectionId: connectionId,
         deviceId: device.id,
         maxFailedHeartbeats: maxFailedHeartbeats,
+        requireLifecycle: requireLifecycle,
       );
     } catch (e) {
       _emitEvent(

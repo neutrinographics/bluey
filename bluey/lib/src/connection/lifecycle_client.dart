@@ -15,6 +15,7 @@ class LifecycleClient {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final int maxFailedHeartbeats;
+  final bool requireLifecycle;
   final void Function() onServerUnreachable;
 
   Timer? _heartbeatTimer;
@@ -25,6 +26,7 @@ class LifecycleClient {
     required platform.BlueyPlatform platformApi,
     required String connectionId,
     this.maxFailedHeartbeats = 1,
+    this.requireLifecycle = false,
     required this.onServerUnreachable,
   }) : _platform = platformApi,
        _connectionId = connectionId;
@@ -35,14 +37,19 @@ class LifecycleClient {
   /// Starts the heartbeat if the server hosts the control service.
   ///
   /// [allServices] is the full list of discovered services (including the
-  /// control service).
+  /// control service). When [requireLifecycle] is true and the control
+  /// service (or its heartbeat characteristic) is absent, this fires
+  /// [onServerUnreachable] instead of silently skipping heartbeats.
   void start({required List<RemoteService> allServices}) {
     if (_heartbeatCharUuid != null) return;
 
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
         .firstOrNull;
-    if (controlService == null) return;
+    if (controlService == null) {
+      if (requireLifecycle) onServerUnreachable();
+      return;
+    }
 
     final heartbeatChar = controlService.characteristics
         .where(
@@ -50,7 +57,10 @@ class LifecycleClient {
               c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
         )
         .firstOrNull;
-    if (heartbeatChar == null) return;
+    if (heartbeatChar == null) {
+      if (requireLifecycle) onServerUnreachable();
+      return;
+    }
 
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
 

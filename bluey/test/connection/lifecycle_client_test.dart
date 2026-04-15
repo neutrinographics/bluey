@@ -65,6 +65,7 @@ final _intervalBytes10s = Uint8List.fromList([0x10, 0x27, 0x00, 0x00]);
 Future<Connection> _connectAndDiscover(
   Bluey bluey, {
   int maxFailedHeartbeats = 1,
+  bool requireLifecycle = false,
 }) async {
   final device = Device(
     id: UUID('00000000-0000-0000-0000-aabbccddee01'),
@@ -74,10 +75,27 @@ Future<Connection> _connectAndDiscover(
   final connection = await bluey.connect(
     device,
     maxFailedHeartbeats: maxFailedHeartbeats,
+    requireLifecycle: requireLifecycle,
   );
   // Discovering services is what starts the lifecycle heartbeat.
   await connection.services();
   return connection;
+}
+
+/// Builds a fake peripheral with some non-Bluey service (no control service).
+void _simulateNonBlueyPeripheral(FakeBlueyPlatform fakePlatform) {
+  fakePlatform.simulatePeripheral(
+    id: _deviceAddress,
+    name: 'Generic BLE Peer',
+    services: const [
+      platform.PlatformService(
+        uuid: '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+        isPrimary: true,
+        characteristics: [],
+        includedServices: [],
+      ),
+    ],
+  );
 }
 
 void main() {
@@ -226,6 +244,106 @@ void main() {
           contains(ConnectionState.disconnected),
           reason: 'Should disconnect after 2 consecutive failures following '
               'the reset',
+        );
+
+        bluey.dispose();
+        async.flushMicrotasks();
+      });
+    });
+  });
+
+  group('LifecycleClient requireLifecycle', () {
+    test(
+        'permissive mode accepts a non-Bluey peer (no control service) '
+        'without disconnecting', () {
+      fakeAsync((async) {
+        _simulateNonBlueyPeripheral(fakePlatform);
+
+        final bluey = Bluey();
+
+        late Connection connection;
+        _connectAndDiscover(bluey).then((c) => connection = c);
+        async.flushMicrotasks();
+
+        final states = <ConnectionState>[];
+        connection.stateChanges.listen(states.add);
+
+        // Wait past any heartbeat interval — nothing should happen since no
+        // heartbeat is running against a non-Bluey peer.
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+
+        expect(
+          states,
+          isNot(contains(ConnectionState.disconnected)),
+          reason: 'Permissive mode (default) should leave non-Bluey peers '
+              'connected',
+        );
+
+        bluey.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
+    test(
+        'requireLifecycle disconnects when peer lacks the control service',
+        () {
+      fakeAsync((async) {
+        _simulateNonBlueyPeripheral(fakePlatform);
+
+        final bluey = Bluey();
+
+        late Connection connection;
+        _connectAndDiscover(bluey, requireLifecycle: true)
+            .then((c) => connection = c);
+        async.flushMicrotasks();
+
+        final states = <ConnectionState>[];
+        connection.stateChanges.listen(states.add);
+
+        // The disconnect is fired synchronously during services() — but we
+        // subscribed after services() returned, so let any pending async
+        // propagation run.
+        async.flushMicrotasks();
+        async.elapse(Duration.zero);
+
+        // Connection state should now reflect disconnection.
+        expect(
+          connection.state,
+          ConnectionState.disconnected,
+          reason: 'requireLifecycle should disconnect peers that do not host '
+              'the control service',
+        );
+
+        bluey.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
+    test(
+        'requireLifecycle with a proper Bluey server does NOT spuriously '
+        'disconnect', () {
+      fakeAsync((async) {
+        _simulateBlueyServerPeripheral(fakePlatform);
+
+        final bluey = Bluey();
+
+        late Connection connection;
+        _connectAndDiscover(bluey, requireLifecycle: true)
+            .then((c) => connection = c);
+        async.flushMicrotasks();
+
+        final states = <ConnectionState>[];
+        connection.stateChanges.listen(states.add);
+
+        // Let heartbeats flow normally.
+        async.elapse(const Duration(seconds: 20));
+        async.flushMicrotasks();
+
+        expect(
+          states,
+          isNot(contains(ConnectionState.disconnected)),
+          reason: 'A proper Bluey server should satisfy requireLifecycle',
         );
 
         bluey.dispose();
