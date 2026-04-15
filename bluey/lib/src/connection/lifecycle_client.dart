@@ -94,7 +94,7 @@ class LifecycleClient {
         _connectionId,
         charUuid,
         lifecycle.disconnectValue,
-        false,
+        true,
       );
     } catch (_) {
       // Best effort — connection may already be lost

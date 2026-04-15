@@ -225,7 +225,7 @@ void main() {
         centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
         value: Uint8List.fromList([0x00]),
-        responseNeeded: false,
+        responseNeeded: true,
       );
       await Future.delayed(Duration.zero);
 

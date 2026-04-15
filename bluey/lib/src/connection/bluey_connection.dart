@@ -129,6 +129,11 @@ class BlueyConnection implements Connection {
   void _handleServerUnreachable() {
     _state = ConnectionState.disconnected;
     _stateController.add(_state);
+
+    // Tear down the platform connection to avoid leaking GATT handles.
+    // Best-effort — the connection may already be dead at the platform layer.
+    _platform.disconnect(_connectionId).catchError((_) {});
+
     _cleanup();
   }
 
