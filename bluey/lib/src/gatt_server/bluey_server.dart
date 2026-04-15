@@ -46,8 +46,10 @@ class BlueyServer implements Server {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
   }) {
     _lifecycle = LifecycleServer(
+      platformApi: _platform,
       interval: lifecycleInterval,
-      onClientTimedOut: _handleClientDisconnected,
+      onClientGone: _handleClientDisconnected,
+      onHeartbeatReceived: _trackClientIfNeeded,
     );
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
 
@@ -84,16 +86,13 @@ class BlueyServer implements Server {
     // Control service requests are handled here; all others are forwarded
     // to the filtered controllers for the public API.
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
-      if (!_lifecycle.handleReadRequest(req, _platform)) {
+      if (!_lifecycle.handleReadRequest(req)) {
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
-      if (lifecycle.isControlServiceCharacteristic(req.characteristicUuid)) {
-        _trackClientIfNeeded(req.centralId);
-      }
-      if (!_lifecycle.handleWriteRequest(req, _platform)) {
+      if (!_lifecycle.handleWriteRequest(req)) {
         _filteredWriteRequestsController.add(req);
       }
     });
@@ -135,7 +134,7 @@ class BlueyServer implements Server {
     // Add the internal control service before advertising if lifecycle is
     // enabled. This must happen before startAdvertising because on iOS,
     // services cannot be added while advertising.
-    await _lifecycle.addControlServiceIfNeeded(_platform);
+    await _lifecycle.addControlServiceIfNeeded();
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
