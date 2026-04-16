@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/peer/server_id.dart';
 
 void main() {
   group('GattPermission', () {
@@ -301,6 +302,10 @@ class MockServer implements Server {
   bool _isAdvertising = false;
   final _connectionsController = StreamController<Client>.broadcast();
   final _disconnectionsController = StreamController<String>.broadcast();
+  final ServerId _serverId = ServerId.generate();
+
+  @override
+  ServerId get serverId => _serverId;
 
   @override
   bool get isAdvertising => _isAdvertising;

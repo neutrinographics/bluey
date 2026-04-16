@@ -17,6 +17,7 @@ import 'server.dart';
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
+  final ServerId _serverId;
   late final LifecycleServer _lifecycle;
 
   bool _isAdvertising = false;
@@ -45,12 +46,12 @@ class BlueyServer implements Server {
     this._platform,
     this._eventBus, {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
-    ServerId? serverId,
-  }) {
+    ServerId? identity,
+  }) : _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
       interval: lifecycleInterval,
-      serverId: serverId ?? ServerId.generate(),
+      serverId: _serverId,
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
     );
@@ -100,6 +101,9 @@ class BlueyServer implements Server {
       }
     });
   }
+
+  @override
+  ServerId get serverId => _serverId;
 
   @override
   bool get isAdvertising => _isAdvertising;

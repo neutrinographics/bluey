@@ -367,5 +367,46 @@ void main() {
       expect(bytes, hasLength(16));
       expect(decodeServerId(bytes), equals(id));
     });
+
+    test('auto-generates a ServerId when constructed without identity', () {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      expect(server.serverId, isNotNull);
+      server.dispose();
+      bluey.dispose();
+    });
+
+    test('respects an app-supplied identity', () {
+      final id = ServerId('11111111-2222-3333-4444-555555555555');
+      final bluey = Bluey();
+      final server = bluey.server(identity: id)!;
+      expect(server.serverId, equals(id));
+      server.dispose();
+      bluey.dispose();
+    });
+
+    test('server responds to serverId reads with the configured identity',
+        () async {
+      final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      final bluey = Bluey();
+      final server = bluey.server(identity: id)!;
+      await server.startAdvertising();
+
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
+      await Future.delayed(Duration.zero);
+
+      fakePlatform.simulateReadRequest(
+        centralId: _clientId1,
+        characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+      );
+      await Future.delayed(Duration.zero);
+
+      expect(fakePlatform.respondReadCalls, isNotEmpty);
+      final call = fakePlatform.respondReadCalls.last;
+      expect(call.value, equals(id.toBytes()));
+
+      await server.dispose();
+      await bluey.dispose();
+    });
   });
 }

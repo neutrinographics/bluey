@@ -13,6 +13,7 @@ import 'event_bus.dart';
 import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
+import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
@@ -395,7 +396,10 @@ class Bluey {
   ///   await server.startAdvertising(name: 'My Device');
   /// }
   /// ```
-  Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
+  Server? server({
+    Duration? lifecycleInterval = const Duration(seconds: 10),
+    ServerId? identity,
+  }) {
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
@@ -403,6 +407,7 @@ class Bluey {
       _platform,
       _eventBus,
       lifecycleInterval: lifecycleInterval,
+      identity: identity,
     );
   }
 
