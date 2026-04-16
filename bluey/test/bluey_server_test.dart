@@ -456,9 +456,10 @@ void main() {
         // Give time for async operation
         await Future.delayed(Duration.zero);
 
-        expect(mockPlatform.addedServices, hasLength(1));
+        // +1 for the auto-registered lifecycle control service
+        expect(mockPlatform.addedServices, hasLength(2));
         expect(
-          mockPlatform.addedServices.first.uuid,
+          mockPlatform.addedServices.last.uuid,
           equals('0000180f-0000-1000-8000-00805f9b34fb'),
         );
       });

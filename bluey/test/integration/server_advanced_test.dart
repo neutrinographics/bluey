@@ -441,7 +441,8 @@ void main() {
           ),
         );
 
-        expect(fakePlatform.localServices, hasLength(3));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(4));
 
         await server.startAdvertising(
           name: 'Multi-Service Device',
@@ -476,13 +477,15 @@ void main() {
           ),
         );
 
-        expect(fakePlatform.localServices, hasLength(2));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(3));
 
         // Remove one service
         server.removeService(UUID('0000180d-0000-1000-8000-00805f9b34fb'));
 
-        expect(fakePlatform.localServices, hasLength(1));
-        expect(fakePlatform.localServices.first.uuid, contains('180f'));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(2));
+        expect(fakePlatform.localServices.last.uuid, contains('180f'));
 
         await server.dispose();
         await bluey.dispose();
