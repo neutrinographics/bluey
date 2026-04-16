@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/lifecycle.dart';
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -343,6 +345,27 @@ void main() {
 
         bluey.dispose();
       });
+    });
+
+    test('control service includes the serverId characteristic', () {
+      final service = buildControlService();
+      final charUuids =
+          service.characteristics.map((c) => c.uuid.toLowerCase()).toList();
+      expect(charUuids, contains('b1e70004-0000-1000-8000-00805f9b34fb'));
+
+      final serverIdChar = service.characteristics.firstWhere(
+        (c) =>
+            c.uuid.toLowerCase() == 'b1e70004-0000-1000-8000-00805f9b34fb',
+      );
+      expect(serverIdChar.properties.canRead, isTrue);
+      expect(serverIdChar.properties.canWrite, isFalse);
+    });
+
+    test('encodeServerId/decodeServerId round-trip', () {
+      final id = ServerId.generate();
+      final bytes = encodeServerId(id);
+      expect(bytes, hasLength(16));
+      expect(decodeServerId(bytes), equals(id));
     });
   });
 }

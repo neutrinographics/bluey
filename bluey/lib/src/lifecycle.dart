@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
+import 'peer/server_id.dart';
+
 /// Internal lifecycle management for Bluey peer-to-peer connections.
 ///
 /// When two Bluey devices connect, the server hosts a hidden control service
@@ -21,6 +23,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 const _controlServiceUuidString = 'b1e70001-0000-1000-8000-00805f9b34fb';
 const _heartbeatCharUuidString = 'b1e70002-0000-1000-8000-00805f9b34fb';
 const _intervalCharUuidString = 'b1e70003-0000-1000-8000-00805f9b34fb';
+const _serverIdCharUuidString = 'b1e70004-0000-1000-8000-00805f9b34fb';
 
 /// UUID of the internal Bluey lifecycle control service.
 final controlServiceUuid = _controlServiceUuidString;
@@ -30,6 +33,10 @@ final heartbeatCharUuid = _heartbeatCharUuidString;
 
 /// UUID of the interval characteristic (readable, returns server interval).
 final intervalCharUuid = _intervalCharUuidString;
+
+/// UUID of the serverId characteristic (readable, returns the server's
+/// stable [ServerId] as 16 raw bytes).
+final serverIdCharUuid = _serverIdCharUuidString;
 
 /// Value written by the client as a periodic heartbeat.
 final heartbeatValue = Uint8List.fromList([0x01]);
@@ -44,7 +51,8 @@ const defaultLifecycleInterval = Duration(seconds: 10);
 bool isControlServiceCharacteristic(String characteristicUuid) {
   final normalized = characteristicUuid.toLowerCase();
   return normalized == _heartbeatCharUuidString ||
-      normalized == _intervalCharUuidString;
+      normalized == _intervalCharUuidString ||
+      normalized == _serverIdCharUuidString;
 }
 
 /// Checks whether a service UUID is the control service.
@@ -60,6 +68,12 @@ Uint8List encodeInterval(Duration interval) {
   bytes.setInt32(0, ms, Endian.little);
   return bytes.buffer.asUint8List();
 }
+
+/// Encodes a [ServerId] as 16 raw bytes for the serverId characteristic.
+Uint8List encodeServerId(ServerId id) => id.toBytes();
+
+/// Decodes a 16-byte serverId characteristic value.
+ServerId decodeServerId(Uint8List bytes) => ServerId.fromBytes(bytes);
 
 /// Decodes a 4-byte little-endian interval value (in milliseconds) from the
 /// interval characteristic.
@@ -94,6 +108,20 @@ PlatformLocalService buildControlService() {
       ),
       PlatformLocalCharacteristic(
         uuid: _intervalCharUuidString,
+        properties: const PlatformCharacteristicProperties(
+          canRead: true,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        permissions: const [
+          PlatformGattPermission.read,
+        ],
+        descriptors: const [],
+      ),
+      PlatformLocalCharacteristic(
+        uuid: _serverIdCharUuidString,
         properties: const PlatformCharacteristicProperties(
           canRead: true,
           canWrite: false,
