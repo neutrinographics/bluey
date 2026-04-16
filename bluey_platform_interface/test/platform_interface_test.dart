@@ -154,6 +154,72 @@ final class MockBlueyPlatform extends BlueyPlatform
   @override
   Future<void> disconnectCentral(String centralId) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> closeServer() => throw UnimplementedError();
+
+  @override
+  Future<void> configure(BlueyConfig config) => throw UnimplementedError();
+
+  @override
+  Future<PlatformBondState> getBondState(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<PlatformBondState> bondStateStream(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> bond(String deviceId) => throw UnimplementedError();
+
+  @override
+  Future<void> removeBond(String deviceId) => throw UnimplementedError();
+
+  @override
+  Future<List<PlatformDevice>> getBondedDevices() =>
+      throw UnimplementedError();
+
+  @override
+  Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> requestPhy(
+    String deviceId,
+    PlatformPhy? txPhy,
+    PlatformPhy? rxPhy,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<PlatformConnectionParameters> getConnectionParameters(
+    String deviceId,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> requestConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters params,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> indicateCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> indicateCharacteristicTo(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) => throw UnimplementedError();
+
+  @override
+  Stream<String> get serviceChanges => throw UnimplementedError();
 }
 
 void main() {

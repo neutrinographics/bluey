@@ -850,6 +850,12 @@ class ConnectionManager(
                 }
             }
 
+            override fun onServiceChanged(gatt: BluetoothGatt) {
+                handler.post {
+                    flutterApi.onServicesChanged(deviceId) {}
+                }
+            }
+
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
                 // Cancel the pending timeout since the RSSI read resolved
                 pendingRssiTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }

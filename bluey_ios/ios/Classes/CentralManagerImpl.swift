@@ -771,6 +771,17 @@ class CentralManagerImpl: NSObject {
         }
     }
 
+    func didModifyServices(peripheral: CBPeripheral, invalidatedServices: [CBService]) {
+        let deviceId = peripheral.identifier.uuidString.lowercased()
+
+        // Clear cached services for this device so the next discovery is fresh
+        services.removeValue(forKey: deviceId)
+        characteristics.removeValue(forKey: deviceId)
+        descriptors.removeValue(forKey: deviceId)
+
+        flutterApi.onServicesChanged(deviceId: deviceId) { _ in }
+    }
+
     func didReadRSSI(peripheral: CBPeripheral, rssi: NSNumber, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
 

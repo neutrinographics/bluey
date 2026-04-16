@@ -505,6 +505,12 @@ abstract base class BlueyPlatform extends PlatformInterface {
     Uint8List value,
   );
 
+  /// Stream of device IDs whose GATT services have changed.
+  ///
+  /// Fires when a remote server's GATT database is modified (service
+  /// added or removed). The client should re-discover services.
+  Stream<String> get serviceChanges;
+
   /// Stream of connected centrals.
   Stream<PlatformCentral> get centralConnections;
 

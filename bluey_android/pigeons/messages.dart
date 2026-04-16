@@ -509,4 +509,7 @@ abstract class BlueyFlutterApi {
     String centralId,
     String characteristicUuid,
   );
+
+  /// Remote device's GATT services changed (service added/removed on the server).
+  void onServicesChanged(String deviceId);
 }

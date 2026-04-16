@@ -22,6 +22,8 @@ final class BlueyAndroid extends BlueyPlatform {
 
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
+  final StreamController<String> _serviceChangesController =
+      StreamController<String>.broadcast();
 
   bool _isInitialized = false;
 
@@ -77,6 +79,10 @@ final class BlueyAndroid extends BlueyPlatform {
 
     _flutterApi.onWriteRequestCallback = (request) {
       _server.onWriteRequest(request);
+    };
+
+    _flutterApi.onServicesChangedCallback = (deviceId) {
+      _serviceChangesController.add(deviceId);
     };
 
     _flutterApi.onCharacteristicSubscribedCallback = (
@@ -396,6 +402,12 @@ final class BlueyAndroid extends BlueyPlatform {
   }
 
   @override
+  Stream<String> get serviceChanges {
+    _ensureInitialized();
+    return _serviceChangesController.stream;
+  }
+
+  @override
   Stream<PlatformCentral> get centralConnections {
     _ensureInitialized();
     return _server.centralConnections;
@@ -484,6 +496,7 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   void Function(WriteRequestDto)? onWriteRequestCallback;
   void Function(String, String)? onCharacteristicSubscribedCallback;
   void Function(String, String)? onCharacteristicUnsubscribedCallback;
+  void Function(String)? onServicesChangedCallback;
 
   @override
   void onStateChanged(BluetoothStateDto state) {
@@ -548,5 +561,10 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
     String characteristicUuid,
   ) {
     onCharacteristicUnsubscribedCallback?.call(centralId, characteristicUuid);
+  }
+
+  @override
+  void onServicesChanged(String deviceId) {
+    onServicesChangedCallback?.call(deviceId);
   }
 }
