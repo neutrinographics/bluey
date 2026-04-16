@@ -20,6 +20,12 @@ class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
 
+  /// The platform-level connection identifier.
+  ///
+  /// Exposed for internal use by [LifecycleClient] and peer orchestration.
+  /// Not part of the public [Connection] interface.
+  String get connectionId => _connectionId;
+
   @override
   final UUID deviceId;
 
