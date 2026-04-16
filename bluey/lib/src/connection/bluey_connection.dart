@@ -203,7 +203,14 @@ class BlueyConnection implements Connection {
           .where((s) => !lifecycle.isControlService(s.uuid.toString()))
           .toList();
     } else {
-      _cachedServices = allServices;
+      // Check if the control service appeared (e.g., server finished
+      // initializing after we connected). If so, upgrade in place.
+      await _tryUpgrade(allServices);
+      _cachedServices = isBlueyServer
+          ? allServices
+              .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+              .toList()
+          : allServices;
     }
 
     return _cachedServices!;
@@ -317,54 +324,58 @@ class BlueyConnection implements Connection {
     if (isBlueyServer || _upgrading) return;
     _upgrading = true;
     try {
-      // Invalidate cached services so re-discovery fetches fresh data
       _cachedServices = null;
-
       final allServices = await services();
-
-      // Check if the control service appeared
-      final controlService = allServices
-          .where((s) => lifecycle.isControlService(s.uuid.toString()))
-          .firstOrNull;
-
-      if (controlService == null) return;
-
-      // Read serverId if available
-      final serverIdChar = controlService.characteristics
-          .where(
-            (c) =>
-                c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
-          )
-          .firstOrNull;
-
-      ServerId? serverId;
-      if (serverIdChar != null) {
-        try {
-          final bytes = await serverIdChar.read();
-          serverId = lifecycle.decodeServerId(bytes);
-        } catch (_) {}
-      }
-
-      // Start lifecycle heartbeat
-      final lifecycleClient = LifecycleClient(
-        platformApi: _platform,
-        connectionId: _connectionId,
-        maxFailedHeartbeats: _maxFailedHeartbeats,
-        onServerUnreachable: () {
-          disconnect().catchError((_) {});
-        },
-      );
-      lifecycleClient.start(allServices: allServices);
-
-      upgrade(
-        lifecycleClient: lifecycleClient,
-        serverId: serverId ?? ServerId.generate(),
-      );
+      await _tryUpgrade(allServices);
     } catch (_) {
       // Service discovery failed -- stay as raw connection
     } finally {
       _upgrading = false;
     }
+  }
+
+  /// Checks whether [allServices] contains the Bluey control service.
+  /// If so, reads the ServerId, starts the lifecycle heartbeat, and
+  /// upgrades this connection in place. No-op if already upgraded.
+  Future<void> _tryUpgrade(List<RemoteService> allServices) async {
+    if (isBlueyServer) return;
+
+    final controlService = allServices
+        .where((s) => lifecycle.isControlService(s.uuid.toString()))
+        .firstOrNull;
+    if (controlService == null) return;
+
+    // Read serverId if available
+    final serverIdChar = controlService.characteristics
+        .where(
+          (c) =>
+              c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+        )
+        .firstOrNull;
+
+    ServerId? serverId;
+    if (serverIdChar != null) {
+      try {
+        final bytes = await serverIdChar.read();
+        serverId = lifecycle.decodeServerId(bytes);
+      } catch (_) {}
+    }
+
+    // Start lifecycle heartbeat
+    final lifecycleClient = LifecycleClient(
+      platformApi: _platform,
+      connectionId: _connectionId,
+      maxFailedHeartbeats: _maxFailedHeartbeats,
+      onServerUnreachable: () {
+        disconnect().catchError((_) {});
+      },
+    );
+    lifecycleClient.start(allServices: allServices);
+
+    upgrade(
+      lifecycleClient: lifecycleClient,
+      serverId: serverId ?? ServerId.generate(),
+    );
   }
 
   /// Clean up resources.
