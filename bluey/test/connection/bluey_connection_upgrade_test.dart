@@ -247,4 +247,178 @@ void main() {
       await bluey.dispose();
     });
   });
+
+  group('BlueyConnection late upgrade via service change', () {
+    test('auto-upgrades when services change and control service appears',
+        () async {
+      // Start with a non-Bluey peripheral (no control service)
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      ));
+
+      expect(conn.isBlueyServer, isFalse);
+
+      // Server restarts and registers the control service.
+      // Update the simulated peripheral's services and fire service change.
+      final serverId = ServerId.generate();
+      fakePlatform.simulateServiceChange(
+        'AA:BB:CC:DD:EE:01',
+        newServices: [
+          platform.PlatformService(
+            uuid: lifecycle.controlServiceUuid,
+            isPrimary: true,
+            characteristics: const [
+              platform.PlatformCharacteristic(
+                uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+                properties: platform.PlatformCharacteristicProperties(
+                  canRead: false,
+                  canWrite: true,
+                  canWriteWithoutResponse: false,
+                  canNotify: false,
+                  canIndicate: false,
+                ),
+                descriptors: [],
+              ),
+              platform.PlatformCharacteristic(
+                uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+                properties: platform.PlatformCharacteristicProperties(
+                  canRead: true,
+                  canWrite: false,
+                  canWriteWithoutResponse: false,
+                  canNotify: false,
+                  canIndicate: false,
+                ),
+                descriptors: [],
+              ),
+              platform.PlatformCharacteristic(
+                uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+                properties: platform.PlatformCharacteristicProperties(
+                  canRead: true,
+                  canWrite: false,
+                  canWriteWithoutResponse: false,
+                  canNotify: false,
+                  canIndicate: false,
+                ),
+                descriptors: [],
+              ),
+            ],
+            includedServices: [],
+          ),
+        ],
+        newCharacteristicValues: {
+          'b1e70003-0000-1000-8000-00805f9b34fb':
+              lifecycle.encodeInterval(const Duration(seconds: 10)),
+          'b1e70004-0000-1000-8000-00805f9b34fb': serverId.toBytes(),
+        },
+      );
+
+      // Give async handlers time to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      expect(conn.isBlueyServer, isTrue);
+      expect(conn.serverId, equals(serverId));
+
+      await conn.disconnect();
+      await bluey.dispose();
+    });
+
+    test('does not re-upgrade when already a Bluey server', () async {
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: serverId,
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      ));
+
+      expect(conn.isBlueyServer, isTrue);
+
+      final states = <ConnectionState>[];
+      conn.stateChanges.listen(states.add);
+
+      // Fire service change -- should be ignored since already upgraded
+      fakePlatform.simulateServiceChange('AA:BB:CC:DD:EE:01');
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // No extra connected event from a redundant upgrade
+      expect(states.where((s) => s == ConnectionState.connected), isEmpty);
+
+      await conn.disconnect();
+      await bluey.dispose();
+    });
+
+    test('service change for different device is ignored', () async {
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      ));
+
+      expect(conn.isBlueyServer, isFalse);
+
+      // Fire service change for a different device
+      fakePlatform.simulateServiceChange('XX:YY:ZZ:00:11:22');
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Should still be a raw connection
+      expect(conn.isBlueyServer, isFalse);
+
+      await conn.disconnect();
+      await bluey.dispose();
+    });
+
+    test('service change without control service does not upgrade', () async {
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Server',
+      ));
+
+      expect(conn.isBlueyServer, isFalse);
+
+      // Fire service change with a regular service (not Bluey control)
+      fakePlatform.simulateServiceChange(
+        'AA:BB:CC:DD:EE:01',
+        newServices: [
+          const platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      expect(conn.isBlueyServer, isFalse);
+
+      await conn.disconnect();
+      await bluey.dispose();
+    });
+  });
 }

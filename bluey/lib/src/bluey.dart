@@ -328,6 +328,7 @@ class Bluey {
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
+        maxFailedHeartbeats: maxFailedHeartbeats,
       );
 
       // Auto-upgrade: if the server hosts the Bluey control service,

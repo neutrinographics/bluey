@@ -52,6 +52,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   int _nextRequestId = 1;
 
   // === Stream Controllers ===
+  final _serviceChangesController = StreamController<String>.broadcast();
   final _stateController = StreamController<BluetoothState>.broadcast();
   final _centralConnectionController =
       StreamController<PlatformCentral>.broadcast();
@@ -285,6 +286,40 @@ final class FakeBlueyPlatform extends BlueyPlatform {
         value: value,
       ),
     );
+  }
+
+  /// Simulates a service change notification for a connected peripheral.
+  ///
+  /// Optionally updates the simulated peripheral's services before firing,
+  /// so that the next [discoverServices] call returns [newServices].
+  void simulateServiceChange(String deviceId, {
+    List<PlatformService>? newServices,
+    Map<String, Uint8List>? newCharacteristicValues,
+  }) {
+    if (newServices != null || newCharacteristicValues != null) {
+      final existingPeripheral = _peripherals[deviceId];
+      if (existingPeripheral != null) {
+        _peripherals[deviceId] = _SimulatedPeripheral(
+          device: existingPeripheral.device,
+          services: newServices ?? existingPeripheral.services,
+          characteristicValues: newCharacteristicValues != null
+              ? Map.from(newCharacteristicValues)
+              : existingPeripheral.characteristicValues,
+        );
+        // Also update the connected device's peripheral reference
+        final connection = _connections[deviceId];
+        if (connection != null) {
+          _connections[deviceId] = _ConnectedDevice(
+            peripheral: _peripherals[deviceId]!,
+            stateController: connection.stateController,
+            notificationController: connection.notificationController,
+            mtu: connection.mtu,
+            subscribedCharacteristics: connection.subscribedCharacteristics,
+          );
+        }
+      }
+    }
+    _serviceChangesController.add(deviceId);
   }
 
   /// Gets whether we're currently advertising.
@@ -664,6 +699,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   @override
+  Stream<String> get serviceChanges => _serviceChangesController.stream;
+
+  @override
   Stream<PlatformCentral> get centralConnections =>
       _centralConnectionController.stream;
 
@@ -732,6 +770,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Disposes all resources.
   Future<void> dispose() async {
     await _stateController.close();
+    await _serviceChangesController.close();
     await _centralConnectionController.close();
     await _centralDisconnectionController.close();
     await _readRequestController.close();

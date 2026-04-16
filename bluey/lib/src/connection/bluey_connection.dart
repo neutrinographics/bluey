@@ -20,6 +20,7 @@ import 'lifecycle_client.dart';
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
+  final int _maxFailedHeartbeats;
 
   /// The platform-level connection identifier.
   ///
@@ -62,6 +63,8 @@ class BlueyConnection implements Connection {
   StreamSubscription? _platformStateSubscription;
   StreamSubscription? _platformBondStateSubscription;
   StreamSubscription? _platformPhySubscription;
+  StreamSubscription? _serviceChangeSubscription;
+  bool _upgrading = false;
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
@@ -73,8 +76,10 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
+    int maxFailedHeartbeats = 1,
   }) : _platform = platformInstance,
-       _connectionId = connectionId {
+       _connectionId = connectionId,
+       _maxFailedHeartbeats = maxFailedHeartbeats {
     // Subscribe to platform connection state changes
     _platformStateSubscription = _platform
         .connectionStateStream(_connectionId)
@@ -129,6 +134,13 @@ class BlueyConnection implements Connection {
     // Initialize connection parameters
     _platform.getConnectionParameters(_connectionId).then((params) {
       _connectionParameters = _mapConnectionParameters(params);
+    });
+
+    // Subscribe to service changes for late upgrade
+    _serviceChangeSubscription = _platform.serviceChanges
+        .where((deviceId) => deviceId == _connectionId)
+        .listen((_) {
+      _handleServiceChange();
     });
   }
 
@@ -299,10 +311,67 @@ class BlueyConnection implements Connection {
     _connectionParameters = params;
   }
 
+  /// Handles a service change notification by re-discovering services
+  /// and upgrading to the Bluey protocol if the control service appeared.
+  Future<void> _handleServiceChange() async {
+    if (isBlueyServer || _upgrading) return;
+    _upgrading = true;
+    try {
+      // Invalidate cached services so re-discovery fetches fresh data
+      _cachedServices = null;
+
+      final allServices = await services();
+
+      // Check if the control service appeared
+      final controlService = allServices
+          .where((s) => lifecycle.isControlService(s.uuid.toString()))
+          .firstOrNull;
+
+      if (controlService == null) return;
+
+      // Read serverId if available
+      final serverIdChar = controlService.characteristics
+          .where(
+            (c) =>
+                c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+          )
+          .firstOrNull;
+
+      ServerId? serverId;
+      if (serverIdChar != null) {
+        try {
+          final bytes = await serverIdChar.read();
+          serverId = lifecycle.decodeServerId(bytes);
+        } catch (_) {}
+      }
+
+      // Start lifecycle heartbeat
+      final lifecycleClient = LifecycleClient(
+        platformApi: _platform,
+        connectionId: _connectionId,
+        maxFailedHeartbeats: _maxFailedHeartbeats,
+        onServerUnreachable: () {
+          disconnect().catchError((_) {});
+        },
+      );
+      lifecycleClient.start(allServices: allServices);
+
+      upgrade(
+        lifecycleClient: lifecycleClient,
+        serverId: serverId ?? ServerId.generate(),
+      );
+    } catch (_) {
+      // Service discovery failed -- stay as raw connection
+    } finally {
+      _upgrading = false;
+    }
+  }
+
   /// Clean up resources.
   Future<void> _cleanup() async {
     _lifecycle?.stop();
     _lifecycle = null;
+    await _serviceChangeSubscription?.cancel();
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();
