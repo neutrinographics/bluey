@@ -197,12 +197,11 @@ class ConnectionManager(
             return
         }
 
-        // Check if services already discovered
-        val services = gatt.services
-        if (services != null && services.isNotEmpty()) {
-            callback(Result.success(mapServices(services)))
-            return
-        }
+        // Always perform a fresh discovery from the remote device.
+        // The Dart layer manages its own service cache. Returning stale
+        // data here prevents the client from detecting GATT database
+        // changes (e.g., iOS server restart where Service Changed
+        // indications are not sent).
 
         // Store callback for async response
         pendingServiceDiscovery[deviceId] = callback
