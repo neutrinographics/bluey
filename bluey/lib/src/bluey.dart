@@ -498,9 +498,9 @@ class Bluey {
 
   /// Scan for nearby Bluey servers.
   ///
-  /// Filters by the Bluey control service UUID, briefly connects to
-  /// each candidate to read its `serverId`, and returns a list of
-  /// [BlueyPeer]s deduplicated by [ServerId].
+  /// Scans for nearby BLE devices, briefly connects to each candidate
+  /// to check for the Bluey control service and read its `serverId`,
+  /// and returns a list of [BlueyPeer]s deduplicated by [ServerId].
   ///
   /// [timeout] bounds the scan window. Defaults to 5 seconds.
   Future<List<BlueyPeer>> discoverPeers({

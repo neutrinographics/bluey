@@ -1,5 +1,13 @@
 # BlueyPeer — Stable Identity for Bluey-to-Bluey Connections
 
+> **Note:** This spec guided initial design. The implementation diverged
+> in several ways — notably `PeerConnection` was merged into
+> `BlueyConnection` (single connection class with in-place upgrade),
+> `connect()` auto-upgrades instead of being protocol-free, and the
+> manufacturer-data scan-time marker was replaced with post-connect
+> detection. The code and its doc comments are the source of truth
+> for current behavior.
+
 ## Problem
 
 Cross-platform BLE identity is fundamentally unstable. Today, connecting to a previously-seen server requires an app to scan again every time, because:
