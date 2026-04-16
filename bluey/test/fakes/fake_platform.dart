@@ -78,6 +78,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [respondToWriteRequest] in order.
   final List<RespondWriteCall> respondWriteCalls = [];
 
+  /// Records every call to [writeCharacteristic] in order.
+  final List<WriteCharacteristicCall> writeCharacteristicCalls = [];
+
   // === Test Helpers ===
 
   /// When true, writeCharacteristic calls will throw to simulate a dead server.
@@ -446,6 +449,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
+    writeCharacteristicCalls.add(WriteCharacteristicCall(
+      deviceId: deviceId,
+      characteristicUuid: characteristicUuid,
+      value: Uint8List.fromList(value),
+      withResponse: withResponse,
+    ));
+
     connection.peripheral.characteristicValues[characteristicUuid] = value;
   }
 
@@ -799,5 +809,20 @@ class RespondWriteCall {
   RespondWriteCall({
     required this.requestId,
     required this.status,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.writeCharacteristic].
+class WriteCharacteristicCall {
+  final String deviceId;
+  final String characteristicUuid;
+  final Uint8List value;
+  final bool withResponse;
+
+  WriteCharacteristicCall({
+    required this.deviceId,
+    required this.characteristicUuid,
+    required this.value,
+    required this.withResponse,
   });
 }

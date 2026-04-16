@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../connection/connection.dart';
+import '../connection/lifecycle_client.dart';
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../shared/exceptions.dart';
@@ -16,9 +17,11 @@ import 'server_id.dart';
 class PeerConnection implements Connection {
   final Connection _inner;
   final ServerId _serverId;
+  final LifecycleClient? _lifecycle;
 
   /// Creates a [PeerConnection] wrapping the given [inner] connection.
-  PeerConnection(this._inner, this._serverId);
+  PeerConnection(this._inner, this._serverId, {LifecycleClient? lifecycle})
+      : _lifecycle = lifecycle;
 
   @override
   bool get isBlueyServer => true;
@@ -71,7 +74,13 @@ class PeerConnection implements Connection {
   Future<int> readRssi() => _inner.readRssi();
 
   @override
-  Future<void> disconnect() => _inner.disconnect();
+  Future<void> disconnect() async {
+    if (_lifecycle != null) {
+      await _lifecycle.sendDisconnectCommand();
+      _lifecycle.stop();
+    }
+    await _inner.disconnect();
+  }
 
   @override
   BondState get bondState => _inner.bondState;

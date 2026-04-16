@@ -368,6 +368,27 @@ void main() {
       expect(decodeServerId(bytes), equals(id));
     });
 
+    test('emits disconnect for untracked client (stale connection after server restart)', () async {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      await server.startAdvertising();
+
+      final disconnections = <String>[];
+      server.disconnections.listen(disconnections.add);
+
+      // Simulate a central that was connected before the server restarted.
+      // The server has NO record of this client -- it was never in
+      // _connectedClients. But the platform reports its disconnection.
+      fakePlatform.simulateCentralDisconnection('stale-client-id');
+      await Future.delayed(Duration.zero);
+
+      // The server should still emit the disconnect event.
+      expect(disconnections, contains('stale-client-id'));
+
+      await server.dispose();
+      await bluey.dispose();
+    });
+
     test('auto-generates a ServerId when constructed without identity', () {
       final bluey = Bluey();
       final server = bluey.server()!;

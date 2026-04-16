@@ -396,6 +396,7 @@ class Bluey {
       return PeerConnection(
         rawConnection,
         serverId ?? ServerId.generate(), // fallback if serverId read failed
+        lifecycle: lifecycleClient,
       );
     } catch (_) {
       // Service discovery failed -- return raw connection

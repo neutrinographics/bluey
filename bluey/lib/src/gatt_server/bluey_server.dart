@@ -353,15 +353,16 @@ class BlueyServer implements Server {
     // Cancel any heartbeat timer for this client
     _lifecycle.cancelTimer(clientId);
 
-    // Only emit if the client was actually tracked
-    if (_connectedClients.containsKey(clientId)) {
-      final client = _connectedClients[clientId]!;
+    final client = _connectedClients.remove(clientId);
+    if (client != null) {
       _emitEvent(
         ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
-      _connectedClients.remove(clientId);
-      _disconnectionsController.add(client.id.toString());
     }
+
+    // Always emit on the disconnections stream -- even for untracked clients
+    // (e.g., stale connections from before a server restart).
+    _disconnectionsController.add(clientId);
   }
 
   // === Private mapping methods ===

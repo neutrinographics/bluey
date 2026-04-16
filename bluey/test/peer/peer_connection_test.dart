@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/lifecycle.dart';
 import 'package:bluey/src/peer/peer_connection.dart';
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
@@ -171,6 +175,48 @@ void main() {
 
       await peer.disconnect();
       await bluey.dispose();
+    });
+
+    test('disconnect() sends lifecycle disconnect command before teardown', () {
+      fakeAsync((async) {
+        final serverId = ServerId.generate();
+        fakePlatform.simulateBlueyServer(
+          address: 'AA:BB:CC:DD:EE:01',
+          serverId: serverId,
+        );
+
+        final bluey = Bluey();
+
+        late Connection conn;
+        bluey.connect(Device(
+          id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+          address: 'AA:BB:CC:DD:EE:01',
+          name: 'Test',
+        )).then((c) => conn = c);
+        async.flushMicrotasks();
+
+        expect(conn.isBlueyServer, isTrue);
+
+        // Clear the write log so we only see writes from disconnect.
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        conn.disconnect();
+        async.flushMicrotasks();
+
+        // The disconnect command [0x00] should have been written to the
+        // heartbeat characteristic before the platform disconnect occurred.
+        final disconnectWrites = fakePlatform.writeCharacteristicCalls.where(
+          (call) =>
+              call.characteristicUuid == heartbeatCharUuid &&
+              call.value.length == 1 &&
+              call.value[0] == 0x00,
+        );
+        expect(disconnectWrites, isNotEmpty,
+            reason: 'disconnect() must send [0x00] to heartbeat char');
+
+        bluey.dispose();
+        async.flushMicrotasks();
+      });
     });
   });
 }
