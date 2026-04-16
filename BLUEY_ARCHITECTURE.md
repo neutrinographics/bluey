@@ -2243,14 +2243,6 @@ If the control service is absent at connect time (e.g., the server is still init
 
 The library provides the hooks; the app wires up persistence. The server passes a persisted `ServerId` to `bluey.server(identity: ...)`. The client saves `peer.serverId` and reconnects via `bluey.peer(savedId).connect()`.
 
-### Known limitation: iOS server restart notification
-
-When an iOS server app restarts and re-registers its GATT database, iOS does not send a Service Changed indication to connected Android clients. This is a CoreBluetooth limitation — `CBPeripheralManager` does not expose the Service Changed characteristic (0x2A05) and rejects attempts to register it manually.
-
-**Impact:** An Android client that reconnected before the iOS server finished initializing will have a raw (non-Bluey) connection. The connection is functional but lacks heartbeat-based disconnect detection and stable identity.
-
-**Workaround:** The app can call `connection.services()` (without cache) after the server is expected to be ready. If the control service has appeared, the connection upgrades automatically. The example app's "refresh services" button triggers this. A future version of Bluey may add periodic retry logic to handle this transparently.
-
 ---
 
 ## Document History
