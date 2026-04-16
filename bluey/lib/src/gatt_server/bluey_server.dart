@@ -19,6 +19,7 @@ class BlueyServer implements Server {
   final BlueyEventBus _eventBus;
   final ServerId _serverId;
   late final LifecycleServer _lifecycle;
+  late final Future<void> _controlServiceReady;
 
   bool _isAdvertising = false;
   final Map<String, BlueyClient> _connectedClients = {};
@@ -55,6 +56,16 @@ class BlueyServer implements Server {
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
     );
+    // Eagerly add the control service so it's available for incoming
+    // connections even before startAdvertising() is called. A client may
+    // reconnect via a cached peripheral reference while the server UI is
+    // still on the "not advertising" screen.
+    //
+    // Store the Future so addService() and startAdvertising() can await
+    // it — Android's BluetoothGattServer requires services to be added
+    // sequentially (no concurrent addService calls).
+    _controlServiceReady = _lifecycle.addControlServiceIfNeeded();
+
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
 
     _centralConnectionsSub = _platform.centralConnections.listen((
@@ -119,6 +130,9 @@ class BlueyServer implements Server {
 
   @override
   Future<void> addService(HostedService service) async {
+    // Wait for the eagerly-registered control service to finish before
+    // adding app services — Android requires sequential addService calls.
+    await _controlServiceReady;
     final platformService = _mapHostedServiceToPlatform(service);
     await _platform.addService(platformService);
     _emitEvent(
@@ -138,10 +152,9 @@ class BlueyServer implements Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
   }) async {
-    // Add the internal control service before advertising if lifecycle is
-    // enabled. This must happen before startAdvertising because on iOS,
-    // services cannot be added while advertising.
-    await _lifecycle.addControlServiceIfNeeded();
+    // Ensure the eagerly-registered control service has completed before
+    // advertising. The Future is cached and completes only once.
+    await _controlServiceReady;
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
