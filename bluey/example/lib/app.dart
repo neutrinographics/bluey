@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'features/peer/presentation/peer_screen.dart';
 import 'features/scanner/presentation/scanner_screen.dart';
 import 'features/server/presentation/server_screen.dart';
 
@@ -56,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       extendBody: true,
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [ScannerScreen(), ServerScreen()],
+        children: const [ScannerScreen(), PeerScreen(), ServerScreen()],
       ),
       bottomNavigationBar: _BottomNav(
         selectedIndex: _selectedIndex,
@@ -113,10 +114,16 @@ class _BottomNav extends StatelessWidget {
                     onTap: () => onDestinationSelected(0),
                   ),
                   _NavItem(
-                    icon: Icons.cell_tower,
-                    label: 'SERVER',
+                    icon: Icons.people_outline,
+                    label: 'PEERS',
                     isActive: selectedIndex == 1,
                     onTap: () => onDestinationSelected(1),
+                  ),
+                  _NavItem(
+                    icon: Icons.cell_tower,
+                    label: 'SERVER',
+                    isActive: selectedIndex == 2,
+                    onTap: () => onDestinationSelected(2),
                   ),
                 ],
               ),
