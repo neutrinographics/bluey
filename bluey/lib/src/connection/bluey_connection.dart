@@ -4,13 +4,11 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../gatt_client/gatt.dart';
-import '../lifecycle.dart' as lifecycle;
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import 'connection.dart';
 import 'connection_state.dart';
-import 'lifecycle_client.dart';
 
 /// Internal implementation of [Connection] that wraps platform calls.
 ///
@@ -56,8 +54,6 @@ class BlueyConnection implements Connection {
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
-  late final LifecycleClient _lifecycle;
-
   /// Creates a new connection instance.
   ///
   /// This is called internally by Bluey and should not be used directly.
@@ -65,8 +61,6 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
-    int maxFailedHeartbeats = 1,
-    bool requireLifecycle = false,
   }) : _platform = platformInstance,
        _connectionId = connectionId {
     // Subscribe to platform connection state changes
@@ -124,25 +118,6 @@ class BlueyConnection implements Connection {
     _platform.getConnectionParameters(_connectionId).then((params) {
       _connectionParameters = _mapConnectionParameters(params);
     });
-
-    _lifecycle = LifecycleClient(
-      platformApi: _platform,
-      connectionId: _connectionId,
-      maxFailedHeartbeats: maxFailedHeartbeats,
-      requireLifecycle: requireLifecycle,
-      onServerUnreachable: _handleServerUnreachable,
-    );
-  }
-
-  void _handleServerUnreachable() {
-    _state = ConnectionState.disconnected;
-    _stateController.add(_state);
-
-    // Tear down the platform connection to avoid leaking GATT handles.
-    // Best-effort — the connection may already be dead at the platform layer.
-    _platform.disconnect(_connectionId).catchError((_) {});
-
-    _cleanup();
   }
 
   @override
@@ -156,9 +131,6 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
-    if (lifecycle.isControlService(uuid.toString())) {
-      throw ServiceNotFoundException(uuid);
-    }
     if (_cachedServices == null) {
       throw ServiceNotFoundException(uuid);
     }
@@ -179,22 +151,13 @@ class BlueyConnection implements Connection {
     }
 
     final platformServices = await _platform.discoverServices(_connectionId);
-    final allServices =
+    _cachedServices =
         platformServices.map((ps) => _mapService(ps)).toList();
-
-    // Start lifecycle heartbeat if the server hosts the control service
-    _lifecycle.start(allServices: allServices);
-
-    // Filter the control service from the public result
-    _cachedServices = allServices
-        .where((s) => !lifecycle.isControlService(s.uuid.toString()))
-        .toList();
     return _cachedServices!;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
-    if (lifecycle.isControlService(uuid.toString())) return false;
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
@@ -221,10 +184,6 @@ class BlueyConnection implements Connection {
 
     _state = ConnectionState.disconnecting;
     _stateController.add(_state);
-
-    // Send disconnect command to the server's control service so it can
-    // clean up immediately. Best-effort — the connection may already be lost.
-    await _lifecycle.sendDisconnectCommand();
 
     await _platform.disconnect(_connectionId);
 
@@ -292,7 +251,6 @@ class BlueyConnection implements Connection {
 
   /// Clean up resources.
   Future<void> _cleanup() async {
-    _lifecycle.stop();
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();

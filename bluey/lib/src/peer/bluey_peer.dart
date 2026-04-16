@@ -5,6 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
+import '../connection/lifecycle_client.dart';
 import 'peer.dart';
 import 'peer_connection.dart';
 import 'peer_discovery.dart';
@@ -58,11 +59,20 @@ class _BlueyPeer implements BlueyPeer {
         timeout: timeout,
       );
 
-      // PeerDiscovery.connectTo() returns a BlueyConnection whose
-      // internal LifecycleClient has not yet started. Eagerly discover
-      // services so the heartbeat begins immediately rather than
-      // waiting for the caller's first services() call.
-      await rawConnection.services();
+      // Discover services on the raw connection (includes control service).
+      final allServices = await rawConnection.services();
+
+      // Start lifecycle heartbeat.
+      final connectionId = (rawConnection as BlueyConnection).connectionId;
+      final lifecycle = LifecycleClient(
+        platformApi: _platform,
+        connectionId: connectionId,
+        maxFailedHeartbeats: _maxFailedHeartbeats,
+        onServerUnreachable: () {
+          rawConnection.disconnect().catchError((_) {});
+        },
+      );
+      lifecycle.start(allServices: allServices);
 
       // Wrap with PeerConnection so the control service is hidden
       // from the caller's view of services/service/hasService.
