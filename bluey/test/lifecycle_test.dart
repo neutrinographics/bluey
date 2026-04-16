@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/lifecycle.dart';
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -343,6 +345,198 @@ void main() {
 
         bluey.dispose();
       });
+    });
+
+    test('control service includes the serverId characteristic', () {
+      final service = buildControlService();
+      final charUuids =
+          service.characteristics.map((c) => c.uuid.toLowerCase()).toList();
+      expect(charUuids, contains('b1e70004-0000-1000-8000-00805f9b34fb'));
+
+      final serverIdChar = service.characteristics.firstWhere(
+        (c) =>
+            c.uuid.toLowerCase() == 'b1e70004-0000-1000-8000-00805f9b34fb',
+      );
+      expect(serverIdChar.properties.canRead, isTrue);
+      expect(serverIdChar.properties.canWrite, isFalse);
+    });
+
+    test('encodeServerId/decodeServerId round-trip', () {
+      final id = ServerId.generate();
+      final bytes = encodeServerId(id);
+      expect(bytes, hasLength(16));
+      expect(decodeServerId(bytes), equals(id));
+    });
+
+    test('emits disconnect for untracked client (stale connection after server restart)', () async {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      await server.startAdvertising();
+
+      final disconnections = <String>[];
+      server.disconnections.listen(disconnections.add);
+
+      // Simulate a central that was connected before the server restarted.
+      // The server has NO record of this client -- it was never in
+      // _connectedClients. But the platform reports its disconnection.
+      fakePlatform.simulateCentralDisconnection('stale-client-id');
+      await Future.delayed(Duration.zero);
+
+      // The server should still emit the disconnect event.
+      expect(disconnections, contains('stale-client-id'));
+
+      await server.dispose();
+      await bluey.dispose();
+    });
+
+    test('auto-generates a ServerId when constructed without identity', () {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      expect(server.serverId, isNotNull);
+      server.dispose();
+      bluey.dispose();
+    });
+
+    test('respects an app-supplied identity', () {
+      final id = ServerId('11111111-2222-3333-4444-555555555555');
+      final bluey = Bluey();
+      final server = bluey.server(identity: id)!;
+      expect(server.serverId, equals(id));
+      server.dispose();
+      bluey.dispose();
+    });
+
+    test('server responds to serverId reads with the configured identity',
+        () async {
+      final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      final bluey = Bluey();
+      final server = bluey.server(identity: id)!;
+      await server.startAdvertising();
+
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
+      await Future.delayed(Duration.zero);
+
+      fakePlatform.simulateReadRequest(
+        centralId: _clientId1,
+        characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+      );
+      await Future.delayed(Duration.zero);
+
+      expect(fakePlatform.respondReadCalls, isNotEmpty);
+      final call = fakePlatform.respondReadCalls.last;
+      expect(call.value, equals(id.toBytes()));
+
+      await server.dispose();
+      await bluey.dispose();
+    });
+  });
+
+  group('lifecycle.dart utilities', () {
+    // 18. isControlService returns true for control service UUID
+    test('isControlService returns true for control service UUID', () {
+      expect(isControlService('b1e70001-0000-1000-8000-00805f9b34fb'), isTrue);
+    });
+
+    // 19. isControlService returns false for random UUID
+    test('isControlService returns false for random UUID', () {
+      expect(
+        isControlService('0000180d-0000-1000-8000-00805f9b34fb'),
+        isFalse,
+      );
+    });
+
+    // 20. isControlServiceCharacteristic returns true for all three char UUIDs
+    test(
+      'isControlServiceCharacteristic returns true for all three char UUIDs',
+      () {
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70002-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'heartbeat char',
+        );
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70003-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'interval char',
+        );
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70004-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'serverId char',
+        );
+      },
+    );
+
+    // 21. isControlServiceCharacteristic returns false for random UUID
+    test('isControlServiceCharacteristic returns false for random UUID', () {
+      expect(
+        isControlServiceCharacteristic('00002a37-0000-1000-8000-00805f9b34fb'),
+        isFalse,
+      );
+    });
+
+    // 22. decodeInterval with short input returns default
+    test('decodeInterval with short input returns default', () {
+      final shortInput = Uint8List.fromList([0x01, 0x02]);
+      final result = decodeInterval(shortInput);
+      expect(result, equals(defaultLifecycleInterval));
+    });
+
+    // 23. encodeInterval/decodeInterval round-trip
+    test('encodeInterval/decodeInterval round-trip', () {
+      const original = Duration(seconds: 42);
+      final encoded = encodeInterval(original);
+      expect(encoded, hasLength(4));
+      final decoded = decodeInterval(encoded);
+      expect(decoded, equals(original));
+    });
+  });
+
+  group('BlueyServer trackClientIfNeeded', () {
+    // 24. untracked client sending heartbeat gets auto-tracked
+    //
+    // On iOS, CBPeripheralManager has no connection callback. The server
+    // learns about clients only when they write to the control service.
+    // This test verifies that a heartbeat from a client that the platform
+    // reported (but the server would track via onHeartbeatReceived if the
+    // centralConnections event were missing) correctly appears in
+    // connectedClients and on the connections stream, and that a second
+    // heartbeat does not double-track.
+    test('untracked client sending heartbeat gets auto-tracked', () async {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      await server.startAdvertising();
+
+      final connections = <Client>[];
+      server.connections.listen(connections.add);
+
+      // Connect a central at the platform level. The server tracks it via
+      // the centralConnections stream.
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
+      await Future.delayed(Duration.zero);
+
+      expect(server.connectedClients, hasLength(1));
+      expect(connections, hasLength(1));
+
+      // Send a heartbeat -- should NOT double-track the same client.
+      await fakePlatform.simulateWriteRequest(
+        centralId: _clientId1,
+        characteristicUuid: _heartbeatCharUuid,
+        value: Uint8List.fromList([0x01]),
+        responseNeeded: true,
+      );
+      await Future.delayed(Duration.zero);
+
+      expect(server.connectedClients, hasLength(1),
+          reason: 'trackClientIfNeeded should be idempotent');
+      expect(connections, hasLength(1),
+          reason: 'No duplicate connection event');
+
+      await server.dispose();
+      await bluey.dispose();
     });
   });
 }

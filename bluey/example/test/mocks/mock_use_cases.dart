@@ -24,12 +24,15 @@ import 'package:bluey_example/features/server/application/stop_advertising.dart'
 import 'package:bluey_example/features/server/application/add_service.dart';
 import 'package:bluey_example/features/server/application/send_notification.dart';
 import 'package:bluey_example/features/server/application/check_server_support.dart';
+import 'package:bluey_example/features/server/application/set_server_identity.dart';
+import 'package:bluey_example/features/server/application/reset_server.dart';
 import 'package:bluey_example/features/server/application/observe_connections.dart';
 import 'package:bluey_example/features/server/application/disconnect_client.dart';
 import 'package:bluey_example/features/server/application/dispose_server.dart';
 import 'package:bluey_example/features/server/application/get_connected_clients.dart';
 import 'package:bluey_example/features/server/application/observe_disconnections.dart';
 import 'package:bluey_example/features/server/application/handle_requests.dart';
+import 'package:bluey_example/features/server/infrastructure/server_identity_storage.dart';
 
 // Scanner Mocks
 class MockScanForDevices extends Mock implements ScanForDevices {}
@@ -69,6 +72,12 @@ class MockAddService extends Mock implements AddService {}
 class MockSendNotification extends Mock implements SendNotification {}
 
 class MockCheckServerSupport extends Mock implements CheckServerSupport {}
+
+class MockSetServerIdentity extends Mock implements SetServerIdentity {}
+
+class MockResetServer extends Mock implements ResetServer {}
+
+class MockServerIdentityStorage extends Mock implements ServerIdentityStorage {}
 
 class MockObserveConnections extends Mock implements ObserveConnections {}
 

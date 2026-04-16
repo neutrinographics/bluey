@@ -4,6 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../lifecycle.dart' as lifecycle;
+import '../peer/server_id.dart';
 
 /// Server-side lifecycle management.
 ///
@@ -13,6 +14,7 @@ import '../lifecycle.dart' as lifecycle;
 class LifecycleServer {
   final platform.BlueyPlatform _platform;
   final Duration? _interval;
+  final ServerId _serverId;
   final void Function(String clientId) onClientGone;
   final void Function(String clientId)? onHeartbeatReceived;
 
@@ -22,10 +24,15 @@ class LifecycleServer {
   LifecycleServer({
     required platform.BlueyPlatform platformApi,
     required Duration? interval,
+    required ServerId serverId,
     required this.onClientGone,
     this.onHeartbeatReceived,
   })  : _platform = platformApi,
-        _interval = interval;
+        _interval = interval,
+        _serverId = serverId;
+
+  /// Whether lifecycle management is enabled (interval is non-null).
+  bool get isEnabled => _interval != null;
 
   /// Adds the control service to the platform if lifecycle is enabled
   /// and it hasn't been added yet.
@@ -73,7 +80,18 @@ class LifecycleServer {
   /// Handles a read request to a control service characteristic.
   /// Returns true if the request was handled (caller should not forward it).
   bool handleReadRequest(platform.PlatformReadRequest req) {
-    if (!lifecycle.isControlServiceCharacteristic(req.characteristicUuid)) {
+    final uuid = req.characteristicUuid.toLowerCase();
+
+    if (uuid == lifecycle.serverIdCharUuid) {
+      _platform.respondToReadRequest(
+        req.requestId,
+        platform.PlatformGattStatus.success,
+        lifecycle.encodeServerId(_serverId),
+      );
+      return true;
+    }
+
+    if (!lifecycle.isControlServiceCharacteristic(uuid)) {
       return false;
     }
 

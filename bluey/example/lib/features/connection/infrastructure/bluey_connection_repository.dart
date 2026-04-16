@@ -19,7 +19,6 @@ class BlueyConnectionRepository implements ConnectionRepository {
       device,
       timeout: timeout,
       maxFailedHeartbeats: settings.maxFailedHeartbeats,
-      requireLifecycle: settings.requireLifecycle,
     );
   }
 

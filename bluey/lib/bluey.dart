@@ -36,5 +36,9 @@ export 'src/gatt_server/gatt_request.dart';
 // Platform bounded context
 export 'src/platform/bluetooth_state.dart';
 
+// Peer bounded context
+export 'src/peer/peer.dart' show BlueyPeer;
+export 'src/peer/server_id.dart' show ServerId;
+
 // Domain events
 export 'src/events.dart';

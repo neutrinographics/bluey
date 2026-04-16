@@ -42,8 +42,9 @@ void main() {
         await server!.addService(service);
 
         // Assert
-        expect(fakePlatform.localServices, hasLength(1));
-        expect(fakePlatform.localServices.first.uuid, contains('180f'));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(2));
+        expect(fakePlatform.localServices.last.uuid, contains('180f'));
 
         await server.dispose();
         await bluey.dispose();
@@ -66,8 +67,8 @@ void main() {
           ),
         );
 
-        // Assert
-        expect(fakePlatform.localServices, hasLength(2));
+        // Assert: +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(3));
 
         await server.dispose();
         await bluey.dispose();
@@ -95,8 +96,8 @@ void main() {
 
         await server.addService(service);
 
-        // Assert
-        expect(fakePlatform.localServices.first.characteristics, hasLength(2));
+        // Assert (use .last to skip the auto-registered lifecycle control service)
+        expect(fakePlatform.localServices.last.characteristics, hasLength(2));
 
         await server.dispose();
         await bluey.dispose();
@@ -128,8 +129,8 @@ void main() {
 
         await server.addService(service);
 
-        // Assert
-        final char = fakePlatform.localServices.first.characteristics.first;
+        // Assert (use .last to skip the auto-registered lifecycle control service)
+        final char = fakePlatform.localServices.last.characteristics.first;
         expect(char.descriptors, hasLength(1));
 
         await server.dispose();
@@ -145,13 +146,14 @@ void main() {
           HostedService(uuid: serviceUuid, characteristics: []),
         );
 
-        expect(fakePlatform.localServices, hasLength(1));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(2));
 
         // Act
         server.removeService(serviceUuid);
 
-        // Assert
-        expect(fakePlatform.localServices, isEmpty);
+        // Assert: only the lifecycle control service remains
+        expect(fakePlatform.localServices, hasLength(1));
 
         await server.dispose();
         await bluey.dispose();
@@ -186,8 +188,13 @@ void main() {
 
         await server.startAdvertising(name: 'Test Device', services: services);
 
-        // Assert
+        // Assert: 2 app services only (control service no longer advertised)
         expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(2));
+        // No manufacturer data when app doesn't provide any
+        expect(
+          fakePlatform.advertiseConfig?.manufacturerDataCompanyId,
+          isNull,
+        );
 
         await server.dispose();
         await bluey.dispose();
@@ -513,7 +520,8 @@ void main() {
           ),
         );
 
-        expect(fakePlatform.localServices, hasLength(1));
+        // +1 for the auto-registered lifecycle control service
+        expect(fakePlatform.localServices, hasLength(2));
 
         // Act
         await server.dispose();

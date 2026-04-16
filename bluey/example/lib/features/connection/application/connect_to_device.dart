@@ -11,6 +11,9 @@ class ConnectToDevice {
 
   /// Connects to the specified [device].
   ///
+  /// The underlying [Bluey.connect] auto-upgrades to a peer connection
+  /// when the device hosts the Bluey control service.
+  ///
   /// Returns a [Connection] object for reading and writing characteristics.
   /// Throws a [BlueyException] if the connection fails.
   Future<Connection> call(

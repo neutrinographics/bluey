@@ -1827,6 +1827,9 @@ abstract class BlueyFlutterApi {
   /// A central unsubscribed from notifications for a characteristic.
   void onCharacteristicUnsubscribed(String centralId, String characteristicUuid);
 
+  /// Remote device's GATT services changed (service added/removed on the server).
+  void onServicesChanged(String deviceId);
+
   static void setUp(BlueyFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
@@ -2072,6 +2075,27 @@ abstract class BlueyFlutterApi {
           final String arg_characteristicUuid = args[1]! as String;
           try {
             api.onCharacteristicUnsubscribed(arg_centralId, arg_characteristicUuid);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onServicesChanged$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final String arg_deviceId = args[0]! as String;
+          try {
+            api.onServicesChanged(arg_deviceId);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

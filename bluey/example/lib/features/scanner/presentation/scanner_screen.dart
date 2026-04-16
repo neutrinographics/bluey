@@ -210,17 +210,6 @@ class _ConnectionSettingsDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Require lifecycle'),
-                subtitle: const Text(
-                  'Only connect to peers running a Bluey server. '
-                  'Non-Bluey peers are disconnected automatically.',
-                ),
-                value: settings.requireLifecycle,
-                onChanged: cubit.setRequireLifecycle,
-              ),
-              const SizedBox(height: 12),
               Text(
                 'Max failed heartbeats: ${settings.maxFailedHeartbeats}',
                 style: Theme.of(context).textTheme.labelLarge,
@@ -511,7 +500,7 @@ class _DeviceCard extends StatelessWidget {
         result.device.name != null && result.device.name!.isNotEmpty;
 
     return GestureDetector(
-      onTap: () => _connectToDevice(context, result.device),
+      onTap: () => _connectToDevice(context, result),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
@@ -551,6 +540,7 @@ class _DeviceCard extends StatelessWidget {
                                   : _kTextDark.withValues(alpha: 0.6),
                           height: 1.56,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         result.device.id.toString(),
@@ -600,11 +590,18 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Future<void> _connectToDevice(BuildContext context, Device device) async {
+  Future<void> _connectToDevice(
+    BuildContext context,
+    ScanResult result,
+  ) async {
     await context.read<ScannerCubit>().stopScan();
     if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => ConnectionScreen(device: device)),
+      MaterialPageRoute(
+        builder: (context) => ConnectionScreen(
+          device: result.device,
+        ),
+      ),
     );
   }
 }

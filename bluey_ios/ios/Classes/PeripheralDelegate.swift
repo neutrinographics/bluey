@@ -62,4 +62,10 @@ class PeripheralDelegate: NSObject, CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
         manager?.didReadRSSI(peripheral: peripheral, rssi: RSSI, error: error)
     }
+
+    // MARK: - Service Changes
+
+    func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
+        manager?.didModifyServices(peripheral: peripheral, invalidatedServices: invalidatedServices)
+    }
 }

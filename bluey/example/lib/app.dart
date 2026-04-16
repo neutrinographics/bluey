@@ -108,7 +108,7 @@ class _BottomNav extends StatelessWidget {
                 children: [
                   _NavItem(
                     icon: Icons.bluetooth,
-                    label: 'SCANNER',
+                    label: 'DEVICES',
                     isActive: selectedIndex == 0,
                     onTap: () => onDestinationSelected(0),
                   ),

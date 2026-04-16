@@ -268,6 +268,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   }
 
   @override
+  @override
+  Stream<String> get serviceChanges => Stream.empty();
+
+  @override
   Stream<platform.PlatformCentral> get centralConnections =>
       _centralConnectionsController.stream;
 
@@ -456,9 +460,10 @@ void main() {
         // Give time for async operation
         await Future.delayed(Duration.zero);
 
-        expect(mockPlatform.addedServices, hasLength(1));
+        // +1 for the auto-registered lifecycle control service
+        expect(mockPlatform.addedServices, hasLength(2));
         expect(
-          mockPlatform.addedServices.first.uuid,
+          mockPlatform.addedServices.last.uuid,
           equals('0000180f-0000-1000-8000-00805f9b34fb'),
         );
       });
@@ -497,6 +502,7 @@ void main() {
           services: [UUID.short(0x180F), UUID.short(0x180D)],
         );
 
+        // 2 app services only (control service no longer advertised)
         expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(2));
         expect(
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
@@ -505,6 +511,11 @@ void main() {
         expect(
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
           contains('0000180d-0000-1000-8000-00805f9b34fb'),
+        );
+        // No manufacturer data when app doesn't provide any
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+          isNull,
         );
       });
 
@@ -518,6 +529,7 @@ void main() {
           ),
         );
 
+        // App-provided manufacturer data takes priority over Bluey marker
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
           equals(0x004C),
@@ -525,6 +537,22 @@ void main() {
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerData,
           equals(Uint8List.fromList([1, 2, 3])),
+        );
+      });
+
+      test('startAdvertising does not set manufacturer data when none provided',
+          () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(name: 'Test Device');
+
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+          isNull,
+        );
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerData,
+          isNull,
         );
       });
 

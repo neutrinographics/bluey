@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:bluey/src/lifecycle.dart';
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
 /// A fake implementation of [BlueyPlatform] for testing.
@@ -50,6 +52,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   int _nextRequestId = 1;
 
   // === Stream Controllers ===
+  final _serviceChangesController = StreamController<String>.broadcast();
   final _stateController = StreamController<BluetoothState>.broadcast();
   final _centralConnectionController =
       StreamController<PlatformCentral>.broadcast();
@@ -75,6 +78,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   /// Records every call to [respondToWriteRequest] in order.
   final List<RespondWriteCall> respondWriteCalls = [];
+
+  /// Records every call to [writeCharacteristic] in order.
+  final List<WriteCharacteristicCall> writeCharacteristicCalls = [];
 
   // === Test Helpers ===
 
@@ -109,6 +115,67 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       ),
       services: services,
       characteristicValues: Map.from(characteristicValues),
+    );
+  }
+
+  /// Simulates a Bluey server advertising the control service with a
+  /// pre-populated serverId characteristic.
+  void simulateBlueyServer({
+    required String address,
+    required ServerId serverId,
+    String name = 'Bluey Server',
+    Duration intervalValue = const Duration(seconds: 10),
+  }) {
+    simulatePeripheral(
+      id: address,
+      name: name,
+      serviceUuids: [controlServiceUuid],
+      services: [
+        PlatformService(
+          uuid: controlServiceUuid,
+          isPrimary: true,
+          characteristics: const [
+            PlatformCharacteristic(
+              uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: false,
+                canWrite: true,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+            PlatformCharacteristic(
+              uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: true,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+            PlatformCharacteristic(
+              uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: true,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+          ],
+          includedServices: [],
+        ),
+      ],
+      characteristicValues: {
+        'b1e70003-0000-1000-8000-00805f9b34fb': encodeInterval(intervalValue),
+        'b1e70004-0000-1000-8000-00805f9b34fb': serverId.toBytes(),
+      },
     );
   }
 
@@ -219,6 +286,40 @@ final class FakeBlueyPlatform extends BlueyPlatform {
         value: value,
       ),
     );
+  }
+
+  /// Simulates a service change notification for a connected peripheral.
+  ///
+  /// Optionally updates the simulated peripheral's services before firing,
+  /// so that the next [discoverServices] call returns [newServices].
+  void simulateServiceChange(String deviceId, {
+    List<PlatformService>? newServices,
+    Map<String, Uint8List>? newCharacteristicValues,
+  }) {
+    if (newServices != null || newCharacteristicValues != null) {
+      final existingPeripheral = _peripherals[deviceId];
+      if (existingPeripheral != null) {
+        _peripherals[deviceId] = _SimulatedPeripheral(
+          device: existingPeripheral.device,
+          services: newServices ?? existingPeripheral.services,
+          characteristicValues: newCharacteristicValues != null
+              ? Map.from(newCharacteristicValues)
+              : existingPeripheral.characteristicValues,
+        );
+        // Also update the connected device's peripheral reference
+        final connection = _connections[deviceId];
+        if (connection != null) {
+          _connections[deviceId] = _ConnectedDevice(
+            peripheral: _peripherals[deviceId]!,
+            stateController: connection.stateController,
+            notificationController: connection.notificationController,
+            mtu: connection.mtu,
+            subscribedCharacteristics: connection.subscribedCharacteristics,
+          );
+        }
+      }
+    }
+    _serviceChangesController.add(deviceId);
   }
 
   /// Gets whether we're currently advertising.
@@ -382,6 +483,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
     }
+
+    writeCharacteristicCalls.add(WriteCharacteristicCall(
+      deviceId: deviceId,
+      characteristicUuid: characteristicUuid,
+      value: Uint8List.fromList(value),
+      withResponse: withResponse,
+    ));
 
     connection.peripheral.characteristicValues[characteristicUuid] = value;
   }
@@ -591,6 +699,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   @override
+  Stream<String> get serviceChanges => _serviceChangesController.stream;
+
+  @override
   Stream<PlatformCentral> get centralConnections =>
       _centralConnectionController.stream;
 
@@ -659,6 +770,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Disposes all resources.
   Future<void> dispose() async {
     await _stateController.close();
+    await _serviceChangesController.close();
     await _centralConnectionController.close();
     await _centralDisconnectionController.close();
     await _readRequestController.close();
@@ -736,5 +848,20 @@ class RespondWriteCall {
   RespondWriteCall({
     required this.requestId,
     required this.status,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.writeCharacteristic].
+class WriteCharacteristicCall {
+  final String deviceId;
+  final String characteristicUuid;
+  final Uint8List value;
+  final bool withResponse;
+
+  WriteCharacteristicCall({
+    required this.deviceId,
+    required this.characteristicUuid,
+    required this.value,
+    required this.withResponse,
   });
 }

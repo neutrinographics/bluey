@@ -5,6 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../peer/server_id.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
@@ -19,9 +20,25 @@ import 'lifecycle_client.dart';
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
+  final int _maxFailedHeartbeats;
+
+  /// The platform-level connection identifier.
+  ///
+  /// Exposed for internal use by [LifecycleClient] and peer orchestration.
+  /// Not part of the public [Connection] interface.
+  String get connectionId => _connectionId;
 
   @override
   final UUID deviceId;
+
+  LifecycleClient? _lifecycle;
+  ServerId? _serverId;
+
+  @override
+  bool get isBlueyServer => _lifecycle != null;
+
+  @override
+  ServerId? get serverId => _serverId;
 
   ConnectionState _state =
       ConnectionState
@@ -46,11 +63,11 @@ class BlueyConnection implements Connection {
   StreamSubscription? _platformStateSubscription;
   StreamSubscription? _platformBondStateSubscription;
   StreamSubscription? _platformPhySubscription;
+  StreamSubscription? _serviceChangeSubscription;
+  bool _upgrading = false;
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
-
-  late final LifecycleClient _lifecycle;
 
   /// Creates a new connection instance.
   ///
@@ -60,9 +77,9 @@ class BlueyConnection implements Connection {
     required String connectionId,
     required this.deviceId,
     int maxFailedHeartbeats = 1,
-    bool requireLifecycle = false,
   }) : _platform = platformInstance,
-       _connectionId = connectionId {
+       _connectionId = connectionId,
+       _maxFailedHeartbeats = maxFailedHeartbeats {
     // Subscribe to platform connection state changes
     _platformStateSubscription = _platform
         .connectionStateStream(_connectionId)
@@ -119,24 +136,29 @@ class BlueyConnection implements Connection {
       _connectionParameters = _mapConnectionParameters(params);
     });
 
-    _lifecycle = LifecycleClient(
-      platformApi: _platform,
-      connectionId: _connectionId,
-      maxFailedHeartbeats: maxFailedHeartbeats,
-      requireLifecycle: requireLifecycle,
-      onServerUnreachable: _handleServerUnreachable,
-    );
+    // Subscribe to service changes for late upgrade
+    _serviceChangeSubscription = _platform.serviceChanges
+        .where((deviceId) => deviceId == _connectionId)
+        .listen((_) {
+      _handleServiceChange();
+    });
   }
 
-  void _handleServerUnreachable() {
-    _state = ConnectionState.disconnected;
-    _stateController.add(_state);
-
-    // Tear down the platform connection to avoid leaking GATT handles.
-    // Best-effort — the connection may already be dead at the platform layer.
-    _platform.disconnect(_connectionId).catchError((_) {});
-
-    _cleanup();
+  /// Upgrades this connection to use the Bluey lifecycle protocol.
+  ///
+  /// Called internally when the control service is discovered during
+  /// auto-upgrade or peer connect. Sets [isBlueyServer] to true and
+  /// enables service filtering and lifecycle disconnect commands.
+  ///
+  /// Not part of the public [Connection] interface.
+  void upgrade({
+    required LifecycleClient lifecycleClient,
+    required ServerId serverId,
+  }) {
+    _lifecycle = lifecycleClient;
+    _serverId = serverId;
+    _cachedServices = null; // invalidate so next services() call filters
+    _stateController.add(ConnectionState.connected);
   }
 
   @override
@@ -150,7 +172,7 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
-    if (lifecycle.isControlService(uuid.toString())) {
+    if (isBlueyServer && lifecycle.isControlService(uuid.toString())) {
       throw ServiceNotFoundException(uuid);
     }
     if (_cachedServices == null) {
@@ -176,19 +198,29 @@ class BlueyConnection implements Connection {
     final allServices =
         platformServices.map((ps) => _mapService(ps)).toList();
 
-    // Start lifecycle heartbeat if the server hosts the control service
-    _lifecycle.start(allServices: allServices);
+    if (isBlueyServer) {
+      _cachedServices = allServices
+          .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+          .toList();
+    } else {
+      // Check if the control service appeared (e.g., server finished
+      // initializing after we connected). If so, upgrade in place.
+      await _tryUpgrade(allServices);
+      _cachedServices = isBlueyServer
+          ? allServices
+              .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+              .toList()
+          : allServices;
+    }
 
-    // Filter the control service from the public result
-    _cachedServices = allServices
-        .where((s) => !lifecycle.isControlService(s.uuid.toString()))
-        .toList();
     return _cachedServices!;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
-    if (lifecycle.isControlService(uuid.toString())) return false;
+    if (isBlueyServer && lifecycle.isControlService(uuid.toString())) {
+      return false;
+    }
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
@@ -216,9 +248,11 @@ class BlueyConnection implements Connection {
     _state = ConnectionState.disconnecting;
     _stateController.add(_state);
 
-    // Send disconnect command to the server's control service so it can
-    // clean up immediately. Best-effort — the connection may already be lost.
-    await _lifecycle.sendDisconnectCommand();
+    // Send lifecycle disconnect command if upgraded to Bluey protocol.
+    if (_lifecycle != null) {
+      await _lifecycle!.sendDisconnectCommand();
+      _lifecycle!.stop();
+    }
 
     await _platform.disconnect(_connectionId);
 
@@ -284,9 +318,71 @@ class BlueyConnection implements Connection {
     _connectionParameters = params;
   }
 
+  /// Handles a service change notification by re-discovering services
+  /// and upgrading to the Bluey protocol if the control service appeared.
+  Future<void> _handleServiceChange() async {
+    if (isBlueyServer || _upgrading) return;
+    _upgrading = true;
+    try {
+      _cachedServices = null;
+      final allServices = await services();
+      await _tryUpgrade(allServices);
+    } catch (_) {
+      // Service discovery failed -- stay as raw connection
+    } finally {
+      _upgrading = false;
+    }
+  }
+
+  /// Checks whether [allServices] contains the Bluey control service.
+  /// If so, reads the ServerId, starts the lifecycle heartbeat, and
+  /// upgrades this connection in place. No-op if already upgraded.
+  Future<void> _tryUpgrade(List<RemoteService> allServices) async {
+    if (isBlueyServer) return;
+
+    final controlService = allServices
+        .where((s) => lifecycle.isControlService(s.uuid.toString()))
+        .firstOrNull;
+    if (controlService == null) return;
+
+    // Read serverId if available
+    final serverIdChar = controlService.characteristics
+        .where(
+          (c) =>
+              c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+        )
+        .firstOrNull;
+
+    ServerId? serverId;
+    if (serverIdChar != null) {
+      try {
+        final bytes = await serverIdChar.read();
+        serverId = lifecycle.decodeServerId(bytes);
+      } catch (_) {}
+    }
+
+    // Start lifecycle heartbeat
+    final lifecycleClient = LifecycleClient(
+      platformApi: _platform,
+      connectionId: _connectionId,
+      maxFailedHeartbeats: _maxFailedHeartbeats,
+      onServerUnreachable: () {
+        disconnect().catchError((_) {});
+      },
+    );
+    lifecycleClient.start(allServices: allServices);
+
+    upgrade(
+      lifecycleClient: lifecycleClient,
+      serverId: serverId ?? ServerId.generate(),
+    );
+  }
+
   /// Clean up resources.
   Future<void> _cleanup() async {
-    _lifecycle.stop();
+    _lifecycle?.stop();
+    _lifecycle = null;
+    await _serviceChangeSubscription?.cancel();
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();

@@ -10,6 +10,12 @@ class MockConnection implements Connection {
   final UUID deviceId;
 
   @override
+  bool get isBlueyServer => false;
+
+  @override
+  ServerId? get serverId => null;
+
+  @override
   ConnectionState state;
 
   @override

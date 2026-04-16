@@ -243,6 +243,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   ) async {}
 
   @override
+  @override
+  Stream<String> get serviceChanges => Stream.empty();
+
+  @override
   Stream<platform.PlatformCentral> get centralConnections => Stream.empty();
 
   @override

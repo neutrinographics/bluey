@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **All code must follow DDD, Clean Architecture, and TDD (Red, Green, Refactor).** These are non-negotiable requirements.
 
 - **TDD cycle**: Write a failing test first (Red), implement minimum code to pass (Green), then improve (Refactor). No production code without a failing test.
-- **DDD**: Use ubiquitous language consistently (see BLUEY_ARCHITECTURE.md). Respect bounded context boundaries. Value objects are immutable with equality by value.
+- **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
 - **Coverage targets**: 90% minimum for domain layer, 80% overall.
 
@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (424 tests)
+bluey/                         Main library - domain models, public API, tests (543 tests)
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
@@ -72,6 +72,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 3. **GATT Client** - Service/characteristic read/write/notify, descriptors, MTU
 4. **GATT Server** - Peripheral role, advertising, request/response handling
 5. **Platform** - Bluetooth state, permissions, capabilities
+6. **Peer** - Stable peer identity on top of the lifecycle protocol. `BlueyPeer`, `ServerId`, `bluey.peer()`, `bluey.discoverPeers()`. The peer module owns the client-side protocol layer — raw `BlueyConnection` is protocol-free.
 
 ### Key Design Decisions
 
@@ -89,6 +90,8 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 | `Server` | PeripheralManager |
 | `Device` | CBPeripheral, BluetoothDevice |
 | `Connection` | (implicit GATT handle) |
+| `ServerId` | server UUID, peer ID |
+| `BlueyPeer` | peer device (in Bluey-specific contexts) |
 
 ## Testing
 
@@ -103,7 +106,6 @@ When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `te
 
 ## Key Files
 
-- `BLUEY_ARCHITECTURE.md` - comprehensive architecture document with vision, domain model, API design, and bounded context details
 - `bluey_android/pigeons/messages.dart` - Pigeon API definition for Android (generates `Messages.g.kt` + `messages.g.dart`)
 - `bluey_ios/pigeons/messages.dart` - Pigeon API definition for iOS (generates `Messages.g.swift` + `messages.g.dart`)
 - `BUGS_ANALYSIS.md` - known issues and platform-specific quirks

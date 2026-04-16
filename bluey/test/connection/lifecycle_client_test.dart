@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/connection/lifecycle_client.dart';
+import 'package:bluey/src/gatt_client/gatt.dart';
+import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:fake_async/fake_async.dart';
@@ -8,347 +11,737 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
 
-// Control service UUIDs (must match lifecycle.dart)
-const _controlServiceUuid = 'b1e70001-0000-1000-8000-00805f9b34fb';
-const _heartbeatCharUuid = 'b1e70002-0000-1000-8000-00805f9b34fb';
-const _intervalCharUuid = 'b1e70003-0000-1000-8000-00805f9b34fb';
-
 const _deviceAddress = 'AA:BB:CC:DD:EE:01';
 
-/// Builds a fake peripheral that advertises the lifecycle control service,
-/// matching what a Bluey server would expose.
-void _simulateBlueyServerPeripheral(FakeBlueyPlatform fakePlatform) {
-  fakePlatform.simulatePeripheral(
-    id: _deviceAddress,
-    name: 'Bluey Server',
-    services: const [
-      platform.PlatformService(
-        uuid: _controlServiceUuid,
-        isPrimary: true,
-        characteristics: [
-          platform.PlatformCharacteristic(
-            uuid: _heartbeatCharUuid,
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: false,
-              canWrite: true,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-          ),
-          platform.PlatformCharacteristic(
-            uuid: _intervalCharUuid,
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: true,
-              canWrite: false,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-          ),
-        ],
-        includedServices: [],
-      ),
-    ],
-    // Default interval: 10 seconds as 4-byte little-endian ms (10000 = 0x2710)
-    characteristicValues: {
-      _intervalCharUuid: _intervalBytes10s,
-    },
-  );
-}
-
-// 10_000 ms in 4-byte little-endian
-final _intervalBytes10s = Uint8List.fromList([0x10, 0x27, 0x00, 0x00]);
-
-Future<Connection> _connectAndDiscover(
-  Bluey bluey, {
+/// Helper to set up a simulated Bluey server and create a connected
+/// [LifecycleClient] ready for testing.
+Future<({
+  LifecycleClient client,
+  List<RemoteService> services,
+  FakeBlueyPlatform fakePlatform,
+})> _setUpConnectedClient({
   int maxFailedHeartbeats = 1,
-  bool requireLifecycle = false,
+  Duration intervalValue = const Duration(seconds: 10),
+  required void Function() onServerUnreachable,
 }) async {
-  final device = Device(
-    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-    address: _deviceAddress,
-    name: 'Bluey Server',
-  );
-  final connection = await bluey.connect(
-    device,
-    maxFailedHeartbeats: maxFailedHeartbeats,
-    requireLifecycle: requireLifecycle,
-  );
-  // Discovering services is what starts the lifecycle heartbeat.
-  await connection.services();
-  return connection;
-}
+  final fakePlatform = FakeBlueyPlatform();
+  platform.BlueyPlatform.instance = fakePlatform;
 
-/// Builds a fake peripheral with some non-Bluey service (no control service).
-void _simulateNonBlueyPeripheral(FakeBlueyPlatform fakePlatform) {
-  fakePlatform.simulatePeripheral(
-    id: _deviceAddress,
-    name: 'Generic BLE Peer',
-    services: const [
-      platform.PlatformService(
-        uuid: '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-        isPrimary: true,
-        characteristics: [],
-        includedServices: [],
-      ),
-    ],
+  final serverId = ServerId.generate();
+  fakePlatform.simulateBlueyServer(
+    address: _deviceAddress,
+    serverId: serverId,
+    intervalValue: intervalValue,
+  );
+
+  await fakePlatform.connect(
+    _deviceAddress,
+    const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+  );
+
+  final platformServices = await fakePlatform.discoverServices(_deviceAddress);
+  final domainServices = platformServices
+      .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+      .toList();
+
+  final client = LifecycleClient(
+    platformApi: fakePlatform,
+    connectionId: _deviceAddress,
+    maxFailedHeartbeats: maxFailedHeartbeats,
+    onServerUnreachable: onServerUnreachable,
+  );
+
+  return (
+    client: client,
+    services: List<RemoteService>.from(domainServices),
+    fakePlatform: fakePlatform,
   );
 }
 
 void main() {
-  late FakeBlueyPlatform fakePlatform;
+  group('LifecycleClient', () {
+    // 1. start() with no control service does not start heartbeat
+    test('start() with no control service does not start heartbeat', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
 
-  setUp(() {
-    fakePlatform = FakeBlueyPlatform();
-    platform.BlueyPlatform.instance = fakePlatform;
-  });
+      fakePlatform.simulatePeripheral(
+        id: _deviceAddress,
+        name: 'Regular Device',
+        services: const [
+          platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
 
-  group('LifecycleClient disconnect detection', () {
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final platformServices =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final domainServices = platformServices
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      final client = LifecycleClient(
+        platformApi: fakePlatform,
+        connectionId: _deviceAddress,
+        onServerUnreachable: () {},
+      );
+
+      client.start(allServices: List<RemoteService>.from(domainServices));
+
+      expect(client.isRunning, isFalse);
+      expect(fakePlatform.writeCharacteristicCalls, isEmpty);
+    });
+
+    // 2. start() with control service but no heartbeat char does not start
     test(
-        'disconnects when heartbeat write fails with default '
-        'maxFailedHeartbeats (1)', () {
+      'start() with control service but no heartbeat char does not start',
+      () async {
+        final fakePlatform = FakeBlueyPlatform();
+        platform.BlueyPlatform.instance = fakePlatform;
+
+        fakePlatform.simulatePeripheral(
+          id: _deviceAddress,
+          name: 'Partial Bluey',
+          services: [
+            platform.PlatformService(
+              uuid: lifecycle.controlServiceUuid,
+              isPrimary: true,
+              characteristics: const [
+                // Only interval char, no heartbeat char
+                platform.PlatformCharacteristic(
+                  uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+                  properties: platform.PlatformCharacteristicProperties(
+                    canRead: true,
+                    canWrite: false,
+                    canWriteWithoutResponse: false,
+                    canNotify: false,
+                    canIndicate: false,
+                  ),
+                  descriptors: [],
+                ),
+              ],
+              includedServices: [],
+            ),
+          ],
+        );
+
+        await fakePlatform.connect(
+          _deviceAddress,
+          const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+        );
+
+        final platformServices =
+            await fakePlatform.discoverServices(_deviceAddress);
+        final domainServices = platformServices
+            .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+            .toList();
+
+        final client = LifecycleClient(
+          platformApi: fakePlatform,
+          connectionId: _deviceAddress,
+          onServerUnreachable: () {},
+        );
+
+        client.start(allServices: List<RemoteService>.from(domainServices));
+
+        expect(client.isRunning, isFalse);
+        expect(fakePlatform.writeCharacteristicCalls, isEmpty);
+      },
+    );
+
+    // 3. start() is idempotent when already started
+    test('start() is idempotent when already started', () {
       fakeAsync((async) {
-        _simulateBlueyServerPeripheral(fakePlatform);
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
 
-        final bluey = Bluey();
-
-        late Connection connection;
-        _connectAndDiscover(bluey).then((c) => connection = c);
-        // Let connect + service discovery + interval read complete.
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
         async.flushMicrotasks();
 
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
+        client.start(allServices: services);
         async.flushMicrotasks();
 
-        // Server goes away — next heartbeat will fail.
-        fakePlatform.simulateWriteFailure = true;
+        final writesAfterFirstStart =
+            fakePlatform.writeCharacteristicCalls.length;
 
-        // Default heartbeat interval is half the default 10s lifecycle
-        // interval, i.e. 5 seconds. Advance well past that.
-        async.elapse(const Duration(seconds: 6));
+        client.start(allServices: services);
         async.flushMicrotasks();
 
         expect(
-          states,
-          contains(ConnectionState.disconnected),
-          reason: 'Connection should transition to disconnected after the '
-              'first failed heartbeat when maxFailedHeartbeats == 1',
+          fakePlatform.writeCharacteristicCalls.length,
+          equals(writesAfterFirstStart),
+          reason: 'Second start() should not send additional heartbeats',
         );
 
-        bluey.dispose();
-        async.flushMicrotasks();
+        client.stop();
       });
     });
 
-    test(
-        'requires maxFailedHeartbeats consecutive failures before '
-        'disconnecting', () {
+    // 4. start() sends first heartbeat immediately
+    test('start() sends first heartbeat immediately', () {
       fakeAsync((async) {
-        _simulateBlueyServerPeripheral(fakePlatform);
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
 
-        final bluey = Bluey();
-
-        late Connection connection;
-        _connectAndDiscover(bluey, maxFailedHeartbeats: 3)
-            .then((c) => connection = c);
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
         async.flushMicrotasks();
 
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
+        client.start(allServices: services);
         async.flushMicrotasks();
 
-        fakePlatform.simulateWriteFailure = true;
-
-        // One heartbeat failure: not yet disconnected.
-        async.elapse(const Duration(seconds: 6));
-        async.flushMicrotasks();
-        expect(
-          states,
-          isNot(contains(ConnectionState.disconnected)),
-          reason: 'Should not disconnect after 1 failure when '
-              'maxFailedHeartbeats == 3',
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+          (call) =>
+              call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+              call.value.length == 1 &&
+              call.value[0] == 0x01,
         );
+        expect(heartbeatWrites, isNotEmpty,
+            reason: 'First heartbeat should be sent during start()');
 
-        // Second failure: still not disconnected.
-        async.elapse(const Duration(seconds: 5));
-        async.flushMicrotasks();
-        expect(
-          states,
-          isNot(contains(ConnectionState.disconnected)),
-          reason: 'Should not disconnect after 2 failures when '
-              'maxFailedHeartbeats == 3',
-        );
-
-        // Third failure: should now disconnect.
-        async.elapse(const Duration(seconds: 5));
-        async.flushMicrotasks();
-        expect(
-          states,
-          contains(ConnectionState.disconnected),
-          reason: 'Should disconnect after 3 consecutive failures',
-        );
-
-        bluey.dispose();
-        async.flushMicrotasks();
+        client.stop();
       });
     });
 
-    test('successful heartbeat resets the failure count', () {
+    // 5. start() reads interval and sets heartbeat to half
+    test('start() reads interval and sets heartbeat to half', () {
       fakeAsync((async) {
-        _simulateBlueyServerPeripheral(fakePlatform);
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
 
-        final bluey = Bluey();
-
-        late Connection connection;
-        _connectAndDiscover(bluey, maxFailedHeartbeats: 2)
-            .then((c) => connection = c);
+        // Server interval = 20s => heartbeat at 10s
+        _setUpConnectedClient(
+          onServerUnreachable: () {},
+          intervalValue: const Duration(seconds: 20),
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
         async.flushMicrotasks();
 
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
+        client.start(allServices: services);
         async.flushMicrotasks();
 
-        // First heartbeat: fails.
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        // Advance 10 seconds -- heartbeat should fire.
+        async.elapse(const Duration(seconds: 10));
+
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+          (call) =>
+              call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+              call.value[0] == 0x01,
+        );
+        expect(heartbeatWrites, hasLength(1),
+            reason: 'Heartbeat should fire at half the server interval (10s)');
+
+        client.stop();
+      });
+    });
+
+    // 6. start() falls back to default interval when interval read fails
+    test('start() falls back to default interval when interval read fails', () {
+      fakeAsync((async) {
+        final fakePlatform = FakeBlueyPlatform();
+        platform.BlueyPlatform.instance = fakePlatform;
+
+        // Set up a Bluey server but remove the interval char VALUE so the
+        // read will throw, while the interval char UUID itself is still
+        // discoverable in the service structure.
+        fakePlatform.simulatePeripheral(
+          id: _deviceAddress,
+          name: 'Bluey Server',
+          serviceUuids: [lifecycle.controlServiceUuid],
+          services: [
+            platform.PlatformService(
+              uuid: lifecycle.controlServiceUuid,
+              isPrimary: true,
+              characteristics: const [
+                platform.PlatformCharacteristic(
+                  uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+                  properties: platform.PlatformCharacteristicProperties(
+                    canRead: false,
+                    canWrite: true,
+                    canWriteWithoutResponse: false,
+                    canNotify: false,
+                    canIndicate: false,
+                  ),
+                  descriptors: [],
+                ),
+                platform.PlatformCharacteristic(
+                  uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+                  properties: platform.PlatformCharacteristicProperties(
+                    canRead: true,
+                    canWrite: false,
+                    canWriteWithoutResponse: false,
+                    canNotify: false,
+                    canIndicate: false,
+                  ),
+                  descriptors: [],
+                ),
+              ],
+              includedServices: [],
+            ),
+          ],
+          // No values => readCharacteristic will throw
+          characteristicValues: {},
+        );
+
+        fakePlatform.connect(
+          _deviceAddress,
+          const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+        );
+        async.flushMicrotasks();
+
+        late List<platform.PlatformService> pServices;
+        fakePlatform.discoverServices(_deviceAddress).then((s) => pServices = s);
+        async.flushMicrotasks();
+
+        final domainServices = pServices
+            .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+            .toList();
+
+        final client = LifecycleClient(
+          platformApi: fakePlatform,
+          connectionId: _deviceAddress,
+          onServerUnreachable: () {},
+        );
+
+        client.start(allServices: List<RemoteService>.from(domainServices));
+        async.flushMicrotasks();
+
+        expect(client.isRunning, isTrue);
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        // Default interval = 10s, heartbeat = 5s.
+        async.elapse(const Duration(seconds: 5));
+
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+          (call) =>
+              call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+              call.value[0] == 0x01,
+        );
+        expect(heartbeatWrites, hasLength(1),
+            reason: 'Should fall back to default interval (10s / 2 = 5s)');
+
+        client.stop();
+      });
+    });
+
+    // 7. start() falls back to default interval when interval char is absent
+    test(
+      'start() falls back to default interval when interval char is absent',
+      () {
+        fakeAsync((async) {
+          final fakePlatform = FakeBlueyPlatform();
+          platform.BlueyPlatform.instance = fakePlatform;
+
+          fakePlatform.simulatePeripheral(
+            id: _deviceAddress,
+            name: 'No Interval',
+            serviceUuids: [lifecycle.controlServiceUuid],
+            services: [
+              platform.PlatformService(
+                uuid: lifecycle.controlServiceUuid,
+                isPrimary: true,
+                characteristics: const [
+                  // Heartbeat char only -- no interval char
+                  platform.PlatformCharacteristic(
+                    uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+                    properties: platform.PlatformCharacteristicProperties(
+                      canRead: false,
+                      canWrite: true,
+                      canWriteWithoutResponse: false,
+                      canNotify: false,
+                      canIndicate: false,
+                    ),
+                    descriptors: [],
+                  ),
+                ],
+                includedServices: [],
+              ),
+            ],
+          );
+
+          fakePlatform.connect(
+            _deviceAddress,
+            const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+          );
+          async.flushMicrotasks();
+
+          late List<platform.PlatformService> pServices;
+          fakePlatform
+              .discoverServices(_deviceAddress)
+              .then((s) => pServices = s);
+          async.flushMicrotasks();
+
+          final domainServices = pServices
+              .map(
+                (ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress),
+              )
+              .toList();
+
+          final client = LifecycleClient(
+            platformApi: fakePlatform,
+            connectionId: _deviceAddress,
+            onServerUnreachable: () {},
+          );
+
+          client.start(
+            allServices: List<RemoteService>.from(domainServices),
+          );
+          async.flushMicrotasks();
+
+          expect(client.isRunning, isTrue);
+          fakePlatform.writeCharacteristicCalls.clear();
+
+          // Default interval = 10s, heartbeat = 5s.
+          async.elapse(const Duration(seconds: 5));
+
+          final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+            (call) =>
+                call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+                call.value[0] == 0x01,
+          );
+          expect(heartbeatWrites, hasLength(1),
+              reason: 'Should use default interval when interval char absent');
+
+          client.stop();
+        });
+      },
+    );
+
+    // 8. stop() cancels timer and resets state
+    test('stop() cancels timer and resets state', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        expect(client.isRunning, isTrue);
+
+        client.stop();
+
+        expect(client.isRunning, isFalse);
+      });
+    });
+
+    // 9. sendDisconnectCommand() writes 0x00 with response
+    test('sendDisconnectCommand() writes 0x00 with response', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        client.sendDisconnectCommand();
+        async.flushMicrotasks();
+
+        final disconnectWrites = fakePlatform.writeCharacteristicCalls.where(
+          (call) =>
+              call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+              call.value.length == 1 &&
+              call.value[0] == 0x00 &&
+              call.withResponse == true,
+        );
+        expect(disconnectWrites, hasLength(1),
+            reason: 'Should write 0x00 with response to heartbeat char');
+
+        client.stop();
+      });
+    });
+
+    // 10. sendDisconnectCommand() is no-op when not started
+    test('sendDisconnectCommand() is no-op when not started', () async {
+      final setup = await _setUpConnectedClient(
+        onServerUnreachable: () {},
+      );
+
+      await setup.client.sendDisconnectCommand();
+
+      expect(setup.fakePlatform.writeCharacteristicCalls, isEmpty,
+          reason: 'Should not write when not started');
+    });
+
+    // 11. sendDisconnectCommand() swallows errors
+    test('sendDisconnectCommand() swallows errors', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
         fakePlatform.simulateWriteFailure = true;
-        async.elapse(const Duration(seconds: 6));
-        async.flushMicrotasks();
-        expect(states, isNot(contains(ConnectionState.disconnected)));
 
-        // Server comes back — next heartbeat succeeds, resetting the counter.
+        // Should NOT throw.
+        client.sendDisconnectCommand();
+        async.flushMicrotasks();
+
+        fakePlatform.simulateWriteFailure = false;
+        client.stop();
+      });
+    });
+
+    // 12. heartbeat success resets failure count
+    test('heartbeat success resets failure count', () {
+      fakeAsync((async) {
+        var unreachableFired = false;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(
+          maxFailedHeartbeats: 3,
+          onServerUnreachable: () => unreachableFired = true,
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Fail 2 heartbeats (below threshold of 3).
+        fakePlatform.simulateWriteFailure = true;
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // Succeed one heartbeat -- resets failure count.
         fakePlatform.simulateWriteFailure = false;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
-        expect(states, isNot(contains(ConnectionState.disconnected)));
 
-        // Server goes away again — one more failure should NOT disconnect
-        // because the counter was reset by the successful heartbeat.
+        // Fail 2 more -- still below threshold because count was reset.
         fakePlatform.simulateWriteFailure = true;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
-        expect(
-          states,
-          isNot(contains(ConnectionState.disconnected)),
-          reason: 'Counter should have been reset by the successful '
-              'heartbeat — a single failure after should not disconnect',
-        );
-
-        // A second consecutive failure now reaches the threshold.
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
-        expect(
-          states,
-          contains(ConnectionState.disconnected),
-          reason: 'Should disconnect after 2 consecutive failures following '
-              'the reset',
-        );
 
-        bluey.dispose();
-        async.flushMicrotasks();
+        expect(unreachableFired, isFalse,
+            reason: 'Success should have reset the failure counter');
+
+        fakePlatform.simulateWriteFailure = false;
+        client.stop();
       });
     });
+
+    // 13. heartbeat failure fires onServerUnreachable after maxFailedHeartbeats
+    test(
+      'heartbeat failure fires onServerUnreachable after maxFailedHeartbeats',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 3,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Initial immediate heartbeat succeeds. Now enable failures.
+          fakePlatform.simulateWriteFailure = true;
+
+          // Failure 1
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          // Failure 2
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          // Failure 3 -- should trigger callback
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse,
+              reason: 'stop() should have been called internally');
+
+          fakePlatform.simulateWriteFailure = false;
+        });
+      },
+    );
+
+    // 14. heartbeat failure with default maxFailedHeartbeats=1 fires immediately
+    test(
+      'heartbeat failure with default maxFailedHeartbeats=1 fires immediately',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Initial heartbeat succeeds. Now enable failures.
+          fakePlatform.simulateWriteFailure = true;
+
+          // First periodic heartbeat fails -- should trigger immediately.
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWriteFailure = false;
+        });
+      },
+    );
   });
+}
 
-  group('LifecycleClient requireLifecycle', () {
-    test(
-        'permissive mode accepts a non-Bluey peer (no control service) '
-        'without disconnecting', () {
-      fakeAsync((async) {
-        _simulateNonBlueyPeripheral(fakePlatform);
+// ==========================================================================
+// Minimal RemoteService / RemoteCharacteristic implementations for testing.
+//
+// LifecycleClient only inspects service/characteristic UUIDs (via
+// toString().toLowerCase()) and calls _platform.readCharacteristic /
+// _platform.writeCharacteristic directly. These wrappers satisfy the
+// interface without pulling in the full BlueyConnection machinery.
+// ==========================================================================
 
-        final bluey = Bluey();
+class _TestRemoteService implements RemoteService {
+  final platform.PlatformService _ps;
+  final FakeBlueyPlatform _fakePlatform;
+  final String _connectionId;
 
-        late Connection connection;
-        _connectAndDiscover(bluey).then((c) => connection = c);
-        async.flushMicrotasks();
+  _TestRemoteService(this._ps, this._fakePlatform, this._connectionId);
 
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
+  @override
+  UUID get uuid => UUID(_ps.uuid);
 
-        // Wait past any heartbeat interval — nothing should happen since no
-        // heartbeat is running against a non-Bluey peer.
-        async.elapse(const Duration(seconds: 30));
-        async.flushMicrotasks();
+  @override
+  bool get isPrimary => _ps.isPrimary;
 
-        expect(
-          states,
-          isNot(contains(ConnectionState.disconnected)),
-          reason: 'Permissive mode (default) should leave non-Bluey peers '
-              'connected',
-        );
+  @override
+  List<RemoteCharacteristic> get characteristics => _ps.characteristics
+      .map((pc) => _TestRemoteCharacteristic(pc, _fakePlatform, _connectionId))
+      .toList();
 
-        bluey.dispose();
-        async.flushMicrotasks();
-      });
-    });
+  @override
+  List<RemoteService> get includedServices => _ps.includedServices
+      .map((ps) => _TestRemoteService(ps, _fakePlatform, _connectionId))
+      .toList();
 
-    test(
-        'requireLifecycle disconnects when peer lacks the control service',
-        () {
-      fakeAsync((async) {
-        _simulateNonBlueyPeripheral(fakePlatform);
+  @override
+  RemoteCharacteristic characteristic(UUID uuid) {
+    for (final c in characteristics) {
+      if (c.uuid == uuid) return c;
+    }
+    throw CharacteristicNotFoundException(uuid);
+  }
+}
 
-        final bluey = Bluey();
+class _TestRemoteCharacteristic implements RemoteCharacteristic {
+  final platform.PlatformCharacteristic _pc;
+  final FakeBlueyPlatform _fakePlatform;
+  final String _connectionId;
 
-        late Connection connection;
-        _connectAndDiscover(bluey, requireLifecycle: true)
-            .then((c) => connection = c);
-        async.flushMicrotasks();
+  _TestRemoteCharacteristic(
+      this._pc, this._fakePlatform, this._connectionId);
 
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
+  @override
+  UUID get uuid => UUID(_pc.uuid);
 
-        // The disconnect is fired synchronously during services() — but we
-        // subscribed after services() returned, so let any pending async
-        // propagation run.
-        async.flushMicrotasks();
-        async.elapse(Duration.zero);
+  @override
+  CharacteristicProperties get properties => CharacteristicProperties(
+        canRead: _pc.properties.canRead,
+        canWrite: _pc.properties.canWrite,
+        canWriteWithoutResponse: _pc.properties.canWriteWithoutResponse,
+        canNotify: _pc.properties.canNotify,
+        canIndicate: _pc.properties.canIndicate,
+      );
 
-        // Connection state should now reflect disconnection.
-        expect(
-          connection.state,
-          ConnectionState.disconnected,
-          reason: 'requireLifecycle should disconnect peers that do not host '
-              'the control service',
-        );
+  @override
+  Future<Uint8List> read() =>
+      _fakePlatform.readCharacteristic(_connectionId, _pc.uuid);
 
-        bluey.dispose();
-        async.flushMicrotasks();
-      });
-    });
+  @override
+  Future<void> write(Uint8List value, {bool withResponse = true}) =>
+      _fakePlatform.writeCharacteristic(
+          _connectionId, _pc.uuid, value, withResponse);
 
-    test(
-        'requireLifecycle with a proper Bluey server does NOT spuriously '
-        'disconnect', () {
-      fakeAsync((async) {
-        _simulateBlueyServerPeripheral(fakePlatform);
+  @override
+  Stream<Uint8List> get notifications => const Stream.empty();
 
-        final bluey = Bluey();
+  @override
+  RemoteDescriptor descriptor(UUID uuid) =>
+      throw UnimplementedError('Not needed for lifecycle tests');
 
-        late Connection connection;
-        _connectAndDiscover(bluey, requireLifecycle: true)
-            .then((c) => connection = c);
-        async.flushMicrotasks();
-
-        final states = <ConnectionState>[];
-        connection.stateChanges.listen(states.add);
-
-        // Let heartbeats flow normally.
-        async.elapse(const Duration(seconds: 20));
-        async.flushMicrotasks();
-
-        expect(
-          states,
-          isNot(contains(ConnectionState.disconnected)),
-          reason: 'A proper Bluey server should satisfy requireLifecycle',
-        );
-
-        bluey.dispose();
-        async.flushMicrotasks();
-      });
-    });
-  });
+  @override
+  List<RemoteDescriptor> get descriptors => const [];
 }

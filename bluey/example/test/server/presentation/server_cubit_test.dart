@@ -14,6 +14,8 @@ import '../../mocks/mock_bluey.dart';
 
 void main() {
   late MockCheckServerSupport mockCheckServerSupport;
+  late MockSetServerIdentity mockSetServerIdentity;
+  late MockResetServer mockResetServer;
   late MockStartAdvertising mockStartAdvertising;
   late MockStopAdvertising mockStopAdvertising;
   late MockAddService mockAddService;
@@ -25,6 +27,9 @@ void main() {
   late MockObserveDisconnections mockObserveDisconnections;
   late MockObserveReadRequests mockObserveReadRequests;
   late MockObserveWriteRequests mockObserveWriteRequests;
+  late MockServerIdentityStorage mockIdentityStorage;
+
+  final testServerId = ServerId('12345678-1234-4234-8234-123456789abc');
 
   setUpAll(() {
     registerFallbackValue(FakeHostedService());
@@ -32,10 +37,13 @@ void main() {
     registerFallbackValue(Uint8List(0));
     registerFallbackValue(MockClient());
     registerFallbackValue(<UUID>[]);
+    registerFallbackValue(testServerId);
   });
 
   setUp(() {
     mockCheckServerSupport = MockCheckServerSupport();
+    mockSetServerIdentity = MockSetServerIdentity();
+    mockResetServer = MockResetServer();
     mockStartAdvertising = MockStartAdvertising();
     mockStopAdvertising = MockStopAdvertising();
     mockAddService = MockAddService();
@@ -47,6 +55,7 @@ void main() {
     mockObserveDisconnections = MockObserveDisconnections();
     mockObserveReadRequests = MockObserveReadRequests();
     mockObserveWriteRequests = MockObserveWriteRequests();
+    mockIdentityStorage = MockServerIdentityStorage();
 
     when(() => mockDisposeServer()).thenAnswer((_) async {});
     when(() => mockGetConnectedClients()).thenReturn([]);
@@ -59,11 +68,23 @@ void main() {
     when(
       () => mockObserveWriteRequests(),
     ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockIdentityStorage.loadOrGenerate(),
+    ).thenAnswer((_) async => testServerId);
+    when(() => mockSetServerIdentity(any())).thenReturn(null);
+    when(
+      () => mockIdentityStorage.reset(),
+    ).thenAnswer((_) async => testServerId);
+    when(
+      () => mockResetServer(identity: any(named: 'identity')),
+    ).thenAnswer((_) async => null);
   });
 
   ServerCubit createCubit() {
     return ServerCubit(
       checkServerSupport: mockCheckServerSupport,
+      setServerIdentity: mockSetServerIdentity,
+      resetServer: mockResetServer,
       startAdvertising: mockStartAdvertising,
       stopAdvertising: mockStopAdvertising,
       addService: mockAddService,
@@ -75,6 +96,7 @@ void main() {
       observeDisconnections: mockObserveDisconnections,
       observeReadRequests: mockObserveReadRequests,
       observeWriteRequests: mockObserveWriteRequests,
+      identityStorage: mockIdentityStorage,
     );
   }
 
@@ -342,6 +364,55 @@ void main() {
       verify: (cubit) {
         expect(cubit.state.connectedClients, hasLength(1));
         verify(() => mockGetConnectedClients()).called(greaterThanOrEqualTo(1));
+      },
+    );
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'initialize loads identity and sets it on repository',
+      setUp: () {
+        when(() => mockCheckServerSupport()).thenReturn(true);
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockAddService(any())).thenAnswer((_) async {});
+      },
+      build: createCubit,
+      act: (cubit) => cubit.initialize(),
+      verify: (cubit) {
+        expect(cubit.state.serverId, testServerId);
+        verify(() => mockIdentityStorage.loadOrGenerate()).called(1);
+        verify(() => mockSetServerIdentity(testServerId)).called(1);
+      },
+    );
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'resetIdentity clears and regenerates identity',
+      setUp: () {
+        final newId = ServerId('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+        when(
+          () => mockIdentityStorage.reset(),
+        ).thenAnswer((_) async => newId);
+        when(
+          () => mockResetServer(identity: any(named: 'identity')),
+        ).thenAnswer((_) async => MockServer());
+        when(() => mockCheckServerSupport()).thenReturn(true);
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockAddService(any())).thenAnswer((_) async {});
+      },
+      build: createCubit,
+      act: (cubit) => cubit.resetIdentity(),
+      verify: (cubit) {
+        expect(
+          cubit.state.serverId,
+          ServerId('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'),
+        );
+        expect(cubit.state.isAdvertising, isFalse);
+        verify(() => mockIdentityStorage.reset()).called(1);
+        verify(
+          () => mockResetServer(identity: any(named: 'identity')),
+        ).called(1);
       },
     );
 

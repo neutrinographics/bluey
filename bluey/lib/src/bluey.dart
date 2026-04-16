@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
 import 'connection/connection_state.dart';
+import 'connection/lifecycle_client.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
@@ -13,6 +14,11 @@ import 'event_bus.dart';
 import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
+import 'lifecycle.dart' as lifecycle;
+import 'peer/bluey_peer.dart';
+import 'peer/peer.dart';
+import 'peer/peer_discovery.dart';
+import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
@@ -290,25 +296,20 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
-  /// [maxFailedHeartbeats] controls how many consecutive heartbeat write
-  /// failures trigger a local disconnect. Defaults to 1 (fail-fast). Only
-  /// applies when connecting to a Bluey server that hosts the lifecycle
-  /// control service — for other devices, heartbeats are not sent.
-  /// [requireLifecycle] when true, requires the peer to host Bluey's
-  /// lifecycle control service. If the control service is absent after
-  /// service discovery, the connection is treated as unreachable and
-  /// disconnected. Use this when you only want to connect to other Bluey
-  /// servers — e.g., to reject stale/zombie advertisements from a
-  /// force-killed server. Defaults to false (permissive: any BLE peer
-  /// is accepted).
+  /// [maxFailedHeartbeats] - Consecutive heartbeat write failures that
+  ///   trigger a local disconnect when the device is a Bluey server.
   ///
-  /// Returns a [Connection] for GATT operations.
+  /// After connecting, this method automatically discovers services. If the
+  /// device hosts the Bluey control service, the lifecycle heartbeat is
+  /// started and the connection is upgraded in place so that it hides the
+  /// control service. For non-Bluey devices a raw connection is returned.
+  /// Callers can check [Connection.isBlueyServer] to distinguish.
+  ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(
     Device device, {
     Duration? timeout,
     int maxFailedHeartbeats = 1,
-    bool requireLifecycle = false,
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -323,12 +324,18 @@ class Bluey {
 
       _emitEvent(ConnectedEvent(deviceId: device.id));
 
-      return BlueyConnection(
+      final rawConnection = BlueyConnection(
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
         maxFailedHeartbeats: maxFailedHeartbeats,
-        requireLifecycle: requireLifecycle,
+      );
+
+      // Auto-upgrade: if the server hosts the Bluey control service,
+      // start the lifecycle heartbeat and upgrade the connection in place.
+      return await _upgradeIfBlueyServer(
+        rawConnection,
+        maxFailedHeartbeats: maxFailedHeartbeats,
       );
     } catch (e) {
       _emitEvent(
@@ -338,6 +345,67 @@ class Bluey {
         ),
       );
       throw _wrapError(e);
+    }
+  }
+
+  /// Checks if the connected device hosts the Bluey control service.
+  /// If yes, reads the ServerId, starts the lifecycle heartbeat, and
+  /// upgrades the connection in place. If not, returns the raw connection
+  /// unchanged.
+  Future<Connection> _upgradeIfBlueyServer(
+    BlueyConnection rawConnection, {
+    int maxFailedHeartbeats = 1,
+  }) async {
+    try {
+      // Fetch services before upgrade so the full list (including control
+      // service) is available for the lifecycle client.
+      final services = await rawConnection.services();
+
+      final controlService = services
+          .where((s) => lifecycle.isControlService(s.uuid.toString()))
+          .firstOrNull;
+
+      if (controlService == null) return rawConnection;
+
+      // Read the ServerId
+      final serverIdChar = controlService.characteristics
+          .where(
+            (c) => c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+          )
+          .firstOrNull;
+
+      ServerId? serverId;
+      if (serverIdChar != null) {
+        try {
+          final bytes = await serverIdChar.read();
+          serverId = lifecycle.decodeServerId(bytes);
+        } catch (_) {
+          // ServerId read failed -- still upgrade for lifecycle benefits
+        }
+      }
+
+      // Start lifecycle heartbeat
+      final lifecycleClient = LifecycleClient(
+        platformApi: _platform,
+        connectionId: rawConnection.connectionId,
+        maxFailedHeartbeats: maxFailedHeartbeats,
+        onServerUnreachable: () {
+          rawConnection.disconnect().catchError((_) {});
+        },
+      );
+      lifecycleClient.start(allServices: services);
+
+      // Upgrade the connection in place — sets isBlueyServer, enables
+      // service filtering, and invalidates the service cache.
+      rawConnection.upgrade(
+        lifecycleClient: lifecycleClient,
+        serverId: serverId ?? ServerId.generate(),
+      );
+
+      return rawConnection;
+    } catch (_) {
+      // Service discovery failed -- return raw connection
+      return rawConnection;
     }
   }
 
@@ -395,7 +463,10 @@ class Bluey {
   ///   await server.startAdvertising(name: 'My Device');
   /// }
   /// ```
-  Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
+  Server? server({
+    Duration? lifecycleInterval = const Duration(seconds: 10),
+    ServerId? identity,
+  }) {
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
@@ -403,7 +474,46 @@ class Bluey {
       _platform,
       _eventBus,
       lifecycleInterval: lifecycleInterval,
+      identity: identity,
     );
+  }
+
+  /// Construct a peer handle from a known [ServerId].
+  ///
+  /// No BLE activity happens until [BlueyPeer.connect] is called.
+  ///
+  /// [maxFailedHeartbeats] controls how many consecutive heartbeat
+  /// write failures trigger a local disconnect on the peer connection.
+  /// Defaults to 1 (fail-fast).
+  BlueyPeer peer(
+    ServerId serverId, {
+    int maxFailedHeartbeats = 1,
+  }) {
+    return createBlueyPeer(
+      platformApi: _platform,
+      serverId: serverId,
+      maxFailedHeartbeats: maxFailedHeartbeats,
+    );
+  }
+
+  /// Scan for nearby Bluey servers.
+  ///
+  /// Scans for nearby BLE devices, briefly connects to each candidate
+  /// to check for the Bluey control service and read its `serverId`,
+  /// and returns a list of [BlueyPeer]s deduplicated by [ServerId].
+  ///
+  /// [timeout] bounds the scan window. Defaults to 5 seconds.
+  Future<List<BlueyPeer>> discoverPeers({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final discovery = PeerDiscovery(platformApi: _platform);
+    final ids = await discovery.discover(timeout: timeout);
+    return ids
+        .map((id) => createBlueyPeer(
+              platformApi: _platform,
+              serverId: id,
+            ))
+        .toList(growable: false);
   }
 
   /// Release all resources.

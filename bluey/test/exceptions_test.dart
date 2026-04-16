@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey/src/shared/uuid.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
+import 'package:bluey/src/peer/server_id.dart';
 
 void main() {
   group('BlueyException', () {
@@ -166,6 +167,40 @@ void main() {
       expect(exception.message, contains('requestMtu'));
       expect(exception.message, contains('iOS'));
       expect(exception.action, contains('capabilities'));
+    });
+  });
+
+  group('PeerNotFoundException', () {
+    test('exposes expected id and timeout in message', () {
+      final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      final ex = PeerNotFoundException(id, const Duration(seconds: 5));
+      expect(ex.expected, equals(id));
+      expect(ex.timeout, const Duration(seconds: 5));
+      expect(ex.toString(), contains('aaaaaaaa'));
+    });
+
+    test('is a BlueyException', () {
+      expect(
+        PeerNotFoundException(ServerId.generate(), const Duration(seconds: 1)),
+        isA<BlueyException>(),
+      );
+    });
+  });
+
+  group('PeerIdentityMismatchException', () {
+    test('exposes expected and actual ids', () {
+      final expected = ServerId.generate();
+      final actual = ServerId.generate();
+      final ex = PeerIdentityMismatchException(expected, actual);
+      expect(ex.expected, equals(expected));
+      expect(ex.actual, equals(actual));
+    });
+
+    test('is a BlueyException', () {
+      expect(
+        PeerIdentityMismatchException(ServerId.generate(), ServerId.generate()),
+        isA<BlueyException>(),
+      );
     });
   });
 

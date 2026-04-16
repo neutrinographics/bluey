@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'gatt_request.dart';
@@ -55,6 +56,10 @@ abstract class Client {
 /// });
 /// ```
 abstract class Server {
+  /// The stable [ServerId] this server advertises through the lifecycle
+  /// control service.
+  ServerId get serverId;
+
   /// Whether advertising is currently active.
   bool get isAdvertising;
 

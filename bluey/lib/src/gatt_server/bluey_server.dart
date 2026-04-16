@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../event_bus.dart';
 import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'lifecycle_server.dart';
@@ -16,7 +17,9 @@ import 'server.dart';
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
+  final ServerId _serverId;
   late final LifecycleServer _lifecycle;
+  late final Future<void> _controlServiceReady;
 
   bool _isAdvertising = false;
   final Map<String, BlueyClient> _connectedClients = {};
@@ -44,13 +47,25 @@ class BlueyServer implements Server {
     this._platform,
     this._eventBus, {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
-  }) {
+    ServerId? identity,
+  }) : _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
       interval: lifecycleInterval,
+      serverId: _serverId,
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
     );
+    // Eagerly add the control service so it's available for incoming
+    // connections even before startAdvertising() is called. A client may
+    // reconnect via a cached peripheral reference while the server UI is
+    // still on the "not advertising" screen.
+    //
+    // Store the Future so addService() and startAdvertising() can await
+    // it — Android's BluetoothGattServer requires services to be added
+    // sequentially (no concurrent addService calls).
+    _controlServiceReady = _lifecycle.addControlServiceIfNeeded();
+
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
 
     _centralConnectionsSub = _platform.centralConnections.listen((
@@ -99,6 +114,9 @@ class BlueyServer implements Server {
   }
 
   @override
+  ServerId get serverId => _serverId;
+
+  @override
   bool get isAdvertising => _isAdvertising;
 
   @override
@@ -112,6 +130,9 @@ class BlueyServer implements Server {
 
   @override
   Future<void> addService(HostedService service) async {
+    // Wait for the eagerly-registered control service to finish before
+    // adding app services — Android requires sequential addService calls.
+    await _controlServiceReady;
     final platformService = _mapHostedServiceToPlatform(service);
     await _platform.addService(platformService);
     _emitEvent(
@@ -131,10 +152,9 @@ class BlueyServer implements Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
   }) async {
-    // Add the internal control service before advertising if lifecycle is
-    // enabled. This must happen before startAdvertising because on iOS,
-    // services cannot be added while advertising.
-    await _lifecycle.addControlServiceIfNeeded();
+    // Ensure the eagerly-registered control service has completed before
+    // advertising. The Future is cached and completes only once.
+    await _controlServiceReady;
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
@@ -346,15 +366,16 @@ class BlueyServer implements Server {
     // Cancel any heartbeat timer for this client
     _lifecycle.cancelTimer(clientId);
 
-    // Only emit if the client was actually tracked
-    if (_connectedClients.containsKey(clientId)) {
-      final client = _connectedClients[clientId]!;
+    final client = _connectedClients.remove(clientId);
+    if (client != null) {
       _emitEvent(
         ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
-      _connectedClients.remove(clientId);
-      _disconnectionsController.add(client.id.toString());
     }
+
+    // Always emit on the disconnections stream -- even for untracked clients
+    // (e.g., stale connections from before a server restart).
+    _disconnectionsController.add(clientId);
   }
 
   // === Private mapping methods ===

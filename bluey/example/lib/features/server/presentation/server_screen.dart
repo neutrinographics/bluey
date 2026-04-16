@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/di/service_locator.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../application/check_server_support.dart';
+import '../application/set_server_identity.dart';
+import '../application/reset_server.dart';
 import '../application/start_advertising.dart';
 import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
@@ -18,6 +20,7 @@ import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
+import '../infrastructure/server_identity_storage.dart';
 import 'server_cubit.dart';
 import 'server_state.dart';
 
@@ -63,6 +66,8 @@ class ServerScreen extends StatelessWidget {
       create:
           (context) => ServerCubit(
             checkServerSupport: getIt<CheckServerSupport>(),
+            setServerIdentity: getIt<SetServerIdentity>(),
+            resetServer: getIt<ResetServer>(),
             startAdvertising: getIt<StartAdvertising>(),
             stopAdvertising: getIt<StopAdvertising>(),
             addService: getIt<AddService>(),
@@ -74,6 +79,7 @@ class ServerScreen extends StatelessWidget {
             observeDisconnections: getIt<ObserveDisconnections>(),
             observeReadRequests: getIt<ObserveReadRequests>(),
             observeWriteRequests: getIt<ObserveWriteRequests>(),
+            identityStorage: getIt<ServerIdentityStorage>(),
           )..initialize(),
       child: const ScaffoldMessenger(child: _ServerView()),
     );
@@ -256,6 +262,38 @@ class _HeroCard extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                     color: _kTextMedium,
                     height: 1.43,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Server identity
+          Row(
+            children: [
+              Icon(Icons.fingerprint, size: 13, color: _kTextMedium),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  state.serverId != null
+                      ? 'ID: ${state.serverId!.value.substring(0, 8)}...'
+                      : 'ID: ...',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: _kTextMedium,
+                    height: 1.43,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: cubit.resetIdentity,
+                child: Text(
+                  'Reset',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kAccentBlue,
                   ),
                 ),
               ),

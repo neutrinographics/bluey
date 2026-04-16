@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
+import '../peer/server_id.dart';
 import '../shared/uuid.dart';
 import 'connection_state.dart';
 
@@ -133,6 +134,14 @@ enum Phy {
 abstract class Connection {
   /// The connected device's ID.
   UUID get deviceId;
+
+  /// Whether this connection is to a Bluey server running the lifecycle
+  /// protocol (heartbeat-based disconnect detection, stable identity).
+  bool get isBlueyServer;
+
+  /// The server's stable identity, if this is a Bluey server connection.
+  /// Returns null for non-Bluey connections.
+  ServerId? get serverId;
 
   /// Current connection state.
   ConnectionState get state;

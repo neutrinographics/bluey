@@ -3,7 +3,10 @@ import 'package:bluey/bluey.dart';
 
 import '../domain/server_repository.dart';
 import '../infrastructure/bluey_server_repository.dart';
+import '../infrastructure/server_identity_storage.dart';
 import '../application/check_server_support.dart';
+import '../application/set_server_identity.dart';
+import '../application/reset_server.dart';
 import '../application/start_advertising.dart';
 import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
@@ -20,8 +23,18 @@ void registerServerDependencies(GetIt getIt) {
     () => BlueyServerRepository(getIt<Bluey>()),
   );
 
+  getIt.registerLazySingleton<ServerIdentityStorage>(
+    () => ServerIdentityStorage(),
+  );
+
   getIt.registerFactory<CheckServerSupport>(
     () => CheckServerSupport(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<SetServerIdentity>(
+    () => SetServerIdentity(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<ResetServer>(
+    () => ResetServer(getIt<ServerRepository>()),
   );
   getIt.registerFactory<StartAdvertising>(
     () => StartAdvertising(getIt<ServerRepository>()),
