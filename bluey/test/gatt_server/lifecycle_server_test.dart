@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:bluey/src/gatt_server/lifecycle_server.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -61,6 +62,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: gone.add,
       );
 
@@ -81,6 +83,7 @@ void main() {
         final server = LifecycleServer(
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
           onClientGone: gone.add,
         );
 
@@ -106,6 +109,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: gone.add,
       );
 
@@ -123,6 +127,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -150,6 +155,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -172,6 +178,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 15),
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -196,6 +203,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -213,6 +221,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: null,
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -235,6 +244,7 @@ void main() {
         final server = LifecycleServer(
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
           onClientGone: gone.add,
         );
 
@@ -258,6 +268,7 @@ void main() {
         final server = LifecycleServer(
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
           onClientGone: gone.add,
         );
 
@@ -281,6 +292,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: gone.add,
         onHeartbeatReceived: heartbeats.add,
       );
@@ -302,6 +314,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: gone.add,
         onHeartbeatReceived: heartbeats.add,
       );
@@ -324,6 +337,7 @@ void main() {
         final server = LifecycleServer(
           platformApi: fakePlatform,
           interval: null,
+          serverId: ServerId.generate(),
           onClientGone: gone.add,
         );
 
@@ -346,6 +360,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: null,
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -361,6 +376,7 @@ void main() {
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
+        serverId: ServerId.generate(),
         onClientGone: (_) {},
       );
 
@@ -373,6 +389,31 @@ void main() {
         fakePlatform.localServices.single.uuid,
         lifecycle.controlServiceUuid,
       );
+
+      server.dispose();
+    });
+
+    test('responds to serverId read with encoded bytes', () {
+      final id = ServerId.generate();
+      final server = LifecycleServer(
+        platformApi: fakePlatform,
+        interval: const Duration(seconds: 5),
+        serverId: id,
+        onClientGone: (_) {},
+      );
+
+      final handled = server.handleReadRequest(PlatformReadRequest(
+        requestId: 1,
+        centralId: 'central-1',
+        characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+        offset: 0,
+      ));
+      expect(handled, isTrue);
+
+      expect(fakePlatform.respondReadCalls, hasLength(1));
+      final call = fakePlatform.respondReadCalls.single;
+      expect(call.status, PlatformGattStatus.success);
+      expect(call.value, equals(id.toBytes()));
 
       server.dispose();
     });

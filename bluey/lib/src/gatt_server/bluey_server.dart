@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../event_bus.dart';
 import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'lifecycle_server.dart';
@@ -44,10 +45,12 @@ class BlueyServer implements Server {
     this._platform,
     this._eventBus, {
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
+    ServerId? serverId,
   }) {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
       interval: lifecycleInterval,
+      serverId: serverId ?? ServerId.generate(),
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
     );
