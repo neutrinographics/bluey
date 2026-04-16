@@ -7,10 +7,6 @@ import '../domain/connection_settings.dart';
 class ConnectionSettingsCubit extends Cubit<ConnectionSettings> {
   ConnectionSettingsCubit() : super(const ConnectionSettings());
 
-  void setRequireLifecycle(bool value) {
-    emit(state.copyWith(requireLifecycle: value));
-  }
-
   void setMaxFailedHeartbeats(int value) {
     emit(state.copyWith(maxFailedHeartbeats: value));
   }

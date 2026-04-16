@@ -210,17 +210,6 @@ class _ConnectionSettingsDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Require lifecycle'),
-                subtitle: const Text(
-                  'Only connect to peers running a Bluey server. '
-                  'Non-Bluey peers are disconnected automatically.',
-                ),
-                value: settings.requireLifecycle,
-                onChanged: cubit.setRequireLifecycle,
-              ),
-              const SizedBox(height: 12),
               Text(
                 'Max failed heartbeats: ${settings.maxFailedHeartbeats}',
                 style: Theme.of(context).textTheme.labelLarge,
