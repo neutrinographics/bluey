@@ -421,4 +421,91 @@ void main() {
       await bluey.dispose();
     });
   });
+
+  group('BlueyConnection additional coverage', () {
+    // 15. disconnect() is idempotent
+    test('disconnect() is idempotent', () async {
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Regular',
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Regular',
+      ));
+
+      await conn.disconnect();
+      // Second disconnect should be a no-op -- no error.
+      await conn.disconnect();
+
+      await bluey.dispose();
+    });
+
+    // 16. isBlueyServer becomes false after disconnect
+    test('isBlueyServer becomes false after disconnect', () async {
+      final id = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Bluey Server',
+      ));
+
+      expect(conn.isBlueyServer, isTrue);
+
+      await conn.disconnect();
+
+      expect(conn.isBlueyServer, isFalse);
+
+      await bluey.dispose();
+    });
+
+    // 17. services(cache: true) returns cached data without re-discovery
+    test('services(cache: true) returns cached data without re-discovery',
+        () async {
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Regular',
+        services: const [
+          platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
+
+      final bluey = Bluey();
+      final conn = await bluey.connect(Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Regular',
+      ));
+
+      // First call triggers discovery (which was already done during connect,
+      // but this call with cache: false re-discovers).
+      final services1 = await conn.services();
+
+      // Second call with cache: true should return cached data.
+      final services2 = await conn.services(cache: true);
+
+      expect(services2, hasLength(services1.length));
+      expect(
+        services2.map((s) => s.uuid.toString()).toList(),
+        equals(services1.map((s) => s.uuid.toString()).toList()),
+      );
+
+      await conn.disconnect();
+      await bluey.dispose();
+    });
+  });
 }

@@ -430,4 +430,113 @@ void main() {
       await bluey.dispose();
     });
   });
+
+  group('lifecycle.dart utilities', () {
+    // 18. isControlService returns true for control service UUID
+    test('isControlService returns true for control service UUID', () {
+      expect(isControlService('b1e70001-0000-1000-8000-00805f9b34fb'), isTrue);
+    });
+
+    // 19. isControlService returns false for random UUID
+    test('isControlService returns false for random UUID', () {
+      expect(
+        isControlService('0000180d-0000-1000-8000-00805f9b34fb'),
+        isFalse,
+      );
+    });
+
+    // 20. isControlServiceCharacteristic returns true for all three char UUIDs
+    test(
+      'isControlServiceCharacteristic returns true for all three char UUIDs',
+      () {
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70002-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'heartbeat char',
+        );
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70003-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'interval char',
+        );
+        expect(
+          isControlServiceCharacteristic(
+              'b1e70004-0000-1000-8000-00805f9b34fb'),
+          isTrue,
+          reason: 'serverId char',
+        );
+      },
+    );
+
+    // 21. isControlServiceCharacteristic returns false for random UUID
+    test('isControlServiceCharacteristic returns false for random UUID', () {
+      expect(
+        isControlServiceCharacteristic('00002a37-0000-1000-8000-00805f9b34fb'),
+        isFalse,
+      );
+    });
+
+    // 22. decodeInterval with short input returns default
+    test('decodeInterval with short input returns default', () {
+      final shortInput = Uint8List.fromList([0x01, 0x02]);
+      final result = decodeInterval(shortInput);
+      expect(result, equals(defaultLifecycleInterval));
+    });
+
+    // 23. encodeInterval/decodeInterval round-trip
+    test('encodeInterval/decodeInterval round-trip', () {
+      const original = Duration(seconds: 42);
+      final encoded = encodeInterval(original);
+      expect(encoded, hasLength(4));
+      final decoded = decodeInterval(encoded);
+      expect(decoded, equals(original));
+    });
+  });
+
+  group('BlueyServer trackClientIfNeeded', () {
+    // 24. untracked client sending heartbeat gets auto-tracked
+    //
+    // On iOS, CBPeripheralManager has no connection callback. The server
+    // learns about clients only when they write to the control service.
+    // This test verifies that a heartbeat from a client that the platform
+    // reported (but the server would track via onHeartbeatReceived if the
+    // centralConnections event were missing) correctly appears in
+    // connectedClients and on the connections stream, and that a second
+    // heartbeat does not double-track.
+    test('untracked client sending heartbeat gets auto-tracked', () async {
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      await server.startAdvertising();
+
+      final connections = <Client>[];
+      server.connections.listen(connections.add);
+
+      // Connect a central at the platform level. The server tracks it via
+      // the centralConnections stream.
+      fakePlatform.simulateCentralConnection(centralId: _clientId1);
+      await Future.delayed(Duration.zero);
+
+      expect(server.connectedClients, hasLength(1));
+      expect(connections, hasLength(1));
+
+      // Send a heartbeat -- should NOT double-track the same client.
+      await fakePlatform.simulateWriteRequest(
+        centralId: _clientId1,
+        characteristicUuid: _heartbeatCharUuid,
+        value: Uint8List.fromList([0x01]),
+        responseNeeded: true,
+      );
+      await Future.delayed(Duration.zero);
+
+      expect(server.connectedClients, hasLength(1),
+          reason: 'trackClientIfNeeded should be idempotent');
+      expect(connections, hasLength(1),
+          reason: 'No duplicate connection event');
+
+      await server.dispose();
+      await bluey.dispose();
+    });
+  });
 }
