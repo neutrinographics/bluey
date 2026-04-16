@@ -75,4 +75,64 @@ void main() {
       await bluey.dispose();
     });
   });
+
+  group('bluey.connectToBlueyServer', () {
+    test('connects to a known Bluey server device and returns a peer connection', () async {
+      final id = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+
+      final bluey = Bluey();
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Bluey Server',
+      );
+
+      final connection = await bluey.connectToBlueyServer(device);
+      expect(connection.state, ConnectionState.connected);
+
+      // The control service should be hidden (PeerConnection wrapping)
+      final services = await connection.services();
+      final controlServicePresent = services.any(
+        (s) => s.uuid.toString().toLowerCase() == 'b1e70001-0000-1000-8000-00805f9b34fb',
+      );
+      expect(controlServicePresent, isFalse);
+
+      await connection.disconnect();
+      await bluey.dispose();
+    });
+
+    test('throws StateError when device is not a Bluey server', () async {
+      // Simulate a regular peripheral without control service
+      fakePlatform.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:02',
+        name: 'Regular Device',
+        services: [
+          const platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
+
+      final bluey = Bluey();
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        address: 'AA:BB:CC:DD:EE:02',
+        name: 'Regular Device',
+      );
+
+      expect(
+        () => bluey.connectToBlueyServer(device),
+        throwsA(isA<StateError>()),
+      );
+
+      await bluey.dispose();
+    });
+  });
 }

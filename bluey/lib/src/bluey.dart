@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
 import 'connection/connection_state.dart';
+import 'connection/lifecycle_client.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
@@ -13,8 +14,10 @@ import 'event_bus.dart';
 import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
+import 'lifecycle.dart' as lifecycle;
 import 'peer/bluey_peer.dart';
 import 'peer/peer.dart';
+import 'peer/peer_connection.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
@@ -326,6 +329,74 @@ class Bluey {
       _emitEvent(
         ErrorEvent(
           message: 'Connection failed to ${device.id.toShortString()}',
+          error: e,
+        ),
+      );
+      throw _wrapError(e);
+    }
+  }
+
+  /// Connect to a device known to be a Bluey server.
+  ///
+  /// Use this when a scan result's [ScanResult.isBlueyServer] is true.
+  /// Connects, reads the server's [ServerId] from the control service,
+  /// starts a lifecycle heartbeat, and wraps the connection so the
+  /// control service is hidden from the caller.
+  ///
+  /// Throws [StateError] if the device does not host the Bluey control
+  /// service (i.e., it is not actually a Bluey server).
+  Future<Connection> connectToBlueyServer(
+    Device device, {
+    Duration? timeout,
+    int maxFailedHeartbeats = 1,
+  }) async {
+    _emitEvent(ConnectingEvent(deviceId: device.id));
+
+    try {
+      final connectionId = await _platform.connect(
+        device.address,
+        platform.PlatformConnectConfig(
+          timeoutMs: timeout?.inMilliseconds,
+          mtu: null,
+        ),
+      );
+
+      final rawConnection = BlueyConnection(
+        platformInstance: _platform,
+        connectionId: connectionId,
+        deviceId: device.id,
+      );
+
+      // Discover services and verify control service is present.
+      final allServices = await rawConnection.services();
+      final hasControlService = allServices.any(
+        (s) => lifecycle.isControlService(s.uuid.toString()),
+      );
+      if (!hasControlService) {
+        await rawConnection.disconnect();
+        throw StateError('Device is not a Bluey server');
+      }
+
+      // Start lifecycle heartbeat.
+      final lifecycleClient = LifecycleClient(
+        platformApi: _platform,
+        connectionId: connectionId,
+        maxFailedHeartbeats: maxFailedHeartbeats,
+        onServerUnreachable: () {
+          rawConnection.disconnect().catchError((_) {});
+        },
+      );
+      lifecycleClient.start(allServices: allServices);
+
+      _emitEvent(ConnectedEvent(deviceId: device.id));
+
+      // Wrap in PeerConnection to hide the control service.
+      return PeerConnection(rawConnection);
+    } catch (e) {
+      if (e is StateError) rethrow;
+      _emitEvent(
+        ErrorEvent(
+          message: 'Connection to Bluey server failed: ${device.id.toShortString()}',
           error: e,
         ),
       );
