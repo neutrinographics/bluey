@@ -18,18 +18,6 @@ class BlueyConnectionRepository implements ConnectionRepository {
     return await _bluey.connect(
       device,
       timeout: timeout,
-    );
-  }
-
-  @override
-  Future<Connection> connectToBlueyServer(
-    Device device, {
-    Duration? timeout,
-    ConnectionSettings settings = const ConnectionSettings(),
-  }) async {
-    return await _bluey.connectToBlueyServer(
-      device,
-      timeout: timeout,
       maxFailedHeartbeats: settings.maxFailedHeartbeats,
     );
   }

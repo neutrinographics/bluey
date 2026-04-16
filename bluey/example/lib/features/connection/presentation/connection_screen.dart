@@ -37,12 +37,10 @@ const _kRedBg = Color(0x1AA83836);
 
 class ConnectionScreen extends StatelessWidget {
   final bluey.Device device;
-  final bool isBlueyServer;
 
   const ConnectionScreen({
     super.key,
     required this.device,
-    this.isBlueyServer = false,
   });
 
   @override
@@ -55,7 +53,6 @@ class ConnectionScreen extends StatelessWidget {
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
             settings: getIt<ConnectionSettingsCubit>().state,
-            isBlueyServer: isBlueyServer,
           )..connect(),
       child: const _ConnectionView(),
     );
@@ -532,23 +529,49 @@ class _DeviceInfoCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _kGreenBg,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Connected',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _kGreen,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _kGreenBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Connected',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _kGreen,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (connection.isBlueyServer) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1D4ED8),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'BLUEY',
+                              style: GoogleFonts.manrope(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

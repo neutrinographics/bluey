@@ -515,17 +515,13 @@ class _DeviceCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: result.isBlueyServer
-                        ? const Color(0xFFDBEAFE)
-                        : bgColor,
+                    color: bgColor,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
-                    result.isBlueyServer ? Icons.devices : Icons.bluetooth,
+                    Icons.bluetooth,
                     size: 22,
-                    color: result.isBlueyServer
-                        ? const Color(0xFF1D4ED8)
-                        : _kTextDark.withValues(alpha: 0.7),
+                    color: _kTextDark.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -533,46 +529,18 @@ class _DeviceCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              result.device.name ?? 'Unknown Device',
-                              style: GoogleFonts.manrope(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color:
-                                    hasName
-                                        ? _kTextDark
-                                        : _kTextDark.withValues(alpha: 0.6),
-                                height: 1.56,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (result.isBlueyServer) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1D4ED8),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'BLUEY',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        result.device.name ?? 'Unknown Device',
+                        style: GoogleFonts.manrope(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              hasName
+                                  ? _kTextDark
+                                  : _kTextDark.withValues(alpha: 0.6),
+                          height: 1.56,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         result.device.id.toString(),
@@ -632,7 +600,6 @@ class _DeviceCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => ConnectionScreen(
           device: result.device,
-          isBlueyServer: result.isBlueyServer,
         ),
       ),
     );

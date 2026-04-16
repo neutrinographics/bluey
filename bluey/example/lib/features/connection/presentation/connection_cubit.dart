@@ -15,7 +15,6 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final DisconnectDevice _disconnectDevice;
   final GetServices _getServices;
   final ConnectionSettings _settings;
-  final bool _isBlueyServer;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
 
@@ -25,12 +24,10 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required DisconnectDevice disconnectDevice,
     required GetServices getServices,
     ConnectionSettings settings = const ConnectionSettings(),
-    bool isBlueyServer = false,
   }) : _connectToDevice = connectToDevice,
        _disconnectDevice = disconnectDevice,
        _getServices = getServices,
        _settings = settings,
-       _isBlueyServer = isBlueyServer,
        super(ConnectionScreenState(device: device));
 
   /// Connects to the device.
@@ -42,7 +39,6 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     try {
       final connection = await _connectToDevice(
         state.device,
-        isBlueyServer: _isBlueyServer,
         settings: _settings,
       );
 
