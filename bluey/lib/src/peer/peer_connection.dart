@@ -5,6 +5,7 @@ import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
+import 'server_id.dart';
 
 /// A decorator around [Connection] that hides the internal Bluey lifecycle
 /// control service from the public services view.
@@ -14,9 +15,16 @@ import '../shared/uuid.dart';
 /// filter out the control service UUID so that library consumers never see it.
 class PeerConnection implements Connection {
   final Connection _inner;
+  final ServerId _serverId;
 
   /// Creates a [PeerConnection] wrapping the given [inner] connection.
-  PeerConnection(this._inner);
+  PeerConnection(this._inner, this._serverId);
+
+  @override
+  bool get isBlueyServer => true;
+
+  @override
+  ServerId? get serverId => _serverId;
 
   // --- Service-related: filter the control service ---
 

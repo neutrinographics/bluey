@@ -507,10 +507,10 @@ void main() {
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
           contains('0000180d-0000-1000-8000-00805f9b34fb'),
         );
-        // Bluey manufacturer data marker is set instead
+        // No manufacturer data when app doesn't provide any
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
-          equals(0xFFFF),
+          isNull,
         );
       });
 
@@ -535,7 +535,7 @@ void main() {
         );
       });
 
-      test('startAdvertising sets Bluey marker when no app manufacturer data',
+      test('startAdvertising does not set manufacturer data when none provided',
           () async {
         final server = bluey.server()!;
 
@@ -543,11 +543,11 @@ void main() {
 
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
-          equals(0xFFFF),
+          isNull,
         );
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerData,
-          equals(Uint8List.fromList([0xB1, 0xE7])),
+          isNull,
         );
       });
 

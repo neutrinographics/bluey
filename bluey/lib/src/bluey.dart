@@ -297,15 +297,20 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
+  /// [maxFailedHeartbeats] - Consecutive heartbeat write failures that
+  ///   trigger a local disconnect when the device is a Bluey server.
   ///
-  /// Returns a [Connection] for raw BLE GATT operations.
+  /// After connecting, this method automatically discovers services. If the
+  /// device hosts the Bluey control service, the lifecycle heartbeat is
+  /// started and the connection is upgraded to a [PeerConnection] that
+  /// hides the control service. For non-Bluey devices a raw connection is
+  /// returned. Callers can check [Connection.isBlueyServer] to distinguish.
+  ///
   /// Throws [ConnectionException] if connection fails.
-  ///
-  /// For peer-to-peer connections with lifecycle heartbeat and control-service
-  /// filtering, use [BlueyPeer.connect] instead.
   Future<Connection> connect(
     Device device, {
     Duration? timeout,
+    int maxFailedHeartbeats = 1,
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -320,10 +325,17 @@ class Bluey {
 
       _emitEvent(ConnectedEvent(deviceId: device.id));
 
-      return BlueyConnection(
+      final rawConnection = BlueyConnection(
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
+      );
+
+      // Auto-upgrade: if the server hosts the Bluey control service,
+      // start the lifecycle heartbeat and wrap in PeerConnection.
+      return await _upgradeIfBlueyServer(
+        rawConnection,
+        maxFailedHeartbeats: maxFailedHeartbeats,
       );
     } catch (e) {
       _emitEvent(
@@ -336,71 +348,58 @@ class Bluey {
     }
   }
 
-  /// Connect to a device known to be a Bluey server.
-  ///
-  /// Use this when a scan result's [ScanResult.isBlueyServer] is true.
-  /// Connects, reads the server's [ServerId] from the control service,
-  /// starts a lifecycle heartbeat, and wraps the connection so the
-  /// control service is hidden from the caller.
-  ///
-  /// Throws [StateError] if the device does not host the Bluey control
-  /// service (i.e., it is not actually a Bluey server).
-  Future<Connection> connectToBlueyServer(
-    Device device, {
-    Duration? timeout,
+  /// Checks if the connected device hosts the Bluey control service.
+  /// If yes, reads the ServerId, starts the lifecycle heartbeat, and
+  /// wraps the connection in a PeerConnection. If not, returns the
+  /// raw connection unchanged.
+  Future<Connection> _upgradeIfBlueyServer(
+    BlueyConnection rawConnection, {
     int maxFailedHeartbeats = 1,
   }) async {
-    _emitEvent(ConnectingEvent(deviceId: device.id));
-
     try {
-      final connectionId = await _platform.connect(
-        device.address,
-        platform.PlatformConnectConfig(
-          timeoutMs: timeout?.inMilliseconds,
-          mtu: null,
-        ),
-      );
+      final services = await rawConnection.services();
 
-      final rawConnection = BlueyConnection(
-        platformInstance: _platform,
-        connectionId: connectionId,
-        deviceId: device.id,
-      );
+      final controlService = services
+          .where((s) => lifecycle.isControlService(s.uuid.toString()))
+          .firstOrNull;
 
-      // Discover services and verify control service is present.
-      final allServices = await rawConnection.services();
-      final hasControlService = allServices.any(
-        (s) => lifecycle.isControlService(s.uuid.toString()),
-      );
-      if (!hasControlService) {
-        await rawConnection.disconnect();
-        throw StateError('Device is not a Bluey server');
+      if (controlService == null) return rawConnection;
+
+      // Read the ServerId
+      final serverIdChar = controlService.characteristics
+          .where(
+            (c) => c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+          )
+          .firstOrNull;
+
+      ServerId? serverId;
+      if (serverIdChar != null) {
+        try {
+          final bytes = await serverIdChar.read();
+          serverId = lifecycle.decodeServerId(bytes);
+        } catch (_) {
+          // ServerId read failed -- still upgrade for lifecycle benefits
+        }
       }
 
-      // Start lifecycle heartbeat.
+      // Start lifecycle heartbeat
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
-        connectionId: connectionId,
+        connectionId: rawConnection.connectionId,
         maxFailedHeartbeats: maxFailedHeartbeats,
         onServerUnreachable: () {
           rawConnection.disconnect().catchError((_) {});
         },
       );
-      lifecycleClient.start(allServices: allServices);
+      lifecycleClient.start(allServices: services);
 
-      _emitEvent(ConnectedEvent(deviceId: device.id));
-
-      // Wrap in PeerConnection to hide the control service.
-      return PeerConnection(rawConnection);
-    } catch (e) {
-      if (e is StateError) rethrow;
-      _emitEvent(
-        ErrorEvent(
-          message: 'Connection to Bluey server failed: ${device.id.toShortString()}',
-          error: e,
-        ),
+      return PeerConnection(
+        rawConnection,
+        serverId ?? ServerId.generate(), // fallback if serverId read failed
       );
-      throw _wrapError(e);
+    } catch (_) {
+      // Service discovery failed -- return raw connection
+      return rawConnection;
     }
   }
 

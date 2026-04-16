@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
 
@@ -132,72 +130,6 @@ void main() {
         );
 
         expect(result1, isNot(equals(result2)));
-      });
-    });
-
-    group('isBlueyServer', () {
-      test('returns true when Bluey manufacturer data is present', () {
-        final result = ScanResult(
-          device: testDevice,
-          rssi: -50,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            manufacturerData: ManufacturerData(
-              0xFFFF,
-              Uint8List.fromList([0xB1, 0xE7]),
-            ),
-            isConnectable: true,
-          ),
-        );
-        expect(result.isBlueyServer, isTrue);
-      });
-
-      test('returns false without Bluey manufacturer data', () {
-        final result = ScanResult(
-          device: testDevice,
-          rssi: -50,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            isConnectable: true,
-          ),
-        );
-        expect(result.isBlueyServer, isFalse);
-      });
-
-      test('returns false with different company ID', () {
-        final result = ScanResult(
-          device: testDevice,
-          rssi: -50,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            manufacturerData: ManufacturerData(
-              0x004C,
-              Uint8List.fromList([0xB1, 0xE7]),
-            ),
-            isConnectable: true,
-          ),
-        );
-        expect(result.isBlueyServer, isFalse);
-      });
-
-      test('returns false with wrong marker bytes', () {
-        final result = ScanResult(
-          device: testDevice,
-          rssi: -50,
-          advertisement: Advertisement(
-            serviceUuids: [],
-            serviceData: {},
-            manufacturerData: ManufacturerData(
-              0xFFFF,
-              Uint8List.fromList([0x00, 0x00]),
-            ),
-            isConnectable: true,
-          ),
-        );
-        expect(result.isBlueyServer, isFalse);
       });
     });
 

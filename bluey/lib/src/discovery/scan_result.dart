@@ -1,6 +1,5 @@
 import 'package:meta/meta.dart';
 
-import '../lifecycle.dart' as lifecycle;
 import 'advertisement.dart';
 import 'device.dart';
 
@@ -29,15 +28,6 @@ class ScanResult {
     required this.advertisement,
     DateTime? lastSeen,
   }) : lastSeen = lastSeen ?? DateTime.now();
-
-  /// Whether this device is advertising as a Bluey server.
-  ///
-  /// Returns true if the advertisement contains Bluey manufacturer data,
-  /// indicating the device supports the Bluey peer protocol.
-  bool get isBlueyServer => lifecycle.isBlueyManufacturerData(
-    advertisement.manufacturerData?.companyId,
-    advertisement.manufacturerData?.data,
-  );
 
   @override
   bool operator ==(Object other) {

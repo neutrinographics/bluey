@@ -143,22 +143,11 @@ class BlueyServer implements Server {
     // services cannot be added while advertising.
     await _lifecycle.addControlServiceIfNeeded();
 
-    final advertisedUuids = services?.map((u) => u.toString()).toList() ?? [];
-
-    // Add Bluey manufacturer data marker if lifecycle is enabled and the
-    // app hasn't provided its own manufacturer data.
-    int? mfrCompanyId = manufacturerData?.companyId;
-    Uint8List? mfrData = manufacturerData?.data;
-    if (_lifecycle.isEnabled && mfrCompanyId == null) {
-      mfrCompanyId = lifecycle.blueyCompanyId;
-      mfrData = lifecycle.blueyMarkerData;
-    }
-
     final config = platform.PlatformAdvertiseConfig(
       name: name,
-      serviceUuids: advertisedUuids,
-      manufacturerDataCompanyId: mfrCompanyId,
-      manufacturerData: mfrData,
+      serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
+      manufacturerDataCompanyId: manufacturerData?.companyId,
+      manufacturerData: manufacturerData?.data,
       timeoutMs: timeout?.inMilliseconds,
     );
 

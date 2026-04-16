@@ -76,7 +76,7 @@ class _BlueyPeer implements BlueyPeer {
 
       // Wrap with PeerConnection so the control service is hidden
       // from the caller's view of services/service/hasService.
-      return PeerConnection(rawConnection);
+      return PeerConnection(rawConnection, serverId);
     } finally {
       _connecting = false;
     }

@@ -188,10 +188,10 @@ void main() {
 
         // Assert: 2 app services only (control service no longer advertised)
         expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(2));
-        // Bluey manufacturer data marker is set instead
+        // No manufacturer data when app doesn't provide any
         expect(
           fakePlatform.advertiseConfig?.manufacturerDataCompanyId,
-          equals(0xFFFF),
+          isNull,
         );
 
         await server.dispose();

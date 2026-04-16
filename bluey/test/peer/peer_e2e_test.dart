@@ -76,8 +76,8 @@ void main() {
     });
   });
 
-  group('bluey.connectToBlueyServer', () {
-    test('connects to a known Bluey server device and returns a peer connection', () async {
+  group('bluey.connect auto-upgrade', () {
+    test('auto-upgrades to peer connection for Bluey servers', () async {
       final id = ServerId.generate();
       fakePlatform.simulateBlueyServer(
         address: 'AA:BB:CC:DD:EE:01',
@@ -86,30 +86,30 @@ void main() {
 
       final bluey = Bluey();
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Bluey Server',
       );
+      final conn = await bluey.connect(device);
 
-      final connection = await bluey.connectToBlueyServer(device);
-      expect(connection.state, ConnectionState.connected);
+      expect(conn.isBlueyServer, isTrue);
+      expect(conn.serverId, equals(id));
 
-      // The control service should be hidden (PeerConnection wrapping)
-      final services = await connection.services();
+      // The control service should be hidden
+      final services = await conn.services();
       final controlServicePresent = services.any(
         (s) => s.uuid.toString().toLowerCase() == 'b1e70001-0000-1000-8000-00805f9b34fb',
       );
       expect(controlServicePresent, isFalse);
 
-      await connection.disconnect();
+      await conn.disconnect();
       await bluey.dispose();
     });
 
-    test('throws StateError when device is not a Bluey server', () async {
-      // Simulate a regular peripheral without control service
+    test('returns raw connection for non-Bluey devices', () async {
       fakePlatform.simulatePeripheral(
-        id: 'AA:BB:CC:DD:EE:02',
-        name: 'Regular Device',
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'Generic Device',
         services: [
           const platform.PlatformService(
             uuid: '0000180d-0000-1000-8000-00805f9b34fb',
@@ -122,16 +122,16 @@ void main() {
 
       final bluey = Bluey();
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        address: 'AA:BB:CC:DD:EE:02',
-        name: 'Regular Device',
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: 'AA:BB:CC:DD:EE:01',
+        name: 'Generic Device',
       );
+      final conn = await bluey.connect(device);
 
-      expect(
-        () => bluey.connectToBlueyServer(device),
-        throwsA(isA<StateError>()),
-      );
+      expect(conn.isBlueyServer, isFalse);
+      expect(conn.serverId, isNull);
 
+      await conn.disconnect();
       await bluey.dispose();
     });
   });

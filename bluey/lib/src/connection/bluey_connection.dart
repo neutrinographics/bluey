@@ -4,6 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../gatt_client/gatt.dart';
+import '../peer/server_id.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
@@ -26,6 +27,12 @@ class BlueyConnection implements Connection {
 
   @override
   final UUID deviceId;
+
+  @override
+  bool get isBlueyServer => false;
+
+  @override
+  ServerId? get serverId => null;
 
   ConnectionState _state =
       ConnectionState
