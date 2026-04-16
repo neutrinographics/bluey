@@ -31,6 +31,9 @@ class LifecycleServer {
         _interval = interval,
         _serverId = serverId;
 
+  /// Whether lifecycle management is enabled (interval is non-null).
+  bool get isEnabled => _interval != null;
+
   /// Adds the control service to the platform if lifecycle is enabled
   /// and it hasn't been added yet.
   Future<void> addControlServiceIfNeeded() async {

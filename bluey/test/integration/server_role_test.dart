@@ -186,8 +186,8 @@ void main() {
 
         await server.startAdvertising(name: 'Test Device', services: services);
 
-        // Assert
-        expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(2));
+        // Assert: 2 app services + 1 control service (auto-added for lifecycle)
+        expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(3));
 
         await server.dispose();
         await bluey.dispose();

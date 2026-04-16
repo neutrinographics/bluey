@@ -497,7 +497,8 @@ void main() {
           services: [UUID.short(0x180F), UUID.short(0x180D)],
         );
 
-        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(2));
+        // 2 app services + 1 control service (auto-added for lifecycle)
+        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(3));
         expect(
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
           contains('0000180f-0000-1000-8000-00805f9b34fb'),
