@@ -4,12 +4,14 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../gatt_client/gatt.dart';
+import '../lifecycle.dart' as lifecycle;
 import '../peer/server_id.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import 'connection.dart';
 import 'connection_state.dart';
+import 'lifecycle_client.dart';
 
 /// Internal implementation of [Connection] that wraps platform calls.
 ///
@@ -28,11 +30,14 @@ class BlueyConnection implements Connection {
   @override
   final UUID deviceId;
 
-  @override
-  bool get isBlueyServer => false;
+  LifecycleClient? _lifecycle;
+  ServerId? _serverId;
 
   @override
-  ServerId? get serverId => null;
+  bool get isBlueyServer => _lifecycle != null;
+
+  @override
+  ServerId? get serverId => _serverId;
 
   ConnectionState _state =
       ConnectionState
@@ -127,6 +132,23 @@ class BlueyConnection implements Connection {
     });
   }
 
+  /// Upgrades this connection to use the Bluey lifecycle protocol.
+  ///
+  /// Called internally when the control service is discovered during
+  /// auto-upgrade or peer connect. Sets [isBlueyServer] to true and
+  /// enables service filtering and lifecycle disconnect commands.
+  ///
+  /// Not part of the public [Connection] interface.
+  void upgrade({
+    required LifecycleClient lifecycleClient,
+    required ServerId serverId,
+  }) {
+    _lifecycle = lifecycleClient;
+    _serverId = serverId;
+    _cachedServices = null; // invalidate so next services() call filters
+    _stateController.add(ConnectionState.connected);
+  }
+
   @override
   ConnectionState get state => _state;
 
@@ -138,6 +160,9 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
+    if (isBlueyServer && lifecycle.isControlService(uuid.toString())) {
+      throw ServiceNotFoundException(uuid);
+    }
     if (_cachedServices == null) {
       throw ServiceNotFoundException(uuid);
     }
@@ -158,13 +183,25 @@ class BlueyConnection implements Connection {
     }
 
     final platformServices = await _platform.discoverServices(_connectionId);
-    _cachedServices =
+    final allServices =
         platformServices.map((ps) => _mapService(ps)).toList();
+
+    if (isBlueyServer) {
+      _cachedServices = allServices
+          .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+          .toList();
+    } else {
+      _cachedServices = allServices;
+    }
+
     return _cachedServices!;
   }
 
   @override
   Future<bool> hasService(UUID uuid) async {
+    if (isBlueyServer && lifecycle.isControlService(uuid.toString())) {
+      return false;
+    }
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
@@ -191,6 +228,12 @@ class BlueyConnection implements Connection {
 
     _state = ConnectionState.disconnecting;
     _stateController.add(_state);
+
+    // Send lifecycle disconnect command if upgraded to Bluey protocol.
+    if (_lifecycle != null) {
+      await _lifecycle!.sendDisconnectCommand();
+      _lifecycle!.stop();
+    }
 
     await _platform.disconnect(_connectionId);
 
@@ -258,6 +301,8 @@ class BlueyConnection implements Connection {
 
   /// Clean up resources.
   Future<void> _cleanup() async {
+    _lifecycle?.stop();
+    _lifecycle = null;
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();

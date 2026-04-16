@@ -17,7 +17,6 @@ import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
 import 'peer/bluey_peer.dart';
 import 'peer/peer.dart';
-import 'peer/peer_connection.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
@@ -302,9 +301,9 @@ class Bluey {
   ///
   /// After connecting, this method automatically discovers services. If the
   /// device hosts the Bluey control service, the lifecycle heartbeat is
-  /// started and the connection is upgraded to a [PeerConnection] that
-  /// hides the control service. For non-Bluey devices a raw connection is
-  /// returned. Callers can check [Connection.isBlueyServer] to distinguish.
+  /// started and the connection is upgraded in place so that it hides the
+  /// control service. For non-Bluey devices a raw connection is returned.
+  /// Callers can check [Connection.isBlueyServer] to distinguish.
   ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(
@@ -332,7 +331,7 @@ class Bluey {
       );
 
       // Auto-upgrade: if the server hosts the Bluey control service,
-      // start the lifecycle heartbeat and wrap in PeerConnection.
+      // start the lifecycle heartbeat and upgrade the connection in place.
       return await _upgradeIfBlueyServer(
         rawConnection,
         maxFailedHeartbeats: maxFailedHeartbeats,
@@ -350,13 +349,15 @@ class Bluey {
 
   /// Checks if the connected device hosts the Bluey control service.
   /// If yes, reads the ServerId, starts the lifecycle heartbeat, and
-  /// wraps the connection in a PeerConnection. If not, returns the
-  /// raw connection unchanged.
+  /// upgrades the connection in place. If not, returns the raw connection
+  /// unchanged.
   Future<Connection> _upgradeIfBlueyServer(
     BlueyConnection rawConnection, {
     int maxFailedHeartbeats = 1,
   }) async {
     try {
+      // Fetch services before upgrade so the full list (including control
+      // service) is available for the lifecycle client.
       final services = await rawConnection.services();
 
       final controlService = services
@@ -393,11 +394,14 @@ class Bluey {
       );
       lifecycleClient.start(allServices: services);
 
-      return PeerConnection(
-        rawConnection,
-        serverId ?? ServerId.generate(), // fallback if serverId read failed
-        lifecycle: lifecycleClient,
+      // Upgrade the connection in place — sets isBlueyServer, enables
+      // service filtering, and invalidates the service cache.
+      rawConnection.upgrade(
+        lifecycleClient: lifecycleClient,
+        serverId: serverId ?? ServerId.generate(),
       );
+
+      return rawConnection;
     } catch (_) {
       // Service discovery failed -- return raw connection
       return rawConnection;

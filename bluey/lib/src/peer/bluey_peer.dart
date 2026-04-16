@@ -7,7 +7,6 @@ import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
 import '../connection/lifecycle_client.dart';
 import 'peer.dart';
-import 'peer_connection.dart';
 import 'peer_discovery.dart';
 import 'server_id.dart';
 
@@ -59,24 +58,30 @@ class _BlueyPeer implements BlueyPeer {
         timeout: timeout,
       );
 
+      final blueyConnection = rawConnection as BlueyConnection;
+
       // Discover services on the raw connection (includes control service).
-      final allServices = await rawConnection.services();
+      final allServices = await blueyConnection.services();
 
       // Start lifecycle heartbeat.
-      final connectionId = (rawConnection as BlueyConnection).connectionId;
-      final lifecycle = LifecycleClient(
+      final lifecycleClient = LifecycleClient(
         platformApi: _platform,
-        connectionId: connectionId,
+        connectionId: blueyConnection.connectionId,
         maxFailedHeartbeats: _maxFailedHeartbeats,
         onServerUnreachable: () {
-          rawConnection.disconnect().catchError((_) {});
+          blueyConnection.disconnect().catchError((_) {});
         },
       );
-      lifecycle.start(allServices: allServices);
+      lifecycleClient.start(allServices: allServices);
 
-      // Wrap with PeerConnection so the control service is hidden
+      // Upgrade the connection in place so the control service is hidden
       // from the caller's view of services/service/hasService.
-      return PeerConnection(rawConnection, serverId, lifecycle: lifecycle);
+      blueyConnection.upgrade(
+        lifecycleClient: lifecycleClient,
+        serverId: serverId,
+      );
+
+      return blueyConnection;
     } finally {
       _connecting = false;
     }
