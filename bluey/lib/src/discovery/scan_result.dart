@@ -32,12 +32,11 @@ class ScanResult {
 
   /// Whether this device is advertising as a Bluey server.
   ///
-  /// Returns true if the advertisement includes the Bluey lifecycle
-  /// control service UUID, indicating the device supports the Bluey
-  /// peer protocol (heartbeat-based disconnect detection, stable
-  /// identity via [ServerId]).
-  bool get isBlueyServer => advertisement.serviceUuids.any(
-    (uuid) => lifecycle.isControlService(uuid.toString()),
+  /// Returns true if the advertisement contains Bluey manufacturer data,
+  /// indicating the device supports the Bluey peer protocol.
+  bool get isBlueyServer => lifecycle.isBlueyManufacturerData(
+    advertisement.manufacturerData?.companyId,
+    advertisement.manufacturerData?.data,
   );
 
   @override

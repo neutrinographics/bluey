@@ -186,8 +186,13 @@ void main() {
 
         await server.startAdvertising(name: 'Test Device', services: services);
 
-        // Assert: 2 app services + 1 control service (auto-added for lifecycle)
-        expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(3));
+        // Assert: 2 app services only (control service no longer advertised)
+        expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(2));
+        // Bluey manufacturer data marker is set instead
+        expect(
+          fakePlatform.advertiseConfig?.manufacturerDataCompanyId,
+          equals(0xFFFF),
+        );
 
         await server.dispose();
         await bluey.dispose();

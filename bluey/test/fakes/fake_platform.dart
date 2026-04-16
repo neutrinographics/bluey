@@ -126,6 +126,8 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       id: address,
       name: name,
       serviceUuids: [controlServiceUuid],
+      manufacturerDataCompanyId: 0xFFFF,
+      manufacturerData: [0xB1, 0xE7],
       services: [
         PlatformService(
           uuid: controlServiceUuid,

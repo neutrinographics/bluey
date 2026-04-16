@@ -79,20 +79,24 @@ class PeerDiscovery {
     throw PeerNotFoundException(expected, scanTimeout);
   }
 
-  /// Collects device addresses from a scan filtered by the Bluey
-  /// control service UUID.
+  /// Collects device addresses from a scan, filtering by Bluey
+  /// manufacturer data marker.
   Future<Set<String>> _collectCandidates(Duration timeout) async {
     final addresses = <String>{};
     final scanConfig = platform.PlatformScanConfig(
-      serviceUuids: [lifecycle.controlServiceUuid],
+      serviceUuids: const [],
       timeoutMs: timeout.inMilliseconds,
     );
-    await for (final device
-        in _platform.scan(scanConfig).timeout(
+    await for (final result in _platform.scan(scanConfig).timeout(
           timeout,
           onTimeout: (sink) => sink.close(),
         )) {
-      addresses.add(device.id);
+      if (lifecycle.isBlueyManufacturerData(
+        result.manufacturerDataCompanyId,
+        result.manufacturerData,
+      )) {
+        addresses.add(result.id);
+      }
     }
     await _platform.stopScan();
     return addresses;

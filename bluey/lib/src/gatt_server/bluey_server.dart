@@ -143,18 +143,22 @@ class BlueyServer implements Server {
     // services cannot be added while advertising.
     await _lifecycle.addControlServiceIfNeeded();
 
-    // Include the control service UUID in the advertisement so that
-    // PeerDiscovery's scan filter can find this server.
     final advertisedUuids = services?.map((u) => u.toString()).toList() ?? [];
-    if (_lifecycle.isEnabled) {
-      advertisedUuids.add(lifecycle.controlServiceUuid);
+
+    // Add Bluey manufacturer data marker if lifecycle is enabled and the
+    // app hasn't provided its own manufacturer data.
+    int? mfrCompanyId = manufacturerData?.companyId;
+    Uint8List? mfrData = manufacturerData?.data;
+    if (_lifecycle.isEnabled && mfrCompanyId == null) {
+      mfrCompanyId = lifecycle.blueyCompanyId;
+      mfrData = lifecycle.blueyMarkerData;
     }
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
       serviceUuids: advertisedUuids,
-      manufacturerDataCompanyId: manufacturerData?.companyId,
-      manufacturerData: manufacturerData?.data,
+      manufacturerDataCompanyId: mfrCompanyId,
+      manufacturerData: mfrData,
       timeoutMs: timeout?.inMilliseconds,
     );
 

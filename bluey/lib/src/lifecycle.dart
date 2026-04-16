@@ -47,6 +47,21 @@ final disconnectValue = Uint8List.fromList([0x00]);
 /// Default lifecycle interval.
 const defaultLifecycleInterval = Duration(seconds: 10);
 
+/// BLE company ID used in the Bluey advertisement marker.
+/// 0xFFFF is reserved for testing/internal use per the Bluetooth spec.
+const blueyCompanyId = 0xFFFF;
+
+/// Magic bytes identifying a Bluey server in manufacturer data.
+/// Spells "bley" in hex (b1e7).
+final blueyMarkerData = Uint8List.fromList([0xB1, 0xE7]);
+
+/// Returns true if the given manufacturer data identifies a Bluey server.
+bool isBlueyManufacturerData(int? companyId, List<int>? data) {
+  if (companyId != blueyCompanyId) return false;
+  if (data == null || data.length < 2) return false;
+  return data[0] == 0xB1 && data[1] == 0xE7;
+}
+
 /// Checks whether a characteristic UUID belongs to the control service.
 bool isControlServiceCharacteristic(String characteristicUuid) {
   final normalized = characteristicUuid.toLowerCase();

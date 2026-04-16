@@ -497,8 +497,8 @@ void main() {
           services: [UUID.short(0x180F), UUID.short(0x180D)],
         );
 
-        // 2 app services + 1 control service (auto-added for lifecycle)
-        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(3));
+        // 2 app services only (control service no longer advertised)
+        expect(mockPlatform.lastAdvertiseConfig?.serviceUuids, hasLength(2));
         expect(
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
           contains('0000180f-0000-1000-8000-00805f9b34fb'),
@@ -506,6 +506,11 @@ void main() {
         expect(
           mockPlatform.lastAdvertiseConfig?.serviceUuids,
           contains('0000180d-0000-1000-8000-00805f9b34fb'),
+        );
+        // Bluey manufacturer data marker is set instead
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+          equals(0xFFFF),
         );
       });
 
@@ -519,6 +524,7 @@ void main() {
           ),
         );
 
+        // App-provided manufacturer data takes priority over Bluey marker
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
           equals(0x004C),
@@ -526,6 +532,22 @@ void main() {
         expect(
           mockPlatform.lastAdvertiseConfig?.manufacturerData,
           equals(Uint8List.fromList([1, 2, 3])),
+        );
+      });
+
+      test('startAdvertising sets Bluey marker when no app manufacturer data',
+          () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(name: 'Test Device');
+
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+          equals(0xFFFF),
+        );
+        expect(
+          mockPlatform.lastAdvertiseConfig?.manufacturerData,
+          equals(Uint8List.fromList([0xB1, 0xE7])),
         );
       });
 
