@@ -500,7 +500,7 @@ class _DeviceCard extends StatelessWidget {
         result.device.name != null && result.device.name!.isNotEmpty;
 
     return GestureDetector(
-      onTap: () => _connectToDevice(context, result.device),
+      onTap: () => _connectToDevice(context, result),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
@@ -515,13 +515,17 @@ class _DeviceCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: bgColor,
+                    color: result.isBlueyServer
+                        ? const Color(0xFFDBEAFE)
+                        : bgColor,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
-                    Icons.bluetooth,
+                    result.isBlueyServer ? Icons.devices : Icons.bluetooth,
                     size: 22,
-                    color: _kTextDark.withValues(alpha: 0.7),
+                    color: result.isBlueyServer
+                        ? const Color(0xFF1D4ED8)
+                        : _kTextDark.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -529,17 +533,46 @@ class _DeviceCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        result.device.name ?? 'Unknown Device',
-                        style: GoogleFonts.manrope(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              hasName
-                                  ? _kTextDark
-                                  : _kTextDark.withValues(alpha: 0.6),
-                          height: 1.56,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              result.device.name ?? 'Unknown Device',
+                              style: GoogleFonts.manrope(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color:
+                                    hasName
+                                        ? _kTextDark
+                                        : _kTextDark.withValues(alpha: 0.6),
+                                height: 1.56,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (result.isBlueyServer) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1D4ED8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'BLUEY',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         result.device.id.toString(),
@@ -589,11 +622,19 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Future<void> _connectToDevice(BuildContext context, Device device) async {
+  Future<void> _connectToDevice(
+    BuildContext context,
+    ScanResult result,
+  ) async {
     await context.read<ScannerCubit>().stopScan();
     if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => ConnectionScreen(device: device)),
+      MaterialPageRoute(
+        builder: (context) => ConnectionScreen(
+          device: result.device,
+          isBlueyServer: result.isBlueyServer,
+        ),
+      ),
     );
   }
 }

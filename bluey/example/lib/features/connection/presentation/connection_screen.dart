@@ -37,8 +37,13 @@ const _kRedBg = Color(0x1AA83836);
 
 class ConnectionScreen extends StatelessWidget {
   final bluey.Device device;
+  final bool isBlueyServer;
 
-  const ConnectionScreen({super.key, required this.device});
+  const ConnectionScreen({
+    super.key,
+    required this.device,
+    this.isBlueyServer = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +55,7 @@ class ConnectionScreen extends StatelessWidget {
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
             settings: getIt<ConnectionSettingsCubit>().state,
+            isBlueyServer: isBlueyServer,
           )..connect(),
       child: const _ConnectionView(),
     );

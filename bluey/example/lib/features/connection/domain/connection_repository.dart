@@ -12,6 +12,16 @@ abstract class ConnectionRepository {
     ConnectionSettings settings = const ConnectionSettings(),
   });
 
+  /// Connects to a device known to be a Bluey server.
+  ///
+  /// Reads the server's [ServerId], starts the lifecycle heartbeat,
+  /// and hides the control service from the caller.
+  Future<Connection> connectToBlueyServer(
+    Device device, {
+    Duration? timeout,
+    ConnectionSettings settings = const ConnectionSettings(),
+  });
+
   /// Disconnects from a device.
   Future<void> disconnect(Connection connection);
 
