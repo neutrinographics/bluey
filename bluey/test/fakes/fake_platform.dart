@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:bluey/src/lifecycle.dart';
+import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
 /// A fake implementation of [BlueyPlatform] for testing.
@@ -109,6 +111,67 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       ),
       services: services,
       characteristicValues: Map.from(characteristicValues),
+    );
+  }
+
+  /// Simulates a Bluey server advertising the control service with a
+  /// pre-populated serverId characteristic.
+  void simulateBlueyServer({
+    required String address,
+    required ServerId serverId,
+    String name = 'Bluey Server',
+    Duration intervalValue = const Duration(seconds: 10),
+  }) {
+    simulatePeripheral(
+      id: address,
+      name: name,
+      serviceUuids: [controlServiceUuid],
+      services: [
+        PlatformService(
+          uuid: controlServiceUuid,
+          isPrimary: true,
+          characteristics: const [
+            PlatformCharacteristic(
+              uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: false,
+                canWrite: true,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+            PlatformCharacteristic(
+              uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: true,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+            PlatformCharacteristic(
+              uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: true,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+            ),
+          ],
+          includedServices: [],
+        ),
+      ],
+      characteristicValues: {
+        'b1e70003-0000-1000-8000-00805f9b34fb': encodeInterval(intervalValue),
+        'b1e70004-0000-1000-8000-00805f9b34fb': serverId.toBytes(),
+      },
     );
   }
 

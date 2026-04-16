@@ -1,73 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/lifecycle.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
-
-String _simulateBlueyServer(
-  FakeBlueyPlatform fakePlatform,
-  ServerId id, {
-  String? addressSuffix,
-  Duration intervalValue = const Duration(seconds: 10),
-}) {
-  final address = 'AA:BB:CC:DD:EE:${addressSuffix ?? '01'}';
-  fakePlatform.simulatePeripheral(
-    id: address,
-    name: 'Bluey Server',
-    serviceUuids: [controlServiceUuid],
-    services: [
-      platform.PlatformService(
-        uuid: controlServiceUuid,
-        isPrimary: true,
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: false,
-              canWrite: true,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-          ),
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: true,
-              canWrite: false,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-          ),
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: true,
-              canWrite: false,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-          ),
-        ],
-        includedServices: [],
-      ),
-    ],
-    characteristicValues: {
-      'b1e70003-0000-1000-8000-00805f9b34fb': encodeInterval(intervalValue),
-      'b1e70004-0000-1000-8000-00805f9b34fb': id.toBytes(),
-    },
-  );
-  return address;
-}
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -81,8 +17,8 @@ void main() {
     test('returns all nearby Bluey servers', () async {
       final id1 = ServerId.generate();
       final id2 = ServerId.generate();
-      _simulateBlueyServer(fakePlatform, id1, addressSuffix: '01');
-      _simulateBlueyServer(fakePlatform, id2, addressSuffix: '02');
+      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id1);
+      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id2);
 
       final bluey = Bluey();
       final peers = await bluey.discoverPeers(
@@ -113,7 +49,7 @@ void main() {
 
     test('connect() succeeds against a matching server', () async {
       final id = ServerId.generate();
-      _simulateBlueyServer(fakePlatform, id);
+      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
 
       final bluey = Bluey();
       final peer = bluey.peer(id);
@@ -124,7 +60,7 @@ void main() {
     });
 
     test('connect() throws PeerNotFoundException when no match', () async {
-      _simulateBlueyServer(fakePlatform, ServerId.generate());
+      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: ServerId.generate());
 
       final bluey = Bluey();
       final peer = bluey.peer(
