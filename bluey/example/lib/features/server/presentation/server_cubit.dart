@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
 import '../application/check_server_support.dart';
+import '../application/set_server_identity.dart';
+import '../application/reset_server.dart';
 import '../application/start_advertising.dart';
 import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
@@ -16,11 +18,14 @@ import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
+import '../infrastructure/server_identity_storage.dart';
 import 'server_state.dart';
 
 /// Cubit for managing server state.
 class ServerCubit extends Cubit<ServerScreenState> {
   final CheckServerSupport _checkServerSupport;
+  final SetServerIdentity _setServerIdentity;
+  final ResetServer _resetServer;
   final StartAdvertising _startAdvertising;
   final StopAdvertising _stopAdvertising;
   final AddService _addService;
@@ -32,6 +37,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final ObserveDisconnections _observeDisconnections;
   final ObserveReadRequests _observeReadRequests;
   final ObserveWriteRequests _observeWriteRequests;
+  final ServerIdentityStorage _identityStorage;
 
   StreamSubscription<Client>? _connectionSubscription;
   StreamSubscription<String>? _disconnectionSubscription;
@@ -48,6 +54,8 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
   ServerCubit({
     required CheckServerSupport checkServerSupport,
+    required SetServerIdentity setServerIdentity,
+    required ResetServer resetServer,
     required StartAdvertising startAdvertising,
     required StopAdvertising stopAdvertising,
     required AddService addService,
@@ -59,7 +67,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required ObserveDisconnections observeDisconnections,
     required ObserveReadRequests observeReadRequests,
     required ObserveWriteRequests observeWriteRequests,
+    required ServerIdentityStorage identityStorage,
   }) : _checkServerSupport = checkServerSupport,
+       _setServerIdentity = setServerIdentity,
+       _resetServer = resetServer,
        _startAdvertising = startAdvertising,
        _stopAdvertising = stopAdvertising,
        _addService = addService,
@@ -71,16 +82,29 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _observeDisconnections = observeDisconnections,
        _observeReadRequests = observeReadRequests,
        _observeWriteRequests = observeWriteRequests,
+       _identityStorage = identityStorage,
        super(const ServerScreenState());
 
   /// Initializes the server.
   Future<void> initialize() async {
+    // Load (or generate) a stable identity before the server is created.
+    final identity = await _identityStorage.loadOrGenerate();
+    _setServerIdentity(identity);
+    emit(state.copyWith(serverId: identity));
+
     if (!_checkServerSupport()) {
       _addLog('Server', 'Server not supported on this platform');
       emit(state.copyWith(isSupported: false));
       return;
     }
 
+    await _resubscribeAndSetup();
+  }
+
+  /// Subscribes to server streams and adds the demo service.
+  ///
+  /// Shared by [initialize] and [resetIdentity].
+  Future<void> _resubscribeAndSetup() async {
     // Listen for central connection/disconnection events and refresh
     // the list from the library's authoritative state each time.
     _connectionSubscription = _observeConnections().listen(
@@ -228,6 +252,28 @@ class ServerCubit extends Cubit<ServerScreenState> {
   /// Clears any error message.
   void clearError() {
     emit(state.copyWith(error: null));
+  }
+
+  /// Resets the server identity, re-initialises the server, and
+  /// re-subscribes to all streams.
+  Future<void> resetIdentity() async {
+    // Cancel existing subscriptions before disposing the server.
+    await _connectionSubscription?.cancel();
+    await _disconnectionSubscription?.cancel();
+    await _readRequestSubscription?.cancel();
+    await _writeRequestSubscription?.cancel();
+
+    final newId = await _identityStorage.reset();
+    await _resetServer(identity: newId);
+    emit(state.copyWith(
+      serverId: newId,
+      isAdvertising: false,
+      connectedClients: [],
+    ));
+    _addLog('Server', 'Identity reset: ${newId.value.substring(0, 8)}...');
+
+    // Re-subscribe and re-add services.
+    await _resubscribeAndSetup();
   }
 
   void _refreshConnectedClients() {

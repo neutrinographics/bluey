@@ -7,6 +7,14 @@ abstract class ServerRepository {
   /// Gets the server instance, or null if not supported on this platform.
   Server? getServer();
 
+  /// Disposes the current server instance and re-creates it with the
+  /// given [identity]. Returns the new server, or null if not supported.
+  Future<Server?> resetServer({required ServerId identity});
+
+  /// Sets the [ServerId] that will be used when the server is first
+  /// created. Must be called before [getServer] to take effect.
+  void setIdentity(ServerId identity);
+
   /// Starts advertising with the given parameters.
   Future<void> startAdvertising({
     String? name,

@@ -9,11 +9,18 @@ class BlueyServerRepository implements ServerRepository {
   final Bluey _bluey;
   Server? _server;
 
+  ServerId? _identity;
+
   BlueyServerRepository(this._bluey);
 
   @override
+  void setIdentity(ServerId identity) {
+    _identity = identity;
+  }
+
+  @override
   Server? getServer() {
-    _server ??= _bluey.server();
+    _server ??= _bluey.server(identity: _identity);
     return _server;
   }
 
@@ -116,6 +123,14 @@ class BlueyServerRepository implements ServerRepository {
   @override
   Future<void> disconnectClient(Client client) async {
     await client.disconnect();
+  }
+
+  @override
+  Future<Server?> resetServer({required ServerId identity}) async {
+    await _server?.dispose();
+    _server = null;
+    _identity = identity;
+    return getServer();
   }
 
   @override

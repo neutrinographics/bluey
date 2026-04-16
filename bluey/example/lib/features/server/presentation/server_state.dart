@@ -7,6 +7,7 @@ class ServerScreenState {
   final List<Client> connectedClients;
   final List<ServerLogEntry> log;
   final int notificationCount;
+  final ServerId? serverId;
   final String? error;
 
   const ServerScreenState({
@@ -15,6 +16,7 @@ class ServerScreenState {
     this.connectedClients = const [],
     this.log = const [],
     this.notificationCount = 0,
+    this.serverId,
     this.error,
   });
 
@@ -24,6 +26,7 @@ class ServerScreenState {
     List<Client>? connectedClients,
     List<ServerLogEntry>? log,
     int? notificationCount,
+    ServerId? serverId,
     String? error,
   }) {
     return ServerScreenState(
@@ -32,6 +35,7 @@ class ServerScreenState {
       connectedClients: connectedClients ?? this.connectedClients,
       log: log ?? this.log,
       notificationCount: notificationCount ?? this.notificationCount,
+      serverId: serverId ?? this.serverId,
       error: error,
     );
   }
