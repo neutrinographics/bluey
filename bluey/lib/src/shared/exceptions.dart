@@ -1,3 +1,4 @@
+import '../peer/server_id.dart';
 import 'uuid.dart';
 
 /// Base class for all Bluey exceptions.
@@ -166,6 +167,26 @@ class AdvertisingException extends BlueyException {
         'Failed to start advertising: $reason',
         action: 'Check advertising data size and hardware support',
       );
+}
+
+// === Peer Exceptions ===
+
+/// No peer with the expected [ServerId] was found within the timeout.
+class PeerNotFoundException extends BlueyException {
+  final ServerId expected;
+  final Duration timeout;
+
+  PeerNotFoundException(this.expected, this.timeout)
+    : super('No peer with id $expected found within $timeout.');
+}
+
+/// The peer's [ServerId] did not match the expected value.
+class PeerIdentityMismatchException extends BlueyException {
+  final ServerId expected;
+  final ServerId actual;
+
+  PeerIdentityMismatchException(this.expected, this.actual)
+    : super('Peer identity mismatch: expected $expected but got $actual.');
 }
 
 // === Platform Exceptions ===
