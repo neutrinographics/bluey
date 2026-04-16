@@ -72,6 +72,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 3. **GATT Client** - Service/characteristic read/write/notify, descriptors, MTU
 4. **GATT Server** - Peripheral role, advertising, request/response handling
 5. **Platform** - Bluetooth state, permissions, capabilities
+6. **Peer** - Stable peer identity on top of the lifecycle protocol. `BlueyPeer`, `ServerId`, `bluey.peer()`, `bluey.discoverPeers()`. The peer module owns the client-side protocol layer — raw `BlueyConnection` is protocol-free.
 
 ### Key Design Decisions
 
@@ -89,6 +90,8 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 | `Server` | PeripheralManager |
 | `Device` | CBPeripheral, BluetoothDevice |
 | `Connection` | (implicit GATT handle) |
+| `ServerId` | server UUID, peer ID |
+| `BlueyPeer` | peer device (in Bluey-specific contexts) |
 
 ## Testing
 
