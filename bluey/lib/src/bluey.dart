@@ -13,6 +13,9 @@ import 'event_bus.dart';
 import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
+import 'peer/bluey_peer.dart';
+import 'peer/peer.dart';
+import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
 import 'shared/exceptions.dart';
@@ -397,6 +400,44 @@ class Bluey {
       lifecycleInterval: lifecycleInterval,
       identity: identity,
     );
+  }
+
+  /// Construct a peer handle from a known [ServerId].
+  ///
+  /// No BLE activity happens until [BlueyPeer.connect] is called.
+  ///
+  /// [maxFailedHeartbeats] controls how many consecutive heartbeat
+  /// write failures trigger a local disconnect on the peer connection.
+  /// Defaults to 1 (fail-fast).
+  BlueyPeer peer(
+    ServerId serverId, {
+    int maxFailedHeartbeats = 1,
+  }) {
+    return createBlueyPeer(
+      platformApi: _platform,
+      serverId: serverId,
+      maxFailedHeartbeats: maxFailedHeartbeats,
+    );
+  }
+
+  /// Scan for nearby Bluey servers.
+  ///
+  /// Filters by the Bluey control service UUID, briefly connects to
+  /// each candidate to read its `serverId`, and returns a list of
+  /// [BlueyPeer]s deduplicated by [ServerId].
+  ///
+  /// [timeout] bounds the scan window. Defaults to 5 seconds.
+  Future<List<BlueyPeer>> discoverPeers({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final discovery = PeerDiscovery(platformApi: _platform);
+    final ids = await discovery.discover(timeout: timeout);
+    return ids
+        .map((id) => createBlueyPeer(
+              platformApi: _platform,
+              serverId: id,
+            ))
+        .toList(growable: false);
   }
 
   /// Release all resources.
