@@ -77,7 +77,7 @@ void main() {
         conn.stateChanges.listen(states.add);
 
         // Simulate server unreachable.
-        fakePlatform.simulateWriteFailure = true;
+        fakePlatform.simulateWriteTimeout = true;
 
         // Heartbeat interval is half the 10s lifecycle interval = 5s.
         async.elapse(const Duration(seconds: 6));
