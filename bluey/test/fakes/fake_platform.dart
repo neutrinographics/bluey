@@ -87,6 +87,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// When true, writeCharacteristic calls will throw to simulate a dead server.
   bool simulateWriteFailure = false;
 
+  /// When true, writeCharacteristic calls will throw a
+  /// [GattOperationTimeoutException] to simulate a remote peer that stopped
+  /// acknowledging writes. Distinct from [simulateWriteFailure], which
+  /// represents non-timeout errors that should NOT be treated as evidence
+  /// of an absent peer.
+  bool simulateWriteTimeout = false;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -475,6 +482,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
+    if (simulateWriteTimeout) {
+      throw const GattOperationTimeoutException('writeCharacteristic');
+    }
     if (simulateWriteFailure) {
       throw Exception('Write failed: server unreachable');
     }
