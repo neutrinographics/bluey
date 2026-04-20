@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey_android/src/android_connection_manager.dart';
@@ -392,6 +393,92 @@ void main() {
         final stream = connectionManager.notificationStream('unknown-device');
         expect(stream, emitsError(isA<StateError>()));
       });
+    });
+
+    group('error translation', () {
+      test(
+        'writeCharacteristic translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(),
+                any(),
+                any(),
+                any(),
+              )).thenThrow(
+            PlatformException(code: 'gatt-timeout', message: 'Write timed out'),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic rethrows non-timeout PlatformException unchanged',
+        () async {
+          final original = PlatformException(
+            code: 'IllegalStateException',
+            message: 'Failed to write characteristic',
+          );
+          when(() => mockHostApi.writeCharacteristic(
+                any(),
+                any(),
+                any(),
+                any(),
+              )).thenThrow(original);
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(predicate<PlatformException>(
+              (e) => e.code == 'IllegalStateException',
+            )),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(code: 'gatt-timeout', message: 'Read timed out'),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'discoverServices translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.discoverServices(any())).thenThrow(
+            PlatformException(
+                code: 'gatt-timeout', message: 'Discovery timed out'),
+          );
+
+          expect(
+            () => connectionManager.discoverServices('device-1'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'discoverServices')),
+          );
+        },
+      );
     });
   });
 }
