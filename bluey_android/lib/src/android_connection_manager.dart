@@ -1,7 +1,29 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
+
+/// Catches a [PlatformException] thrown by Pigeon and re-throws it as a
+/// [GattOperationTimeoutException] when the platform error code is
+/// `'gatt-timeout'`. Other errors propagate unchanged.
+///
+/// Kept package-private so the same wrapper can be used by every GATT
+/// operation in this file without leaking translation logic into the
+/// platform interface contract.
+Future<T> _translateGattTimeout<T>(
+  String operation,
+  Future<T> Function() body,
+) async {
+  try {
+    return await body();
+  } on PlatformException catch (e) {
+    if (e.code == 'gatt-timeout') {
+      throw GattOperationTimeoutException(operation);
+    }
+    rethrow;
+  }
+}
 
 /// Handles BLE connection management, GATT client operations,
 /// bonding, PHY, and connection parameter stubs for the Android platform.
@@ -72,8 +94,10 @@ class AndroidConnectionManager {
 
   /// Discovers services on the connected device.
   Future<List<PlatformService>> discoverServices(String deviceId) async {
-    final services = await _hostApi.discoverServices(deviceId);
-    return services.map(_mapService).toList();
+    return _translateGattTimeout('discoverServices', () async {
+      final services = await _hostApi.discoverServices(deviceId);
+      return services.map(_mapService).toList();
+    });
   }
 
   /// Reads a characteristic value from the connected device.
@@ -81,7 +105,10 @@ class AndroidConnectionManager {
     String deviceId,
     String characteristicUuid,
   ) async {
-    return await _hostApi.readCharacteristic(deviceId, characteristicUuid);
+    return _translateGattTimeout(
+      'readCharacteristic',
+      () => _hostApi.readCharacteristic(deviceId, characteristicUuid),
+    );
   }
 
   /// Writes a characteristic value on the connected device.
@@ -91,11 +118,14 @@ class AndroidConnectionManager {
     Uint8List value,
     bool withResponse,
   ) async {
-    await _hostApi.writeCharacteristic(
-      deviceId,
-      characteristicUuid,
-      value,
-      withResponse,
+    return _translateGattTimeout(
+      'writeCharacteristic',
+      () => _hostApi.writeCharacteristic(
+        deviceId,
+        characteristicUuid,
+        value,
+        withResponse,
+      ),
     );
   }
 
@@ -105,7 +135,11 @@ class AndroidConnectionManager {
     String characteristicUuid,
     bool enable,
   ) async {
-    await _hostApi.setNotification(deviceId, characteristicUuid, enable);
+    // Wrapped defensively for Phase 2 — no Android timeout for setNotification today.
+    return _translateGattTimeout(
+      'setNotification',
+      () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
+    );
   }
 
   /// Reads a descriptor value from the connected device.
@@ -113,7 +147,10 @@ class AndroidConnectionManager {
     String deviceId,
     String descriptorUuid,
   ) async {
-    return await _hostApi.readDescriptor(deviceId, descriptorUuid);
+    return _translateGattTimeout(
+      'readDescriptor',
+      () => _hostApi.readDescriptor(deviceId, descriptorUuid),
+    );
   }
 
   /// Writes a descriptor value on the connected device.
@@ -122,17 +159,26 @@ class AndroidConnectionManager {
     String descriptorUuid,
     Uint8List value,
   ) async {
-    await _hostApi.writeDescriptor(deviceId, descriptorUuid, value);
+    return _translateGattTimeout(
+      'writeDescriptor',
+      () => _hostApi.writeDescriptor(deviceId, descriptorUuid, value),
+    );
   }
 
   /// Requests a new MTU size for the connection.
   Future<int> requestMtu(String deviceId, int mtu) async {
-    return await _hostApi.requestMtu(deviceId, mtu);
+    return _translateGattTimeout(
+      'requestMtu',
+      () => _hostApi.requestMtu(deviceId, mtu),
+    );
   }
 
   /// Reads the RSSI for the connected device.
   Future<int> readRssi(String deviceId) async {
-    return await _hostApi.readRssi(deviceId);
+    return _translateGattTimeout(
+      'readRssi',
+      () => _hostApi.readRssi(deviceId),
+    );
   }
 
   // === Bonding Stubs ===

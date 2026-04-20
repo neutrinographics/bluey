@@ -215,7 +215,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingServiceDiscoveryTimeouts.remove(deviceId)
                     val pendingCallback = pendingServiceDiscovery.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("Service discovery timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Service discovery timed out", null)))
                 }
                 pendingServiceDiscoveryTimeouts[deviceId] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, discoverServicesTimeoutMs)
@@ -256,7 +256,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingReadTimeouts.remove(key)
                     val pendingCallback = pendingReads.remove(key)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("Read characteristic timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Read characteristic timed out", null)))
                 }
                 pendingReadTimeouts[key] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, readCharacteristicTimeoutMs)
@@ -316,7 +316,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingWriteTimeouts.remove(key)
                     val pendingCallback = pendingWrites.remove(key)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("Write characteristic timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Write characteristic timed out", null)))
                 }
                 pendingWriteTimeouts[key] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, writeCharacteristicTimeoutMs)
@@ -419,7 +419,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingDescriptorReadTimeouts.remove(key)
                     val pendingCallback = pendingDescriptorReads.remove(key)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("Read descriptor timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Read descriptor timed out", null)))
                 }
                 pendingDescriptorReadTimeouts[key] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, readDescriptorTimeoutMs)
@@ -469,7 +469,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingDescriptorWriteTimeouts.remove(key)
                     val pendingCallback = pendingDescriptorWrites.remove(key)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("Write descriptor timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Write descriptor timed out", null)))
                 }
                 pendingDescriptorWriteTimeouts[key] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, writeDescriptorTimeoutMs)
@@ -498,7 +498,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingMtuTimeouts.remove(deviceId)
                     val pendingCallback = pendingMtuRequests.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("MTU request timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "MTU request timed out", null)))
                 }
                 pendingMtuTimeouts[deviceId] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, requestMtuTimeoutMs)
@@ -527,7 +527,7 @@ class ConnectionManager(
                 val timeoutRunnable = Runnable {
                     pendingRssiTimeouts.remove(deviceId)
                     val pendingCallback = pendingRssiReads.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(IllegalStateException("RSSI read timed out")))
+                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "RSSI read timed out", null)))
                 }
                 pendingRssiTimeouts[deviceId] = timeoutRunnable
                 handler.postDelayed(timeoutRunnable, readRssiTimeoutMs)

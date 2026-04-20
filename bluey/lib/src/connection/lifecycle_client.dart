@@ -134,7 +134,14 @@ class LifecycleClient {
         )
         .then((_) {
       _consecutiveFailures = 0;
-    }).catchError((_) {
+    }).catchError((Object error) {
+      // Only timeouts indicate the remote peer is unreachable. Other errors
+      // (e.g. a transient "operation in flight" rejection on Android, or a
+      // missing characteristic from a stale GATT cache after Service Changed)
+      // are not evidence of absence and must not trip the failure counter.
+      if (error is! platform.GattOperationTimeoutException) {
+        return;
+      }
       _consecutiveFailures++;
       if (_consecutiveFailures >= maxFailedHeartbeats) {
         stop();

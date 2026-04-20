@@ -13,6 +13,24 @@ import 'connection.dart';
 import 'connection_state.dart';
 import 'lifecycle_client.dart';
 
+/// Catches the internal [platform.GattOperationTimeoutException] surfaced by
+/// the platform pass-through and rethrows it as the user-facing
+/// [GattTimeoutException] from the [BlueyException] sealed hierarchy.
+///
+/// The platform-interface type stays internal: only [LifecycleClient] (an
+/// internal collaborator) catches it directly. Public callers see only
+/// [BlueyException] subtypes, so they can pattern-match exhaustively.
+Future<T> _translateGattTimeout<T>(
+  String operation,
+  Future<T> Function() body,
+) async {
+  try {
+    return await body();
+  } on platform.GattOperationTimeoutException {
+    throw GattTimeoutException(operation);
+  }
+}
+
 /// Internal implementation of [Connection] that wraps platform calls.
 ///
 /// This class is created by [Bluey.connect] and should not be instantiated
@@ -194,7 +212,10 @@ class BlueyConnection implements Connection {
       return _cachedServices!;
     }
 
-    final platformServices = await _platform.discoverServices(_connectionId);
+    final platformServices = await _translateGattTimeout(
+      'discoverServices',
+      () => _platform.discoverServices(_connectionId),
+    );
     final allServices = platformServices.map((ps) => _mapService(ps)).toList();
 
     if (isBlueyServer) {
@@ -228,14 +249,20 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
-    final negotiatedMtu = await _platform.requestMtu(_connectionId, mtu);
+    final negotiatedMtu = await _translateGattTimeout(
+      'requestMtu',
+      () => _platform.requestMtu(_connectionId, mtu),
+    );
     _mtu = negotiatedMtu;
     return _mtu;
   }
 
   @override
   Future<int> readRssi() async {
-    return await _platform.readRssi(_connectionId);
+    return _translateGattTimeout(
+      'readRssi',
+      () => _platform.readRssi(_connectionId),
+    );
   }
 
   @override
@@ -558,7 +585,10 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    return await _platform.readCharacteristic(_connectionId, uuid.toString());
+    return _translateGattTimeout(
+      'readCharacteristic',
+      () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+    );
   }
 
   @override
@@ -569,11 +599,14 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    await _platform.writeCharacteristic(
-      _connectionId,
-      uuid.toString(),
-      value,
-      withResponse,
+    return _translateGattTimeout(
+      'writeCharacteristic',
+      () => _platform.writeCharacteristic(
+        _connectionId,
+        uuid.toString(),
+        value,
+        withResponse,
+      ),
     );
   }
 
@@ -596,7 +629,10 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   void _onFirstListen() {
     // Enable notifications on the platform
-    _platform.setNotification(_connectionId, uuid.toString(), true);
+    _translateGattTimeout(
+      'setNotification',
+      () => _platform.setNotification(_connectionId, uuid.toString(), true),
+    );
 
     // Subscribe to platform notifications
     _notificationSubscription = _platform
@@ -618,7 +654,10 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   void _onLastCancel() {
     // Disable notifications on the platform
-    _platform.setNotification(_connectionId, uuid.toString(), false);
+    _translateGattTimeout(
+      'setNotification',
+      () => _platform.setNotification(_connectionId, uuid.toString(), false),
+    );
 
     // Cancel subscription
     _notificationSubscription?.cancel();
@@ -653,11 +692,17 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 
   @override
   Future<Uint8List> read() async {
-    return await _platform.readDescriptor(_connectionId, uuid.toString());
+    return _translateGattTimeout(
+      'readDescriptor',
+      () => _platform.readDescriptor(_connectionId, uuid.toString()),
+    );
   }
 
   @override
   Future<void> write(Uint8List value) async {
-    await _platform.writeDescriptor(_connectionId, uuid.toString(), value);
+    return _translateGattTimeout(
+      'writeDescriptor',
+      () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
+    );
   }
 }

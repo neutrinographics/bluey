@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey_ios/src/ios_connection_manager.dart';
@@ -545,6 +546,147 @@ void main() {
         final stream = connectionManager.phyStream('device-1');
         expect(stream, emitsDone);
       });
+    });
+
+    group('error translation', () {
+      test(
+        'writeCharacteristic translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(),
+                any(),
+                any(),
+                any(),
+              )).thenThrow(
+            PlatformException(code: 'gatt-timeout', message: 'Write timed out'),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic rethrows non-timeout PlatformException unchanged',
+        () async {
+          // 'notFound' is a real iOS code: Pigeon's wrapError renders bare
+          // Swift enum errors as PlatformException(code: <case>, message: <type>).
+          final original = PlatformException(
+            code: 'notFound',
+            message: 'BlueyError',
+          );
+          when(() => mockHostApi.writeCharacteristic(
+                any(),
+                any(),
+                any(),
+                any(),
+              )).thenThrow(original);
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(predicate<PlatformException>(
+              (e) => e.code == 'notFound',
+            )),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(code: 'gatt-timeout', message: 'Read timed out'),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'discoverServices translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
+        () async {
+          when(() => mockHostApi.discoverServices(any())).thenThrow(
+            PlatformException(
+                code: 'gatt-timeout', message: 'Discovery timed out'),
+          );
+
+          expect(
+            () => connectionManager.discoverServices('device-1'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'discoverServices')),
+          );
+        },
+      );
+
+      test(
+        'all wrapped methods translate gatt-timeout with correct operation name',
+        () async {
+          // Verify each remaining wrapped method (beyond the explicitly
+          // tested writeCharacteristic / readCharacteristic / discoverServices)
+          // passes its own name as the operation. Catches copy-paste typos
+          // in the operation-name string passed to _translateGattTimeout.
+          final timeout = PlatformException(
+            code: 'gatt-timeout',
+            message: 'timeout',
+          );
+
+          // setNotification
+          when(() => mockHostApi.setNotification(any(), any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.setNotification('d', 'c', true),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'setNotification')),
+          );
+
+          // readDescriptor
+          when(() => mockHostApi.readDescriptor(any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.readDescriptor('d', 'desc'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readDescriptor')),
+          );
+
+          // writeDescriptor
+          when(() => mockHostApi.writeDescriptor(any(), any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.writeDescriptor(
+              'd',
+              'desc',
+              Uint8List.fromList([0x01]),
+            ),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'writeDescriptor')),
+          );
+
+          // readRssi
+          when(() => mockHostApi.readRssi(any())).thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.readRssi('d'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readRssi')),
+          );
+        },
+      );
     });
   });
 }
