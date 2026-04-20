@@ -218,7 +218,7 @@ class CentralManagerImpl: NSObject {
             if let pendingCompletion = self.discoverServicesCompletions.removeValue(forKey: deviceId) {
                 self.pendingServiceDiscovery.removeValue(forKey: deviceId)
                 self.pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Service discovery timed out", details: nil)))
             }
         }
         discoverServicesTimers[deviceId] = timer
@@ -248,7 +248,7 @@ class CentralManagerImpl: NSObject {
             guard let self = self else { return }
             self.readCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.readCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Read characteristic timed out", details: nil)))
             }
         }
         readCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
@@ -278,7 +278,7 @@ class CentralManagerImpl: NSObject {
                 guard let self = self else { return }
                 self.writeCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
                 if let pendingCompletion = self.writeCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                    pendingCompletion(.failure(BlueyError.timeout))
+                    pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Write characteristic timed out", details: nil)))
                 }
             }
             writeCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
@@ -357,7 +357,7 @@ class CentralManagerImpl: NSObject {
             guard let self = self else { return }
             self.readDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.readDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Read descriptor timed out", details: nil)))
             }
         }
         readDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
@@ -385,7 +385,7 @@ class CentralManagerImpl: NSObject {
             guard let self = self else { return }
             self.writeDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
             if let pendingCompletion = self.writeDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Write descriptor timed out", details: nil)))
             }
         }
         writeDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
@@ -439,7 +439,7 @@ class CentralManagerImpl: NSObject {
             guard let self = self else { return }
             self.readRssiTimers.removeValue(forKey: deviceId)
             if let pendingCompletion = self.readRssiCompletions.removeValue(forKey: deviceId) {
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "RSSI read timed out", details: nil)))
             }
         }
         readRssiTimers[deviceId] = timer
