@@ -577,9 +577,11 @@ void main() {
       test(
         'writeCharacteristic rethrows non-timeout PlatformException unchanged',
         () async {
+          // 'notFound' is a real iOS code: Pigeon's wrapError renders bare
+          // Swift enum errors as PlatformException(code: <case>, message: <type>).
           final original = PlatformException(
-            code: 'BlueyError',
-            message: 'Failed to write characteristic',
+            code: 'notFound',
+            message: 'BlueyError',
           );
           when(() => mockHostApi.writeCharacteristic(
                 any(),
@@ -596,7 +598,7 @@ void main() {
               true,
             ),
             throwsA(predicate<PlatformException>(
-              (e) => e.code == 'BlueyError',
+              (e) => e.code == 'notFound',
             )),
           );
         },
