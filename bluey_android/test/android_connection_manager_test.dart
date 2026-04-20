@@ -479,6 +479,67 @@ void main() {
           );
         },
       );
+
+      test(
+        'all wrapped methods translate gatt-timeout with correct operation name',
+        () async {
+          // Verify each remaining wrapped method (beyond the explicitly
+          // tested writeCharacteristic / readCharacteristic / discoverServices)
+          // passes its own name as the operation. Catches copy-paste typos
+          // in the operation-name string passed to _translateGattTimeout.
+          final timeout = PlatformException(
+            code: 'gatt-timeout',
+            message: 'timeout',
+          );
+
+          // setNotification
+          when(() => mockHostApi.setNotification(any(), any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.setNotification('d', 'c', true),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'setNotification')),
+          );
+
+          // readDescriptor
+          when(() => mockHostApi.readDescriptor(any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.readDescriptor('d', 'desc'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readDescriptor')),
+          );
+
+          // writeDescriptor
+          when(() => mockHostApi.writeDescriptor(any(), any(), any()))
+              .thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.writeDescriptor(
+              'd',
+              'desc',
+              Uint8List.fromList([0x01]),
+            ),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'writeDescriptor')),
+          );
+
+          // requestMtu
+          when(() => mockHostApi.requestMtu(any(), any())).thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.requestMtu('d', 200),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'requestMtu')),
+          );
+
+          // readRssi
+          when(() => mockHostApi.readRssi(any())).thenThrow(timeout);
+          await expectLater(
+            () => connectionManager.readRssi('d'),
+            throwsA(isA<GattOperationTimeoutException>()
+                .having((e) => e.operation, 'operation', 'readRssi')),
+          );
+        },
+      );
     });
   });
 }
