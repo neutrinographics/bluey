@@ -165,6 +165,7 @@ class IosConnectionManager {
     String characteristicUuid,
     bool enable,
   ) async {
+    // Wrapped defensively for Phase 2 — no iOS timeout for setNotification today.
     return _translateGattTimeout(
       'setNotification',
       () => _hostApi.setNotification(deviceId, characteristicUuid, enable),

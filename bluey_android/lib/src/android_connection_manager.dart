@@ -135,6 +135,7 @@ class AndroidConnectionManager {
     String characteristicUuid,
     bool enable,
   ) async {
+    // Wrapped defensively for Phase 2 — no Android timeout for setNotification today.
     return _translateGattTimeout(
       'setNotification',
       () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
