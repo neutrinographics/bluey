@@ -551,19 +551,19 @@ void main() {
         async.flushMicrotasks();
 
         // Fail 2 heartbeats (below threshold of 3).
-        fakePlatform.simulateWriteFailure = true;
+        fakePlatform.simulateWriteTimeout = true;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
         // Succeed one heartbeat -- resets failure count.
-        fakePlatform.simulateWriteFailure = false;
+        fakePlatform.simulateWriteTimeout = false;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
         // Fail 2 more -- still below threshold because count was reset.
-        fakePlatform.simulateWriteFailure = true;
+        fakePlatform.simulateWriteTimeout = true;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
         async.elapse(const Duration(seconds: 5));
@@ -572,7 +572,7 @@ void main() {
         expect(unreachableFired, isFalse,
             reason: 'Success should have reset the failure counter');
 
-        fakePlatform.simulateWriteFailure = false;
+        fakePlatform.simulateWriteTimeout = false;
         client.stop();
       });
     });
@@ -601,7 +601,7 @@ void main() {
           async.flushMicrotasks();
 
           // Initial immediate heartbeat succeeds. Now enable failures.
-          fakePlatform.simulateWriteFailure = true;
+          fakePlatform.simulateWriteTimeout = true;
 
           // Failure 1
           async.elapse(const Duration(seconds: 5));
@@ -620,7 +620,7 @@ void main() {
           expect(client.isRunning, isFalse,
               reason: 'stop() should have been called internally');
 
-          fakePlatform.simulateWriteFailure = false;
+          fakePlatform.simulateWriteTimeout = false;
         });
       },
     );
@@ -649,7 +649,7 @@ void main() {
           async.flushMicrotasks();
 
           // Initial heartbeat succeeds. Now enable failures.
-          fakePlatform.simulateWriteFailure = true;
+          fakePlatform.simulateWriteTimeout = true;
 
           // First periodic heartbeat fails -- should trigger immediately.
           async.elapse(const Duration(seconds: 5));
@@ -658,7 +658,7 @@ void main() {
           expect(unreachableFired, isTrue);
           expect(client.isRunning, isFalse);
 
-          fakePlatform.simulateWriteFailure = false;
+          fakePlatform.simulateWriteTimeout = false;
         });
       },
     );
