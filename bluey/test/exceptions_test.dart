@@ -204,6 +204,28 @@ void main() {
     });
   });
 
+  group('GattTimeoutException', () {
+    test('exposes the operation name', () {
+      const e = GattTimeoutException('writeCharacteristic');
+      expect(e.operation, equals('writeCharacteristic'));
+    });
+
+    test('is a BlueyException so callers can pattern-match exhaustively', () {
+      const e = GattTimeoutException('readCharacteristic');
+      expect(e, isA<BlueyException>());
+    });
+
+    test('toString mentions the operation', () {
+      const e = GattTimeoutException('discoverServices');
+      expect(e.toString(), contains('discoverServices'));
+    });
+
+    test('has a remediation action', () {
+      const e = GattTimeoutException('writeDescriptor');
+      expect(e.action, isNotNull);
+    });
+  });
+
   group('Enums', () {
     test('ConnectionFailureReason has all cases', () {
       expect(

@@ -136,6 +136,26 @@ class GattException extends BlueyException {
       );
 }
 
+/// A GATT operation (read, write, discoverServices, descriptor read/write,
+/// MTU/RSSI request, or notification subscribe) did not complete within its
+/// configured timeout.
+///
+/// Indicates the remote device may be unreachable. Callers should check
+/// [Connection.state] before retrying; in many cases the remote has gone
+/// out of range or stopped responding and the connection will tear down
+/// shortly via the lifecycle heartbeat.
+class GattTimeoutException extends BlueyException {
+  /// Name of the GATT operation that timed out, e.g. `'writeCharacteristic'`.
+  final String operation;
+
+  const GattTimeoutException(this.operation)
+      : super(
+          'GATT operation "$operation" timed out',
+          action:
+              'Check Connection.state; the remote device may be unreachable.',
+        );
+}
+
 /// Operation not supported by this characteristic.
 class OperationNotSupportedException extends BlueyException {
   final String operation; // 'read', 'write', 'notify'
