@@ -389,9 +389,7 @@ void main() {
       'resetIdentity clears and regenerates identity',
       setUp: () {
         final newId = ServerId('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
-        when(
-          () => mockIdentityStorage.reset(),
-        ).thenAnswer((_) async => newId);
+        when(() => mockIdentityStorage.reset()).thenAnswer((_) async => newId);
         when(
           () => mockResetServer(identity: any(named: 'identity')),
         ).thenAnswer((_) async => MockServer());

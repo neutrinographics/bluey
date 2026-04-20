@@ -140,8 +140,8 @@ class BlueyConnection implements Connection {
     _serviceChangeSubscription = _platform.serviceChanges
         .where((deviceId) => deviceId == _connectionId)
         .listen((_) {
-      _handleServiceChange();
-    });
+          _handleServiceChange();
+        });
   }
 
   /// Upgrades this connection to use the Bluey lifecycle protocol.
@@ -195,22 +195,23 @@ class BlueyConnection implements Connection {
     }
 
     final platformServices = await _platform.discoverServices(_connectionId);
-    final allServices =
-        platformServices.map((ps) => _mapService(ps)).toList();
+    final allServices = platformServices.map((ps) => _mapService(ps)).toList();
 
     if (isBlueyServer) {
-      _cachedServices = allServices
-          .where((s) => !lifecycle.isControlService(s.uuid.toString()))
-          .toList();
+      _cachedServices =
+          allServices
+              .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+              .toList();
     } else {
       // Check if the control service appeared (e.g., server finished
       // initializing after we connected). If so, upgrade in place.
       await _tryUpgrade(allServices);
-      _cachedServices = isBlueyServer
-          ? allServices
-              .where((s) => !lifecycle.isControlService(s.uuid.toString()))
-              .toList()
-          : allServices;
+      _cachedServices =
+          isBlueyServer
+              ? allServices
+                  .where((s) => !lifecycle.isControlService(s.uuid.toString()))
+                  .toList()
+              : allServices;
     }
 
     return _cachedServices!;
@@ -340,18 +341,20 @@ class BlueyConnection implements Connection {
   Future<void> _tryUpgrade(List<RemoteService> allServices) async {
     if (isBlueyServer) return;
 
-    final controlService = allServices
-        .where((s) => lifecycle.isControlService(s.uuid.toString()))
-        .firstOrNull;
+    final controlService =
+        allServices
+            .where((s) => lifecycle.isControlService(s.uuid.toString()))
+            .firstOrNull;
     if (controlService == null) return;
 
     // Read serverId if available
-    final serverIdChar = controlService.characteristics
-        .where(
-          (c) =>
-              c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
-        )
-        .firstOrNull;
+    final serverIdChar =
+        controlService.characteristics
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+            )
+            .firstOrNull;
 
     ServerId? serverId;
     if (serverIdChar != null) {

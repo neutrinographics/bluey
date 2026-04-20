@@ -167,11 +167,7 @@ class _TopBar extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(
-                  Icons.tune,
-                  color: _kHeaderText,
-                  size: 22,
-                ),
+                icon: const Icon(Icons.tune, color: _kHeaderText, size: 22),
                 tooltip: 'Connection settings',
                 onPressed: () => _showConnectionSettings(context),
               ),
@@ -225,8 +221,8 @@ class _ConnectionSettingsDialog extends StatelessWidget {
                 max: 10,
                 divisions: 9,
                 label: '${settings.maxFailedHeartbeats}',
-                onChanged: (value) =>
-                    cubit.setMaxFailedHeartbeats(value.round()),
+                onChanged:
+                    (value) => cubit.setMaxFailedHeartbeats(value.round()),
               ),
             ],
           ),
@@ -590,17 +586,12 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Future<void> _connectToDevice(
-    BuildContext context,
-    ScanResult result,
-  ) async {
+  Future<void> _connectToDevice(BuildContext context, ScanResult result) async {
     await context.read<ScannerCubit>().stopScan();
     if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ConnectionScreen(
-          device: result.device,
-        ),
+        builder: (context) => ConnectionScreen(device: result.device),
       ),
     );
   }

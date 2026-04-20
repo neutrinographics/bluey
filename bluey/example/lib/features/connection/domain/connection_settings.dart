@@ -7,13 +7,9 @@ class ConnectionSettings {
   /// disconnect. See [Bluey.connect].
   final int maxFailedHeartbeats;
 
-  const ConnectionSettings({
-    this.maxFailedHeartbeats = 1,
-  });
+  const ConnectionSettings({this.maxFailedHeartbeats = 1});
 
-  ConnectionSettings copyWith({
-    int? maxFailedHeartbeats,
-  }) {
+  ConnectionSettings copyWith({int? maxFailedHeartbeats}) {
     return ConnectionSettings(
       maxFailedHeartbeats: maxFailedHeartbeats ?? this.maxFailedHeartbeats,
     );

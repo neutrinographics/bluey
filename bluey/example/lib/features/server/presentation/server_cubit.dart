@@ -265,11 +265,13 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
     final newId = await _identityStorage.reset();
     await _resetServer(identity: newId);
-    emit(state.copyWith(
-      serverId: newId,
-      isAdvertising: false,
-      connectedClients: [],
-    ));
+    emit(
+      state.copyWith(
+        serverId: newId,
+        isAdvertising: false,
+        connectedClients: [],
+      ),
+    );
     _addLog('Server', 'Identity reset: ${newId.value.substring(0, 8)}...');
 
     // Re-subscribe and re-add services.
