@@ -662,6 +662,148 @@ void main() {
         });
       },
     );
+
+    // 15. non-timeout heartbeat error does NOT increment failure count
+    test(
+      'non-timeout heartbeat error does NOT increment failure counter',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Initial heartbeat succeeded. Now simulate a non-timeout error
+          // (e.g. another GATT op in flight on Android).
+          fakePlatform.simulateWriteFailure = true;
+
+          // Even with maxFailedHeartbeats=1, ten consecutive non-timeout
+          // errors should NOT trigger onServerUnreachable.
+          for (var i = 0; i < 10; i++) {
+            async.elapse(const Duration(seconds: 5));
+            async.flushMicrotasks();
+          }
+
+          expect(unreachableFired, isFalse,
+              reason: 'Non-timeout errors are transient and must be ignored');
+          expect(client.isRunning, isTrue,
+              reason: 'Heartbeat must keep running through non-timeout errors');
+
+          fakePlatform.simulateWriteFailure = false;
+          client.stop();
+        });
+      },
+    );
+
+    // 16. timeout heartbeat error DOES increment failure count
+    test(
+      'timeout heartbeat error fires onServerUnreachable after threshold',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 2,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWriteTimeout = true;
+
+          // Timeout 1 — below threshold
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          // Timeout 2 — at threshold, should fire
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWriteTimeout = false;
+        });
+      },
+    );
+
+    // 17. mixed timeouts and non-timeouts: only timeouts count
+    test(
+      'mixed timeouts and non-timeouts: only timeouts count toward threshold',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 3,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Timeout 1
+          fakePlatform.simulateWriteTimeout = true;
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          // 5 non-timeout failures interleaved — must NOT advance the counter
+          fakePlatform.simulateWriteTimeout = false;
+          fakePlatform.simulateWriteFailure = true;
+          for (var i = 0; i < 5; i++) {
+            async.elapse(const Duration(seconds: 5));
+            async.flushMicrotasks();
+          }
+          expect(unreachableFired, isFalse,
+              reason: 'Non-timeout errors must not advance the counter');
+          fakePlatform.simulateWriteFailure = false;
+
+          // Timeout 2
+          fakePlatform.simulateWriteTimeout = true;
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          // Timeout 3 — threshold
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+
+          fakePlatform.simulateWriteTimeout = false;
+        });
+      },
+    );
   });
 }
 
