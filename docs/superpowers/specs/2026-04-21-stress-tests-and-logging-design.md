@@ -11,7 +11,7 @@ Phase 2a shipped real correctness guarantees (per-connection GATT queue, three t
 
 Two distinct deliverables, bundled for efficiency since they touch overlapping flows:
 
-1. **In-app stress test tool** in the example app, accessible from the connection screen (beneath the Disconnect button) when connected to a bluey peer. Configurable per-test parameters; live counters; failure breakdown by exception type.
+1. **In-app stress test tool** in the example app, accessible from the connection screen (beneath the Disconnect button) when the connected peer hosts the stress test service. Configurable per-test parameters; live counters; failure breakdown by exception type.
 2. **Lightweight library logging** via `dart:developer.log` at ~15–20 key points across `bluey/lib/src/`, using 5 named loggers under the `bluey.*` namespace. Visible in devtools, logcat, and Xcode console without any consumer-side setup.
 
 ### In scope
@@ -86,6 +86,22 @@ Two-pronged mitigation:
 2. **Burst-id filtering.** `burstMe` notifications carry a 1-byte burst-id prefix. The client tracks the expected burst-id for the current run; notifications with a different id are stragglers from a previous (cancelled) burst and are silently dropped. Required because we can't prevent the previous burst's notifications from arriving on the wire — only filter them out client-side.
 
 This design accepts that `Stop` is best-effort cleanup. The reliable cleanup happens at the start of the next test. Trade-off: ~50ms overhead per test for the `reset` round-trip; in exchange, no spec-rot from accumulated server state and no flaky cross-test interference.
+
+### Stress Tests button visibility
+
+The button on `ConnectionScreen` is visible only when the connected peer **hosts the stress test service** — not merely when the peer is a bluey peer. The two are distinct:
+
+| Peer state | `isBlueyServer` | Hosts stress service | Button shown |
+|---|---|---|---|
+| Generic GATT device (non-bluey) | false | no | no |
+| Bluey peer running this example app's server | true | yes | **yes** |
+| Bluey peer running a different (custom) bluey-based server | true | no | no |
+
+The stress service is example-app scaffolding, not part of the bluey library — any bluey-based app that doesn't register it won't have it. So the only honest visibility test is *"can the button do useful work?"*, which means *"is `StressProtocol.serviceUuid` in `connection.services`?"*.
+
+`ConnectionCubit` already loads services after connect (`loadServices()` at the end of `connect()`). The stress button widget watches the cubit's `state.services` (or equivalent) and renders only when the stress service is present.
+
+**Hide vs disable:** the button is hidden entirely when the service is absent — not greyed out with a tooltip. For a developer-facing example app, an absent button is less clutter than a disabled one and avoids the "why is this greyed out" question that would lead to the same answer.
 
 ## Components
 
@@ -415,7 +431,7 @@ TDD-first commit order. Each commit leaves the workspace green.
 
 2. `feat(example): add stress service handler in server feature` — RED + GREEN. New `infrastructure/stress_service_handler.dart`. Tests for each opcode's behaviour (echo, burstMe with burst-id prefix, delayAck, dropNext, setPayloadSize, reset, unknown). Includes the burst-abort-on-reset test. Wires into `server_setup.dart` so the example server registers the stress service alongside the demo service.
 
-3. `feat(example): scaffold stress_tests feature module` — empty domain types, use case stubs, runner skeleton, cubit + state, screen with empty test cards. No real logic yet. Wired into navigation: `ConnectionScreen` gains a "Stress Tests" button immediately beneath the existing Disconnect button (same `GestureDetector` + `Container` style for visual consistency).
+3. `feat(example): scaffold stress_tests feature module` — empty domain types, use case stubs, runner skeleton, cubit + state, screen with empty test cards. No real logic yet. Wired into navigation: `ConnectionScreen` gains a "Stress Tests" button immediately beneath the existing Disconnect button (same `GestureDetector` + `Container` style for visual consistency). See "Stress Tests button visibility" in Architecture for the visibility rule.
 
 4. `feat(example): implement StressTestRunner.runBurstWrite + RunBurstWrite use case` — RED + GREEN. Integration tests using `FakeBlueyPlatform` for success/timeout/status-failed/disconnect paths.
 
