@@ -1,11 +1,8 @@
 import 'dart:async';
-// ignore_for_file: avoid_print
-// [DIAG:lifecycle-force-kill] Temporary diagnostic prints for investigating
-// why iOS client doesn't detect an Android server force-kill. Revert once
-// the root cause is identified.
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -42,25 +39,12 @@ class LifecycleClient {
   /// control service). If the control service or its heartbeat characteristic
   /// is absent, the method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
-    if (_heartbeatCharUuid != null) {
-      print('[DIAG:lifecycle] start: already running, skipping');
-      return;
-    }
-    print(
-      '[DIAG:lifecycle] start: ${allServices.length} services discovered: '
-      '${allServices.map((s) => s.uuid.toString()).join(', ')}',
-    );
+    if (_heartbeatCharUuid != null) return;
 
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
         .firstOrNull;
-    if (controlService == null) {
-      print(
-        '[DIAG:lifecycle] start: NO CONTROL SERVICE — heartbeat disabled. '
-        'Expected ${lifecycle.controlServiceUuid}',
-      );
-      return;
-    }
+    if (controlService == null) return;
 
     final heartbeatChar = controlService.characteristics
         .where(
@@ -68,13 +52,9 @@ class LifecycleClient {
               c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
         )
         .firstOrNull;
-    if (heartbeatChar == null) {
-      print('[DIAG:lifecycle] start: control service has no heartbeat char');
-      return;
-    }
+    if (heartbeatChar == null) return;
 
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
-    print('[DIAG:lifecycle] start: heartbeat char found, firing initial send');
 
     // Send the first heartbeat immediately so the server (especially iOS,
     // which has no connection callback) learns about this client as soon as
@@ -136,7 +116,6 @@ class LifecycleClient {
   );
 
   void _beginHeartbeat(Duration interval) {
-    print('[DIAG:lifecycle] beginHeartbeat: interval=${interval.inMilliseconds}ms');
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(interval, (_) {
       _sendHeartbeat();
@@ -147,7 +126,6 @@ class LifecycleClient {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
-    print('[DIAG:lifecycle] heartbeat →');
     _platform
         .writeCharacteristic(
           _connectionId,
@@ -156,31 +134,50 @@ class LifecycleClient {
           true,
         )
         .then((_) {
-      print('[DIAG:lifecycle] heartbeat ack');
       _consecutiveFailures = 0;
     }).catchError((Object error) {
-      print(
-        '[DIAG:lifecycle] heartbeat error: '
-        '${error.runtimeType}: $error',
-      );
-      // Only timeouts indicate the remote peer is unreachable. Other errors
-      // (e.g. a transient "operation in flight" rejection on Android, or a
-      // missing characteristic from a stale GATT cache after Service Changed)
-      // are not evidence of absence and must not trip the failure counter.
-      if (error is! platform.GattOperationTimeoutException) {
-        print('[DIAG:lifecycle] error NOT counted (non-timeout)');
+      if (!_isDeadPeerSignal(error)) {
+        // Unrecognized errors (e.g. exotic platform codes, a transient
+        // framework wobble) are not reliable evidence of peer absence.
+        // Leave the counter alone so the connection isn't torn down by a
+        // false positive.
         return;
       }
       _consecutiveFailures++;
-      print(
-        '[DIAG:lifecycle] timeout counted: $_consecutiveFailures/'
-        '$maxFailedHeartbeats',
-      );
       if (_consecutiveFailures >= maxFailedHeartbeats) {
-        print('[DIAG:lifecycle] TRIPPED → onServerUnreachable');
         stop();
         onServerUnreachable();
       }
     });
+  }
+
+  /// Whether [error] is evidence that the peer is no longer reachable.
+  ///
+  /// Treated as dead-peer signals:
+  ///
+  /// * [platform.GattOperationTimeoutException] — the peer stopped
+  ///   acknowledging within the per-op timeout.
+  /// * [platform.GattOperationDisconnectedException] — Android's GATT
+  ///   queue drained the pending heartbeat when the link dropped.
+  /// * [PlatformException] with code `notFound` or `notConnected` — iOS's
+  ///   CoreBluetooth invalidates the peer's characteristic handles as
+  ///   soon as the peer vanishes, long before `didDisconnect` fires. The
+  ///   resulting `BlueyError.notFound` / `.notConnected` reaches Dart as
+  ///   a raw [PlatformException] (it's not translated by
+  ///   `_translateGattPlatformError`), so we match on the Pigeon error
+  ///   code directly.
+  ///
+  /// Every other error is ignored — there was a time when transient
+  /// "operation in flight" rejections on Android produced false positives;
+  /// Phase 2a's GATT operation queue eliminates that class of error, but
+  /// the safety net remains to guard against future unknowns.
+  bool _isDeadPeerSignal(Object error) {
+    if (error is platform.GattOperationTimeoutException) return true;
+    if (error is platform.GattOperationDisconnectedException) return true;
+    if (error is PlatformException &&
+        (error.code == 'notFound' || error.code == 'notConnected')) {
+      return true;
+    }
+    return false;
   }
 }

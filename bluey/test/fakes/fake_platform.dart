@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:bluey/src/lifecycle.dart';
 import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 /// A fake implementation of [BlueyPlatform] for testing.
 ///
@@ -106,6 +107,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// fire-and-forget paths in BlueyRemoteCharacteristic (onFirstListen /
   /// onLastCancel) that would otherwise produce unhandled async errors.
   bool simulateSetNotificationDisconnected = false;
+
+  /// When non-null, writeCharacteristic throws a [PlatformException] with
+  /// this [PlatformException.code]. Models platform-layer errors that are
+  /// emitted BEFORE reaching the typed-exception translation helper (e.g.
+  /// iOS Swift's `BlueyError.notFound` / `.notConnected` when the peer's
+  /// GATT handles have been invalidated after an ungraceful disconnect).
+  String? simulateWritePlatformErrorCode;
 
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
@@ -500,6 +508,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     }
     if (simulateWriteDisconnected) {
       throw const GattOperationDisconnectedException('writeCharacteristic');
+    }
+    final code = simulateWritePlatformErrorCode;
+    if (code != null) {
+      throw PlatformException(code: code);
     }
     if (simulateWriteFailure) {
       throw Exception('Write failed: server unreachable');
