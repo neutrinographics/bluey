@@ -287,27 +287,36 @@ class ConnectionManager(
             return
         }
 
-        // Step 1 (inline, sync): enable local notifications
-        if (!gatt.setCharacteristicNotification(characteristic, enable)) {
-            callback(Result.failure(IllegalStateException("Failed to set notification")))
+        // Step 1 (inline, sync): enable local notifications + look up CCCD.
+        // SecurityException guard: BLUETOOTH_CONNECT can be revoked between
+        // connect() and this call. Without this try/catch the exception would
+        // propagate up to the Pigeon dispatcher and crash the plugin instead
+        // of surfacing as a normal callback failure.
+        val cccd: BluetoothGattDescriptor?
+        val cccdValue: ByteArray
+        try {
+            if (!gatt.setCharacteristicNotification(characteristic, enable)) {
+                callback(Result.failure(IllegalStateException("Failed to set notification")))
+                return
+            }
+            cccd = characteristic.getDescriptor(CCCD_UUID)
+            if (cccd == null) {
+                callback(Result.success(Unit))
+                return
+            }
+            // BluetoothGattDescriptor static fields are platform types in Kotlin; use
+            // the well-known BLE spec byte values as fallbacks for stub environments.
+            cccdValue = when {
+                !enable ->
+                    BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x00, 0x00)
+                (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0 ->
+                    BluetoothGattDescriptor.ENABLE_INDICATION_VALUE ?: byteArrayOf(0x02, 0x00)
+                else ->
+                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x01, 0x00)
+            }
+        } catch (e: SecurityException) {
+            callback(Result.failure(e))
             return
-        }
-
-        // Step 2: if CCCD exists, enqueue its write
-        val cccd = characteristic.getDescriptor(CCCD_UUID)
-        if (cccd == null) {
-            callback(Result.success(Unit))
-            return
-        }
-        // BluetoothGattDescriptor static fields are platform types in Kotlin; use
-        // the well-known BLE spec byte values as fallbacks for stub environments.
-        val cccdValue: ByteArray = when {
-            !enable ->
-                BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x00, 0x00)
-            (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0 ->
-                BluetoothGattDescriptor.ENABLE_INDICATION_VALUE ?: byteArrayOf(0x02, 0x00)
-            else ->
-                BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x01, 0x00)
         }
         val queue = queueFor(deviceId)
         if (queue == null) {

@@ -264,6 +264,25 @@ class ConnectionManagerQueueTest {
     }
 
     @Test
+    fun `setNotification propagates SecurityException from inline sync enable`() {
+        val char = mockCharacteristic()
+        val denied = SecurityException("BLUETOOTH_CONNECT revoked")
+        every { mockGatt.setCharacteristicNotification(char, true) } throws denied
+
+        var captured: Result<Unit>? = null
+        connectionManager.setNotification(
+            deviceAddress, testCharUuid.toString(), true,
+        ) { captured = it }
+
+        assertNotNull("callback must fire even when sync enable throws", captured)
+        assertTrue(captured!!.isFailure)
+        assertSame(
+            "SecurityException must not be masked by the setNotification path",
+            denied, captured!!.exceptionOrNull(),
+        )
+    }
+
+    @Test
     fun `onCharacteristicChanged bypasses queue and forwards notification`() {
         val char = mockCharacteristic()
         every { mockGatt.writeCharacteristic(
