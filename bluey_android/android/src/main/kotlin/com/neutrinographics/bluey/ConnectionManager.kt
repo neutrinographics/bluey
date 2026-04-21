@@ -480,14 +480,13 @@ class ConnectionManager(
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
                         // Cancel the pending connect timeout
                         pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                        // Create the per-connection queue NOW that gatt is usable
-                        queues[deviceId] = GattOpQueue(gatt, handler)
-                        // Connection successful - invoke pending callback on main thread
-                        val pendingCallback = pendingConnections.remove(deviceId)
-                        if (pendingCallback != null) {
-                            handler.post {
-                                pendingCallback.invoke(Result.success(deviceId))
-                            }
+                        handler.post {
+                            // Creating the queue on the main thread preserves GattOpQueue's
+                            // single-threaded invariant (all state mutation on the main-looper
+                            // thread). onConnectionStateChange fires on a binder thread.
+                            queues[deviceId] = GattOpQueue(gatt, handler)
+                            val pendingCallback = pendingConnections.remove(deviceId)
+                            pendingCallback?.invoke(Result.success(deviceId))
                         }
                     }
 

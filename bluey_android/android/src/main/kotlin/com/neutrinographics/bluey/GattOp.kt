@@ -29,6 +29,15 @@ internal abstract class GattOp {
     /** Human-readable description for error messages, e.g. "Write characteristic". */
     abstract val description: String
 
+    /**
+     * Human-readable message for synchronous rejection errors, e.g.
+     * "Failed to write characteristic". Kept separate from [description]
+     * because generating this from [description] via lowercase transform
+     * mangles acronyms (MTU, RSSI) and noun descriptions ("Service
+     * discovery" → "Failed to service discovery").
+     */
+    abstract val syncFailureMessage: String
+
     /** Timeout in milliseconds. Sourced from ConnectionManager configuration. */
     abstract val timeoutMs: Long
 
@@ -55,6 +64,7 @@ internal class ReadCharacteristicOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Read characteristic"
+    override val syncFailureMessage = "Failed to read characteristic"
     override fun execute(gatt: BluetoothGatt): Boolean = gatt.readCharacteristic(characteristic)
     @Suppress("UNCHECKED_CAST")
     override fun complete(result: Result<Any?>) {
@@ -70,6 +80,7 @@ internal class WriteCharacteristicOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Write characteristic"
+    override val syncFailureMessage = "Failed to write characteristic"
     override fun execute(gatt: BluetoothGatt): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeCharacteristic(characteristic, value, writeType) == BluetoothGatt.GATT_SUCCESS
@@ -93,6 +104,7 @@ internal class ReadDescriptorOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Read descriptor"
+    override val syncFailureMessage = "Failed to read descriptor"
     override fun execute(gatt: BluetoothGatt): Boolean = gatt.readDescriptor(descriptor)
     @Suppress("UNCHECKED_CAST")
     override fun complete(result: Result<Any?>) {
@@ -107,6 +119,7 @@ internal class WriteDescriptorOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Write descriptor"
+    override val syncFailureMessage = "Failed to write descriptor"
     override fun execute(gatt: BluetoothGatt): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeDescriptor(descriptor, value) == BluetoothGatt.GATT_SUCCESS
@@ -129,6 +142,7 @@ internal class EnableNotifyCccdOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Enable notify CCCD"
+    override val syncFailureMessage = "Failed to write CCCD"
     override fun execute(gatt: BluetoothGatt): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeDescriptor(descriptor, value) == BluetoothGatt.GATT_SUCCESS
@@ -149,6 +163,7 @@ internal class DiscoverServicesOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "Service discovery"
+    override val syncFailureMessage = "Failed to start service discovery"
     override fun execute(gatt: BluetoothGatt): Boolean = gatt.discoverServices()
     override fun complete(result: Result<Any?>) {
         callback(result.map { Unit })
@@ -161,6 +176,7 @@ internal class RequestMtuOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "MTU request"
+    override val syncFailureMessage = "Failed to request MTU"
     override fun execute(gatt: BluetoothGatt): Boolean = gatt.requestMtu(mtu)
     @Suppress("UNCHECKED_CAST")
     override fun complete(result: Result<Any?>) {
@@ -173,6 +189,7 @@ internal class ReadRssiOp(
     override val timeoutMs: Long,
 ) : GattOp() {
     override val description = "RSSI read"
+    override val syncFailureMessage = "Failed to read RSSI"
     override fun execute(gatt: BluetoothGatt): Boolean = gatt.readRemoteRssi()
     @Suppress("UNCHECKED_CAST")
     override fun complete(result: Result<Any?>) {

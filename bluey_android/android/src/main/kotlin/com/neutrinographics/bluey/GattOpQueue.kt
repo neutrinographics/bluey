@@ -120,11 +120,10 @@ internal class GattOpQueue(
             currentTimeout?.let { handler.removeCallbacks(it) }
             currentTimeout = null
             current = null
-            val lowerFirst = op.description.replaceFirstChar { it.lowercase() }
             try {
                 op.complete(
                     Result.failure(
-                        IllegalStateException("Failed to $lowerFirst")
+                        IllegalStateException(op.syncFailureMessage)
                     )
                 )
             } catch (e: Throwable) {

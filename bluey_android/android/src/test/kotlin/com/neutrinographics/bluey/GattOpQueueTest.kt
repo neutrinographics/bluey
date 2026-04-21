@@ -66,6 +66,11 @@ class GattOpQueueTest {
         var executedCount = 0
         var result: Result<Any?>? = null
 
+        // Derive from description for test convenience; avoids duplicating
+        // message strings in every test fixture. Production ops override
+        // this explicitly to preserve hand-written log strings.
+        override val syncFailureMessage = "Failed to ${description.replaceFirstChar { it.lowercase() }}"
+
         override fun execute(gatt: BluetoothGatt): Boolean {
             executedCount++
             return executeReturns
@@ -177,6 +182,7 @@ class GattOpQueueTest {
 
         val thirdSpy = object : GattOp() {
             override val description = "Third"
+            override val syncFailureMessage = "Failed to third"
             override val timeoutMs = 1000L
             override fun execute(gatt: BluetoothGatt): Boolean {
                 executionLog.add("execute:Third")
@@ -188,6 +194,7 @@ class GattOpQueueTest {
         }
         val secondSpy = object : GattOp() {
             override val description = "Second"
+            override val syncFailureMessage = "Failed to second"
             override val timeoutMs = 1000L
             override fun execute(gatt: BluetoothGatt): Boolean {
                 executionLog.add("execute:Second")
@@ -199,6 +206,7 @@ class GattOpQueueTest {
         }
         val first = object : GattOp() {
             override val description = "First"
+            override val syncFailureMessage = "Failed to first"
             override val timeoutMs = 1000L
             override fun execute(gatt: BluetoothGatt): Boolean {
                 executionLog.add("execute:First")
@@ -278,6 +286,7 @@ class GattOpQueueTest {
         val executionOrder = mutableListOf<String>()
         fun makeOp(name: String) = object : GattOp() {
             override val description = name
+            override val syncFailureMessage = "Failed to $name"
             override val timeoutMs = 1000L
             override fun execute(gatt: BluetoothGatt): Boolean {
                 executionOrder.add(name)
