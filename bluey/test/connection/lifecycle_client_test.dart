@@ -886,6 +886,45 @@ void main() {
       },
     );
 
+    // 20a. GattOperationStatusFailedException (e.g. GATT_INVALID_HANDLE)
+    // counts as dead-peer signal — this is the Android-client→iOS-server
+    // force-kill path, where Service Changed on the peer side invalidates
+    // the characteristic handle and every subsequent heartbeat write
+    // returns status 0x01.
+    test(
+      'GattOperationStatusFailedException trips onServerUnreachable',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWriteStatusFailed = 0x01;
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWriteStatusFailed = null;
+        });
+      },
+    );
+
     // 20. GattOperationDisconnectedException counts as dead-peer signal.
     //
     // Symmetric with Phase 2a's Android queue drain: when a pending heartbeat

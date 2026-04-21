@@ -155,6 +155,14 @@ class LifecycleClient {
   ///   acknowledging within the per-op timeout.
   /// * [platform.GattOperationDisconnectedException] — Android's GATT
   ///   queue drained the pending heartbeat when the link dropped.
+  /// * [platform.GattOperationStatusFailedException] — the peer returned
+  ///   a non-success GATT status. This is the Android-client→iOS-server
+  ///   force-kill path: iOS fires a Service Changed indication on the way
+  ///   out, which invalidates Android's cached characteristic handle, and
+  ///   every subsequent heartbeat write returns GATT_INVALID_HANDLE
+  ///   (0x01). The physical link stays up (iOS's BLE stack still answers
+  ///   link-layer packets after the app dies), so without this branch we
+  ///   would hold the connection open indefinitely.
   /// * [PlatformException] with code `notFound` or `notConnected` — iOS's
   ///   CoreBluetooth invalidates the peer's characteristic handles as
   ///   soon as the peer vanishes, long before `didDisconnect` fires. The
@@ -170,6 +178,7 @@ class LifecycleClient {
   bool _isDeadPeerSignal(Object error) {
     if (error is platform.GattOperationTimeoutException) return true;
     if (error is platform.GattOperationDisconnectedException) return true;
+    if (error is platform.GattOperationStatusFailedException) return true;
     if (error is PlatformException &&
         (error.code == 'notFound' || error.code == 'notConnected')) {
       return true;
