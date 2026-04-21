@@ -1,4 +1,8 @@
 import 'dart:async';
+// ignore_for_file: avoid_print
+// [DIAG:lifecycle-ios-server-shutdown] Temporary diagnostic prints for
+// investigating why Android client doesn't detect iOS server force-kill.
+// Revert once root-caused.
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -126,6 +130,7 @@ class LifecycleClient {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
+    print('[DIAG:lifecycle] heartbeat →');
     _platform
         .writeCharacteristic(
           _connectionId,
@@ -134,17 +139,30 @@ class LifecycleClient {
           true,
         )
         .then((_) {
+      print('[DIAG:lifecycle] heartbeat ack');
       _consecutiveFailures = 0;
     }).catchError((Object error) {
+      // Dump every facet of the error so we can decide whether to count it.
+      String? platformCode;
+      String? platformMessage;
+      if (error is PlatformException) {
+        platformCode = error.code;
+        platformMessage = error.message;
+      }
+      print(
+        '[DIAG:lifecycle] heartbeat error: type=${error.runtimeType} '
+        'code=$platformCode msg=$platformMessage raw=$error',
+      );
       if (!_isDeadPeerSignal(error)) {
-        // Unrecognized errors (e.g. exotic platform codes, a transient
-        // framework wobble) are not reliable evidence of peer absence.
-        // Leave the counter alone so the connection isn't torn down by a
-        // false positive.
+        print('[DIAG:lifecycle] error NOT counted (not a dead-peer signal)');
         return;
       }
       _consecutiveFailures++;
+      print(
+        '[DIAG:lifecycle] counted: $_consecutiveFailures/$maxFailedHeartbeats',
+      );
       if (_consecutiveFailures >= maxFailedHeartbeats) {
+        print('[DIAG:lifecycle] TRIPPED → onServerUnreachable');
         stop();
         onServerUnreachable();
       }
