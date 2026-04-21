@@ -149,3 +149,34 @@ AdvertiseSettings.Builder()
 3. **iOS connection caching** - Connections may persist across app restarts
 4. **GATT server open may fail** - Retry logic needed
 5. **MTU negotiation** - iOS typically requests MTU of 517, but the actual MTU depends on both devices
+
+## GATT Operation Queue
+
+Android's `BluetoothGatt` API enforces a strict **one-operation-in-flight** rule per connection. Calling `gatt.writeCharacteristic()` while another op is outstanding returns `false` synchronously and no `BluetoothGattCallback` fires for the rejected call. Concurrent GATT ops from application code (e.g. user write + lifecycle heartbeat + iOS Service Changed re-discovery) race unless the plugin serializes them.
+
+**Solution (Phase 2a, 2026-04-21):** `ConnectionManager` owns one `GattOpQueue` instance per active GATT connection, keyed by `deviceId`. Every GATT op — read/write characteristic, read/write descriptor, discoverServices, requestMtu, readRssi, setNotification's CCCD write — is constructed as a `GattOp` (sealed class, Command pattern) and enqueued. The queue:
+
+- Executes ops in strict FIFO order; at most one op in flight at a time per connection
+- Per-op timeout via `handler.postDelayed` (values sourced from `ConnectionManager`'s existing timeout config)
+- Drain-on-disconnect: `onConnectionStateChange(STATE_DISCONNECTED)` fires `queue.drainAll(FlutterError("gatt-disconnected", ...))` so pending callbacks resolve promptly instead of dangling until `cleanup()`
+
+### Threading model
+
+The queue is **not thread-safe**. All state mutation happens on the main thread. `BluetoothGattCallback` methods fire on Binder IPC threads; every callback override in `ConnectionManager` posts its `queue.onComplete(...)` / `queue.drainAll(...)` invocation via `handler.post { ... }` before touching the queue. User-initiated `enqueue` calls arrive on the Pigeon dispatcher thread (main). Timeout `Runnables` fire on the `Handler`'s looper (main). Net result: the queue sees a single-threaded access pattern and needs no locks.
+
+### What is NOT queued
+
+- **Incoming notifications (`onCharacteristicChanged`).** Pure arrivals; they don't occupy the single-op slot at the GATT layer and must not be delayed behind user-initiated ops.
+- **Connect / disconnect (`BluetoothDevice.connectGatt`, `BluetoothGatt.disconnect`).** Connection-level, not GATT.
+- **Bonding (`BluetoothDevice.createBond`).** Separate Android API; does not go through `BluetoothGatt`.
+- **The synchronous `gatt.setCharacteristicNotification()` call inside `setNotification`.** Purely local; doesn't hit the wire. Runs inline in `ConnectionManager.setNotification` before the CCCD descriptor write is enqueued.
+- **Unsolicited `BluetoothGattCallback` events (`onConnectionStateChange`, `onServiceChanged`, `onMtuChanged` when initiated by the peer).** Not responses to our ops.
+
+### Cross-connection concurrency
+
+The single-op rule is **per `BluetoothGatt` instance**, not global. Two connections may process GATT ops concurrently at the HCI / link-layer level. `ConnectionManager.queues: Map<String, GattOpQueue>` assigns one queue per connection; concurrent connections' queues do not share state or interfere.
+
+### Limitations (Phase 2a)
+
+- **Write-without-response is serialized.** The link layer actually permits many write-without-response packets back-to-back via the credit flow-control system. Phase 2a serializes them anyway for simplicity; Phase 2c revisits this for burst-throughput workloads.
+- **Discovery / MTU are queued as regular ops.** On some Android versions the OS briefly serializes these across connections at a lower level; our per-connection queue does not coordinate with the OS-level serialization, which is fine because the OS handles it transparently via the callbacks we're already awaiting.
