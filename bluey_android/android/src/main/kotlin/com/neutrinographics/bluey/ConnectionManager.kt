@@ -32,6 +32,7 @@ class ConnectionManager(
 ) {
     private var activity: Activity? = null
     private val connections = mutableMapOf<String, BluetoothGatt>()
+    private val queues = mutableMapOf<String, GattOpQueue>()
     private val handler = Handler(Looper.getMainLooper())
 
     // Pending operation callbacks - GATT operations are async
@@ -196,34 +197,20 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
-        // Always perform a fresh discovery from the remote device.
-        // The Dart layer manages its own service cache. Returning stale
-        // data here prevents the client from detecting GATT database
-        // changes (e.g., iOS server restart where Service Changed
-        // indications are not sent).
-
-        // Store callback for async response
-        pendingServiceDiscovery[deviceId] = callback
-
-        try {
-            if (!gatt.discoverServices()) {
-                pendingServiceDiscovery.remove(deviceId)
-                callback(Result.failure(IllegalStateException("Failed to start service discovery")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingServiceDiscoveryTimeouts.remove(deviceId)
-                    val pendingCallback = pendingServiceDiscovery.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Service discovery timed out", null)))
-                }
-                pendingServiceDiscoveryTimeouts[deviceId] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, discoverServicesTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingServiceDiscovery.remove(deviceId)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(
+            DiscoverServicesOp(
+                callback = { result ->
+                    val mapped = result.map { mapServices(gatt.services) }
+                    callback(mapped)
+                },
+                timeoutMs = discoverServicesTimeoutMs,
+            )
+        )
     }
 
     fun readCharacteristic(
@@ -236,35 +223,17 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
             callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
             return
         }
-
-        // Store callback for async response
-        val key = "$deviceId:$characteristicUuid"
-        pendingReads[key] = callback
-
-        try {
-            if (!gatt.readCharacteristic(characteristic)) {
-                pendingReads.remove(key)
-                callback(Result.failure(IllegalStateException("Failed to read characteristic")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingReadTimeouts.remove(key)
-                    val pendingCallback = pendingReads.remove(key)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Read characteristic timed out", null)))
-                }
-                pendingReadTimeouts[key] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, readCharacteristicTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingReads.remove(key)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(ReadCharacteristicOp(characteristic, callback, readCharacteristicTimeoutMs))
     }
 
     fun writeCharacteristic(
@@ -279,52 +248,26 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
             callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
             return
         }
-
-        // Store callback for async response
-        val key = "$deviceId:$characteristicUuid"
-        pendingWrites[key] = callback
-
-        try {
-            val writeType = if (withResponse) {
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            } else {
-                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            }
-
-            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(characteristic, value, writeType) == BluetoothGatt.GATT_SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                characteristic.writeType = writeType
-                @Suppress("DEPRECATION")
-                characteristic.value = value
-                @Suppress("DEPRECATION")
-                gatt.writeCharacteristic(characteristic)
-            }
-
-            if (!success) {
-                pendingWrites.remove(key)
-                callback(Result.failure(IllegalStateException("Failed to write characteristic")))
-            } else if (withResponse) {
-                // Schedule timeout (only for write-with-response)
-                val timeoutRunnable = Runnable {
-                    pendingWriteTimeouts.remove(key)
-                    val pendingCallback = pendingWrites.remove(key)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Write characteristic timed out", null)))
-                }
-                pendingWriteTimeouts[key] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, writeCharacteristicTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingWrites.remove(key)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        val writeType = if (withResponse) {
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        } else {
+            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        }
+        queue.enqueue(
+            WriteCharacteristicOp(
+                characteristic, value, writeType, callback, writeCharacteristicTimeoutMs,
+            )
+        )
     }
 
     fun setNotification(
@@ -338,56 +281,51 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
             callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
             return
         }
 
+        // Step 1 (inline, sync): enable local notifications + look up CCCD.
+        // SecurityException guard: BLUETOOTH_CONNECT can be revoked between
+        // connect() and this call. Without this try/catch the exception would
+        // propagate up to the Pigeon dispatcher and crash the plugin instead
+        // of surfacing as a normal callback failure.
+        val cccd: BluetoothGattDescriptor?
+        val cccdValue: ByteArray
         try {
-            // Enable local notifications
             if (!gatt.setCharacteristicNotification(characteristic, enable)) {
                 callback(Result.failure(IllegalStateException("Failed to set notification")))
                 return
             }
-
-            // Write to CCCD to enable remote notifications
-            val cccd = characteristic.getDescriptor(CCCD_UUID)
+            cccd = characteristic.getDescriptor(CCCD_UUID)
             if (cccd == null) {
-                // Some characteristics don't have CCCD, that's OK
                 callback(Result.success(Unit))
                 return
             }
-
-            val cccdValue = when {
-                !enable -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            // BluetoothGattDescriptor static fields are platform types in Kotlin; use
+            // the well-known BLE spec byte values as fallbacks for stub environments.
+            cccdValue = when {
+                !enable ->
+                    BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x00, 0x00)
                 (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0 ->
-                    BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-
-                else -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            }
-
-            // Store callback for async response
-            val key = "$deviceId:${CCCD_UUID}"
-            pendingDescriptorWrites[key] = callback
-
-            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeDescriptor(cccd, cccdValue) == BluetoothGatt.GATT_SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                cccd.value = cccdValue
-                @Suppress("DEPRECATION")
-                gatt.writeDescriptor(cccd)
-            }
-
-            if (!success) {
-                pendingDescriptorWrites.remove(key)
-                callback(Result.failure(IllegalStateException("Failed to write CCCD")))
+                    BluetoothGattDescriptor.ENABLE_INDICATION_VALUE ?: byteArrayOf(0x02, 0x00)
+                else ->
+                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x01, 0x00)
             }
         } catch (e: SecurityException) {
             callback(Result.failure(e))
+            return
         }
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
+        }
+        queue.enqueue(
+            EnableNotifyCccdOp(cccd, cccdValue, callback, writeDescriptorTimeoutMs),
+        )
     }
 
     fun readDescriptor(
@@ -400,34 +338,17 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
         val descriptor = findDescriptor(gatt, descriptorUuid)
         if (descriptor == null) {
             callback(Result.failure(IllegalStateException("Descriptor not found: $descriptorUuid")))
             return
         }
-
-        val key = "$deviceId:$descriptorUuid"
-        pendingDescriptorReads[key] = callback
-
-        try {
-            if (!gatt.readDescriptor(descriptor)) {
-                pendingDescriptorReads.remove(key)
-                callback(Result.failure(IllegalStateException("Failed to read descriptor")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingDescriptorReadTimeouts.remove(key)
-                    val pendingCallback = pendingDescriptorReads.remove(key)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Read descriptor timed out", null)))
-                }
-                pendingDescriptorReadTimeouts[key] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, readDescriptorTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingDescriptorReads.remove(key)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(ReadDescriptorOp(descriptor, callback, readDescriptorTimeoutMs))
     }
 
     fun writeDescriptor(
@@ -441,43 +362,17 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
         val descriptor = findDescriptor(gatt, descriptorUuid)
         if (descriptor == null) {
             callback(Result.failure(IllegalStateException("Descriptor not found: $descriptorUuid")))
             return
         }
-
-        val key = "$deviceId:$descriptorUuid"
-        pendingDescriptorWrites[key] = callback
-
-        try {
-            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeDescriptor(descriptor, value) == BluetoothGatt.GATT_SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                descriptor.value = value
-                @Suppress("DEPRECATION")
-                gatt.writeDescriptor(descriptor)
-            }
-
-            if (!success) {
-                pendingDescriptorWrites.remove(key)
-                callback(Result.failure(IllegalStateException("Failed to write descriptor")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingDescriptorWriteTimeouts.remove(key)
-                    val pendingCallback = pendingDescriptorWrites.remove(key)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "Write descriptor timed out", null)))
-                }
-                pendingDescriptorWriteTimeouts[key] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, writeDescriptorTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingDescriptorWrites.remove(key)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(WriteDescriptorOp(descriptor, value, callback, writeDescriptorTimeoutMs))
     }
 
     fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit) {
@@ -486,27 +381,12 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
-        pendingMtuRequests[deviceId] = callback
-
-        try {
-            if (!gatt.requestMtu(mtu.toInt())) {
-                pendingMtuRequests.remove(deviceId)
-                callback(Result.failure(IllegalStateException("Failed to request MTU")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingMtuTimeouts.remove(deviceId)
-                    val pendingCallback = pendingMtuRequests.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "MTU request timed out", null)))
-                }
-                pendingMtuTimeouts[deviceId] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, requestMtuTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingMtuRequests.remove(deviceId)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(RequestMtuOp(mtu.toInt(), callback, requestMtuTimeoutMs))
     }
 
     fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
@@ -515,27 +395,12 @@ class ConnectionManager(
             callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
             return
         }
-
-        pendingRssiReads[deviceId] = callback
-
-        try {
-            if (!gatt.readRemoteRssi()) {
-                pendingRssiReads.remove(deviceId)
-                callback(Result.failure(IllegalStateException("Failed to read RSSI")))
-            } else {
-                // Schedule timeout
-                val timeoutRunnable = Runnable {
-                    pendingRssiTimeouts.remove(deviceId)
-                    val pendingCallback = pendingRssiReads.remove(deviceId)
-                    pendingCallback?.invoke(Result.failure(FlutterError("gatt-timeout", "RSSI read timed out", null)))
-                }
-                pendingRssiTimeouts[deviceId] = timeoutRunnable
-                handler.postDelayed(timeoutRunnable, readRssiTimeoutMs)
-            }
-        } catch (e: SecurityException) {
-            pendingRssiReads.remove(deviceId)
-            callback(Result.failure(e))
+        val queue = queueFor(deviceId)
+        if (queue == null) {
+            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            return
         }
+        queue.enqueue(ReadRssiOp(callback, readRssiTimeoutMs))
     }
 
     fun cleanup() {
@@ -549,6 +414,7 @@ class ConnectionManager(
             }
         }
         connections.clear()
+        queues.clear()
 
         // Cancel all pending timeouts so they cannot fire after cleanup
         pendingConnectionTimeouts.values.forEach { handler.removeCallbacks(it) }
@@ -608,6 +474,27 @@ class ConnectionManager(
         }
     }
 
+    /** Resolves the [GattOpQueue] for [deviceId], or null if no connection exists. */
+    private fun queueFor(deviceId: String): GattOpQueue? = queues[deviceId]
+
+    /**
+     * Builds a `gatt-status-failed` [FlutterError] carrying the native GATT
+     * status code for transport to Dart. Used by every `BluetoothGattCallback`
+     * override when [status] is not [BluetoothGatt.GATT_SUCCESS] so that the
+     * status reaches callers as a typed protocol error instead of a bare
+     * [IllegalStateException] that Pigeon would marshal with an unhelpful
+     * `IllegalStateException` error code.
+     *
+     * The [status] is stored in `FlutterError.details` so Dart can read it
+     * without parsing the human-readable message.
+     */
+    private fun statusFailedError(operation: String, status: Int): FlutterError =
+        FlutterError(
+            "gatt-status-failed",
+            "$operation failed with status: $status",
+            status,
+        )
+
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -620,12 +507,13 @@ class ConnectionManager(
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
                         // Cancel the pending connect timeout
                         pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                        // Connection successful - invoke pending callback on main thread
-                        val pendingCallback = pendingConnections.remove(deviceId)
-                        if (pendingCallback != null) {
-                            handler.post {
-                                pendingCallback.invoke(Result.success(deviceId))
-                            }
+                        handler.post {
+                            // Creating the queue on the main thread preserves GattOpQueue's
+                            // single-threaded invariant (all state mutation on the main-looper
+                            // thread). onConnectionStateChange fires on a binder thread.
+                            queues[deviceId] = GattOpQueue(gatt, handler)
+                            val pendingCallback = pendingConnections.remove(deviceId)
+                            pendingCallback?.invoke(Result.success(deviceId))
                         }
                     }
 
@@ -635,8 +523,17 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
-                        // Cancel any pending timeouts for this device so stale
-                        // timers cannot fire against a future operation.
+                        // Drain any pending queue operations with gatt-disconnected
+                        queues.remove(deviceId)?.let { queue ->
+                            handler.post {
+                                queue.drainAll(
+                                    FlutterError("gatt-disconnected",
+                                        "connection lost with pending GATT op", null)
+                                )
+                            }
+                        }
+                        // Legacy map cleanup (unused after this task but declarations remain
+                        // for Phase 2b to remove)
                         cancelAllTimeouts(deviceId)
                         // Connection failed or disconnected - invoke pending callback with error if present
                         val pendingCallback = pendingConnections.remove(deviceId)
@@ -662,16 +559,13 @@ class ConnectionManager(
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                // Cancel the pending timeout since discovery resolved
-                pendingServiceDiscoveryTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                val callback = pendingServiceDiscovery.remove(deviceId)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
-                        Result.success(mapServices(gatt.services))
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Service discovery failed with status: $status"))
+                        Result.failure(statusFailedError("Service discovery", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -681,17 +575,13 @@ class ConnectionManager(
                 value: ByteArray,
                 status: Int
             ) {
-                val key = "$deviceId:${characteristic.uuid}"
-                // Cancel the pending timeout since the read resolved
-                pendingReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingReads.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(value)
                     } else {
-                        Result.failure(IllegalStateException("Read failed with status: $status"))
+                        Result.failure(statusFailedError("Read", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -702,17 +592,13 @@ class ConnectionManager(
                 characteristic: BluetoothGattCharacteristic,
                 status: Int
             ) {
-                val key = "$deviceId:${characteristic.uuid}"
-                // Cancel the pending timeout since the read resolved
-                pendingReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingReads.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(characteristic.value ?: ByteArray(0))
                     } else {
-                        Result.failure(IllegalStateException("Read failed with status: $status"))
+                        Result.failure(statusFailedError("Read", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -721,17 +607,13 @@ class ConnectionManager(
                 characteristic: BluetoothGattCharacteristic,
                 status: Int
             ) {
-                val key = "$deviceId:${characteristic.uuid}"
-                // Cancel the pending timeout since the write resolved
-                pendingWriteTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingWrites.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Write failed with status: $status"))
+                        Result.failure(statusFailedError("Write", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -774,17 +656,13 @@ class ConnectionManager(
                 status: Int,
                 value: ByteArray
             ) {
-                val key = "$deviceId:${descriptor.uuid}"
-                // Cancel the pending timeout since the read resolved
-                pendingDescriptorReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingDescriptorReads.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(value)
                     } else {
-                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor read", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -795,17 +673,13 @@ class ConnectionManager(
                 descriptor: BluetoothGattDescriptor,
                 status: Int
             ) {
-                val key = "$deviceId:${descriptor.uuid}"
-                // Cancel the pending timeout since the read resolved
-                pendingDescriptorReadTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingDescriptorReads.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(descriptor.value ?: ByteArray(0))
                     } else {
-                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor read", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -814,31 +688,24 @@ class ConnectionManager(
                 descriptor: BluetoothGattDescriptor,
                 status: Int
             ) {
-                val key = "$deviceId:${descriptor.uuid}"
-                // Cancel the pending timeout since the write resolved
-                pendingDescriptorWriteTimeouts.remove(key)?.let { handler.removeCallbacks(it) }
-                val callback = pendingDescriptorWrites.remove(key)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Descriptor write failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor write", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                // Cancel the pending timeout since the MTU request resolved
-                pendingMtuTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                val callback = pendingMtuRequests.remove(deviceId)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(mtu.toLong())
                     } else {
-                        Result.failure(IllegalStateException("MTU request failed with status: $status"))
+                        Result.failure(statusFailedError("MTU request", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
 
                 // Also notify Flutter of MTU change
@@ -856,16 +723,13 @@ class ConnectionManager(
             }
 
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
-                // Cancel the pending timeout since the RSSI read resolved
-                pendingRssiTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                val callback = pendingRssiReads.remove(deviceId)
-                if (callback != null) {
-                    val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                handler.post {
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(rssi.toLong())
                     } else {
-                        Result.failure(IllegalStateException("RSSI read failed with status: $status"))
+                        Result.failure(statusFailedError("RSSI read", status))
                     }
-                    handler.post { callback(result) }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
         }

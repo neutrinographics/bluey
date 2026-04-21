@@ -451,9 +451,6 @@ void main() {
       );
 
       test('services caches results after first discovery', () async {
-        var discoverCount = 0;
-        final originalDiscover = mockPlatform.discoverServices;
-
         mockPlatform.mockServices = [
           platform.PlatformService(
             uuid: '0000180d-0000-1000-8000-00805f9b34fb',

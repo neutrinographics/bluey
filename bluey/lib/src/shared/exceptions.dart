@@ -156,6 +156,34 @@ class GattTimeoutException extends BlueyException {
         );
 }
 
+/// A GATT operation completed but the peer returned a non-success status
+/// code — the request reached the peer and a response came back, but the
+/// response was a protocol-level error.
+///
+/// Distinct from [GattTimeoutException] (no response) and [DisconnectedException]
+/// with [DisconnectReason.linkLoss] (link dropped before response).
+///
+/// The [status] is the native GATT status code (e.g. Android's
+/// `BluetoothGatt.GATT_*` constants: `0x01` = invalid handle, `0x03` =
+/// write not permitted, `0x05` = insufficient authentication, `0x08` =
+/// connection timeout). Callers can use it to distinguish recoverable
+/// errors (bonding required) from terminal ones (peer removed the
+/// characteristic via Service Changed and is no longer responding).
+class GattOperationFailedException extends BlueyException {
+  /// Name of the GATT operation that failed, e.g. `'writeCharacteristic'`.
+  final String operation;
+
+  /// Native GATT status code returned by the peer.
+  final int status;
+
+  const GattOperationFailedException(this.operation, this.status)
+      : super(
+          'GATT operation "$operation" failed with status $status',
+          action:
+              'Inspect status; retry, request bonding, or disconnect depending on the code.',
+        );
+}
+
 /// Operation not supported by this characteristic.
 class OperationNotSupportedException extends BlueyException {
   final String operation; // 'read', 'write', 'notify'

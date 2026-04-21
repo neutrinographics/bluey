@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/connection/lifecycle_client.dart';
-import 'package:bluey/src/gatt_client/gatt.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -801,6 +800,209 @@ void main() {
           expect(unreachableFired, isTrue);
 
           fakePlatform.simulateWriteTimeout = false;
+        });
+      },
+    );
+
+    // 18. iOS "notFound" platform error counts as dead-peer signal
+    //
+    // Regression guard for observed field behaviour (2026-04-21): after an
+    // Android bluey-server is force-killed, iOS CoreBluetooth invalidates
+    // the peripheral's characteristic handles long before `didDisconnect`
+    // fires (supervision timeout is 20–30s). iOS Swift's writeCharacteristic
+    // emits `BlueyError.notFound`, which Pigeon surfaces as
+    // `PlatformException(code: 'notFound')`. The LifecycleClient must treat
+    // this as a peer-unreachable signal; previously it was silently ignored.
+    test(
+      'PlatformException(notFound) trips onServerUnreachable after threshold',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 2,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWritePlatformErrorCode = 'notFound';
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isFalse);
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWritePlatformErrorCode = null;
+        });
+      },
+    );
+
+    // 19. iOS "notConnected" platform error counts as dead-peer signal
+    test(
+      'PlatformException(notConnected) trips onServerUnreachable after threshold',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWritePlatformErrorCode = 'notConnected';
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWritePlatformErrorCode = null;
+        });
+      },
+    );
+
+    // 20a. GattOperationStatusFailedException (e.g. GATT_INVALID_HANDLE)
+    // counts as dead-peer signal — this is the Android-client→iOS-server
+    // force-kill path, where Service Changed on the peer side invalidates
+    // the characteristic handle and every subsequent heartbeat write
+    // returns status 0x01.
+    test(
+      'GattOperationStatusFailedException trips onServerUnreachable',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWriteStatusFailed = 0x01;
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWriteStatusFailed = null;
+        });
+      },
+    );
+
+    // 20. GattOperationDisconnectedException counts as dead-peer signal.
+    //
+    // Symmetric with Phase 2a's Android queue drain: when a pending heartbeat
+    // is drained by `queue.drainAll(gatt-disconnected)` during a mid-op link
+    // loss, the heartbeat should treat it as proof of peer absence rather
+    // than a transient error.
+    test(
+      'GattOperationDisconnectedException trips onServerUnreachable',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWriteDisconnected = true;
+
+          async.elapse(const Duration(seconds: 5));
+          async.flushMicrotasks();
+          expect(unreachableFired, isTrue);
+          expect(client.isRunning, isFalse);
+
+          fakePlatform.simulateWriteDisconnected = false;
+        });
+      },
+    );
+
+    // 21. Unrecognized PlatformException code is still ignored (safety net).
+    //
+    // Complement to test #15: the counter must not react to exotic platform
+    // errors that have no defined "peer is dead" meaning. Only the known
+    // dead-peer codes (notFound/notConnected) should trip.
+    test(
+      'unrecognized PlatformException code does NOT trip counter',
+      () {
+        fakeAsync((async) {
+          var unreachableFired = false;
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          _setUpConnectedClient(
+            maxFailedHeartbeats: 1,
+            onServerUnreachable: () => unreachableFired = true,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          fakePlatform.simulateWritePlatformErrorCode = 'something-unrelated';
+
+          for (var i = 0; i < 5; i++) {
+            async.elapse(const Duration(seconds: 5));
+            async.flushMicrotasks();
+          }
+          expect(unreachableFired, isFalse);
+          expect(client.isRunning, isTrue);
+
+          fakePlatform.simulateWritePlatformErrorCode = null;
+          client.stop();
         });
       },
     );

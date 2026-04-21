@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:bluey/src/lifecycle.dart';
 import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 /// A fake implementation of [BlueyPlatform] for testing.
 ///
@@ -93,6 +94,33 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// represents non-timeout errors that should NOT be treated as evidence
   /// of an absent peer.
   bool simulateWriteTimeout = false;
+
+  /// When true, writeCharacteristic calls will throw a
+  /// [GattOperationDisconnectedException] to simulate a mid-op link loss
+  /// (the platform queue draining a pending op when the GATT connection
+  /// drops). Distinct from [simulateWriteTimeout] and [simulateWriteFailure].
+  bool simulateWriteDisconnected = false;
+
+  /// When true, setNotification calls will throw a
+  /// [GattOperationDisconnectedException] to simulate the CCCD descriptor
+  /// write being drained by a mid-op link loss. Used to cover the
+  /// fire-and-forget paths in BlueyRemoteCharacteristic (onFirstListen /
+  /// onLastCancel) that would otherwise produce unhandled async errors.
+  bool simulateSetNotificationDisconnected = false;
+
+  /// When non-null, writeCharacteristic throws a [PlatformException] with
+  /// this [PlatformException.code]. Models platform-layer errors that are
+  /// emitted BEFORE reaching the typed-exception translation helper (e.g.
+  /// iOS Swift's `BlueyError.notFound` / `.notConnected` when the peer's
+  /// GATT handles have been invalidated after an ungraceful disconnect).
+  String? simulateWritePlatformErrorCode;
+
+  /// When non-null, writeCharacteristic throws a
+  /// [GattOperationStatusFailedException] carrying this GATT status code.
+  /// Models Android's `onCharacteristicWrite(status != SUCCESS)` path —
+  /// most notably status 0x01 (`GATT_INVALID_HANDLE`) that follows a
+  /// peer-side Service Changed event after an iOS server force-kill.
+  int? simulateWriteStatusFailed;
 
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
@@ -485,6 +513,17 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
     }
+    if (simulateWriteDisconnected) {
+      throw const GattOperationDisconnectedException('writeCharacteristic');
+    }
+    final status = simulateWriteStatusFailed;
+    if (status != null) {
+      throw GattOperationStatusFailedException('writeCharacteristic', status);
+    }
+    final code = simulateWritePlatformErrorCode;
+    if (code != null) {
+      throw PlatformException(code: code);
+    }
     if (simulateWriteFailure) {
       throw Exception('Write failed: server unreachable');
     }
@@ -510,6 +549,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String characteristicUuid,
     bool enable,
   ) async {
+    if (simulateSetNotificationDisconnected) {
+      throw const GattOperationDisconnectedException('setNotification');
+    }
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');

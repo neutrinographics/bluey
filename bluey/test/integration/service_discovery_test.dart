@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'

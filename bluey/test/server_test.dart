@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/peer/server_id.dart';
 
 void main() {
   group('GattPermission', () {

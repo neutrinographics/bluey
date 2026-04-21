@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:bluey/bluey.dart';
 
 import 'package:bluey_example/features/server/application/check_server_support.dart';
 

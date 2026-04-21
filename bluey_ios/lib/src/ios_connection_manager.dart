@@ -7,14 +7,24 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
-/// Catches a [PlatformException] thrown by Pigeon and re-throws it as a
-/// [GattOperationTimeoutException] when the platform error code is
-/// `'gatt-timeout'`. Other errors propagate unchanged.
+/// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
+/// matching typed platform-interface exception:
+///
+///   * `'gatt-timeout'` → [GattOperationTimeoutException]
+///   * `'gatt-disconnected'` → [GattOperationDisconnectedException]
+///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
+///     the native status extracted from `details`. iOS Swift does not
+///     currently emit this code, but the translation is kept symmetric
+///     with the Android contract so that any future native-side mapping
+///     (e.g. of `CBError` numeric codes) surfaces as the same typed
+///     exception.
+///
+/// Other errors propagate unchanged.
 ///
 /// Kept package-private so the same wrapper can be used by every GATT
 /// operation in this file without leaking translation logic into the
 /// platform interface contract.
-Future<T> _translateGattTimeout<T>(
+Future<T> _translateGattPlatformError<T>(
   String operation,
   Future<T> Function() body,
 ) async {
@@ -23,6 +33,13 @@ Future<T> _translateGattTimeout<T>(
   } on PlatformException catch (e) {
     if (e.code == 'gatt-timeout') {
       throw GattOperationTimeoutException(operation);
+    }
+    if (e.code == 'gatt-disconnected') {
+      throw GattOperationDisconnectedException(operation);
+    }
+    if (e.code == 'gatt-status-failed') {
+      final status = e.details is int ? e.details as int : -1;
+      throw GattOperationStatusFailedException(operation, status);
     }
     rethrow;
   }
@@ -124,7 +141,7 @@ class IosConnectionManager {
 
   /// Discovers services on a connected device, expanding short UUIDs.
   Future<List<PlatformService>> discoverServices(String deviceId) async {
-    return _translateGattTimeout('discoverServices', () async {
+    return _translateGattPlatformError('discoverServices', () async {
       final services = await _hostApi.discoverServices(deviceId);
       return services.map(_mapService).toList();
     });
@@ -135,7 +152,7 @@ class IosConnectionManager {
     String deviceId,
     String characteristicUuid,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readCharacteristic',
       () => _hostApi.readCharacteristic(deviceId, characteristicUuid),
     );
@@ -148,7 +165,7 @@ class IosConnectionManager {
     Uint8List value,
     bool withResponse,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'writeCharacteristic',
       () => _hostApi.writeCharacteristic(
         deviceId,
@@ -166,7 +183,7 @@ class IosConnectionManager {
     bool enable,
   ) async {
     // Wrapped defensively for Phase 2 — no iOS timeout for setNotification today.
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'setNotification',
       () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
     );
@@ -177,7 +194,7 @@ class IosConnectionManager {
     String deviceId,
     String descriptorUuid,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readDescriptor',
       () => _hostApi.readDescriptor(deviceId, descriptorUuid),
     );
@@ -189,7 +206,7 @@ class IosConnectionManager {
     String descriptorUuid,
     Uint8List value,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'writeDescriptor',
       () => _hostApi.writeDescriptor(deviceId, descriptorUuid, value),
     );
@@ -197,7 +214,7 @@ class IosConnectionManager {
 
   /// Reads the current RSSI for a connected device.
   Future<int> readRssi(String deviceId) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readRssi',
       () => _hostApi.readRssi(deviceId),
     );

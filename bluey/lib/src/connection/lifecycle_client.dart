@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -135,11 +136,7 @@ class LifecycleClient {
         .then((_) {
       _consecutiveFailures = 0;
     }).catchError((Object error) {
-      // Only timeouts indicate the remote peer is unreachable. Other errors
-      // (e.g. a transient "operation in flight" rejection on Android, or a
-      // missing characteristic from a stale GATT cache after Service Changed)
-      // are not evidence of absence and must not trip the failure counter.
-      if (error is! platform.GattOperationTimeoutException) {
+      if (!_isDeadPeerSignal(error)) {
         return;
       }
       _consecutiveFailures++;
@@ -148,5 +145,44 @@ class LifecycleClient {
         onServerUnreachable();
       }
     });
+  }
+
+  /// Whether [error] is evidence that the peer is no longer reachable.
+  ///
+  /// Treated as dead-peer signals:
+  ///
+  /// * [platform.GattOperationTimeoutException] — the peer stopped
+  ///   acknowledging within the per-op timeout.
+  /// * [platform.GattOperationDisconnectedException] — Android's GATT
+  ///   queue drained the pending heartbeat when the link dropped.
+  /// * [platform.GattOperationStatusFailedException] — the peer returned
+  ///   a non-success GATT status. This is the Android-client→iOS-server
+  ///   force-kill path: iOS fires a Service Changed indication on the way
+  ///   out, which invalidates Android's cached characteristic handle, and
+  ///   every subsequent heartbeat write returns GATT_INVALID_HANDLE
+  ///   (0x01). The physical link stays up (iOS's BLE stack still answers
+  ///   link-layer packets after the app dies), so without this branch we
+  ///   would hold the connection open indefinitely.
+  /// * [PlatformException] with code `notFound` or `notConnected` — iOS's
+  ///   CoreBluetooth invalidates the peer's characteristic handles as
+  ///   soon as the peer vanishes, long before `didDisconnect` fires. The
+  ///   resulting `BlueyError.notFound` / `.notConnected` reaches Dart as
+  ///   a raw [PlatformException] (it's not translated by
+  ///   `_translateGattPlatformError`), so we match on the Pigeon error
+  ///   code directly.
+  ///
+  /// Every other error is ignored — there was a time when transient
+  /// "operation in flight" rejections on Android produced false positives;
+  /// Phase 2a's GATT operation queue eliminates that class of error, but
+  /// the safety net remains to guard against future unknowns.
+  bool _isDeadPeerSignal(Object error) {
+    if (error is platform.GattOperationTimeoutException) return true;
+    if (error is platform.GattOperationDisconnectedException) return true;
+    if (error is platform.GattOperationStatusFailedException) return true;
+    if (error is PlatformException &&
+        (error.code == 'notFound' || error.code == 'notConnected')) {
+      return true;
+    }
+    return false;
   }
 }

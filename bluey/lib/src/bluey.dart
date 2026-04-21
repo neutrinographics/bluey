@@ -5,7 +5,6 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
-import 'connection/connection_state.dart';
 import 'connection/lifecycle_client.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
@@ -548,20 +547,6 @@ class Bluey {
     }
   }
 
-  ConnectionState _mapConnectionState(
-    platform.PlatformConnectionState platformState,
-  ) {
-    switch (platformState) {
-      case platform.PlatformConnectionState.disconnected:
-        return ConnectionState.disconnected;
-      case platform.PlatformConnectionState.connecting:
-        return ConnectionState.connecting;
-      case platform.PlatformConnectionState.connected:
-        return ConnectionState.connected;
-      case platform.PlatformConnectionState.disconnecting:
-        return ConnectionState.disconnecting;
-    }
-  }
 
   /// Converts a platform device ID to a UUID.
   ///

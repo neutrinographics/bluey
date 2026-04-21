@@ -481,12 +481,182 @@ void main() {
       );
 
       test(
+        'writeCharacteristic translates PlatformException(gatt-disconnected) to GattOperationDisconnectedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(code: 'gatt-disconnected', message: 'link lost'),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(gatt-disconnected) to GattOperationDisconnectedException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(code: 'gatt-disconnected', message: 'link lost'),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'readCharacteristic')),
+          );
+        },
+      );
+
+      test(
+        'all wrapped methods translate gatt-disconnected with correct operation name',
+        () async {
+          final disconnect = PlatformException(
+            code: 'gatt-disconnected',
+            message: 'link lost',
+          );
+
+          when(() => mockHostApi.setNotification(any(), any(), any()))
+              .thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.setNotification('d', 'c', true),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'setNotification')),
+          );
+
+          when(() => mockHostApi.readDescriptor(any(), any()))
+              .thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.readDescriptor('d', 'desc'),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'readDescriptor')),
+          );
+
+          when(() => mockHostApi.writeDescriptor(any(), any(), any()))
+              .thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.writeDescriptor(
+              'd', 'desc', Uint8List.fromList([0x01]),
+            ),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'writeDescriptor')),
+          );
+
+          when(() => mockHostApi.requestMtu(any(), any())).thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.requestMtu('d', 200),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'requestMtu')),
+          );
+
+          when(() => mockHostApi.readRssi(any())).thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.readRssi('d'),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'readRssi')),
+          );
+
+          when(() => mockHostApi.discoverServices(any())).thenThrow(disconnect);
+          await expectLater(
+            () => connectionManager.discoverServices('d'),
+            throwsA(isA<GattOperationDisconnectedException>()
+                .having((e) => e.operation, 'operation', 'discoverServices')),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Write failed with status: 1',
+              details: 1,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')
+                .having((e) => e.status, 'status', 1)),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Read failed with status: 5',
+              details: 5,
+            ),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.operation, 'operation', 'readCharacteristic')
+                .having((e) => e.status, 'status', 5)),
+          );
+        },
+      );
+
+      test(
+        'gatt-status-failed without int details defaults status to -1',
+        () async {
+          // Pigeon sometimes marshals details via String/JSON paths that
+          // could arrive as a non-int. Sentinel -1 is the documented
+          // fallback rather than throwing or guessing.
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Write failed',
+              details: null,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.status, 'status', -1)),
+          );
+        },
+      );
+
+      test(
         'all wrapped methods translate gatt-timeout with correct operation name',
         () async {
           // Verify each remaining wrapped method (beyond the explicitly
           // tested writeCharacteristic / readCharacteristic / discoverServices)
           // passes its own name as the operation. Catches copy-paste typos
-          // in the operation-name string passed to _translateGattTimeout.
+          // in the operation-name string passed to _translateGattPlatformError.
           final timeout = PlatformException(
             code: 'gatt-timeout',
             message: 'timeout',

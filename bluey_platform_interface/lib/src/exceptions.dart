@@ -7,6 +7,10 @@
 /// an unreachable peer. Callers that monitor liveness — most notably
 /// `LifecycleClient` — should only treat instances of this exception as
 /// evidence that the remote device is gone.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into a user-facing exception at the public API boundary.
 class GattOperationTimeoutException implements Exception {
   /// Name of the platform interface method that timed out, e.g.
   /// `'writeCharacteristic'`. Used for diagnostics; not parsed by callers.
@@ -23,4 +27,77 @@ class GattOperationTimeoutException implements Exception {
 
   @override
   int get hashCode => operation.hashCode;
+}
+
+/// A GATT operation (read, write, etc.) could not complete because the
+/// underlying connection was torn down before the operation's response
+/// was received.
+///
+/// Distinct from [GattOperationTimeoutException]: the peer didn't just stop
+/// responding — the link itself is gone. Consumers that monitor liveness
+/// (e.g. `LifecycleClient`) can use the presence of this exception to
+/// distinguish "timeout" from "connection loss" when deciding how to react.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into a user-facing exception at the public API boundary.
+class GattOperationDisconnectedException implements Exception {
+  /// Name of the platform interface method whose operation was aborted,
+  /// e.g. `'writeCharacteristic'`. Used for diagnostics; not parsed by
+  /// callers.
+  final String operation;
+
+  const GattOperationDisconnectedException(this.operation);
+
+  @override
+  String toString() =>
+      'GattOperationDisconnectedException: $operation aborted due to disconnect';
+
+  @override
+  bool operator ==(Object other) =>
+      other is GattOperationDisconnectedException && other.operation == operation;
+
+  @override
+  int get hashCode => operation.hashCode;
+}
+
+/// A GATT operation completed but the peer returned a non-success status
+/// code — the request reached the peer and a response came back, but the
+/// response was a protocol-level error (invalid handle, insufficient
+/// authentication, write-not-permitted, etc.).
+///
+/// Distinct from [GattOperationTimeoutException] (no response arrived) and
+/// from [GattOperationDisconnectedException] (the link dropped before a
+/// response could arrive). Carries the native [status] code so callers can
+/// distinguish recoverable errors (e.g. bonding required) from terminal
+/// ones (e.g. invalid handle after a Service Changed event where the peer
+/// has removed the characteristic).
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into a user-facing exception at the public API boundary.
+class GattOperationStatusFailedException implements Exception {
+  /// Name of the platform interface method whose operation failed, e.g.
+  /// `'writeCharacteristic'`. Used for diagnostics; not parsed by callers.
+  final String operation;
+
+  /// Native GATT status code returned by the peer. On Android this is the
+  /// `BluetoothGatt.GATT_*` constant (e.g. `GATT_INVALID_HANDLE = 0x01`);
+  /// on iOS the translation to a comparable code is platform-specific.
+  final int status;
+
+  const GattOperationStatusFailedException(this.operation, this.status);
+
+  @override
+  String toString() =>
+      'GattOperationStatusFailedException: $operation failed with status $status';
+
+  @override
+  bool operator ==(Object other) =>
+      other is GattOperationStatusFailedException &&
+      other.operation == operation &&
+      other.status == status;
+
+  @override
+  int get hashCode => Object.hash(operation, status);
 }

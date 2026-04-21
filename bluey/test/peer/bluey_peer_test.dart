@@ -1,7 +1,6 @@
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/lifecycle.dart';
 import 'package:bluey/src/peer/bluey_peer.dart';
-import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:fake_async/fake_async.dart';
