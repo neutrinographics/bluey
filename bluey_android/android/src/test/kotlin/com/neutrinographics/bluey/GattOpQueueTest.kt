@@ -281,6 +281,36 @@ class GattOpQueueTest {
     }
 
     @Test
+    fun `execute throwing propagates the thrown exception to caller`() {
+        val queue = GattOpQueue(mockGatt, mockHandler)
+        val permissionDenied = SecurityException("BLUETOOTH_CONNECT revoked")
+        val throwingOp = object : GattOp() {
+            override val description = "Write characteristic"
+            override val syncFailureMessage = "Failed to write characteristic"
+            override val timeoutMs = 1000L
+            var result: Result<Any?>? = null
+            override fun execute(gatt: BluetoothGatt): Boolean {
+                throw permissionDenied
+            }
+            override fun complete(result: Result<Any?>) {
+                this.result = result
+            }
+        }
+        val next = TestOp(description = "Next")
+        queue.enqueue(throwingOp)
+        queue.enqueue(next)
+
+        assertSame(
+            "Caller must receive the original thrown exception, not a masking IllegalStateException",
+            permissionDenied, throwingOp.result!!.exceptionOrNull(),
+        )
+        assertEquals(
+            "Queue must still advance to next op after a throw",
+            1, next.executedCount,
+        )
+    }
+
+    @Test
     fun `multiple enqueues while busy preserve FIFO order`() {
         val queue = GattOpQueue(mockGatt, mockHandler)
         val executionOrder = mutableListOf<String>()

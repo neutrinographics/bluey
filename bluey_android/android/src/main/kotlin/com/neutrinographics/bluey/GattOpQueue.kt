@@ -108,24 +108,31 @@ internal class GattOpQueue(
         currentTimeout = timeout
         handler.postDelayed(timeout, op.timeoutMs)
 
-        val accepted = try {
-            op.execute(gatt)
+        val executeOutcome: Result<Boolean> = try {
+            Result.success(op.execute(gatt))
         } catch (e: Throwable) {
             Log.e(TAG, "GattOp.execute threw: $e", e)
-            false
+            Result.failure(e)
         }
 
-        if (!accepted) {
-            // Sync rejection — fail immediately, advance
+        // Two sync-failure modes:
+        //   - execute() returned false: use syncFailureMessage (preserves
+        //     existing Phase 1 / pre-Phase-1 error text).
+        //   - execute() threw (e.g. SecurityException when BLUETOOTH_CONNECT
+        //     is revoked): propagate the original exception so callers can
+        //     diagnose root cause instead of seeing a generic rejection.
+        val syncFailure: Throwable? = when {
+            executeOutcome.isFailure -> executeOutcome.exceptionOrNull()
+            executeOutcome.getOrThrow() -> null
+            else -> IllegalStateException(op.syncFailureMessage)
+        }
+
+        if (syncFailure != null) {
             currentTimeout?.let { handler.removeCallbacks(it) }
             currentTimeout = null
             current = null
             try {
-                op.complete(
-                    Result.failure(
-                        IllegalStateException(op.syncFailureMessage)
-                    )
-                )
+                op.complete(Result.failure(syncFailure))
             } catch (e: Throwable) {
                 Log.e(TAG, "GattOp.complete threw during sync-failure: $e", e)
             }
