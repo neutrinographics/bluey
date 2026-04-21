@@ -24,3 +24,31 @@ class GattOperationTimeoutException implements Exception {
   @override
   int get hashCode => operation.hashCode;
 }
+
+/// A GATT operation (read, write, etc.) could not complete because the
+/// underlying connection was torn down before the operation's response
+/// was received.
+///
+/// Distinct from [GattOperationTimeoutException]: the peer didn't just stop
+/// responding — the link itself is gone. Consumers that monitor liveness
+/// (e.g. `LifecycleClient`) can use the presence of this exception to
+/// distinguish "timeout" from "connection loss" when deciding how to react.
+class GattOperationDisconnectedException implements Exception {
+  /// Name of the platform interface method whose operation was aborted,
+  /// e.g. `'writeCharacteristic'`. Used for diagnostics; not parsed by
+  /// callers.
+  final String operation;
+
+  const GattOperationDisconnectedException(this.operation);
+
+  @override
+  String toString() =>
+      'GattOperationDisconnectedException: $operation aborted due to disconnect';
+
+  @override
+  bool operator ==(Object other) =>
+      other is GattOperationDisconnectedException && other.operation == operation;
+
+  @override
+  int get hashCode => operation.hashCode;
+}
