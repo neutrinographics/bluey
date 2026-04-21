@@ -644,12 +644,18 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   }
 
   void _onFirstListen() {
-    // Enable notifications on the platform
+    // Enable notifications on the platform. Fire-and-forget by design —
+    // StreamController's onListen callback is synchronous. A platform
+    // failure here (e.g. mid-op disconnect drained by the Android queue)
+    // must surface on the notification stream so subscribers see it
+    // instead of it becoming an unhandled async error.
     _translateGattPlatformError(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
-    );
+    ).catchError((Object error) {
+      _notificationController?.addError(error);
+    });
 
     // Subscribe to platform notifications
     _notificationSubscription = _platform
@@ -670,12 +676,15 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   }
 
   void _onLastCancel() {
-    // Disable notifications on the platform
+    // Disable notifications on the platform. Fire-and-forget; the last
+    // subscriber has just cancelled, so there is no natural recipient for
+    // errors. Swallow silently to keep teardown best-effort — a link-loss
+    // race on shutdown is an expected condition, not a test failure.
     _translateGattPlatformError(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
-    );
+    ).catchError((Object _) {});
 
     // Cancel subscription
     _notificationSubscription?.cancel();

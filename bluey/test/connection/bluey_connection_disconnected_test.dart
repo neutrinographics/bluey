@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
@@ -32,7 +33,10 @@ void main() {
       id: TestDeviceIds.device1,
       name: 'Disconnect Test Device',
       services: [
-        TestServiceBuilder(_serviceUuid).withWritable(_charUuid).build(),
+        TestServiceBuilder(_serviceUuid)
+            .withWritable(_charUuid)
+            .withNotifiable(TestUuids.customChar2)
+            .build(),
       ],
     );
 
@@ -108,6 +112,64 @@ void main() {
         );
 
         fakePlatform.simulateWriteDisconnected = false;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'setNotification failure on first listen surfaces on the notification stream',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final notifyChar = svc.characteristic(UUID(TestUuids.customChar2));
+
+        fakePlatform.simulateSetNotificationDisconnected = true;
+
+        final errorCompleter = Completer<Object>();
+        final sub = notifyChar.notifications.listen(
+          (_) {},
+          onError: errorCompleter.complete,
+        );
+
+        final received = await errorCompleter.future.timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => fail(
+            'Expected _onFirstListen setNotification failure to reach the '
+            'stream consumer, but no error arrived within 2s',
+          ),
+        );
+        expect(received, isA<DisconnectedException>());
+
+        fakePlatform.simulateSetNotificationDisconnected = false;
+        await sub.cancel();
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'setNotification failure on last cancel does not produce unhandled async error',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final notifyChar = svc.characteristic(UUID(TestUuids.customChar2));
+
+        // Subscribe and cancel so we hit _onLastCancel. setNotification(false)
+        // then fails; there is no stream consumer left, so the failure has no
+        // natural recipient. It must be swallowed silently — otherwise it
+        // escapes as an unhandled Future error and trips the test zone.
+        final sub = notifyChar.notifications.listen((_) {});
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.simulateSetNotificationDisconnected = true;
+        await sub.cancel();
+        // Let the teardown microtask settle. If _onLastCancel leaks its
+        // rejected future, flutter_test's zone guard fails the test here.
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.simulateSetNotificationDisconnected = false;
         await conn.disconnect();
       },
     );

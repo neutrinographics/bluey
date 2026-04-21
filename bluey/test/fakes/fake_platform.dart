@@ -100,6 +100,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// drops). Distinct from [simulateWriteTimeout] and [simulateWriteFailure].
   bool simulateWriteDisconnected = false;
 
+  /// When true, setNotification calls will throw a
+  /// [GattOperationDisconnectedException] to simulate the CCCD descriptor
+  /// write being drained by a mid-op link loss. Used to cover the
+  /// fire-and-forget paths in BlueyRemoteCharacteristic (onFirstListen /
+  /// onLastCancel) that would otherwise produce unhandled async errors.
+  bool simulateSetNotificationDisconnected = false;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -519,6 +526,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String characteristicUuid,
     bool enable,
   ) async {
+    if (simulateSetNotificationDisconnected) {
+      throw const GattOperationDisconnectedException('setNotification');
+    }
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
