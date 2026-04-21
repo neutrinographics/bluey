@@ -44,16 +44,19 @@ void main() {
     await bluey.dispose();
   });
 
+  final deviceUuid = UUID('00000000-0000-0000-0000-aabbccddee01');
+
+  Device buildDevice() => Device(
+    id: deviceUuid,
+    address: TestDeviceIds.device1,
+    name: 'Disconnect Test Device',
+  );
+
   group('BlueyConnection GATT disconnect rewrap', () {
     test(
       'writeCharacteristic rewraps platform disconnect into DisconnectedException',
       () async {
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-          address: TestDeviceIds.device1,
-          name: 'Disconnect Test Device',
-        );
-        final conn = await bluey.connect(device);
+        final conn = await bluey.connect(buildDevice());
         final services = await conn.services();
         final svc = services.first;
         final char = svc.characteristic(UUID(_charUuid));
@@ -64,6 +67,69 @@ void main() {
           () => char.write(Uint8List.fromList([0x01])),
           throwsA(isA<DisconnectedException>()),
         );
+
+        fakePlatform.simulateWriteDisconnected = false;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'platform.GattOperationDisconnectedException does not leak past the public API',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteDisconnected = true;
+
+        await expectLater(
+          () => char.write(Uint8List.fromList([0x01])),
+          throwsA(isNot(isA<platform.GattOperationDisconnectedException>())),
+        );
+
+        fakePlatform.simulateWriteDisconnected = false;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'thrown DisconnectedException is also a BlueyException (sealed-hierarchy match)',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteDisconnected = true;
+
+        await expectLater(
+          () => char.write(Uint8List.fromList([0x01])),
+          throwsA(isA<BlueyException>()),
+        );
+
+        fakePlatform.simulateWriteDisconnected = false;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'DisconnectedException carries deviceId and DisconnectReason.linkLoss',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteDisconnected = true;
+
+        try {
+          await char.write(Uint8List.fromList([0x01]));
+          fail('Expected DisconnectedException');
+        } on DisconnectedException catch (e) {
+          expect(e.deviceId, equals(deviceUuid));
+          expect(e.reason, equals(DisconnectReason.linkLoss));
+        }
 
         fakePlatform.simulateWriteDisconnected = false;
         await conn.disconnect();
