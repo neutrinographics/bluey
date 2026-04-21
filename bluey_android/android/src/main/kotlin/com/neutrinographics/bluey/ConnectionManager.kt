@@ -477,6 +477,24 @@ class ConnectionManager(
     /** Resolves the [GattOpQueue] for [deviceId], or null if no connection exists. */
     private fun queueFor(deviceId: String): GattOpQueue? = queues[deviceId]
 
+    /**
+     * Builds a `gatt-status-failed` [FlutterError] carrying the native GATT
+     * status code for transport to Dart. Used by every `BluetoothGattCallback`
+     * override when [status] is not [BluetoothGatt.GATT_SUCCESS] so that the
+     * status reaches callers as a typed protocol error instead of a bare
+     * [IllegalStateException] that Pigeon would marshal with an unhelpful
+     * `IllegalStateException` error code.
+     *
+     * The [status] is stored in `FlutterError.details` so Dart can read it
+     * without parsing the human-readable message.
+     */
+    private fun statusFailedError(operation: String, status: Int): FlutterError =
+        FlutterError(
+            "gatt-status-failed",
+            "$operation failed with status: $status",
+            status,
+        )
+
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -545,7 +563,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Service discovery failed with status: $status"))
+                        Result.failure(statusFailedError("Service discovery", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -561,7 +579,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(value)
                     } else {
-                        Result.failure(IllegalStateException("Read failed with status: $status"))
+                        Result.failure(statusFailedError("Read", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -578,7 +596,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(characteristic.value ?: ByteArray(0))
                     } else {
-                        Result.failure(IllegalStateException("Read failed with status: $status"))
+                        Result.failure(statusFailedError("Read", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -593,7 +611,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Write failed with status: $status"))
+                        Result.failure(statusFailedError("Write", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -642,7 +660,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(value)
                     } else {
-                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor read", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -659,7 +677,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(descriptor.value ?: ByteArray(0))
                     } else {
-                        Result.failure(IllegalStateException("Descriptor read failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor read", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -674,7 +692,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(Unit)
                     } else {
-                        Result.failure(IllegalStateException("Descriptor write failed with status: $status"))
+                        Result.failure(statusFailedError("Descriptor write", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -685,7 +703,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(mtu.toLong())
                     } else {
-                        Result.failure(IllegalStateException("MTU request failed with status: $status"))
+                        Result.failure(statusFailedError("MTU request", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }
@@ -709,7 +727,7 @@ class ConnectionManager(
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(rssi.toLong())
                     } else {
-                        Result.failure(IllegalStateException("RSSI read failed with status: $status"))
+                        Result.failure(statusFailedError("RSSI read", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
                 }

@@ -264,6 +264,46 @@ class ConnectionManagerQueueTest {
     }
 
     @Test
+    fun `onCharacteristicWrite with non-success status emits gatt-status-failed FlutterError`() {
+        // Regression guard for the iOS-server-force-kill scenario: when the
+        // peer removes its GATT service (via Service Changed + app exit),
+        // subsequent writes return a non-success status (typically 0x01,
+        // GATT_INVALID_HANDLE). That must reach callers as a typed protocol
+        // error — not as a bare IllegalStateException that Pigeon marshals
+        // with an unhelpful "IllegalStateException" error code.
+        val char = mockCharacteristic()
+        every { mockGatt.writeCharacteristic(
+            any<BluetoothGattCharacteristic>(), any(), any(),
+        ) } returns BluetoothGatt.GATT_SUCCESS
+
+        var captured: Result<Unit>? = null
+        connectionManager.writeCharacteristic(
+            deviceAddress, testCharUuid.toString(),
+            byteArrayOf(0x01), true,
+        ) { captured = it }
+
+        // Fire the OS callback with GATT_INVALID_HANDLE (status 0x01)
+        capturedGattCallback!!.onCharacteristicWrite(mockGatt, char, 0x01)
+
+        assertNotNull(captured)
+        assertTrue(captured!!.isFailure)
+        val err = captured!!.exceptionOrNull()
+        assertTrue(
+            "expected FlutterError with code gatt-status-failed, got ${err?.javaClass?.simpleName}: $err",
+            err is FlutterError && err.code == "gatt-status-failed",
+        )
+        val flutterError = err as FlutterError
+        assertEquals(
+            "FlutterError.details must carry the native status for Dart-side matching",
+            0x01, flutterError.details,
+        )
+        assertTrue(
+            "message should mention 'status' for log readability",
+            flutterError.message?.contains("status") == true,
+        )
+    }
+
+    @Test
     fun `setNotification propagates SecurityException from inline sync enable`() {
         val char = mockCharacteristic()
         val denied = SecurityException("BLUETOOTH_CONNECT revoked")
