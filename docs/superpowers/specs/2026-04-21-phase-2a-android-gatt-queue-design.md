@@ -29,7 +29,7 @@ Serialize every GATT-layer operation per connection through a single internal qu
 - Removing the now-unused `pendingReads` / `pendingWrites` / etc. maps in `ConnectionManager.kt`. They remain declared but unused in 2a; 2b removes them after 2a is on-device-validated.
 - Removing the now-unused `cancelAllTimeouts` helper. Same reasoning.
 - A proper reusable Kotlin test harness (helper factories, fake timers, test DSL). 2a uses the existing mockk pattern from `GattServerTest.kt` directly; 2b extracts reusable scaffolding.
-- Write-without-response pipelining via BLE link-layer credits (Android's `peripheralIsReady(toSendWriteWithoutResponse:)` equivalent). Phase 2a is strictly serial for all op types. CoreBluetooth's pipelining is an optimization that buys higher throughput for some workloads; YAGNI until a workload demands it.
+- Write-without-response pipelining via BLE link-layer credits. Phase 2a serializes **every** op type including `writeCharacteristic(withResponse: false)`. That's over-conservative — Android's link layer credits allow many write-without-response requests back-to-back for 10-30× higher throughput on bursty streams (firmware uploads, sensor buffers, audio). CoreBluetooth does this transparently; Nordic's Android library exposes a dedicated bulk API. **Deferred to Phase 2c** so the strict-serial baseline from 2a can be validated before pipelining is layered on top. The decision adds real complexity (link-layer credit accounting, a separate `canSendWriteWithoutResponse` callback), so it warrants its own design pass.
 - iOS-side changes. CoreBluetooth already serializes internally; `bluey_ios` does not need a queue.
 
 ## Architecture
@@ -66,6 +66,16 @@ One `GattOpQueue` instance per connection, keyed by `connectionId` inside `Conne
 - Each `GattOp` subclass is a Command object (Command pattern), not a Value Object — it carries a user callback that gets executed once. Its configuration fields are immutable after construction; equality-by-value is not meaningful here.
 - Op type names follow the ubiquitous language of the GATT Client bounded context: `ReadCharacteristicOp`, `WriteCharacteristicOp`, `ReadDescriptorOp`, `WriteDescriptorOp`, `DiscoverServicesOp`, `RequestMtuOp`, `ReadRssiOp`, `EnableNotifyCccdOp`. Names match the platform-interface method names exactly. No platform-specific jargon (no `GattReadOp` or `BluetoothWriteOp`).
 - `ConnectionManager` is the anti-corruption layer between Android's `BluetoothGatt` framework and the platform interface. The queue sits inside this ACL; nothing queue-shaped leaks above it.
+
+**Threading model — single-threaded invariant:**
+
+`BluetoothGattCallback` methods fire on **Binder IPC threads**, not the main thread. The queue's internal state (`current`, `pending`, `currentTimeout`) would be mutated from multiple threads if callbacks called `onComplete` / `drainAll` directly. That's a data race.
+
+**Invariant: all queue state mutation happens on the main thread.** Every `BluetoothGattCallback` override marshals to the main thread via `handler.post { queue.onXXX(...) }` before touching the queue. Timeout `Runnable`s are posted via `handler.postDelayed` which runs on the Handler's looper thread (the main thread in our setup). User-initiated `enqueue` from `ConnectionManager` happens on the Pigeon dispatcher thread, which Pigeon configures to be the main thread by default.
+
+Result: the queue never needs locks or `@Synchronized`. Its methods assume single-threaded access and check `Looper.myLooper() == Looper.getMainLooper()` at debug-time via `assert` for safety. This matches the pattern the existing `ConnectionManager.kt` already uses for its pending-callback maps (see `handler.post { pendingCallback.invoke(...) }` in the existing code).
+
+The existing `BluetoothGattCallback.onConnectionStateChange` → `handler.post { ... }` pattern extends straightforwardly: `onCharacteristicWrite`, `onCharacteristicRead`, `onDescriptorWrite`, `onDescriptorRead`, `onServicesDiscovered`, `onMtuChanged`, `onReadRemoteRssi` all post their `queue.onComplete(...)` call to the handler. The `STATE_DISCONNECTED` branch posts `queue.drainAll(...)` to the handler too.
 
 **What is NOT queued:**
 
@@ -373,6 +383,7 @@ Test cases:
 4. `setNotification` with CCCD present → `gatt.setCharacteristicNotification` called sync (returns true), then `gatt.writeDescriptor(cccd)` queued, timeout active.
 5. `setNotification` CCCD-write timeout fires → caller callback sees `FlutterError("gatt-timeout", ...)` (hygiene fix #1 validated).
 6. `onCharacteristicChanged` (incoming notification) bypasses queue — verify `queue.onComplete` NOT called for notification arrivals, and that the notification is still forwarded to `flutterApi.onNotification` as before.
+7. Threading invariant: the `BluetoothGattCallback` override (e.g. `onCharacteristicWrite`) posts `queue.onComplete(...)` via `handler.post` before touching the queue — verify `handler.post` is invoked with a non-null `Runnable`, and that the queue's state doesn't mutate until the posted `Runnable` executes.
 
 ### Dart platform-interface tests — `GattOperationDisconnectedException`
 
