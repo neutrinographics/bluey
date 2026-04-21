@@ -1,6 +1,24 @@
 group 'com.neutrinographics.bluey'
 version '1.0'
 
+// Resolve Flutter SDK location for standalone Kotlin unit test builds.
+// In the normal Flutter app build, the flutter-gradle-plugin injects these
+// dependencies automatically. When running ./gradlew test standalone we must
+// supply them explicitly.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader -> localProperties.load(reader) }
+}
+def flutterSdkPath = localProperties.getProperty("flutter.sdk") ?: System.getenv("FLUTTER_ROOT")
+if (flutterSdkPath == null) {
+    throw new GradleException(
+        "flutter.sdk not set in local.properties and FLUTTER_ROOT env var not set. " +
+        "Create bluey_android/android/local.properties with flutter.sdk=/path/to/flutter"
+    )
+}
+def flutterEmbeddingJar = "${flutterSdkPath}/bin/cache/artifacts/engine/android-arm-release/flutter.jar"
+
 buildscript {
     ext.kotlin_version = '2.1.0'
     repositories {
@@ -63,7 +81,17 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 
-    // Test dependencies
+    // Flutter embedding and AndroidX — supplied as compileOnly so they don't
+    // conflict with the versions injected by the Flutter app build chain.
+    compileOnly files(flutterEmbeddingJar)
+    compileOnly "androidx.core:core:1.12.0"
+    compileOnly "androidx.annotation:annotation:1.7.0"
+
+    // Test dependencies — need the full jars on the test classpath so the
+    // Kotlin unit tests can resolve Flutter/AndroidX symbols at runtime.
+    testImplementation files(flutterEmbeddingJar)
+    testImplementation "androidx.core:core:1.12.0"
+    testImplementation "androidx.annotation:annotation:1.7.0"
     testImplementation "junit:junit:4.13.2"
     testImplementation "io.mockk:mockk:1.13.8"
     testImplementation "io.mockk:mockk-android:1.13.8"
