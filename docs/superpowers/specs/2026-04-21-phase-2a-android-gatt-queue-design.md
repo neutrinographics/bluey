@@ -87,12 +87,14 @@ The existing `BluetoothGattCallback.onConnectionStateChange` → `handler.post {
 
 ## Components
 
-### `GattOp` sealed class
+### `GattOp` abstract class
 
 Private inside `ConnectionManager.kt`'s package (`com.neutrinographics.bluey`). One concrete subclass per op type.
 
+**Note on `abstract` vs `sealed`:** the plan originally called for a sealed class, but Kotlin's sealed-class rules (no cross-module extension, no anonymous-object extension) conflict with the unit test design in `GattOpQueueTest.kt` which uses both named test subclasses in the test sourceset AND anonymous-object extensions for closure-capturing reentrancy tests. `abstract class` delivers the same DDD "closed set of Command objects" property — `internal` visibility prevents external extension, all production subclasses live in `GattOp.kt`, and exhaustive pattern matching isn't used by the queue (which calls `execute()` / `complete()` polymorphically).
+
 ```kotlin
-internal sealed class GattOp {
+internal abstract class GattOp {
     /** Human-readable operation description for error messages, e.g. "Write characteristic". */
     abstract val description: String
     abstract val timeoutMs: Long

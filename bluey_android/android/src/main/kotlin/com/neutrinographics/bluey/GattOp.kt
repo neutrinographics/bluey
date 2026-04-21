@@ -13,6 +13,18 @@ import android.os.Build
  * callback executed exactly once. Configuration fields are immutable after
  * construction.
  */
+// NOTE: declared `abstract class` rather than `sealed class` even though
+// the set of subclasses is known and closed. Two Kotlin constraints force
+// this choice:
+//   1. Sealed classes permit subclassing only within the same module.
+//      Android Gradle treats main and test sourcesets as separate Kotlin
+//      modules, so a sealed GattOp would reject test-only subclasses
+//      declared in GattOpQueueTest.kt.
+//   2. Sealed classes cannot be extended via anonymous objects at all.
+//      Several unit tests use `object : GattOp() { ... }` to capture
+//      local state via closure (see GattOpQueueTest.kt reentrancy test).
+// The `internal` modifier is sufficient to prevent external extension;
+// all production subclasses are declared in this file.
 internal abstract class GattOp {
     /** Human-readable description for error messages, e.g. "Write characteristic". */
     abstract val description: String
