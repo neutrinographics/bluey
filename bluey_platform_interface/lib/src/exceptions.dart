@@ -7,6 +7,10 @@
 /// an unreachable peer. Callers that monitor liveness — most notably
 /// `LifecycleClient` — should only treat instances of this exception as
 /// evidence that the remote device is gone.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into a user-facing exception at the public API boundary.
 class GattOperationTimeoutException implements Exception {
   /// Name of the platform interface method that timed out, e.g.
   /// `'writeCharacteristic'`. Used for diagnostics; not parsed by callers.
@@ -33,6 +37,10 @@ class GattOperationTimeoutException implements Exception {
 /// responding — the link itself is gone. Consumers that monitor liveness
 /// (e.g. `LifecycleClient`) can use the presence of this exception to
 /// distinguish "timeout" from "connection loss" when deciding how to react.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into a user-facing exception at the public API boundary.
 class GattOperationDisconnectedException implements Exception {
   /// Name of the platform interface method whose operation was aborted,
   /// e.g. `'writeCharacteristic'`. Used for diagnostics; not parsed by
