@@ -1,10 +1,14 @@
 package com.neutrinographics.bluey
 
+import android.Manifest
 import android.bluetooth.*
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import io.mockk.*
 import org.junit.After
 import org.junit.Before
@@ -38,6 +42,13 @@ class ConnectionManagerQueueTest {
 
     @Before
     fun setUp() {
+        // Pin SDK_INT to TIRAMISU so production code takes the modern gatt API
+        // branch (3-arg writeCharacteristic / 2-arg writeDescriptor) that the
+        // mocks are wired to match.  Under unit-test JVM the field defaults to 0
+        // which would cause the deprecated 1-arg overload to be invoked instead,
+        // making every mock stub miss and every write fail synchronously.
+        setSdkVersion(Build.VERSION_CODES.TIRAMISU)
+
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
         every { Log.e(any(), any()) } returns 0
@@ -45,6 +56,13 @@ class ConnectionManagerQueueTest {
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any()) } returns 0
         every { Log.v(any(), any()) } returns 0
+
+        // With SDK_INT == TIRAMISU the BLUETOOTH_CONNECT permission check fires.
+        // Grant permission so ConnectionManager.connect proceeds past the guard.
+        mockkStatic(ContextCompat::class)
+        every {
+            ContextCompat.checkSelfPermission(any(), Manifest.permission.BLUETOOTH_CONNECT)
+        } returns PackageManager.PERMISSION_GRANTED
 
         mockkStatic(Looper::class)
         every { Looper.getMainLooper() } returns mockk(relaxed = true)
@@ -66,8 +84,7 @@ class ConnectionManagerQueueTest {
 
         every { mockDevice.address } returns deviceAddress
         every { mockAdapter.getRemoteDevice(deviceAddress) } returns mockDevice
-        // Mock both the 4-arg form (API 23+) and the 3-arg form (below API 23).
-        // Unit tests run with Build.VERSION.SDK_INT == 0, so the else-branch fires.
+        // SDK_INT is now TIRAMISU, so the 4-arg connectGatt form (API 23+) fires.
         every { mockDevice.connectGatt(any(), any(), any<BluetoothGattCallback>(), any()) } answers {
             capturedGattCallback = thirdArg()
             mockGatt
@@ -82,17 +99,47 @@ class ConnectionManagerQueueTest {
         // Simulate a completed connection so internal `connections[deviceId]` + queues[deviceId]
         // are populated. The ConnectionManager.connect API returns a connection ID;
         // simulate STATE_CONNECTED by firing the captured gatt callback.
-        val connectConfig = ConnectConfigDto()
-        connectionManager.connect(deviceAddress, connectConfig) { /* ignored */ }
+        var connectResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            connectResult = result
+        }
         capturedGattCallback!!.onConnectionStateChange(
             mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
         )
+        assertNotNull("connect callback should have fired after STATE_CONNECTED", connectResult)
+        assertTrue("connect should succeed in setUp", connectResult!!.isSuccess)
     }
 
     @After
     fun tearDown() {
         clearAllMocks()
         unmockkAll()
+        // Restore SDK_INT so other test classes are not affected
+        setSdkVersion(0)
+    }
+
+    /**
+     * Uses sun.misc.Unsafe to overwrite the final Build.VERSION.SDK_INT field.
+     * This matches the approach used in BlueyPluginTest and avoids requiring
+     * mockk-agent / byte-buddy for final-field mocking.
+     */
+    private fun setSdkVersion(version: Int) {
+        val sdkIntField = Build.VERSION::class.java.getDeclaredField("SDK_INT")
+        val unsafeClass = Class.forName("sun.misc.Unsafe")
+        val theUnsafe = unsafeClass.getDeclaredField("theUnsafe")
+        theUnsafe.isAccessible = true
+        val unsafe = theUnsafe.get(null)
+        val staticFieldBase = unsafeClass.getMethod("staticFieldBase", java.lang.reflect.Field::class.java)
+        val staticFieldOffset = unsafeClass.getMethod("staticFieldOffset", java.lang.reflect.Field::class.java)
+        val putInt = unsafeClass.getMethod(
+            "putInt", Any::class.java, Long::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+        )
+        putInt.invoke(
+            unsafe,
+            staticFieldBase.invoke(unsafe, sdkIntField),
+            staticFieldOffset.invoke(unsafe, sdkIntField) as Long,
+            version,
+        )
     }
 
     /**
@@ -171,6 +218,14 @@ class ConnectionManagerQueueTest {
             byteArrayOf(0x02), true,
         ) { results.add(it) }
 
+        // Both ops must still be in flight (neither synchronously completed nor failed)
+        // before the disconnect fires.  If this asserts 0, drain is what populates results,
+        // not a sync failure path.
+        assertEquals(
+            "Writes must still be in flight before disconnect",
+            0, results.size,
+        )
+
         capturedGattCallback!!.onConnectionStateChange(
             mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_DISCONNECTED,
         )
@@ -243,7 +298,23 @@ class ConnectionManagerQueueTest {
             )
         }
 
-        // Op in flight unaffected — complete it normally
+        // If the notification had been routed through the queue it would have
+        // "completed" the current op, allowing a subsequent enqueue to execute.
+        // Verify that is NOT what happened: submit a second write and confirm it
+        // has NOT reached the OS yet — the queue is still busy with the first write.
+        connectionManager.writeCharacteristic(
+            deviceAddress, testCharUuid.toString(),
+            byteArrayOf(0x99.toByte()), true,
+        ) { /* ignored */ }
+        verify(exactly = 1) {
+            mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())
+        }
+        // (Total OS writes still 1 — the second submission is queued, not executed.)
+
+        // Now complete the first write normally; the second write should fire.
         capturedGattCallback!!.onCharacteristicWrite(mockGatt, char, BluetoothGatt.GATT_SUCCESS)
+        verify(exactly = 2) {
+            mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())
+        }
     }
 }
