@@ -154,7 +154,7 @@ AdvertiseSettings.Builder()
 
 Android's `BluetoothGatt` API enforces a strict **one-operation-in-flight** rule per connection. Calling `gatt.writeCharacteristic()` while another op is outstanding returns `false` synchronously and no `BluetoothGattCallback` fires for the rejected call. Concurrent GATT ops from application code (e.g. user write + lifecycle heartbeat + iOS Service Changed re-discovery) race unless the plugin serializes them.
 
-**Solution (Phase 2a, 2026-04-21):** `ConnectionManager` owns one `GattOpQueue` instance per active GATT connection, keyed by `deviceId`. Every GATT op — read/write characteristic, read/write descriptor, discoverServices, requestMtu, readRssi, setNotification's CCCD write — is constructed as a `GattOp` (sealed class, Command pattern) and enqueued. The queue:
+**Solution (Phase 2a, 2026-04-21):** `ConnectionManager` owns one `GattOpQueue` instance per active GATT connection, keyed by `deviceId`. Every GATT op — read/write characteristic, read/write descriptor, discoverServices, requestMtu, readRssi, setNotification's CCCD write — is constructed as a `GattOp` (`internal abstract class`, Command pattern) and enqueued. The queue:
 
 - Executes ops in strict FIFO order; at most one op in flight at a time per connection
 - Per-op timeout via `handler.postDelayed` (values sourced from `ConnectionManager`'s existing timeout config)
