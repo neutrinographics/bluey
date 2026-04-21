@@ -1,4 +1,8 @@
 import 'dart:async';
+// ignore_for_file: avoid_print
+// [DIAG:lifecycle-force-kill] Temporary diagnostic prints for investigating
+// why iOS client doesn't detect an Android server force-kill. Revert once
+// the root cause is identified.
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -38,12 +42,25 @@ class LifecycleClient {
   /// control service). If the control service or its heartbeat characteristic
   /// is absent, the method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
-    if (_heartbeatCharUuid != null) return;
+    if (_heartbeatCharUuid != null) {
+      print('[DIAG:lifecycle] start: already running, skipping');
+      return;
+    }
+    print(
+      '[DIAG:lifecycle] start: ${allServices.length} services discovered: '
+      '${allServices.map((s) => s.uuid.toString()).join(', ')}',
+    );
 
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
         .firstOrNull;
-    if (controlService == null) return;
+    if (controlService == null) {
+      print(
+        '[DIAG:lifecycle] start: NO CONTROL SERVICE — heartbeat disabled. '
+        'Expected ${lifecycle.controlServiceUuid}',
+      );
+      return;
+    }
 
     final heartbeatChar = controlService.characteristics
         .where(
@@ -51,9 +68,13 @@ class LifecycleClient {
               c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
         )
         .firstOrNull;
-    if (heartbeatChar == null) return;
+    if (heartbeatChar == null) {
+      print('[DIAG:lifecycle] start: control service has no heartbeat char');
+      return;
+    }
 
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
+    print('[DIAG:lifecycle] start: heartbeat char found, firing initial send');
 
     // Send the first heartbeat immediately so the server (especially iOS,
     // which has no connection callback) learns about this client as soon as
@@ -115,6 +136,7 @@ class LifecycleClient {
   );
 
   void _beginHeartbeat(Duration interval) {
+    print('[DIAG:lifecycle] beginHeartbeat: interval=${interval.inMilliseconds}ms');
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(interval, (_) {
       _sendHeartbeat();
@@ -125,6 +147,7 @@ class LifecycleClient {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
+    print('[DIAG:lifecycle] heartbeat →');
     _platform
         .writeCharacteristic(
           _connectionId,
@@ -133,17 +156,28 @@ class LifecycleClient {
           true,
         )
         .then((_) {
+      print('[DIAG:lifecycle] heartbeat ack');
       _consecutiveFailures = 0;
     }).catchError((Object error) {
+      print(
+        '[DIAG:lifecycle] heartbeat error: '
+        '${error.runtimeType}: $error',
+      );
       // Only timeouts indicate the remote peer is unreachable. Other errors
       // (e.g. a transient "operation in flight" rejection on Android, or a
       // missing characteristic from a stale GATT cache after Service Changed)
       // are not evidence of absence and must not trip the failure counter.
       if (error is! platform.GattOperationTimeoutException) {
+        print('[DIAG:lifecycle] error NOT counted (non-timeout)');
         return;
       }
       _consecutiveFailures++;
+      print(
+        '[DIAG:lifecycle] timeout counted: $_consecutiveFailures/'
+        '$maxFailedHeartbeats',
+      );
       if (_consecutiveFailures >= maxFailedHeartbeats) {
+        print('[DIAG:lifecycle] TRIPPED → onServerUnreachable');
         stop();
         onServerUnreachable();
       }
