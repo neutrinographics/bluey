@@ -4,14 +4,15 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
 
-/// Catches a [PlatformException] thrown by Pigeon and re-throws it as a
-/// [GattOperationTimeoutException] when the platform error code is
-/// `'gatt-timeout'`. Other errors propagate unchanged.
+/// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
+/// matching typed platform-interface exception: `'gatt-timeout'` →
+/// [GattOperationTimeoutException], `'gatt-disconnected'` →
+/// [GattOperationDisconnectedException]. Other errors propagate unchanged.
 ///
 /// Kept package-private so the same wrapper can be used by every GATT
 /// operation in this file without leaking translation logic into the
 /// platform interface contract.
-Future<T> _translateGattTimeout<T>(
+Future<T> _translateGattPlatformError<T>(
   String operation,
   Future<T> Function() body,
 ) async {
@@ -20,6 +21,9 @@ Future<T> _translateGattTimeout<T>(
   } on PlatformException catch (e) {
     if (e.code == 'gatt-timeout') {
       throw GattOperationTimeoutException(operation);
+    }
+    if (e.code == 'gatt-disconnected') {
+      throw GattOperationDisconnectedException(operation);
     }
     rethrow;
   }
@@ -94,7 +98,7 @@ class AndroidConnectionManager {
 
   /// Discovers services on the connected device.
   Future<List<PlatformService>> discoverServices(String deviceId) async {
-    return _translateGattTimeout('discoverServices', () async {
+    return _translateGattPlatformError('discoverServices', () async {
       final services = await _hostApi.discoverServices(deviceId);
       return services.map(_mapService).toList();
     });
@@ -105,7 +109,7 @@ class AndroidConnectionManager {
     String deviceId,
     String characteristicUuid,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readCharacteristic',
       () => _hostApi.readCharacteristic(deviceId, characteristicUuid),
     );
@@ -118,7 +122,7 @@ class AndroidConnectionManager {
     Uint8List value,
     bool withResponse,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'writeCharacteristic',
       () => _hostApi.writeCharacteristic(
         deviceId,
@@ -136,7 +140,7 @@ class AndroidConnectionManager {
     bool enable,
   ) async {
     // Wrapped defensively for Phase 2 — no Android timeout for setNotification today.
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'setNotification',
       () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
     );
@@ -147,7 +151,7 @@ class AndroidConnectionManager {
     String deviceId,
     String descriptorUuid,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readDescriptor',
       () => _hostApi.readDescriptor(deviceId, descriptorUuid),
     );
@@ -159,7 +163,7 @@ class AndroidConnectionManager {
     String descriptorUuid,
     Uint8List value,
   ) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'writeDescriptor',
       () => _hostApi.writeDescriptor(deviceId, descriptorUuid, value),
     );
@@ -167,7 +171,7 @@ class AndroidConnectionManager {
 
   /// Requests a new MTU size for the connection.
   Future<int> requestMtu(String deviceId, int mtu) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'requestMtu',
       () => _hostApi.requestMtu(deviceId, mtu),
     );
@@ -175,7 +179,7 @@ class AndroidConnectionManager {
 
   /// Reads the RSSI for the connected device.
   Future<int> readRssi(String deviceId) async {
-    return _translateGattTimeout(
+    return _translateGattPlatformError(
       'readRssi',
       () => _hostApi.readRssi(deviceId),
     );
