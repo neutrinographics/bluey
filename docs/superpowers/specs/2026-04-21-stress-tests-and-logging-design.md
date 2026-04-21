@@ -11,7 +11,7 @@ Phase 2a shipped real correctness guarantees (per-connection GATT queue, three t
 
 Two distinct deliverables, bundled for efficiency since they touch overlapping flows:
 
-1. **In-app stress test tool** in the example app, accessible from the service explorer when connected to a bluey peer. Configurable per-test parameters; live counters; failure breakdown by exception type.
+1. **In-app stress test tool** in the example app, accessible from the connection screen (beneath the Disconnect button) when connected to a bluey peer. Configurable per-test parameters; live counters; failure breakdown by exception type.
 2. **Lightweight library logging** via `dart:developer.log` at ~15–20 key points across `bluey/lib/src/`, using 5 named loggers under the `bluey.*` namespace. Visible in devtools, logcat, and Xcode console without any consumer-side setup.
 
 ### In scope
@@ -239,7 +239,7 @@ class RunBurstWrite {
 
 **One-test-at-a-time invariant:** while a card is running, all other cards' Run buttons disable. Keeps stats clean.
 
-**Disconnect handling:** if the connection drops mid-test, the cubit cancels the run, marks the result as terminated by disconnect, and the `StressTestsScreen` pops back to the service explorer.
+**Disconnect handling:** if the connection drops mid-test, the cubit cancels the run, marks the result as terminated by disconnect, and the `StressTestsScreen` pops back to the connection screen.
 
 ### Library logging — `bluey/lib/src/`
 
@@ -338,7 +338,7 @@ Failure modes the runner catches and tallies:
 | Other `BlueyException` | any | `failuresByType[exception.runtimeType.toString()]++` |
 | Unexpected (non-`BlueyException`) | any | logged via `bluey.gatt` SEVERE; counted as `failuresByType['Unknown']++` |
 
-**Mid-test disconnect:** the runner detects via the connection state stream (subscribed in parallel with op execution); on disconnected, it cancels pending ops, emits a final snapshot with `isRunning=false`, and signals termination. The cubit pops the stress tests screen back to the service explorer.
+**Mid-test disconnect:** the runner detects via the connection state stream (subscribed in parallel with op execution); on disconnected, it cancels pending ops, emits a final snapshot with `isRunning=false`, and signals termination. The cubit pops the stress tests screen back to the connection screen.
 
 **Connection lost before screen opens:** screen shows a "Connect a device first" empty state.
 
@@ -371,7 +371,7 @@ TDD-first commit order. Each commit leaves the workspace green.
 
 2. `feat(example): add stress service handler in server feature` — RED + GREEN. New `infrastructure/stress_service_handler.dart`. Tests for each opcode's behaviour (echo, burstMe, delayAck, dropNext, setPayloadSize, unknown). Wires into `server_setup.dart` so the example server registers the stress service alongside the demo service.
 
-3. `feat(example): scaffold stress_tests feature module` — empty domain types, use case stubs, runner skeleton, cubit + state, screen with empty test cards. No real logic yet. Wired into navigation: `ServiceScreen` gains a "Stress Tests" `FloatingActionButton`.
+3. `feat(example): scaffold stress_tests feature module` — empty domain types, use case stubs, runner skeleton, cubit + state, screen with empty test cards. No real logic yet. Wired into navigation: `ConnectionScreen` gains a "Stress Tests" button immediately beneath the existing Disconnect button (same `GestureDetector` + `Container` style for visual consistency).
 
 4. `feat(example): implement StressTestRunner.runBurstWrite + RunBurstWrite use case` — RED + GREEN. Integration tests using `FakeBlueyPlatform` for success/timeout/status-failed/disconnect paths.
 
