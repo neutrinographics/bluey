@@ -19,6 +19,8 @@ import 'lifecycle_client.dart';
 ///   * [platform.GattOperationTimeoutException] → [GattTimeoutException]
 ///   * [platform.GattOperationDisconnectedException] →
 ///     [DisconnectedException] with [DisconnectReason.linkLoss]
+///   * [platform.GattOperationStatusFailedException] →
+///     [GattOperationFailedException] carrying the native status
 ///
 /// The platform-interface types stay internal: only [LifecycleClient] (an
 /// internal collaborator) catches them directly. Public callers see only
@@ -34,6 +36,8 @@ Future<T> _translateGattPlatformError<T>(
     throw GattTimeoutException(operation);
   } on platform.GattOperationDisconnectedException {
     throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
+  } on platform.GattOperationStatusFailedException catch (e) {
+    throw GattOperationFailedException(operation, e.status);
   }
 }
 

@@ -55,6 +55,71 @@ void main() {
     name: 'Disconnect Test Device',
   );
 
+  group('BlueyConnection GATT status-failed rewrap', () {
+    test(
+      'writeCharacteristic rewraps platform status-failed into GattOperationFailedException',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteStatusFailed = 1;
+
+        try {
+          await char.write(Uint8List.fromList([0x01]));
+          fail('Expected GattOperationFailedException');
+        } on GattOperationFailedException catch (e) {
+          expect(e.operation, equals('writeCharacteristic'));
+          expect(e.status, equals(1));
+        }
+
+        fakePlatform.simulateWriteStatusFailed = null;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'GattOperationFailedException is a BlueyException (sealed hierarchy)',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteStatusFailed = 5;
+
+        await expectLater(
+          () => char.write(Uint8List.fromList([0x01])),
+          throwsA(isA<BlueyException>()),
+        );
+
+        fakePlatform.simulateWriteStatusFailed = null;
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'platform.GattOperationStatusFailedException does not leak past the public API',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        final services = await conn.services();
+        final svc = services.first;
+        final char = svc.characteristic(UUID(_charUuid));
+
+        fakePlatform.simulateWriteStatusFailed = 1;
+
+        await expectLater(
+          () => char.write(Uint8List.fromList([0x01])),
+          throwsA(isNot(isA<platform.GattOperationStatusFailedException>())),
+        );
+
+        fakePlatform.simulateWriteStatusFailed = null;
+        await conn.disconnect();
+      },
+    );
+  });
+
   group('BlueyConnection GATT disconnect rewrap', () {
     test(
       'writeCharacteristic rewraps platform disconnect into DisconnectedException',

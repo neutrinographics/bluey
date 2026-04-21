@@ -115,6 +115,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// GATT handles have been invalidated after an ungraceful disconnect).
   String? simulateWritePlatformErrorCode;
 
+  /// When non-null, writeCharacteristic throws a
+  /// [GattOperationStatusFailedException] carrying this GATT status code.
+  /// Models Android's `onCharacteristicWrite(status != SUCCESS)` path —
+  /// most notably status 0x01 (`GATT_INVALID_HANDLE`) that follows a
+  /// peer-side Service Changed event after an iOS server force-kill.
+  int? simulateWriteStatusFailed;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -508,6 +515,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     }
     if (simulateWriteDisconnected) {
       throw const GattOperationDisconnectedException('writeCharacteristic');
+    }
+    final status = simulateWriteStatusFailed;
+    if (status != null) {
+      throw GattOperationStatusFailedException('writeCharacteristic', status);
     }
     final code = simulateWritePlatformErrorCode;
     if (code != null) {
