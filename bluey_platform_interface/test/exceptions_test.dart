@@ -51,4 +51,36 @@ void main() {
       expect(a.hashCode, equals(b.hashCode));
     });
   });
+
+  group('GattOperationStatusFailedException', () {
+    test('exposes the operation name, status, and a default message', () {
+      const e = GattOperationStatusFailedException('writeCharacteristic', 1);
+
+      expect(e.operation, equals('writeCharacteristic'));
+      expect(e.status, equals(1));
+      expect(
+        e.toString(),
+        allOf(contains('writeCharacteristic'), contains('1')),
+        reason: 'toString should mention both the operation and status code',
+      );
+    });
+
+    test('is an Exception so it can be caught with on Exception', () {
+      const e = GattOperationStatusFailedException('readCharacteristic', 8);
+      expect(e, isA<Exception>());
+    });
+
+    test('two instances with the same operation and status are equal', () {
+      const a = GattOperationStatusFailedException('readCharacteristic', 3);
+      const b = GattOperationStatusFailedException('readCharacteristic', 3);
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('differs by status', () {
+      const a = GattOperationStatusFailedException('readCharacteristic', 3);
+      const b = GattOperationStatusFailedException('readCharacteristic', 5);
+      expect(a, isNot(equals(b)));
+    });
+  });
 }
