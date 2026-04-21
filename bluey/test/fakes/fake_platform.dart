@@ -94,6 +94,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// of an absent peer.
   bool simulateWriteTimeout = false;
 
+  /// When true, writeCharacteristic calls will throw a
+  /// [GattOperationDisconnectedException] to simulate a mid-op link loss
+  /// (the platform queue draining a pending op when the GATT connection
+  /// drops). Distinct from [simulateWriteTimeout] and [simulateWriteFailure].
+  bool simulateWriteDisconnected = false;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -484,6 +490,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   ) async {
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
+    }
+    if (simulateWriteDisconnected) {
+      throw const GattOperationDisconnectedException('writeCharacteristic');
     }
     if (simulateWriteFailure) {
       throw Exception('Write failed: server unreachable');
