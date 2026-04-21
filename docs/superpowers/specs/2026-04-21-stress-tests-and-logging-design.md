@@ -17,7 +17,7 @@ Two distinct deliverables, bundled for efficiency since they touch overlapping f
 ### In scope
 
 - 7 stress tests (burst write, mixed-op concurrency, long-running soak, timeout probe, failure injection, MTU probe, notification throughput)
-- Custom GATT service in the example server with a 5-opcode protocol (`echo`, `burstMe`, `delayAck`, `dropNext`, `setPayloadSize`)
+- Custom GATT service in the example server with a 6-opcode protocol (`echo`, `burstMe`, `delayAck`, `dropNext`, `setPayloadSize`, `reset`)
 - New `stress_tests` feature module in the example app, following existing clean-architecture layering
 - `dart:developer.log` instrumentation in `bluey` library, no native-side (Kotlin/Swift) logging
 - Per-test config form, live counters with exception-type breakdown, latency p50/p95
@@ -70,10 +70,22 @@ Three cleanly separated areas of work. The library is touched only for logging i
 
 ### DDD notes
 
-- **`StressCommand`** is a sealed Command-pattern hierarchy — `EchoCommand`, `BurstMeCommand`, `DelayAckCommand`, `DropNextCommand`, `SetPayloadSizeCommand`. Each subclass owns its encode/decode. Adding a future opcode = one new subclass + one new server `case`.
+- **`StressCommand`** is a sealed Command-pattern hierarchy — `EchoCommand`, `BurstMeCommand`, `DelayAckCommand`, `DropNextCommand`, `SetPayloadSizeCommand`, `ResetCommand`. Each subclass owns its encode/decode. Adding a future opcode = one new subclass + one new server `case`.
 - **`StressTestRunner`** is the only client-side surface that touches `BlueyConnection`. Use cases call it; the cubit consumes its result stream. Keeps `BlueyConnection` interaction in one place.
-- **`StressServiceHandler`** is the server-side aggregate root for stress-service state (`_lastEcho`, `_dropNextWrite`, `_payloadSize`). State resets on server start.
+- **`StressServiceHandler`** is the server-side aggregate root for stress-service state (`_lastEcho`, `_dropNextWrite`, `_payloadSize`, `_burstId`, `_abortBurst`). State resets on server start or on receipt of a `reset` command.
 - **Library stays ignorant** of stress tests — UUIDs, opcodes, dispatcher all live in `bluey/example/`. Library only gets logging.
+
+### Test isolation
+
+When the user hits Stop on a running test, the cubit cancels its stream subscription. That stops the client from *tallying* further events, but doesn't stop work already in flight: writes already enqueued in Android's GATT queue execute on the wire, server-side flags (`_dropNextWrite`, `_payloadSize`, `_lastEcho`) persist, and an in-progress `burstMe` loop keeps emitting notifications. Without coordination, the next test runs against a contaminated server.
+
+Two-pronged mitigation:
+
+1. **`reset` opcode + reset-on-start.** Every test's first action is to send `ResetCommand` and await the response. The server clears all state and aborts any in-flight `burstMe` loop. The next test starts from a known baseline regardless of how the previous one ended.
+
+2. **Burst-id filtering.** `burstMe` notifications carry a 1-byte burst-id prefix. The client tracks the expected burst-id for the current run; notifications with a different id are stragglers from a previous (cancelled) burst and are silently dropped. Required because we can't prevent the previous burst's notifications from arriving on the wire — only filter them out client-side.
+
+This design accepts that `Stop` is best-effort cleanup. The reliable cleanup happens at the start of the next test. Trade-off: ~50ms overhead per test for the `reset` round-trip; in exchange, no spec-rot from accumulated server state and no flaky cross-test interference.
 
 ## Components
 
@@ -96,10 +108,11 @@ byte 1..   : opcode-specific payload (little-endian for multi-byte ints)
 | Opcode | Name | Payload (from client) | Server behaviour |
 |--------|------|-----------------------|------------------|
 | `0x01` | `echo` | any bytes | Server stores payload, returns it on next read, fires a notification with it |
-| `0x02` | `burstMe` | `uint16 count` (LE), `uint16 payloadSize` (LE) | Server fires `count` back-to-back notifications, each `payloadSize` bytes of deterministic pattern (`[0,1,2,...]`) |
+| `0x02` | `burstMe` | `uint16 count` (LE), `uint16 payloadSize` (LE) | Server increments its `_burstId` counter, then fires `count` back-to-back notifications. Each notification: `[burstId, ...payload]` where payload is `payloadSize` bytes of deterministic pattern (`[0,1,2,...]`). Loop checks an abort flag between emissions; `reset` sets it. |
 | `0x03` | `delayAck` | `uint16 delayMs` (LE) | Server waits `delayMs` ms before responding to the write |
 | `0x04` | `dropNext` | none | Server silently ignores the next write (no response, no notification). Self-clears after one drop. |
 | `0x05` | `setPayloadSize` | `uint16 sizeBytes` (LE) | Server's next read returns `sizeBytes` bytes of deterministic pattern |
+| `0x06` | `reset` | none | Clears `_lastEcho`, sets `_dropNextWrite = false`, resets `_payloadSize = 20`, sets the burst abort flag (interrupts any in-flight `burstMe` loop), responds with success. |
 
 **Sealed Dart-side hierarchy:**
 ```dart
@@ -112,6 +125,7 @@ class BurstMeCommand extends StressCommand { final int count; final int payloadS
 class DelayAckCommand extends StressCommand { final int delayMs; ... }
 class DropNextCommand extends StressCommand { ... }
 class SetPayloadSizeCommand extends StressCommand { final int sizeBytes; ... }
+class ResetCommand extends StressCommand { ... }
 ```
 
 **Read response (no framing):** the characteristic's read returns either the last `echo`'d value, or — if `setPayloadSize` was the most recent op — `sizeBytes` of pattern.
@@ -125,6 +139,8 @@ class StressServiceHandler {
   Uint8List _lastEcho = Uint8List(0);
   bool _dropNextWrite = false;
   int _payloadSize = 20;
+  int _burstId = 0;        // increments per burstMe invocation
+  bool _abortBurst = false; // set by reset; checked between notifications
 
   Future<void> onWrite(WriteRequest req, BlueyServer server) async {
     if (_dropNextWrite) {
@@ -137,20 +153,40 @@ class StressServiceHandler {
         _lastEcho = payload;
         server.respondToWrite(req, status: PlatformGattStatus.success);
         server.notify(req.deviceId, StressProtocol.charUuid, payload);
+
       case BurstMeCommand(:final count, :final payloadSize):
+        _abortBurst = false;
+        _burstId = (_burstId + 1) & 0xff;
+        final thisBurstId = _burstId;
         server.respondToWrite(req, status: PlatformGattStatus.success);
         for (var i = 0; i < count; i++) {
-          server.notify(req.deviceId, StressProtocol.charUuid,
-                        _generatePattern(payloadSize));
+          if (_abortBurst) break;
+          final pattern = _generatePattern(payloadSize);
+          // Prepend burst-id so client can filter stragglers from a
+          // previous burst that the user cancelled.
+          final payload = Uint8List(pattern.length + 1)
+            ..[0] = thisBurstId
+            ..setRange(1, pattern.length + 1, pattern);
+          server.notify(req.deviceId, StressProtocol.charUuid, payload);
         }
+
       case DelayAckCommand(:final delayMs):
         await Future.delayed(Duration(milliseconds: delayMs));
         server.respondToWrite(req, status: PlatformGattStatus.success);
+
       case DropNextCommand():
         _dropNextWrite = true;
         server.respondToWrite(req, status: PlatformGattStatus.success);
+
       case SetPayloadSizeCommand(:final sizeBytes):
         _payloadSize = sizeBytes;
+        server.respondToWrite(req, status: PlatformGattStatus.success);
+
+      case ResetCommand():
+        _lastEcho = Uint8List(0);
+        _dropNextWrite = false;
+        _payloadSize = 20;
+        _abortBurst = true; // interrupts any in-flight burstMe loop
         server.respondToWrite(req, status: PlatformGattStatus.success);
     }
   }
@@ -160,7 +196,7 @@ class StressServiceHandler {
 }
 ```
 
-Server-side state (`_lastEcho`, `_dropNextWrite`, `_payloadSize`) is per-server-instance, shared across all centrals (matches BLE peripheral semantics — one GATT database per peripheral).
+Server-side state (`_lastEcho`, `_dropNextWrite`, `_payloadSize`, `_burstId`, `_abortBurst`) is per-server-instance, shared across all centrals (matches BLE peripheral semantics — one GATT database per peripheral).
 
 ### Client-side — `bluey/example/lib/features/stress_tests/`
 
@@ -228,7 +264,9 @@ class RunBurstWrite {
 - Public methods: `runBurstWrite`, `runMixedOps`, `runSoak`, `runTimeoutProbe`, `runFailureInjection`, `runMtuProbe`, `runNotificationThroughput`.
 - Each returns a `Stream<StressTestResult>` that emits incremental snapshots as ops complete.
 - Encodes `StressCommand`s, awaits writes, observes notifications, catches exceptions, accumulates counters.
-- Cancellable via the stream subscription.
+- **Every method begins by sending `ResetCommand` and awaiting the response.** This is the test-isolation contract: regardless of what state the previous test left the server in, the new test starts from a known baseline. The reset call's own success/failure is logged via `bluey.gatt` but does NOT count toward the test's `attempted`/`succeeded`/`failed` totals — it's prologue, not part of the measurement.
+- For `runNotificationThroughput`, the runner reads the current burst-id from the server's first notification of the new burst and filters subsequent notifications by it — stragglers from a cancelled previous burst (different burst-id) are dropped.
+- Cancellable via the stream subscription. On cancel, the runner stops launching new ops; in-flight ops complete in the background and are not tallied.
 
 **Presentation:**
 - `StressTestsScreen` — column of `TestCard` widgets, one per test type
@@ -286,7 +324,7 @@ Levels: default (info) for normal events; `Level.WARNING` (900) for recoverable 
 - Running: config form disabled, Stop button enabled, results panel updating live
 - Complete: config form active again, results panel frozen at final values
 
-**Stop behaviour:** cancels the stream subscription, marks result as cancelled, leaves counters at their last values.
+**Stop behaviour:** cancels the stream subscription, marks result as cancelled, leaves counters at their last values. In-flight ops complete in the background but aren't tallied; server-side state is left dirty. The next test's `reset` prologue cleans it up.
 
 ## Data flow — burst write example
 
@@ -305,6 +343,9 @@ RunBurstWrite.call(config, connection)
 StressTestRunner.runBurstWrite(config, connection)
    │  resolves stress service + characteristic from connection.services()
    │  creates Stream<StressTestResult> via StreamController
+   │
+   │  // PROLOGUE: clean slate
+   │  await characteristic.write(ResetCommand().encode(), withResponse: true)
    │
    │  for i in 0..config.count:
    │    final cmd = EchoCommand(payload: pattern(config.payloadBytes))
@@ -357,6 +398,9 @@ Failure modes the runner catches and tallies:
 - Unit tests for `StressServiceHandler.onWrite` for each opcode, asserting state mutation and (mocked) `BlueyServer.respondToWrite` / `notify` calls.
 - Specifically test `dropNext` self-clears after one drop.
 - Specifically test unknown opcode → response with `PlatformGattStatus.requestNotSupported`.
+- Specifically test `reset` clears all state (`_lastEcho` empty, `_dropNextWrite=false`, `_payloadSize=20`) and sets the burst abort flag.
+- Specifically test that a `reset` mid-`burstMe` interrupts the notification loop (verify only the notifications emitted before the abort flag was checked are sent).
+- Specifically test `burstMe` increments `_burstId` and prepends the new id to every notification's payload.
 
 ### Library logging
 
@@ -367,9 +411,9 @@ Failure modes the runner catches and tallies:
 
 TDD-first commit order. Each commit leaves the workspace green.
 
-1. `feat(example): add stress test protocol shared module` — RED + GREEN. New `bluey/example/lib/shared/stress_protocol.dart`. Sealed `StressCommand` hierarchy with `encode`/`decode` per opcode. Tests in `bluey/example/test/shared/stress_protocol_test.dart` cover round-trips.
+1. `feat(example): add stress test protocol shared module` — RED + GREEN. New `bluey/example/lib/shared/stress_protocol.dart`. Sealed `StressCommand` hierarchy (6 subclasses) with `encode`/`decode` per opcode. Tests in `bluey/example/test/shared/stress_protocol_test.dart` cover round-trips.
 
-2. `feat(example): add stress service handler in server feature` — RED + GREEN. New `infrastructure/stress_service_handler.dart`. Tests for each opcode's behaviour (echo, burstMe, delayAck, dropNext, setPayloadSize, unknown). Wires into `server_setup.dart` so the example server registers the stress service alongside the demo service.
+2. `feat(example): add stress service handler in server feature` — RED + GREEN. New `infrastructure/stress_service_handler.dart`. Tests for each opcode's behaviour (echo, burstMe with burst-id prefix, delayAck, dropNext, setPayloadSize, reset, unknown). Includes the burst-abort-on-reset test. Wires into `server_setup.dart` so the example server registers the stress service alongside the demo service.
 
 3. `feat(example): scaffold stress_tests feature module` — empty domain types, use case stubs, runner skeleton, cubit + state, screen with empty test cards. No real logic yet. Wired into navigation: `ConnectionScreen` gains a "Stress Tests" button immediately beneath the existing Disconnect button (same `GestureDetector` + `Container` style for visual consistency).
 
@@ -394,6 +438,7 @@ Order rationale: protocol first (shared between client and server), server next 
 - Manual verification: `Timeout probe` triggers a `GattTimeoutException` with the expected operation name and within `delayPastTimeout` of the per-op timeout.
 - Manual verification: `Failure injection` triggers timeout (no ack from dropped write), then subsequent ops succeed (queue drained correctly).
 - Manual verification: `Notification throughput` receives all `count` notifications with intact pattern bytes.
+- Manual verification: stopping a test mid-run and immediately starting a different test produces clean results — no stale notifications, no `dropNext` leak from the cancelled run, no `setPayloadSize` leak.
 - Library log output visible in devtools when running the example app: `bluey.connection`, `bluey.gatt`, `bluey.lifecycle`, `bluey.peer`, `bluey.server` namespaces all appear during normal use.
 
 ## Open questions
