@@ -32,7 +32,6 @@ class MockConnection implements Connection {
   ConnectionParameters connectionParameters;
 
   final List<RemoteService> _services;
-  bool _servicesDiscovered = false;
 
   final _stateController = StreamController<ConnectionState>.broadcast();
   final _bondStateController = StreamController<BondState>.broadcast();
@@ -70,7 +69,6 @@ class MockConnection implements Connection {
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
-    _servicesDiscovered = true;
     return _services;
   }
 

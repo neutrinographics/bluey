@@ -547,20 +547,6 @@ class Bluey {
     }
   }
 
-  ConnectionState _mapConnectionState(
-    platform.PlatformConnectionState platformState,
-  ) {
-    switch (platformState) {
-      case platform.PlatformConnectionState.disconnected:
-        return ConnectionState.disconnected;
-      case platform.PlatformConnectionState.connecting:
-        return ConnectionState.connecting;
-      case platform.PlatformConnectionState.connected:
-        return ConnectionState.connected;
-      case platform.PlatformConnectionState.disconnecting:
-        return ConnectionState.disconnecting;
-    }
-  }
 
   /// Converts a platform device ID to a UUID.
   ///
