@@ -5,9 +5,14 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
 
 /// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
-/// matching typed platform-interface exception: `'gatt-timeout'` →
-/// [GattOperationTimeoutException], `'gatt-disconnected'` →
-/// [GattOperationDisconnectedException]. Other errors propagate unchanged.
+/// matching typed platform-interface exception:
+///
+///   * `'gatt-timeout'` → [GattOperationTimeoutException]
+///   * `'gatt-disconnected'` → [GattOperationDisconnectedException]
+///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
+///     the native status extracted from `details`.
+///
+/// Other errors propagate unchanged.
 ///
 /// Kept package-private so the same wrapper can be used by every GATT
 /// operation in this file without leaking translation logic into the
@@ -24,6 +29,12 @@ Future<T> _translateGattPlatformError<T>(
     }
     if (e.code == 'gatt-disconnected') {
       throw GattOperationDisconnectedException(operation);
+    }
+    if (e.code == 'gatt-status-failed') {
+      // Native status arrives in `details` as an int. Sentinel -1 handles
+      // the rare marshaling paths where it could come back null / non-int.
+      final status = e.details is int ? e.details as int : -1;
+      throw GattOperationStatusFailedException(operation, status);
     }
     rethrow;
   }

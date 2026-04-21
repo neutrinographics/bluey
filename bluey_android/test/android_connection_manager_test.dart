@@ -575,6 +575,82 @@ void main() {
       );
 
       test(
+        'writeCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Write failed with status: 1',
+              details: 1,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')
+                .having((e) => e.status, 'status', 1)),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Read failed with status: 5',
+              details: 5,
+            ),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.operation, 'operation', 'readCharacteristic')
+                .having((e) => e.status, 'status', 5)),
+          );
+        },
+      );
+
+      test(
+        'gatt-status-failed without int details defaults status to -1',
+        () async {
+          // Pigeon sometimes marshals details via String/JSON paths that
+          // could arrive as a non-int. Sentinel -1 is the documented
+          // fallback rather than throwing or guessing.
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Write failed',
+              details: null,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.status, 'status', -1)),
+          );
+        },
+      );
+
+      test(
         'all wrapped methods translate gatt-timeout with correct operation name',
         () async {
           // Verify each remaining wrapped method (beyond the explicitly

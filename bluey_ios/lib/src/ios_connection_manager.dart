@@ -8,9 +8,18 @@ import 'messages.g.dart';
 import 'uuid_utils.dart';
 
 /// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
-/// matching typed platform-interface exception: `'gatt-timeout'` →
-/// [GattOperationTimeoutException], `'gatt-disconnected'` →
-/// [GattOperationDisconnectedException]. Other errors propagate unchanged.
+/// matching typed platform-interface exception:
+///
+///   * `'gatt-timeout'` → [GattOperationTimeoutException]
+///   * `'gatt-disconnected'` → [GattOperationDisconnectedException]
+///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
+///     the native status extracted from `details`. iOS Swift does not
+///     currently emit this code, but the translation is kept symmetric
+///     with the Android contract so that any future native-side mapping
+///     (e.g. of `CBError` numeric codes) surfaces as the same typed
+///     exception.
+///
+/// Other errors propagate unchanged.
 ///
 /// Kept package-private so the same wrapper can be used by every GATT
 /// operation in this file without leaking translation logic into the
@@ -27,6 +36,10 @@ Future<T> _translateGattPlatformError<T>(
     }
     if (e.code == 'gatt-disconnected') {
       throw GattOperationDisconnectedException(operation);
+    }
+    if (e.code == 'gatt-status-failed') {
+      final status = e.details is int ? e.details as int : -1;
+      throw GattOperationStatusFailedException(operation, status);
     }
     rethrow;
   }

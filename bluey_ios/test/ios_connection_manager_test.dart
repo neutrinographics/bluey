@@ -723,6 +723,33 @@ void main() {
       );
 
       test(
+        'writeCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(
+                any(), any(), any(), any(),
+              )).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Write failed with status: 1',
+              details: 1,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()
+                .having((e) => e.operation, 'operation', 'writeCharacteristic')
+                .having((e) => e.status, 'status', 1)),
+          );
+        },
+      );
+
+      test(
         'all wrapped methods translate gatt-timeout with correct operation name',
         () async {
           // Verify each remaining wrapped method (beyond the explicitly
