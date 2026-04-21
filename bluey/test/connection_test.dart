@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock implementation for testing the interface

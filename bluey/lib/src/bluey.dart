@@ -5,7 +5,6 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
-import 'connection/connection_state.dart';
 import 'connection/lifecycle_client.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';

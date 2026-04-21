@@ -10,7 +10,6 @@ import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import 'connection.dart';
-import 'connection_state.dart';
 import 'lifecycle_client.dart';
 
 /// Catches the internal platform-interface exceptions surfaced by the

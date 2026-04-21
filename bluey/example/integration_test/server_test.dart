@@ -99,7 +99,7 @@ void main() {
       );
 
       // Should not throw
-      await server.removeService(serviceUuid);
+      server.removeService(serviceUuid);
 
       await server.dispose();
     });

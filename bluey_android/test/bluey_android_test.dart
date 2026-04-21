@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey_android/bluey_android.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';

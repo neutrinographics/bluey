@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/connection/lifecycle_client.dart';
-import 'package:bluey/src/gatt_client/gatt.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
