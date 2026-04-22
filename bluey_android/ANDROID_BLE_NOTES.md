@@ -180,3 +180,18 @@ The single-op rule is **per `BluetoothGatt` instance**, not global. Two connecti
 
 - **Write-without-response is serialized.** The link layer actually permits many write-without-response packets back-to-back via the credit flow-control system. Phase 2a serializes them anyway for simplicity; Phase 2c revisits this for burst-throughput workloads.
 - **Discovery / MTU are queued as regular ops.** On some Android versions the OS briefly serializes these across connections at a lower level; our per-connection queue does not coordinate with the OS-level serialization, which is fine because the OS handles it transparently via the callbacks we're already awaiting.
+
+## Activity-Aware Liveness (2026-04-22)
+
+`LifecycleClient` no longer sends a heartbeat on every interval tick if it has recently observed other activity on the connection. Any successful GATT op (read, write, discoverServices, requestMtu, readRssi, setNotification) or incoming notification counts as activity and:
+
+1. Resets the consecutive-failure counter.
+2. Refreshes the activity-window timestamp so the next tick's `shouldSendProbe` check returns false.
+
+Symmetric change on the server: `LifecycleServer` accepts any incoming request from a client (not just heartbeat writes) as liveness evidence via `recordActivity(clientId)`. `BlueyServer` calls this on the fallthrough path of its read/write listeners.
+
+The heartbeat write still fires as a fallback when the connection is genuinely idle. The control service, heartbeat characteristic, and wire protocol are unchanged.
+
+Motivation: burst workloads (e.g. the example app's stress-test suite) were starving the heartbeat into a queue-wait timeout, tripping `onServerUnreachable` mid-burst even though every preceding write had succeeded. Treating user-op success as activity prevents this false positive.
+
+Implementation reference: `bluey/lib/src/connection/liveness_monitor.dart` owns the state machine; `LifecycleClient` delegates all policy decisions to it.
