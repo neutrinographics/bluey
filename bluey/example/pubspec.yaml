@@ -18,6 +18,7 @@ dependencies:
   #   path: ../../bluey_android
   # bluey_platform_interface:
   #   path: ../../bluey_platform_interface
+  collection: ^1.18.0
   flutter_bloc: ^8.1.0
   get_it: ^7.6.0
   google_fonts: ^6.1.0

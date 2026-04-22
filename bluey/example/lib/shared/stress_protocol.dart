@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
+
 /// UUIDs and command framing for the stress test service hosted by the
 /// example server. Shared between client (stress_tests feature) and
 /// server (stress_service_handler). NOT part of the bluey library — this
@@ -32,7 +34,7 @@ sealed class StressCommand {
   static StressCommand decode(Uint8List bytes) {
     if (bytes.isEmpty) {
       throw const StressProtocolException(
-        opcode: -1,
+        opcode: null,
         message: 'Empty stress command payload',
       );
     }
@@ -54,7 +56,8 @@ sealed class StressCommand {
 /// notification with it. Opcode 0x01.
 class EchoCommand extends StressCommand {
   final Uint8List payload;
-  const EchoCommand(this.payload);
+
+  EchoCommand(Uint8List payload) : payload = Uint8List.fromList(payload);
 
   @override
   Uint8List encode() {
@@ -63,11 +66,20 @@ class EchoCommand extends StressCommand {
     out.setRange(1, out.length, payload);
     return out;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is EchoCommand &&
+      const ListEquality<int>().equals(other.payload, payload);
+
+  @override
+  int get hashCode => Object.hashAll(payload);
 }
 
 /// Thrown when stress command bytes can't be decoded.
 class StressProtocolException implements Exception {
-  final int opcode;
+  /// The raw opcode byte, or `null` if the payload was empty.
+  final int? opcode;
   final String message;
   const StressProtocolException({required this.opcode, required this.message});
   @override

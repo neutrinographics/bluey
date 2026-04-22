@@ -34,6 +34,21 @@ void main() {
       expect(decoded, isA<EchoCommand>());
       expect((decoded as EchoCommand).payload, equals(original.payload));
     });
+
+    test('EchoCommand values are equal when payloads match', () {
+      expect(
+        EchoCommand(Uint8List.fromList([1, 2, 3])),
+        equals(EchoCommand(Uint8List.fromList([1, 2, 3]))),
+      );
+    });
+
+    test('EchoCommand constructor defensively copies payload', () {
+      final mutable = Uint8List.fromList([1, 2, 3]);
+      final cmd = EchoCommand(mutable);
+      mutable[0] = 99;
+      expect(cmd.payload[0], equals(1),
+          reason: 'Mutating the caller\'s list must not change the command');
+    });
   });
 
   group('StressCommand.decode', () {
