@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -6,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
 import '../connection/lifecycle_client.dart';
+import '../lifecycle.dart' as lifecycle;
 import 'peer.dart';
 import 'peer_discovery.dart';
 import 'server_id.dart';
@@ -51,6 +53,8 @@ class _BlueyPeer implements BlueyPeer {
     try {
       final effectiveScanTimeout = scanTimeout ?? const Duration(seconds: 5);
 
+      dev.log('upgrade attempt: deviceId=${serverId}', name: 'bluey.peer');
+
       final discovery = PeerDiscovery(platformApi: _platform);
       final rawConnection = await discovery.connectTo(
         serverId,
@@ -63,6 +67,16 @@ class _BlueyPeer implements BlueyPeer {
       // Discover services on the raw connection (includes control service).
       final allServices = await blueyConnection.services();
 
+      final controlService = allServices
+          .where((s) => lifecycle.isControlService(s.uuid.toString()))
+          .firstOrNull;
+      dev.log(
+        controlService != null
+            ? 'control service discovered'
+            : 'no control service — peer is not a bluey peer',
+        name: 'bluey.peer',
+      );
+
       // Start lifecycle heartbeat.
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
@@ -74,12 +88,16 @@ class _BlueyPeer implements BlueyPeer {
       );
       lifecycleClient.start(allServices: allServices);
 
+      dev.log('serverId read: $serverId', name: 'bluey.peer');
+
       // Upgrade the connection in place so the control service is hidden
       // from the caller's view of services/service/hasService.
       blueyConnection.upgrade(
         lifecycleClient: lifecycleClient,
         serverId: serverId,
       );
+
+      dev.log('upgrade complete: deviceId=${blueyConnection.deviceId}', name: 'bluey.peer');
 
       return blueyConnection;
     } finally {

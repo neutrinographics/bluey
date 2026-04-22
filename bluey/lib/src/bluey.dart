@@ -375,6 +375,8 @@ class Bluey {
     int maxFailedHeartbeats = 1,
   }) async {
     try {
+      dev.log('upgrade attempt: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
+
       // Fetch services before upgrade so the full list (including control
       // service) is available for the lifecycle client.
       final services = await rawConnection.services();
@@ -382,6 +384,13 @@ class Bluey {
       final controlService = services
           .where((s) => lifecycle.isControlService(s.uuid.toString()))
           .firstOrNull;
+
+      dev.log(
+        controlService != null
+            ? 'control service discovered'
+            : 'no control service — peer is not a bluey peer',
+        name: 'bluey.peer',
+      );
 
       if (controlService == null) return rawConnection;
 
@@ -402,6 +411,8 @@ class Bluey {
         }
       }
 
+      dev.log('serverId read: $serverId', name: 'bluey.peer');
+
       // Start lifecycle heartbeat
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
@@ -419,6 +430,8 @@ class Bluey {
         lifecycleClient: lifecycleClient,
         serverId: serverId ?? ServerId.generate(),
       );
+
+      dev.log('upgrade complete: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
 
       return rawConnection;
     } catch (_) {

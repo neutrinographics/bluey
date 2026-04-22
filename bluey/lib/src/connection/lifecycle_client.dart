@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -55,6 +56,7 @@ class LifecycleClient {
     if (heartbeatChar == null) return;
 
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
+    dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
     // Send the first heartbeat immediately so the server (especially iOS,
     // which has no connection callback) learns about this client as soon as
@@ -116,6 +118,7 @@ class LifecycleClient {
   );
 
   void _beginHeartbeat(Duration interval) {
+    dev.log('heartbeat interval set: ${interval.inMilliseconds}ms', name: 'bluey.lifecycle');
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(interval, (_) {
       _sendHeartbeat();
@@ -140,7 +143,17 @@ class LifecycleClient {
         return;
       }
       _consecutiveFailures++;
+      dev.log(
+        'heartbeat failed (counted): $_consecutiveFailures/$maxFailedHeartbeats — ${error.runtimeType}',
+        name: 'bluey.lifecycle',
+        level: 900, // WARNING
+      );
       if (_consecutiveFailures >= maxFailedHeartbeats) {
+        dev.log(
+          'heartbeat threshold reached — invoking onServerUnreachable',
+          name: 'bluey.lifecycle',
+          level: 1000, // SEVERE
+        );
         stop();
         onServerUnreachable();
       }

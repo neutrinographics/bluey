@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
@@ -67,10 +68,12 @@ class BlueyServer implements Server {
     _controlServiceReady = _lifecycle.addControlServiceIfNeeded();
 
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
+    dev.log('server initialized', name: 'bluey.server');
 
     _centralConnectionsSub = _platform.centralConnections.listen((
       platformCentral,
     ) {
+      dev.log('central connected: ${platformCentral.id}', name: 'bluey.server');
       _emitEvent(
         ClientConnectedEvent(
           clientId: platformCentral.id,
@@ -135,6 +138,7 @@ class BlueyServer implements Server {
     await _controlServiceReady;
     final platformService = _mapHostedServiceToPlatform(service);
     await _platform.addService(platformService);
+    dev.log('service added: ${service.uuid}', name: 'bluey.server');
     _emitEvent(
       ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
     );
@@ -166,6 +170,7 @@ class BlueyServer implements Server {
 
     await _platform.startAdvertising(config);
     _isAdvertising = true;
+    dev.log('advertising started', name: 'bluey.server');
     _emitEvent(
       AdvertisingStartedEvent(
         name: name,
@@ -179,6 +184,7 @@ class BlueyServer implements Server {
   Future<void> stopAdvertising() async {
     await _platform.stopAdvertising();
     _isAdvertising = false;
+    dev.log('advertising stopped', name: 'bluey.server');
     _emitEvent(AdvertisingStoppedEvent(source: 'BlueyServer'));
   }
 
@@ -363,6 +369,11 @@ class BlueyServer implements Server {
   // === Lifecycle management ===
 
   void _handleClientDisconnected(String clientId) {
+    dev.log(
+      'central disconnected: $clientId',
+      name: 'bluey.server',
+      level: 900, // WARNING
+    );
     // Cancel any heartbeat timer for this client
     _lifecycle.cancelTimer(clientId);
 
