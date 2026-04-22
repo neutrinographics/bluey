@@ -7,6 +7,13 @@ import '../../../shared/stress_protocol.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
 
+String _typeName(Object e) {
+  if (e is BlueyPlatformException) {
+    return 'BlueyPlatformException(${e.code ?? 'null'})';
+  }
+  return e.runtimeType.toString();
+}
+
 /// Single point of contact between the stress_tests feature and a live
 /// [Connection]. Each `run*` method returns a `Stream<StressTestResult>`
 /// that emits incremental snapshots as ops complete and a final
@@ -27,13 +34,7 @@ class StressTestRunner {
         try {
           final stressChar = await _resolveStressChar(connection);
 
-          // Test isolation: clean baseline before measuring. Failures here
-          // abort the run with an empty final snapshot — reset is prologue,
-          // not measurement.
-          try {
-            await stressChar.write(
-                const ResetCommand().encode(), withResponse: true);
-          } on Object {
+          if (!await _prologue(connection, stressChar)) {
             if (!cancelled && !controller.isClosed) {
               controller
                   .add(StressTestResult.initial().finished(elapsed: Duration.zero));
@@ -75,7 +76,7 @@ class StressTestRunner {
                 ));
               } catch (e) {
                 publish(_OpOutcome.failure(
-                  typeName: e.runtimeType.toString(),
+                  typeName: _typeName(e),
                   status:
                       e is GattOperationFailedException ? e.status : null,
                 ));
@@ -115,10 +116,7 @@ class StressTestRunner {
         try {
           final stressChar = await _resolveStressChar(connection);
 
-          try {
-            await stressChar.write(
-                const ResetCommand().encode(), withResponse: true);
-          } on Object {
+          if (!await _prologue(connection, stressChar)) {
             if (!cancelled && !controller.isClosed) {
               controller.add(
                   StressTestResult.initial().finished(elapsed: Duration.zero));
@@ -157,7 +155,7 @@ class StressTestRunner {
               ));
             } catch (e) {
               publish(_OpOutcome.failure(
-                typeName: e.runtimeType.toString(),
+                typeName: _typeName(e),
                 status: e is GattOperationFailedException ? e.status : null,
               ));
             }
@@ -198,9 +196,7 @@ class StressTestRunner {
   ) async* {
     final stressChar = await _resolveStressChar(connection);
 
-    try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
-    } on Object {
+    if (!await _prologue(connection, stressChar)) {
       yield StressTestResult.initial().finished(elapsed: Duration.zero);
       return;
     }
@@ -227,7 +223,7 @@ class StressTestRunner {
           result = result.markConnectionLost();
         }
         result = result.recordFailure(
-          typeName: e.runtimeType.toString(),
+          typeName: _typeName(e),
           status: e is GattOperationFailedException ? e.status : null,
         );
       }
@@ -252,9 +248,7 @@ class StressTestRunner {
   ) async* {
     final stressChar = await _resolveStressChar(connection);
 
-    try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
-    } on Object {
+    if (!await _prologue(connection, stressChar)) {
       yield StressTestResult.initial().finished(elapsed: Duration.zero);
       return;
     }
@@ -285,7 +279,7 @@ class StressTestRunner {
         result = result.markConnectionLost();
       }
       result = result.recordFailure(
-        typeName: e.runtimeType.toString(),
+        typeName: _typeName(e),
         status: e is GattOperationFailedException ? e.status : null,
       );
     }
@@ -299,8 +293,12 @@ class StressTestRunner {
   ) async* {
     final stressChar = await _resolveStressChar(connection);
 
+    if (!await _prologue(connection, stressChar)) {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
     try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
       await stressChar.write(const DropNextCommand().encode(), withResponse: true);
     } on Object {
       yield StressTestResult.initial().finished(elapsed: Duration.zero);
@@ -328,7 +326,7 @@ class StressTestRunner {
           result = result.markConnectionLost();
         }
         result = result.recordFailure(
-          typeName: e.runtimeType.toString(),
+          typeName: _typeName(e),
           status: e is GattOperationFailedException ? e.status : null,
         );
       }
@@ -369,7 +367,7 @@ class StressTestRunner {
         result = result.markConnectionLost();
       }
       result = result.recordFailure(
-        typeName: e.runtimeType.toString(),
+        typeName: _typeName(e),
         status: e is GattOperationFailedException ? e.status : null,
       );
       yield result.finished(elapsed: stopwatch.elapsed);
@@ -412,7 +410,7 @@ class StressTestRunner {
           result = result.markConnectionLost();
         }
         result = result.recordFailure(
-          typeName: e.runtimeType.toString(),
+          typeName: _typeName(e),
           status: e is GattOperationFailedException ? e.status : null,
         );
       }
@@ -428,9 +426,7 @@ class StressTestRunner {
   ) async* {
     final stressChar = await _resolveStressChar(connection);
 
-    try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
-    } on Object {
+    if (!await _prologue(connection, stressChar)) {
       yield StressTestResult.initial().finished(elapsed: Duration.zero);
       return;
     }
@@ -478,7 +474,7 @@ class StressTestRunner {
         result = result.markConnectionLost();
       }
       result = result.recordFailure(
-        typeName: e.runtimeType.toString(),
+        typeName: _typeName(e),
         status: e is GattOperationFailedException ? e.status : null,
       );
       writeSucceeded = false;
@@ -516,6 +512,34 @@ class StressTestRunner {
 
     stopwatch.stop();
     yield result.finished(elapsed: stopwatch.elapsed);
+  }
+
+  /// Shared prologue for every stress test. Requests a higher MTU so
+  /// first-run bursts with >20-byte payloads don't fail before auto-MTU
+  /// negotiation completes, then sends `ResetCommand` to zero the
+  /// server-side counters. MTU failure is swallowed — not every peer
+  /// honours a higher MTU and that's fine; the test still runs (at the
+  /// peer's default payload limit).
+  ///
+  /// Returns true if the reset succeeded; false if the reset failed,
+  /// in which case the caller should emit a zero-elapsed final snapshot
+  /// and close its stream.
+  Future<bool> _prologue(
+    Connection connection,
+    RemoteCharacteristic stressChar,
+  ) async {
+    try {
+      await connection.requestMtu(247);
+    } catch (_) {
+      // Swallow — MTU upgrade is best-effort.
+    }
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+      return true;
+    } on Object {
+      return false;
+    }
   }
 
   Future<RemoteCharacteristic> _resolveStressChar(
