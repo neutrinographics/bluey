@@ -8,6 +8,7 @@ import 'package:bluey/bluey.dart';
 
 import 'package:bluey_example/features/server/presentation/server_cubit.dart';
 import 'package:bluey_example/features/server/presentation/server_state.dart';
+import 'package:bluey_example/shared/stress_protocol.dart';
 
 import '../../mocks/mock_use_cases.dart';
 import '../../mocks/mock_bluey.dart';
@@ -424,5 +425,88 @@ void main() {
       await cubit.close();
       verify(() => mockDisposeServer()).called(1);
     });
+
+  });
+
+  group('stress write null-server drop', () {
+    late StreamController<WriteRequest> writeController;
+    late MockClient stressClient;
+
+    setUp(() {
+      writeController = StreamController<WriteRequest>();
+      stressClient = MockClient();
+      when(
+        () => stressClient.id,
+      ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+      when(() => mockCheckServerSupport()).thenReturn(true);
+      when(
+        () => mockObserveConnections(),
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockObserveWriteRequests(),
+      ).thenAnswer((_) => writeController.stream);
+      when(() => mockAddService(any())).thenAnswer((_) async {});
+      when(() => mockGetServer()).thenReturn(null);
+    });
+
+    tearDown(() async {
+      if (!writeController.isClosed) {
+        await writeController.close();
+      }
+    });
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'stress write is logged as dropped when server is unavailable and response required',
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.initialize();
+        writeController.add(
+          WriteRequest(
+            client: stressClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: Uint8List.fromList([0x06]),
+            offset: 0,
+            responseNeeded: true,
+            internalRequestId: 1,
+          ),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(
+          cubit.state.log.any(
+            (e) =>
+                e.tag == 'Stress' &&
+                e.message.contains('server unavailable'),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'stress write with no response needed is silent when server is unavailable',
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.initialize();
+        writeController.add(
+          WriteRequest(
+            client: stressClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: Uint8List.fromList([0x06]),
+            offset: 0,
+            responseNeeded: false,
+            internalRequestId: 2,
+          ),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(
+          cubit.state.log.any((e) => e.tag == 'Stress'),
+          isFalse,
+        );
+      },
+    );
   });
 }

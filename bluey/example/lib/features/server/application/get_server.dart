@@ -7,6 +7,9 @@ import '../domain/server_repository.dart';
 /// Used by the cubit to pass the [Server] directly to handlers that require
 /// it (e.g. [StressServiceHandler]) rather than routing through individual
 /// use cases for every server operation.
+///
+/// Distinct from [CheckServerSupport], which only tests for null presence
+/// without returning the instance.
 class GetServer {
   final ServerRepository _repository;
 

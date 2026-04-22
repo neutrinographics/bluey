@@ -169,6 +169,8 @@ class ServerCubit extends Cubit<ServerScreenState> {
           } catch (e) {
             _addLog('Stress', 'Write handler error: $e');
           }
+        } else if (request.responseNeeded) {
+          _addLog('Stress', 'Write dropped: server unavailable');
         }
         return;
       }
