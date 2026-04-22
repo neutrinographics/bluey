@@ -10,6 +10,8 @@ import '../../../shared/presentation/error_snackbar.dart';
 import '../../../shared/presentation/section_header.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../service_explorer/presentation/service_screen.dart';
+import '../../stress_tests/presentation/stress_tests_screen.dart';
+import '../../../shared/stress_protocol.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
@@ -404,6 +406,7 @@ class _ConnectedContentState extends State<_ConnectedContent> {
             child: _DeviceInfoCard(
               device: state.device,
               connection: state.connection!,
+              services: state.services,
             ),
           ),
         ),
@@ -483,8 +486,13 @@ class _ConnectedContentState extends State<_ConnectedContent> {
 class _DeviceInfoCard extends StatelessWidget {
   final bluey.Device device;
   final bluey.Connection connection;
+  final List<bluey.RemoteService>? services;
 
-  const _DeviceInfoCard({required this.device, required this.connection});
+  const _DeviceInfoCard({
+    required this.device,
+    required this.connection,
+    this.services,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -636,6 +644,47 @@ class _DeviceInfoCard extends StatelessWidget {
               ),
             ),
           ),
+          // Stress Tests button (visible only when peer hosts the stress service)
+          if (_hasStressService(services))
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => StressTestsScreen(
+                      connection: connection,
+                    ),
+                  ),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.bolt,
+                        size: 16,
+                        color: Colors.blueAccent,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Stress Tests',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -762,4 +811,13 @@ class _ServiceCard extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _hasStressService(List<bluey.RemoteService>? services) {
+  if (services == null) return false;
+  return services.any(
+    (s) =>
+        s.uuid.toString().toLowerCase() ==
+        StressProtocol.serviceUuid.toLowerCase(),
+  );
 }
