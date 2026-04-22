@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:bluey/bluey.dart' show BlueyPlatformException;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter/services.dart' show PlatformException;
 
@@ -18,6 +19,7 @@ import 'uuid_utils.dart';
 ///     with the Android contract so that any future native-side mapping
 ///     (e.g. of `CBError` numeric codes) surfaces as the same typed
 ///     exception.
+///   * `'bluey-unknown'` → [BlueyPlatformException] with code 'unknown'
 ///
 /// Other errors propagate unchanged.
 ///
@@ -40,6 +42,13 @@ Future<T> _translateGattPlatformError<T>(
     if (e.code == 'gatt-status-failed') {
       final status = e.details is int ? e.details as int : -1;
       throw GattOperationStatusFailedException(operation, status);
+    }
+    if (e.code == 'bluey-unknown') {
+      throw BlueyPlatformException(
+        e.message ?? 'unknown iOS error',
+        code: 'unknown',
+        cause: e,
+      );
     }
     rethrow;
   }

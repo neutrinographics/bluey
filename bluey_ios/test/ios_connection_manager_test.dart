@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:bluey/bluey.dart' show BlueyPlatformException;
 import 'package:bluey_ios/src/ios_connection_manager.dart';
 import 'package:bluey_ios/src/messages.g.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
@@ -798,6 +799,31 @@ void main() {
             () => connectionManager.readRssi('d'),
             throwsA(isA<GattOperationTimeoutException>()
                 .having((e) => e.operation, 'operation', 'readRssi')),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic translates PlatformException(bluey-unknown) '
+        'to BlueyPlatformException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(code: 'bluey-unknown', message: 'opaque native error'),
+          );
+
+          await expectLater(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<BlueyPlatformException>()
+                  .having((e) => e.code, 'code', 'unknown')
+                  .having((e) => e.message, 'message', contains('opaque native error')),
+            ),
           );
         },
       );
