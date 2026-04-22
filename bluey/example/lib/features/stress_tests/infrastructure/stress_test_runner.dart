@@ -22,37 +22,51 @@ class StressTestRunner {
   ) async* {
     final stressChar = await _resolveStressChar(connection);
 
-    // Test isolation: clean baseline before measuring.
-    await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    // Test isolation: clean baseline before measuring. Failures here
+    // abort the run with an empty final snapshot — reset is prologue,
+    // not measurement.
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
 
     var result = StressTestResult.initial();
     final stopwatch = Stopwatch()..start();
     yield result;
 
-    final futures = <Future<void>>[];
     final payload = _generatePattern(config.payloadBytes);
     final cmd = EchoCommand(payload).encode();
 
+    final outcomes = <_OpOutcome>[];
+    final futures = <Future<void>>[];
     for (var i = 0; i < config.count; i++) {
       final opStart = stopwatch.elapsedMicroseconds;
       futures.add(() async {
         try {
           await stressChar.write(cmd, withResponse: config.withResponse);
-          final latency = Duration(
-            microseconds: stopwatch.elapsedMicroseconds - opStart,
-          );
-          result = result.recordSuccess(latency: latency);
+          outcomes.add(_OpOutcome.success(
+            latency: Duration(
+              microseconds: stopwatch.elapsedMicroseconds - opStart,
+            ),
+          ));
         } catch (e) {
-          final typeName = e.runtimeType.toString();
-          final status =
-              e is GattOperationFailedException ? e.status : null;
-          result = result.recordFailure(typeName: typeName, status: status);
+          outcomes.add(_OpOutcome.failure(
+            typeName: e.runtimeType.toString(),
+            status: e is GattOperationFailedException ? e.status : null,
+          ));
         }
       }());
     }
-
     await Future.wait(futures);
     stopwatch.stop();
+
+    for (final o in outcomes) {
+      result = o.success
+          ? result.recordSuccess(latency: o.latency!)
+          : result.recordFailure(typeName: o.typeName!, status: o.status);
+    }
     yield result.finished(elapsed: stopwatch.elapsed);
   }
 
@@ -116,4 +130,26 @@ class StressTestRunner {
     }
     return out;
   }
+}
+
+/// Internal per-op outcome buffer used by runner methods that dispatch
+/// ops via `Future.wait`. Collecting outcomes into a list first and
+/// folding them into the final [StressTestResult] after all futures
+/// complete avoids any ambiguity about shared mutable state across
+/// concurrent async closures.
+class _OpOutcome {
+  final bool success;
+  final Duration? latency;
+  final String? typeName;
+  final int? status;
+  const _OpOutcome._({
+    required this.success,
+    this.latency,
+    this.typeName,
+    this.status,
+  });
+  factory _OpOutcome.success({required Duration latency}) =>
+      _OpOutcome._(success: true, latency: latency);
+  factory _OpOutcome.failure({required String typeName, int? status}) =>
+      _OpOutcome._(success: false, typeName: typeName, status: status);
 }

@@ -110,5 +110,28 @@ void main() {
       // The remaining writes are echoes (opcode 0x01).
       expect(writesSent.skip(1).every((w) => w.first == 0x01), isTrue);
     });
+
+    test('reset write failure aborts with empty final snapshot, no crash',
+        () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        // Fail the Reset (opcode 0x06).
+        if (value.isNotEmpty && value.first == 0x06) {
+          throw const GattTimeoutException('writeCharacteristic');
+        }
+      };
+
+      final results = await runner
+          .runBurstWrite(
+            const BurstWriteConfig(count: 5, payloadBytes: 4),
+            conn,
+          )
+          .toList();
+
+      expect(results, isNotEmpty);
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      expect(last.attempted, equals(0),
+          reason: 'reset failure should skip all echo writes');
+    });
   });
 }
