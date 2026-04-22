@@ -18,10 +18,19 @@ class ConfigForm extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = config;
     if (c is BurstWriteConfig) return _burst(c);
-    // Fallback for as-yet-unsupported configs (filled in by Tasks 14-19)
+    if (c is MixedOpsConfig) return _mixedOps(c);
+    // Fallback for as-yet-unsupported configs (filled in by Tasks 15-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
       style: TextStyle(color: Colors.grey.shade600),
+    );
+  }
+
+  Widget _mixedOps(MixedOpsConfig c) {
+    return _intField(
+      label: 'iterations',
+      value: c.iterations,
+      onChanged: (v) => onChanged(MixedOpsConfig(iterations: v)),
     );
   }
 

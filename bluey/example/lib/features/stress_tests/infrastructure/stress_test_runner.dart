@@ -73,8 +73,56 @@ class StressTestRunner {
   Stream<StressTestResult> runMixedOps(
     MixedOpsConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runMixedOps implemented in Task 14');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    final payload = _generatePattern(20);
+    final cmd = EchoCommand(payload).encode();
+
+    Future<_OpOutcome> recordOp(Future<void> Function() op) async {
+      final start = stopwatch.elapsedMicroseconds;
+      try {
+        await op();
+        return _OpOutcome.success(
+          latency: Duration(
+            microseconds: stopwatch.elapsedMicroseconds - start,
+          ),
+        );
+      } catch (e) {
+        return _OpOutcome.failure(
+          typeName: e.runtimeType.toString(),
+          status: e is GattOperationFailedException ? e.status : null,
+        );
+      }
+    }
+
+    final futures = <Future<_OpOutcome>>[];
+    for (var i = 0; i < config.iterations; i++) {
+      futures.add(recordOp(() => stressChar.write(cmd, withResponse: true)));
+      futures.add(recordOp(() => stressChar.read()));
+      futures.add(recordOp(() => connection.services(cache: false)));
+      futures.add(recordOp(() => connection.requestMtu(247)));
+    }
+    final outcomes = await Future.wait(futures);
+    stopwatch.stop();
+
+    for (final o in outcomes) {
+      result = o.success
+          ? result.recordSuccess(latency: o.latency!)
+          : result.recordFailure(typeName: o.typeName!, status: o.status);
+    }
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Stream<StressTestResult> runSoak(

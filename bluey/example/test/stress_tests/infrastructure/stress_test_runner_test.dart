@@ -134,4 +134,32 @@ void main() {
           reason: 'reset failure should skip all echo writes');
     });
   });
+
+  group('StressTestRunner.runMixedOps', () {
+    test('runs configured iterations of write+read+services+mtu', () async {
+      var writes = 0;
+      var reads = 0;
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        writes++;
+      };
+      stressChar.onReadHook = () async {
+        reads++;
+        return Uint8List(0);
+      };
+
+      final results = await runner
+          .runMixedOps(const MixedOpsConfig(iterations: 3), conn)
+          .toList();
+
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      // Each iteration: 1 write + 1 read + 1 services + 1 mtu = 4 ops
+      // Plus 1 reset write = 1 pre-run write (not counted)
+      // Total writes = 1 reset + 3 echoes = 4
+      expect(writes, equals(4));
+      expect(reads, equals(3));
+      expect(last.attempted, equals(12)); // 3 iterations × 4 ops
+      expect(conn.lastRequestedMtu, isNotNull);
+    });
+  });
 }
