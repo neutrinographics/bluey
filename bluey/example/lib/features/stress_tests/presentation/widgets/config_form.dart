@@ -23,6 +23,7 @@ class ConfigForm extends StatelessWidget {
     if (c is TimeoutProbeConfig) return _timeoutProbe(c);
     if (c is FailureInjectionConfig) return _failureInjection(c);
     if (c is MtuProbeConfig) return _mtuProbe(c);
+    if (c is NotificationThroughputConfig) return _notifThroughput(c);
     // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
@@ -153,6 +154,31 @@ class ConfigForm extends StatelessWidget {
           value: c.payloadBytes,
           onChanged: (v) => onChanged(MtuProbeConfig(
             requestedMtu: c.requestedMtu,
+            payloadBytes: v,
+          )),
+        ),
+      ],
+    );
+  }
+
+  Widget _notifThroughput(NotificationThroughputConfig c) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _intField(
+          label: 'count',
+          value: c.count,
+          onChanged: (v) => onChanged(NotificationThroughputConfig(
+            count: v,
+            payloadBytes: c.payloadBytes,
+          )),
+        ),
+        _intField(
+          label: 'payloadBytes',
+          value: c.payloadBytes,
+          onChanged: (v) => onChanged(NotificationThroughputConfig(
+            count: c.count,
             payloadBytes: v,
           )),
         ),

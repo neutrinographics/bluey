@@ -343,8 +343,73 @@ class StressTestRunner {
   Stream<StressTestResult> runNotificationThroughput(
     NotificationThroughputConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runNotificationThroughput implemented in Task 19');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    // Track latencies per burst-id. The first id to accumulate [config.count]
+    // notifications is the winning (current) burst; all other ids are
+    // stragglers from a previous (cancelled) burst and are dropped.
+    final latenciesPerId = <int, List<Duration>>{};
+    int? winningBurstId;
+    final completer = Completer<void>();
+
+    final sub = stressChar.notifications.listen((bytes) {
+      if (bytes.isEmpty) return;
+      final id = bytes[0];
+      // Once a winner is determined, drop notifications from other burst-ids.
+      if (winningBurstId != null && id != winningBurstId) return;
+      final latency =
+          Duration(microseconds: stopwatch.elapsedMicroseconds);
+      (latenciesPerId[id] ??= []).add(latency);
+      if (latenciesPerId[id]!.length >= config.count &&
+          !completer.isCompleted) {
+        winningBurstId = id;
+        completer.complete();
+      }
+    });
+
+    // Kick the server.
+    await stressChar.write(
+      BurstMeCommand(count: config.count, payloadSize: config.payloadBytes)
+          .encode(),
+      withResponse: true,
+    );
+
+    // Wait for all expected notifications, with a generous timeout
+    // proportional to count (1ms per notification + 1s overhead).
+    final timeout = Duration(milliseconds: config.count + 1000);
+    try {
+      await completer.future.timeout(timeout);
+    } on TimeoutException {
+      // nothing — handled below after sub is cancelled
+    }
+    await sub.cancel();
+
+    // Only count the winning burst's notifications as successes; everything
+    // else is a straggler and should not appear in the result.
+    final winnerLatencies =
+        winningBurstId != null ? latenciesPerId[winningBurstId]! : <Duration>[];
+    for (final l in winnerLatencies) {
+      result = result.recordSuccess(latency: l);
+    }
+    final missing = config.count - winnerLatencies.length;
+    for (var i = 0; i < missing; i++) {
+      result = result.recordFailure(typeName: 'NotificationTimeout');
+    }
+
+    stopwatch.stop();
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Future<RemoteCharacteristic> _resolveStressChar(

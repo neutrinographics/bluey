@@ -7,6 +7,7 @@ import '../application/run_burst_write.dart';
 import '../application/run_failure_injection.dart';
 import '../application/run_mixed_ops.dart';
 import '../application/run_mtu_probe.dart';
+import '../application/run_notification_throughput.dart';
 import '../application/run_soak.dart';
 import '../application/run_timeout_probe.dart';
 import '../domain/stress_test.dart';
@@ -21,6 +22,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
   final RunTimeoutProbe _runTimeoutProbe;
   final RunFailureInjection _runFailureInjection;
   final RunMtuProbe _runMtuProbe;
+  final RunNotificationThroughput _runNotificationThroughput;
   final Connection _connection;
   StreamSubscription<StressTestResult>? _activeSub;
 
@@ -31,6 +33,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     required RunTimeoutProbe runTimeoutProbe,
     required RunFailureInjection runFailureInjection,
     required RunMtuProbe runMtuProbe,
+    required RunNotificationThroughput runNotificationThroughput,
     required Connection connection,
   })  : _runBurstWrite = runBurstWrite,
         _runMixedOps = runMixedOps,
@@ -38,6 +41,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         _runTimeoutProbe = runTimeoutProbe,
         _runFailureInjection = runFailureInjection,
         _runMtuProbe = runMtuProbe,
+        _runNotificationThroughput = runNotificationThroughput,
         _connection = connection,
         super(StressTestsState.initial());
 
@@ -68,8 +72,10 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         _runFailureInjection(card.config as FailureInjectionConfig, _connection),
       StressTest.mtuProbe =>
         _runMtuProbe(card.config as MtuProbeConfig, _connection),
-      _ => Stream<StressTestResult>.error(
-          UnimplementedError('Test $test not yet wired'),
+      StressTest.notificationThroughput =>
+        _runNotificationThroughput(
+          card.config as NotificationThroughputConfig,
+          _connection,
         ),
     };
 

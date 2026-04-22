@@ -5,6 +5,7 @@ import 'package:bluey_example/features/stress_tests/application/run_burst_write.
 import 'package:bluey_example/features/stress_tests/application/run_failure_injection.dart';
 import 'package:bluey_example/features/stress_tests/application/run_mixed_ops.dart';
 import 'package:bluey_example/features/stress_tests/application/run_mtu_probe.dart';
+import 'package:bluey_example/features/stress_tests/application/run_notification_throughput.dart';
 import 'package:bluey_example/features/stress_tests/application/run_soak.dart';
 import 'package:bluey_example/features/stress_tests/application/run_timeout_probe.dart';
 import 'package:bluey_example/features/stress_tests/domain/stress_test.dart';
@@ -26,6 +27,9 @@ class _MockRunFailureInjection extends Mock implements RunFailureInjection {}
 
 class _MockRunMtuProbe extends Mock implements RunMtuProbe {}
 
+class _MockRunNotificationThroughput extends Mock
+    implements RunNotificationThroughput {}
+
 class _MockConnection extends Mock implements Connection {}
 
 class _FakeConnection extends Fake implements Connection {}
@@ -37,6 +41,7 @@ void main() {
   late _MockRunTimeoutProbe mockRunTimeoutProbe;
   late _MockRunFailureInjection mockRunFailureInjection;
   late _MockRunMtuProbe mockRunMtuProbe;
+  late _MockRunNotificationThroughput mockRunNotificationThroughput;
   late _MockConnection mockConn;
 
   setUpAll(() {
@@ -51,6 +56,7 @@ void main() {
     mockRunTimeoutProbe = _MockRunTimeoutProbe();
     mockRunFailureInjection = _MockRunFailureInjection();
     mockRunMtuProbe = _MockRunMtuProbe();
+    mockRunNotificationThroughput = _MockRunNotificationThroughput();
     mockConn = _MockConnection();
   });
 
@@ -61,6 +67,7 @@ void main() {
         runTimeoutProbe: mockRunTimeoutProbe,
         runFailureInjection: mockRunFailureInjection,
         runMtuProbe: mockRunMtuProbe,
+        runNotificationThroughput: mockRunNotificationThroughput,
         connection: mockConn,
       );
 

@@ -250,6 +250,70 @@ void main() {
     });
   });
 
+  group('StressTestRunner.runNotificationThroughput', () {
+    test('counts notifications matching the active burst-id', () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        // After reset+burstMe write, simulate the server emitting 5 notifs
+        // with burst-id = 1 (mocked: pretend the server's first burst).
+        if (value.isNotEmpty && value.first == 0x02) {
+          // Defer emissions to the next event loop tick so subscription
+          // is active when they arrive.
+          Future<void>(() async {
+            for (var i = 0; i < 5; i++) {
+              stressChar.emitNotification(
+                Uint8List.fromList([0x01, 0x10, 0x11, 0x12, 0x13]),
+              );
+            }
+          });
+        }
+      };
+
+      final results = await runner
+          .runNotificationThroughput(
+            const NotificationThroughputConfig(count: 5, payloadBytes: 4),
+            conn,
+          )
+          .toList();
+
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      expect(last.succeeded, equals(5));
+    });
+
+    test('drops notifications with stale burst-id (different from current)', () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        if (value.isNotEmpty && value.first == 0x02) {
+          Future<void>(() async {
+            // Two stale (id=99) notifications from a previous burst,
+            // then five fresh (id=1).
+            stressChar.emitNotification(
+              Uint8List.fromList([99, 0xAA, 0xBB, 0xCC, 0xDD]),
+            );
+            stressChar.emitNotification(
+              Uint8List.fromList([99, 0xEE, 0xFF, 0x00, 0x01]),
+            );
+            for (var i = 0; i < 5; i++) {
+              stressChar.emitNotification(
+                Uint8List.fromList([1, 0x10, 0x11, 0x12, 0x13]),
+              );
+            }
+          });
+        }
+      };
+
+      final results = await runner
+          .runNotificationThroughput(
+            const NotificationThroughputConfig(count: 5, payloadBytes: 4),
+            conn,
+          )
+          .toList();
+
+      final last = results.last;
+      expect(last.succeeded, equals(5),
+          reason: 'stale burst-id notifications must not count');
+    });
+  });
+
   group('StressTestRunner.runMtuProbe', () {
     test('requests MTU then sends sized writes', () async {
       var writes = 0;
