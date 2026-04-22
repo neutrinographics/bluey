@@ -13,9 +13,9 @@ import '../shared/uuid.dart';
 import 'connection.dart';
 import 'lifecycle_client.dart';
 
-/// Catches the internal platform-interface exceptions surfaced by the
-/// platform pass-through and rethrows them as the user-facing
-/// [BlueyException] sealed hierarchy:
+/// Runs a GATT op through the error-translation pipeline. Catches the
+/// internal platform-interface exceptions and rethrows them as the
+/// user-facing [BlueyException] sealed hierarchy:
 ///
 ///   * [platform.GattOperationTimeoutException] → [GattTimeoutException]
 ///   * [platform.GattOperationDisconnectedException] →
@@ -26,7 +26,7 @@ import 'lifecycle_client.dart';
 /// The platform-interface types stay internal: only [LifecycleClient] (an
 /// internal collaborator) catches them directly. Public callers see only
 /// [BlueyException] subtypes, so they can pattern-match exhaustively.
-Future<T> _translateGattPlatformError<T>(
+Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
   Future<T> Function() body,
@@ -241,7 +241,7 @@ class BlueyConnection implements Connection {
       level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
-    final platformServices = await _translateGattPlatformError(
+    final platformServices = await _runGattOp(
       deviceId,
       'discoverServices',
       () => _platform.discoverServices(_connectionId),
@@ -292,7 +292,7 @@ class BlueyConnection implements Connection {
     );
     final stopwatch = Stopwatch()..start();
     try {
-      final negotiatedMtu = await _translateGattPlatformError(
+      final negotiatedMtu = await _runGattOp(
         deviceId,
         'requestMtu',
         () => _platform.requestMtu(_connectionId, mtu),
@@ -324,7 +324,7 @@ class BlueyConnection implements Connection {
     );
     final stopwatch = Stopwatch()..start();
     try {
-      final rssi = await _translateGattPlatformError(
+      final rssi = await _runGattOp(
         deviceId,
         'readRssi',
         () => _platform.readRssi(_connectionId),
@@ -686,7 +686,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     );
     final stopwatch = Stopwatch()..start();
     try {
-      final value = await _translateGattPlatformError(
+      final value = await _runGattOp(
         _deviceId,
         'readCharacteristic',
         () => _platform.readCharacteristic(_connectionId, uuid.toString()),
@@ -724,7 +724,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     );
     final stopwatch = Stopwatch()..start();
     try {
-      await _translateGattPlatformError(
+      await _runGattOp(
         _deviceId,
         'writeCharacteristic',
         () => _platform.writeCharacteristic(
@@ -774,7 +774,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // failure here (e.g. mid-op disconnect drained by the Android queue)
     // must surface on the notification stream so subscribers see it
     // instead of it becoming an unhandled async error.
-    _translateGattPlatformError(
+    _runGattOp(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
@@ -805,7 +805,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // subscriber has just cancelled, so there is no natural recipient for
     // errors. Swallow silently to keep teardown best-effort — a link-loss
     // race on shutdown is an expected condition, not a test failure.
-    _translateGattPlatformError(
+    _runGattOp(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
@@ -847,7 +847,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 
   @override
   Future<Uint8List> read() async {
-    return _translateGattPlatformError(
+    return _runGattOp(
       _deviceId,
       'readDescriptor',
       () => _platform.readDescriptor(_connectionId, uuid.toString()),
@@ -856,7 +856,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 
   @override
   Future<void> write(Uint8List value) async {
-    return _translateGattPlatformError(
+    return _runGattOp(
       _deviceId,
       'writeDescriptor',
       () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
