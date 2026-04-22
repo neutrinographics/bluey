@@ -22,6 +22,7 @@ class ConfigForm extends StatelessWidget {
     if (c is SoakConfig) return _soak(c);
     if (c is TimeoutProbeConfig) return _timeoutProbe(c);
     if (c is FailureInjectionConfig) return _failureInjection(c);
+    if (c is MtuProbeConfig) return _mtuProbe(c);
     // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
@@ -129,6 +130,31 @@ class ConfigForm extends StatelessWidget {
             ),
             const Text('withResponse'),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _mtuProbe(MtuProbeConfig c) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _intField(
+          label: 'requestedMtu',
+          value: c.requestedMtu,
+          onChanged: (v) => onChanged(MtuProbeConfig(
+            requestedMtu: v,
+            payloadBytes: c.payloadBytes,
+          )),
+        ),
+        _intField(
+          label: 'payloadBytes',
+          value: c.payloadBytes,
+          onChanged: (v) => onChanged(MtuProbeConfig(
+            requestedMtu: c.requestedMtu,
+            payloadBytes: v,
+          )),
         ),
       ],
     );

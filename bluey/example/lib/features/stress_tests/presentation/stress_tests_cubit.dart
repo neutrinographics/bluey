@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../application/run_burst_write.dart';
 import '../application/run_failure_injection.dart';
 import '../application/run_mixed_ops.dart';
+import '../application/run_mtu_probe.dart';
 import '../application/run_soak.dart';
 import '../application/run_timeout_probe.dart';
 import '../domain/stress_test.dart';
@@ -19,6 +20,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
   final RunSoak _runSoak;
   final RunTimeoutProbe _runTimeoutProbe;
   final RunFailureInjection _runFailureInjection;
+  final RunMtuProbe _runMtuProbe;
   final Connection _connection;
   StreamSubscription<StressTestResult>? _activeSub;
 
@@ -28,12 +30,14 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     required RunSoak runSoak,
     required RunTimeoutProbe runTimeoutProbe,
     required RunFailureInjection runFailureInjection,
+    required RunMtuProbe runMtuProbe,
     required Connection connection,
   })  : _runBurstWrite = runBurstWrite,
         _runMixedOps = runMixedOps,
         _runSoak = runSoak,
         _runTimeoutProbe = runTimeoutProbe,
         _runFailureInjection = runFailureInjection,
+        _runMtuProbe = runMtuProbe,
         _connection = connection,
         super(StressTestsState.initial());
 
@@ -62,6 +66,8 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         _runTimeoutProbe(card.config as TimeoutProbeConfig, _connection),
       StressTest.failureInjection =>
         _runFailureInjection(card.config as FailureInjectionConfig, _connection),
+      StressTest.mtuProbe =>
+        _runMtuProbe(card.config as MtuProbeConfig, _connection),
       _ => Stream<StressTestResult>.error(
           UnimplementedError('Test $test not yet wired'),
         ),

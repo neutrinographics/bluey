@@ -6,6 +6,7 @@ import '../../../shared/di/service_locator.dart';
 import '../application/run_burst_write.dart';
 import '../application/run_failure_injection.dart';
 import '../application/run_mixed_ops.dart';
+import '../application/run_mtu_probe.dart';
 import '../application/run_soak.dart';
 import '../application/run_timeout_probe.dart';
 import 'stress_tests_cubit.dart';
@@ -25,6 +26,7 @@ class StressTestsScreen extends StatelessWidget {
         runSoak: getIt<RunSoak>(),
         runTimeoutProbe: getIt<RunTimeoutProbe>(),
         runFailureInjection: getIt<RunFailureInjection>(),
+        runMtuProbe: getIt<RunMtuProbe>(),
         connection: connection,
       ),
       child: Scaffold(

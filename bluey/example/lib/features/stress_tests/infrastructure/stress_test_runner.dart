@@ -265,8 +265,79 @@ class StressTestRunner {
   Stream<StressTestResult> runMtuProbe(
     MtuProbeConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runMtuProbe implemented in Task 18');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    // Negotiate MTU.
+    final mtuStart = stopwatch.elapsedMicroseconds;
+    try {
+      await connection.requestMtu(config.requestedMtu);
+      result = result.recordSuccess(
+        latency: Duration(
+          microseconds: stopwatch.elapsedMicroseconds - mtuStart,
+        ),
+      );
+    } catch (e) {
+      result = result.recordFailure(
+        typeName: e.runtimeType.toString(),
+        status: e is GattOperationFailedException ? e.status : null,
+      );
+      yield result.finished(elapsed: stopwatch.elapsed);
+      return;
+    }
+
+    // Tell server to return payloadBytes-sized reads.
+    try {
+      await stressChar.write(
+        SetPayloadSizeCommand(sizeBytes: config.payloadBytes).encode(),
+        withResponse: true,
+      );
+    } on Object {
+      // If setPayloadSize fails, the read-length check will fail — but
+      // we still proceed to record the per-cycle failures uniformly.
+    }
+
+    // Three rounds: write payloadBytes, read payloadBytes, verify length.
+    for (var i = 0; i < 3; i++) {
+      final start = stopwatch.elapsedMicroseconds;
+      try {
+        final payload = _generatePattern(config.payloadBytes);
+        await stressChar.write(
+          EchoCommand(payload).encode(),
+          withResponse: true,
+        );
+        final readBack = await stressChar.read();
+        if (readBack.length != config.payloadBytes) {
+          throw StateError(
+            'MTU read returned ${readBack.length} bytes, expected ${config.payloadBytes}',
+          );
+        }
+        result = result.recordSuccess(
+          latency: Duration(
+            microseconds: stopwatch.elapsedMicroseconds - start,
+          ),
+        );
+      } catch (e) {
+        result = result.recordFailure(
+          typeName: e.runtimeType.toString(),
+          status: e is GattOperationFailedException ? e.status : null,
+        );
+      }
+      yield result;
+    }
+    stopwatch.stop();
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Stream<StressTestResult> runNotificationThroughput(

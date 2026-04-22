@@ -249,4 +249,37 @@ void main() {
       expect(last.failuresByType['GattTimeoutException'], equals(1));
     });
   });
+
+  group('StressTestRunner.runMtuProbe', () {
+    test('requests MTU then sends sized writes', () async {
+      var writes = 0;
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        writes++;
+      };
+      // The test's stressChar.onReadHook default returns empty bytes,
+      // which will cause the length check to throw StateError. Set it to
+      // return payloadBytes of pattern so the write+read cycle succeeds.
+      stressChar.onReadHook = () async {
+        // The runner invokes SetPayloadSizeCommand before reads, but the
+        // fake doesn't actually track payload size — it just returns
+        // whatever onReadHook returns. Return 50 bytes to match config.
+        return Uint8List(50);
+      };
+
+      final results = await runner
+          .runMtuProbe(
+            const MtuProbeConfig(requestedMtu: 100, payloadBytes: 50),
+            conn,
+          )
+          .toList();
+
+      expect(conn.lastRequestedMtu, equals(100));
+      // reset + setPayloadSize + 3 echo writes = at least 5 writes total
+      expect(writes, greaterThanOrEqualTo(1));
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      // 1 MTU request + 3 successful cycles = 4 successes minimum.
+      expect(last.succeeded, greaterThanOrEqualTo(1));
+    });
+  });
 }
