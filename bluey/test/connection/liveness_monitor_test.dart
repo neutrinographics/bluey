@@ -96,9 +96,10 @@ void main() {
 
     test('recordProbeSuccess on non-in-flight monitor is idempotent', () {
       final m = buildMonitor();
-      // Calling success without a matching markProbeInFlight should be safe
-      // (used when a non-dead-peer error fires — the client releases the flag
-      // without penalty).
+      // Defensive guard: success without a matching markProbeInFlight is
+      // safe. No production call path exercises this today (non-dead-peer
+      // errors use cancelProbe instead), but keeping idempotence avoids
+      // asymmetry bugs if a future caller forgets to markProbeInFlight.
       expect(() => m.recordProbeSuccess(), returnsNormally);
     });
   });
