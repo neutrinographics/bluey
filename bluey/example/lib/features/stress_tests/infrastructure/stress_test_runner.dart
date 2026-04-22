@@ -223,8 +223,43 @@ class StressTestRunner {
   Stream<StressTestResult> runFailureInjection(
     FailureInjectionConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runFailureInjection implemented in Task 17');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+      await stressChar.write(const DropNextCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    final payload = _generatePattern(20);
+    final cmd = EchoCommand(payload).encode();
+
+    for (var i = 0; i < config.writeCount; i++) {
+      final start = stopwatch.elapsedMicroseconds;
+      try {
+        await stressChar.write(cmd, withResponse: true);
+        result = result.recordSuccess(
+          latency: Duration(
+            microseconds: stopwatch.elapsedMicroseconds - start,
+          ),
+        );
+      } catch (e) {
+        result = result.recordFailure(
+          typeName: e.runtimeType.toString(),
+          status: e is GattOperationFailedException ? e.status : null,
+        );
+      }
+      yield result;
+    }
+    stopwatch.stop();
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Stream<StressTestResult> runMtuProbe(

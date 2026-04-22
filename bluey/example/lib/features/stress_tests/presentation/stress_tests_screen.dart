@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../shared/di/service_locator.dart';
 import '../application/run_burst_write.dart';
+import '../application/run_failure_injection.dart';
 import '../application/run_mixed_ops.dart';
 import '../application/run_soak.dart';
 import '../application/run_timeout_probe.dart';
@@ -23,6 +24,7 @@ class StressTestsScreen extends StatelessWidget {
         runMixedOps: getIt<RunMixedOps>(),
         runSoak: getIt<RunSoak>(),
         runTimeoutProbe: getIt<RunTimeoutProbe>(),
+        runFailureInjection: getIt<RunFailureInjection>(),
         connection: connection,
       ),
       child: Scaffold(

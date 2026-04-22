@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey_example/features/stress_tests/application/run_burst_write.dart';
+import 'package:bluey_example/features/stress_tests/application/run_failure_injection.dart';
 import 'package:bluey_example/features/stress_tests/application/run_mixed_ops.dart';
 import 'package:bluey_example/features/stress_tests/application/run_soak.dart';
 import 'package:bluey_example/features/stress_tests/application/run_timeout_probe.dart';
@@ -20,6 +21,8 @@ class _MockRunSoak extends Mock implements RunSoak {}
 
 class _MockRunTimeoutProbe extends Mock implements RunTimeoutProbe {}
 
+class _MockRunFailureInjection extends Mock implements RunFailureInjection {}
+
 class _MockConnection extends Mock implements Connection {}
 
 class _FakeConnection extends Fake implements Connection {}
@@ -29,6 +32,7 @@ void main() {
   late _MockRunMixedOps mockRunMixedOps;
   late _MockRunSoak mockRunSoak;
   late _MockRunTimeoutProbe mockRunTimeoutProbe;
+  late _MockRunFailureInjection mockRunFailureInjection;
   late _MockConnection mockConn;
 
   setUpAll(() {
@@ -41,6 +45,7 @@ void main() {
     mockRunMixedOps = _MockRunMixedOps();
     mockRunSoak = _MockRunSoak();
     mockRunTimeoutProbe = _MockRunTimeoutProbe();
+    mockRunFailureInjection = _MockRunFailureInjection();
     mockConn = _MockConnection();
   });
 
@@ -49,6 +54,7 @@ void main() {
         runMixedOps: mockRunMixedOps,
         runSoak: mockRunSoak,
         runTimeoutProbe: mockRunTimeoutProbe,
+        runFailureInjection: mockRunFailureInjection,
         connection: mockConn,
       );
 

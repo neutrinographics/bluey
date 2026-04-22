@@ -21,6 +21,7 @@ class ConfigForm extends StatelessWidget {
     if (c is MixedOpsConfig) return _mixedOps(c);
     if (c is SoakConfig) return _soak(c);
     if (c is TimeoutProbeConfig) return _timeoutProbe(c);
+    if (c is FailureInjectionConfig) return _failureInjection(c);
     // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
@@ -71,6 +72,14 @@ class ConfigForm extends StatelessWidget {
       onChanged: (v) => onChanged(TimeoutProbeConfig(
         delayPastTimeout: Duration(seconds: v),
       )),
+    );
+  }
+
+  Widget _failureInjection(FailureInjectionConfig c) {
+    return _intField(
+      label: 'writeCount',
+      value: c.writeCount,
+      onChanged: (v) => onChanged(FailureInjectionConfig(writeCount: v)),
     );
   }
 

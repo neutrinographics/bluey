@@ -214,4 +214,39 @@ void main() {
       expect(last.failuresByType['GattTimeoutException'], equals(1));
     });
   });
+
+  group('StressTestRunner.runFailureInjection', () {
+    test('writes DropNext, then writeCount echoes — first echo throws timeout',
+        () async {
+      var echoCount = 0;
+      var dropNextSent = false;
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        if (value.first == 0x04) {
+          dropNextSent = true;
+          return; // ack the DropNext write
+        }
+        if (value.first == 0x01) {
+          echoCount++;
+          // First echo after DropNext is dropped → timeout.
+          if (echoCount == 1) {
+            throw const GattTimeoutException('writeCharacteristic');
+          }
+        }
+      };
+
+      final results = await runner
+          .runFailureInjection(
+            const FailureInjectionConfig(writeCount: 5),
+            conn,
+          )
+          .toList();
+
+      expect(dropNextSent, isTrue);
+      final last = results.last;
+      expect(last.attempted, equals(5));
+      expect(last.failed, equals(1));
+      expect(last.succeeded, equals(4));
+      expect(last.failuresByType['GattTimeoutException'], equals(1));
+    });
+  });
 }
