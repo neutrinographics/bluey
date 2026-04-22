@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -315,6 +316,11 @@ class Bluey {
       mtu: null,
     );
 
+    dev.log(
+      'connect started: deviceId=${device.id}, address=${device.address}',
+      name: 'bluey.connection',
+    );
+
     _emitEvent(ConnectingEvent(deviceId: device.id));
 
     try {
@@ -332,11 +338,24 @@ class Bluey {
 
       // Auto-upgrade: if the server hosts the Bluey control service,
       // start the lifecycle heartbeat and upgrade the connection in place.
-      return await _upgradeIfBlueyServer(
+      final connection = await _upgradeIfBlueyServer(
         rawConnection,
         maxFailedHeartbeats: maxFailedHeartbeats,
       );
+
+      dev.log(
+        'connect succeeded: deviceId=${device.id}',
+        name: 'bluey.connection',
+      );
+
+      return connection;
     } catch (e) {
+      dev.log(
+        'connect failed: deviceId=${device.id}, exception=${e.runtimeType}',
+        name: 'bluey.connection',
+        level: 1000, // Level.SEVERE
+        error: e,
+      );
       _emitEvent(
         ErrorEvent(
           message: 'Connection failed to ${device.id.toShortString()}',
