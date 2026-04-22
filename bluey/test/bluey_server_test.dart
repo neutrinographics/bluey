@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fakes/test_helpers.dart';
 
 /// Mock platform implementation for testing Server functionality.
 final class MockBlueyPlatform extends platform.BlueyPlatform {
@@ -881,6 +885,87 @@ void main() {
           equals(platform.PlatformGattStatus.success),
         );
       });
+    });
+
+    group('Lifecycle activity on non-control-service requests', () {
+      test(
+        'incoming write to a non-control-service char resets client liveness timer',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final userCharUuid = TestUuids.customChar1;
+
+            server.addService(
+              HostedService(
+                uuid: UUID(TestUuids.customService),
+                isPrimary: true,
+                characteristics: [
+                  HostedCharacteristic(
+                    uuid: UUID(userCharUuid),
+                    properties: const CharacteristicProperties(canWrite: true),
+                    permissions: const [GattPermission.write],
+                    descriptors: const [],
+                  ),
+                ],
+              ),
+            );
+            async.flushMicrotasks();
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // Prime: send a heartbeat from client-1 to start the liveness timer.
+            mockPlatform.emitWriteRequest(
+              platform.PlatformWriteRequest(
+                requestId: 1,
+                centralId: 'client-1',
+                characteristicUuid: lifecycle.heartbeatCharUuid,
+                value: lifecycle.heartbeatValue,
+                offset: 0,
+                responseNeeded: false,
+              ),
+            );
+            async.flushMicrotasks();
+
+            // Advance 9s — under the 10s timeout.
+            async.elapse(const Duration(seconds: 9));
+            expect(disconnections, isEmpty);
+
+            // Send a write to the user service — should reset the timer even
+            // though it's not a control-service write.
+            mockPlatform.emitWriteRequest(
+              platform.PlatformWriteRequest(
+                requestId: 2,
+                centralId: 'client-1',
+                characteristicUuid: userCharUuid,
+                value: Uint8List.fromList([0x99]),
+                offset: 0,
+                responseNeeded: true,
+              ),
+            );
+            async.flushMicrotasks();
+
+            // Advance another 9s — total 18s since the heartbeat, but only
+            // 9s since the user write — still within window.
+            async.elapse(const Duration(seconds: 9));
+            expect(
+              disconnections,
+              isEmpty,
+              reason:
+                  'non-control-service write should reset the liveness timer',
+            );
+
+            // 2s more → past the 10s window from the user write → should fire.
+            async.elapse(const Duration(seconds: 2));
+            expect(disconnections, equals(['client-1']));
+
+            server.dispose();
+          });
+        },
+      );
     });
 
     group('GattResponseStatus mapping', () {

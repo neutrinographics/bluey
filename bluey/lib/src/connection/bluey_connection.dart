@@ -13,32 +13,79 @@ import '../shared/uuid.dart';
 import 'connection.dart';
 import 'lifecycle_client.dart';
 
-/// Catches the internal platform-interface exceptions surfaced by the
-/// platform pass-through and rethrows them as the user-facing
-/// [BlueyException] sealed hierarchy:
+/// Runs a GATT op through the error-translation pipeline, then fires
+/// [onSuccess] if the op returned without throwing. Used by every
+/// public GATT op on [BlueyConnection] / [BlueyRemoteCharacteristic]
+/// / [BlueyRemoteDescriptor] so activity signals flow uniformly into
+/// [LifecycleClient.recordActivity].
+///
+/// Catches internal platform-interface exceptions and rethrows them
+/// as the user-facing [BlueyException] sealed hierarchy:
 ///
 ///   * [platform.GattOperationTimeoutException] → [GattTimeoutException]
 ///   * [platform.GattOperationDisconnectedException] →
 ///     [DisconnectedException] with [DisconnectReason.linkLoss]
 ///   * [platform.GattOperationStatusFailedException] →
 ///     [GattOperationFailedException] carrying the native status
-///
-/// The platform-interface types stay internal: only [LifecycleClient] (an
-/// internal collaborator) catches them directly. Public callers see only
-/// [BlueyException] subtypes, so they can pattern-match exhaustively.
-Future<T> _translateGattPlatformError<T>(
+Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
-  Future<T> Function() body,
-) async {
+  Future<T> Function() body, {
+  void Function()? onSuccess,
+}) async {
   try {
-    return await body();
+    final result = await body();
+    onSuccess?.call();
+    return result;
   } on platform.GattOperationTimeoutException {
     throw GattTimeoutException(operation);
   } on platform.GattOperationDisconnectedException {
     throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
   } on platform.GattOperationStatusFailedException catch (e) {
     throw GattOperationFailedException(operation, e.status);
+  }
+}
+
+/// Wraps [_runGattOp] with start / complete / failed log lines and a
+/// stopwatch. Every public GATT op on the Connection / Characteristic /
+/// Descriptor surface that wants per-op tracing goes through this so
+/// the three log lines stay in lock-step.
+///
+/// [startDetail] — extra context appended after `deviceId=…` in both
+/// the start and failed messages (e.g. `'char=$uuid, bytes=N'`).
+/// [completeDetail] — optional result-derived suffix for the complete
+/// message (e.g. `'negotiated=$mtu'`).
+Future<T> _loggedGattOp<T>({
+  required UUID deviceId,
+  required String op,
+  required Future<T> Function() body,
+  String startDetail = '',
+  String Function(T result)? completeDetail,
+  void Function()? onSuccess,
+}) async {
+  final startSuffix = startDetail.isEmpty ? '' : ', $startDetail';
+  dev.log('$op start: deviceId=$deviceId$startSuffix',
+      name: 'bluey.gatt', level: 500);
+  final sw = Stopwatch()..start();
+  try {
+    final result =
+        await _runGattOp(deviceId, op, body, onSuccess: onSuccess);
+    final detail = completeDetail?.call(result);
+    final completeSuffix = (detail == null || detail.isEmpty) ? '' : ', $detail';
+    dev.log(
+        '$op complete: deviceId=$deviceId$completeSuffix, ${sw.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500);
+    return result;
+  } catch (e) {
+    final status =
+        e is GattOperationFailedException ? ' status=${e.status}' : '';
+    dev.log(
+        '$op failed: deviceId=$deviceId$startSuffix, exception=${e.runtimeType}$status, ${sw.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900,
+        error: e);
+    rethrow;
   }
 }
 
@@ -241,10 +288,11 @@ class BlueyConnection implements Connection {
       level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
-    final platformServices = await _translateGattPlatformError(
+    final platformServices = await _runGattOp(
       deviceId,
       'discoverServices',
       () => _platform.discoverServices(_connectionId),
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
     final allServices = platformServices.map((ps) => _mapService(ps)).toList();
 
@@ -285,65 +333,26 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
-    dev.log(
-      'requestMtu start: deviceId=$deviceId, requested=$mtu',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    _mtu = await _loggedGattOp(
+      deviceId: deviceId,
+      op: 'requestMtu',
+      startDetail: 'requested=$mtu',
+      body: () => _platform.requestMtu(_connectionId, mtu),
+      completeDetail: (negotiated) => 'requested=$mtu, negotiated=$negotiated',
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final negotiatedMtu = await _translateGattPlatformError(
-        deviceId,
-        'requestMtu',
-        () => _platform.requestMtu(_connectionId, mtu),
-      );
-      _mtu = negotiatedMtu;
-      dev.log(
-        'requestMtu complete: deviceId=$deviceId, requested=$mtu, negotiated=$negotiatedMtu, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return _mtu;
-    } catch (e) {
-      dev.log(
-        'requestMtu failed: deviceId=$deviceId, requested=$mtu, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
+    return _mtu;
   }
 
   @override
-  Future<int> readRssi() async {
-    dev.log(
-      'readRssi start: deviceId=$deviceId',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+  Future<int> readRssi() {
+    return _loggedGattOp(
+      deviceId: deviceId,
+      op: 'readRssi',
+      body: () => _platform.readRssi(_connectionId),
+      completeDetail: (rssi) => 'rssi=${rssi}dBm',
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final rssi = await _translateGattPlatformError(
-        deviceId,
-        'readRssi',
-        () => _platform.readRssi(_connectionId),
-      );
-      dev.log(
-        'readRssi complete: deviceId=$deviceId, rssi=${rssi}dBm, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return rssi;
-    } catch (e) {
-      dev.log(
-        'readRssi failed: deviceId=$deviceId, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
@@ -585,6 +594,7 @@ class BlueyConnection implements Connection {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
+    void onActivity() => _lifecycle?.recordActivity();
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
@@ -597,16 +607,22 @@ class BlueyConnection implements Connection {
         canNotify: pc.properties.canNotify,
         canIndicate: pc.properties.canIndicate,
       ),
-      descriptors: pc.descriptors.map((pd) => _mapDescriptor(pd)).toList(),
+      descriptors:
+          pc.descriptors.map((pd) => _mapDescriptor(pd, onActivity)).toList(),
+      onActivity: onActivity,
     );
   }
 
-  BlueyRemoteDescriptor _mapDescriptor(platform.PlatformDescriptor pd) {
+  BlueyRemoteDescriptor _mapDescriptor(
+    platform.PlatformDescriptor pd,
+    void Function()? onActivity,
+  ) {
     return BlueyRemoteDescriptor(
       platform: _platform,
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
+      onActivity: onActivity,
     );
   }
 }
@@ -650,6 +666,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
+  final void Function()? _onActivity;
 
   @override
   final UUID uuid;
@@ -670,85 +687,48 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     required this.descriptors,
+    void Function()? onActivity,
   }) : _platform = platform,
        _connectionId = connectionId,
-       _deviceId = deviceId;
+       _deviceId = deviceId,
+       _onActivity = onActivity;
 
   @override
-  Future<Uint8List> read() async {
+  Future<Uint8List> read() {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    dev.log(
-      'read start: deviceId=$_deviceId, char=$uuid',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    return _loggedGattOp(
+      deviceId: _deviceId,
+      op: 'readCharacteristic',
+      startDetail: 'char=$uuid',
+      body: () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+      completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
+      onSuccess: _onActivity,
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final value = await _translateGattPlatformError(
-        _deviceId,
-        'readCharacteristic',
-        () => _platform.readCharacteristic(_connectionId, uuid.toString()),
-      );
-      dev.log(
-        'read complete: deviceId=$_deviceId, char=$uuid, bytes=${value.length}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return value;
-    } catch (e) {
-      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
-      dev.log(
-        'read failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
-  Future<void> write(Uint8List value, {bool withResponse = true}) async {
+  Future<void> write(Uint8List value, {bool withResponse = true}) {
     if (withResponse && !properties.canWrite) {
       throw const OperationNotSupportedException('write');
     }
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    dev.log(
-      'write start: deviceId=$_deviceId, char=$uuid, bytes=${value.length}',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    return _loggedGattOp<void>(
+      deviceId: _deviceId,
+      op: 'writeCharacteristic',
+      startDetail: 'char=$uuid, bytes=${value.length}',
+      body: () => _platform.writeCharacteristic(
+        _connectionId,
+        uuid.toString(),
+        value,
+        withResponse,
+      ),
+      completeDetail: (_) => 'char=$uuid',
+      onSuccess: _onActivity,
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      await _translateGattPlatformError(
-        _deviceId,
-        'writeCharacteristic',
-        () => _platform.writeCharacteristic(
-          _connectionId,
-          uuid.toString(),
-          value,
-          withResponse,
-        ),
-      );
-      dev.log(
-        'write complete: deviceId=$_deviceId, char=$uuid, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-    } catch (e) {
-      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
-      dev.log(
-        'write failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
@@ -774,10 +754,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // failure here (e.g. mid-op disconnect drained by the Android queue)
     // must surface on the notification stream so subscribers see it
     // instead of it becoming an unhandled async error.
-    _translateGattPlatformError(
+    _runGattOp(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
+      onSuccess: _onActivity,
     ).catchError((Object error) {
       _notificationController?.addError(error);
     });
@@ -792,6 +773,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         )
         .listen(
           (notification) {
+            _onActivity?.call();
             _notificationController?.add(notification.value);
           },
           onError: (error) {
@@ -805,10 +787,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // subscriber has just cancelled, so there is no natural recipient for
     // errors. Swallow silently to keep teardown best-effort — a link-loss
     // race on shutdown is an expected condition, not a test failure.
-    _translateGattPlatformError(
+    _runGattOp(
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
+      onSuccess: _onActivity,
     ).catchError((Object _) {});
 
     // Cancel subscription
@@ -832,6 +815,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
+  final void Function()? _onActivity;
 
   @override
   final UUID uuid;
@@ -841,25 +825,29 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
+    void Function()? onActivity,
   }) : _platform = platform,
        _connectionId = connectionId,
-       _deviceId = deviceId;
+       _deviceId = deviceId,
+       _onActivity = onActivity;
 
   @override
   Future<Uint8List> read() async {
-    return _translateGattPlatformError(
+    return _runGattOp(
       _deviceId,
       'readDescriptor',
       () => _platform.readDescriptor(_connectionId, uuid.toString()),
+      onSuccess: _onActivity,
     );
   }
 
   @override
   Future<void> write(Uint8List value) async {
-    return _translateGattPlatformError(
+    return _runGattOp(
       _deviceId,
       'writeDescriptor',
       () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
+      onSuccess: _onActivity,
     );
   }
 }
