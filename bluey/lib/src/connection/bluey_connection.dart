@@ -592,6 +592,7 @@ class BlueyConnection implements Connection {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
+    void onActivity() => _lifecycle?.recordActivity();
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
@@ -604,16 +605,22 @@ class BlueyConnection implements Connection {
         canNotify: pc.properties.canNotify,
         canIndicate: pc.properties.canIndicate,
       ),
-      descriptors: pc.descriptors.map((pd) => _mapDescriptor(pd)).toList(),
+      descriptors:
+          pc.descriptors.map((pd) => _mapDescriptor(pd, onActivity)).toList(),
+      onActivity: onActivity,
     );
   }
 
-  BlueyRemoteDescriptor _mapDescriptor(platform.PlatformDescriptor pd) {
+  BlueyRemoteDescriptor _mapDescriptor(
+    platform.PlatformDescriptor pd,
+    void Function()? onActivity,
+  ) {
     return BlueyRemoteDescriptor(
       platform: _platform,
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
+      onActivity: onActivity,
     );
   }
 }
@@ -657,6 +664,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
+  final void Function()? _onActivity;
 
   @override
   final UUID uuid;
@@ -677,9 +685,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     required this.descriptors,
+    void Function()? onActivity,
   }) : _platform = platform,
        _connectionId = connectionId,
-       _deviceId = deviceId;
+       _deviceId = deviceId,
+       _onActivity = onActivity;
 
   @override
   Future<Uint8List> read() async {
@@ -697,6 +707,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         _deviceId,
         'readCharacteristic',
         () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+        onSuccess: _onActivity,
       );
       dev.log(
         'read complete: deviceId=$_deviceId, char=$uuid, bytes=${value.length}, ${stopwatch.elapsedMilliseconds}ms',
@@ -740,6 +751,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
           value,
           withResponse,
         ),
+        onSuccess: _onActivity,
       );
       dev.log(
         'write complete: deviceId=$_deviceId, char=$uuid, ${stopwatch.elapsedMilliseconds}ms',
@@ -785,6 +797,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
+      onSuccess: _onActivity,
     ).catchError((Object error) {
       _notificationController?.addError(error);
     });
@@ -799,6 +812,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         )
         .listen(
           (notification) {
+            _onActivity?.call();
             _notificationController?.add(notification.value);
           },
           onError: (error) {
@@ -816,6 +830,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
+      onSuccess: _onActivity,
     ).catchError((Object _) {});
 
     // Cancel subscription
@@ -839,6 +854,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
+  final void Function()? _onActivity;
 
   @override
   final UUID uuid;
@@ -848,9 +864,11 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
+    void Function()? onActivity,
   }) : _platform = platform,
        _connectionId = connectionId,
-       _deviceId = deviceId;
+       _deviceId = deviceId,
+       _onActivity = onActivity;
 
   @override
   Future<Uint8List> read() async {
@@ -858,6 +876,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'readDescriptor',
       () => _platform.readDescriptor(_connectionId, uuid.toString()),
+      onSuccess: _onActivity,
     );
   }
 
@@ -867,6 +886,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'writeDescriptor',
       () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
+      onSuccess: _onActivity,
     );
   }
 }

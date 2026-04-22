@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/connection/bluey_connection.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -69,4 +72,129 @@ void main() {
       });
     });
   });
+
+  group('BlueyRemoteCharacteristic activity hook', () {
+    test('write fires onActivity on success', () async {
+      final activityEvents = <void>[];
+
+      fakePlatform.simulatePeripheral(
+        id: TestDeviceIds.device1,
+        name: 'Test',
+        services: [
+          TestServiceBuilder(TestUuids.customService)
+              .withWritable(TestUuids.customChar1)
+              .build(),
+        ],
+      );
+      await fakePlatform.connect(
+        TestDeviceIds.device1,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final char = BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: false,
+          canWrite: true,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+        onActivity: () => activityEvents.add(null),
+      );
+
+      await char.write(Uint8List.fromList([0x42]));
+      expect(activityEvents, hasLength(1),
+          reason: 'successful write must fire onActivity');
+    });
+
+    test('BlueyRemoteCharacteristic.read fires onActivity on success',
+        () async {
+      final activityEvents = <void>[];
+
+      fakePlatform.simulatePeripheral(
+        id: TestDeviceIds.device1,
+        name: 'Test',
+        services: [
+          TestServiceBuilder(TestUuids.customService)
+              .withReadable(TestUuids.customChar1)
+              .build(),
+        ],
+        characteristicValues: {
+          TestUuids.customChar1: Uint8List.fromList([0x77]),
+        },
+      );
+      await fakePlatform.connect(
+        TestDeviceIds.device1,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final char = BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: true,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+        onActivity: () => activityEvents.add(null),
+      );
+
+      await char.read();
+      expect(activityEvents, hasLength(1));
+    });
+
+    test('BlueyRemoteCharacteristic.write failure does NOT fire onActivity',
+        () async {
+      final activityEvents = <void>[];
+
+      fakePlatform.simulatePeripheral(
+        id: TestDeviceIds.device1,
+        name: 'Test',
+        services: [
+          TestServiceBuilder(TestUuids.customService)
+              .withWritable(TestUuids.customChar1)
+              .build(),
+        ],
+      );
+      await fakePlatform.connect(
+        TestDeviceIds.device1,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+      fakePlatform.simulateWriteTimeout = true;
+
+      final char = BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: false,
+          canWrite: true,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+        onActivity: () => activityEvents.add(null),
+      );
+
+      await expectLater(
+        () => char.write(Uint8List.fromList([0x42])),
+        throwsA(isA<GattTimeoutException>()),
+      );
+      expect(activityEvents, isEmpty);
+
+      fakePlatform.simulateWriteTimeout = false;
+    });
+  }); // end group('BlueyRemoteCharacteristic activity hook')
 }
