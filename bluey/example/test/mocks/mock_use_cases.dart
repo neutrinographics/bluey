@@ -32,6 +32,7 @@ import 'package:bluey_example/features/server/application/dispose_server.dart';
 import 'package:bluey_example/features/server/application/get_connected_clients.dart';
 import 'package:bluey_example/features/server/application/observe_disconnections.dart';
 import 'package:bluey_example/features/server/application/handle_requests.dart';
+import 'package:bluey_example/features/server/application/get_server.dart';
 import 'package:bluey_example/features/server/infrastructure/server_identity_storage.dart';
 
 // Scanner Mocks
@@ -92,3 +93,5 @@ class MockObserveDisconnections extends Mock implements ObserveDisconnections {}
 class MockObserveReadRequests extends Mock implements ObserveReadRequests {}
 
 class MockObserveWriteRequests extends Mock implements ObserveWriteRequests {}
+
+class MockGetServer extends Mock implements GetServer {}

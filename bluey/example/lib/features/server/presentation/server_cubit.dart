@@ -18,7 +18,10 @@ import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
+import '../application/get_server.dart';
 import '../infrastructure/server_identity_storage.dart';
+import '../infrastructure/stress_service_handler.dart';
+import '../../../shared/stress_protocol.dart';
 import 'server_state.dart';
 
 /// Cubit for managing server state.
@@ -37,7 +40,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final ObserveDisconnections _observeDisconnections;
   final ObserveReadRequests _observeReadRequests;
   final ObserveWriteRequests _observeWriteRequests;
+  final GetServer _getServer;
   final ServerIdentityStorage _identityStorage;
+
+  final StressServiceHandler _stressHandler = StressServiceHandler();
 
   StreamSubscription<Client>? _connectionSubscription;
   StreamSubscription<String>? _disconnectionSubscription;
@@ -67,6 +73,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required ObserveDisconnections observeDisconnections,
     required ObserveReadRequests observeReadRequests,
     required ObserveWriteRequests observeWriteRequests,
+    required GetServer getServer,
     required ServerIdentityStorage identityStorage,
   }) : _checkServerSupport = checkServerSupport,
        _setServerIdentity = setServerIdentity,
@@ -82,6 +89,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _observeDisconnections = observeDisconnections,
        _observeReadRequests = observeReadRequests,
        _observeWriteRequests = observeWriteRequests,
+       _getServer = getServer,
        _identityStorage = identityStorage,
        super(const ServerScreenState());
 
@@ -126,6 +134,19 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
     // Listen for read requests and respond with the current value.
     _readRequestSubscription = _observeReadRequests().listen((request) async {
+      if (request.characteristicId == UUID(StressProtocol.charUuid)) {
+        try {
+          final value = _stressHandler.onRead();
+          await _observeReadRequests.respond(
+            request,
+            status: GattResponseStatus.success,
+            value: value,
+          );
+        } catch (e) {
+          _addLog('Stress', 'Read handler error: $e');
+        }
+        return;
+      }
       _addLog('Read', 'From ${_shortId(request.client.id)}');
       try {
         await _observeReadRequests.respond(
@@ -140,6 +161,17 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
     // Listen for write requests, store the value, and respond.
     _writeRequestSubscription = _observeWriteRequests().listen((request) async {
+      if (request.characteristicId == UUID(StressProtocol.charUuid)) {
+        final server = _getServer();
+        if (server != null) {
+          try {
+            await _stressHandler.onWrite(request, server);
+          } catch (e) {
+            _addLog('Stress', 'Write handler error: $e');
+          }
+        }
+        return;
+      }
       _characteristicValue = request.value;
       _addLog(
         'Write',
@@ -187,6 +219,34 @@ class ServerCubit extends Cubit<ServerScreenState> {
     } catch (e) {
       _addLog('Error', 'Failed to add service: $e');
       emit(state.copyWith(error: 'Failed to initialize server: $e'));
+      return;
+    }
+
+    // Add stress test service
+    try {
+      await _addService(
+        HostedService(
+          uuid: UUID(StressProtocol.serviceUuid),
+          isPrimary: true,
+          characteristics: [
+            HostedCharacteristic(
+              uuid: UUID(StressProtocol.charUuid),
+              properties: const CharacteristicProperties(
+                canRead: true,
+                canWrite: true,
+                canWriteWithoutResponse: true,
+                canNotify: true,
+              ),
+              permissions: const [GattPermission.read, GattPermission.write],
+              descriptors: const [],
+            ),
+          ],
+        ),
+      );
+      _addLog('Server', 'Registered stress test service');
+    } catch (e) {
+      _addLog('Error', 'Failed to add stress service: $e');
+      emit(state.copyWith(error: 'Failed to register stress service: $e'));
     }
   }
 

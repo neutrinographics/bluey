@@ -27,6 +27,7 @@ void main() {
   late MockObserveDisconnections mockObserveDisconnections;
   late MockObserveReadRequests mockObserveReadRequests;
   late MockObserveWriteRequests mockObserveWriteRequests;
+  late MockGetServer mockGetServer;
   late MockServerIdentityStorage mockIdentityStorage;
 
   final testServerId = ServerId('12345678-1234-4234-8234-123456789abc');
@@ -55,6 +56,7 @@ void main() {
     mockObserveDisconnections = MockObserveDisconnections();
     mockObserveReadRequests = MockObserveReadRequests();
     mockObserveWriteRequests = MockObserveWriteRequests();
+    mockGetServer = MockGetServer();
     mockIdentityStorage = MockServerIdentityStorage();
 
     when(() => mockDisposeServer()).thenAnswer((_) async {});
@@ -68,6 +70,7 @@ void main() {
     when(
       () => mockObserveWriteRequests(),
     ).thenAnswer((_) => const Stream.empty());
+    when(() => mockGetServer()).thenReturn(null);
     when(
       () => mockIdentityStorage.loadOrGenerate(),
     ).thenAnswer((_) async => testServerId);
@@ -96,6 +99,7 @@ void main() {
       observeDisconnections: mockObserveDisconnections,
       observeReadRequests: mockObserveReadRequests,
       observeWriteRequests: mockObserveWriteRequests,
+      getServer: mockGetServer,
       identityStorage: mockIdentityStorage,
     );
   }
@@ -138,7 +142,7 @@ void main() {
       act: (cubit) => cubit.initialize(),
       verify: (cubit) {
         expect(cubit.state.isSupported, isTrue);
-        verify(() => mockAddService(any())).called(1);
+        verify(() => mockAddService(any())).called(2);
         expect(
           cubit.state.log.any((e) => e.message.contains('Initialized')),
           isTrue,
