@@ -67,6 +67,8 @@ sealed class StressCommand {
               .asByteData(body.offsetInBytes, 2)
               .getUint16(0, Endian.little),
         );
+      case 0x04:
+        return const DropNextCommand();
       case 0x05:
         if (body.length < 2) {
           throw StressProtocolException(
@@ -79,6 +81,8 @@ sealed class StressCommand {
               .asByteData(body.offsetInBytes, 2)
               .getUint16(0, Endian.little),
         );
+      case 0x06:
+        return const ResetCommand();
       default:
         throw StressProtocolException(
           opcode: opcode,
@@ -180,6 +184,34 @@ class SetPayloadSizeCommand extends StressCommand {
 
   @override
   int get hashCode => sizeBytes.hashCode;
+}
+
+/// DropNext: server silently ignores the next write (no response, no
+/// notification). Self-clears after one drop. Opcode 0x04.
+class DropNextCommand extends StressCommand {
+  const DropNextCommand();
+  @override
+  Uint8List encode() => Uint8List.fromList([0x04]);
+
+  @override
+  bool operator ==(Object other) => other is DropNextCommand;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
+/// Reset: clears all server-side stress state (lastEcho, dropNext flag,
+/// payloadSize) and aborts any in-flight burstMe loop. Opcode 0x06.
+class ResetCommand extends StressCommand {
+  const ResetCommand();
+  @override
+  Uint8List encode() => Uint8List.fromList([0x06]);
+
+  @override
+  bool operator ==(Object other) => other is ResetCommand;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Thrown when stress command bytes can't be decoded.

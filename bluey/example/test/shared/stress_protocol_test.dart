@@ -139,4 +139,38 @@ void main() {
       );
     });
   });
+
+  group('DropNextCommand', () {
+    test('encode is [0x04]', () {
+      const cmd = DropNextCommand();
+      expect(cmd.encode(), equals(Uint8List.fromList([0x04])));
+    });
+
+    test('decode round-trips', () {
+      const original = DropNextCommand();
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<DropNextCommand>());
+    });
+
+    test('all DropNextCommand instances are equal', () {
+      expect(const DropNextCommand(), equals(const DropNextCommand()));
+    });
+  });
+
+  group('ResetCommand', () {
+    test('encode is [0x06]', () {
+      const cmd = ResetCommand();
+      expect(cmd.encode(), equals(Uint8List.fromList([0x06])));
+    });
+
+    test('decode round-trips', () {
+      const original = ResetCommand();
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<ResetCommand>());
+    });
+
+    test('all ResetCommand instances are equal', () {
+      expect(const ResetCommand(), equals(const ResetCommand()));
+    });
+  });
 }
