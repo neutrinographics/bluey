@@ -54,7 +54,7 @@ class _ConfigFormState extends State<ConfigForm> {
     // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
-      style: TextStyle(color: Colors.grey.shade600),
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 

@@ -9,11 +9,12 @@ class ResultsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = result;
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -25,17 +26,17 @@ class ResultsPanel extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: colorScheme.errorContainer,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.link_off, size: 14, color: Colors.red.shade700),
+                  Icon(Icons.link_off, size: 14, color: colorScheme.onErrorContainer),
                   const SizedBox(width: 6),
                   Text(
                     'Connection lost',
                     style: TextStyle(
-                      color: Colors.red.shade700,
+                      color: colorScheme.onErrorContainer,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
@@ -76,7 +77,7 @@ class ResultsPanel extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Elapsed: ${_format(r.elapsed)}',
-              style: TextStyle(color: Colors.grey.shade700),
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ),
         ],
