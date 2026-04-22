@@ -46,6 +46,49 @@ Future<T> _runGattOp<T>(
   }
 }
 
+/// Wraps [_runGattOp] with start / complete / failed log lines and a
+/// stopwatch. Every public GATT op on the Connection / Characteristic /
+/// Descriptor surface that wants per-op tracing goes through this so
+/// the three log lines stay in lock-step.
+///
+/// [startDetail] — extra context appended after `deviceId=…` in both
+/// the start and failed messages (e.g. `'char=$uuid, bytes=N'`).
+/// [completeDetail] — optional result-derived suffix for the complete
+/// message (e.g. `'negotiated=$mtu'`).
+Future<T> _loggedGattOp<T>({
+  required UUID deviceId,
+  required String op,
+  required Future<T> Function() body,
+  String startDetail = '',
+  String Function(T result)? completeDetail,
+  void Function()? onSuccess,
+}) async {
+  final startSuffix = startDetail.isEmpty ? '' : ', $startDetail';
+  dev.log('$op start: deviceId=$deviceId$startSuffix',
+      name: 'bluey.gatt', level: 500);
+  final sw = Stopwatch()..start();
+  try {
+    final result =
+        await _runGattOp(deviceId, op, body, onSuccess: onSuccess);
+    final detail = completeDetail?.call(result);
+    final completeSuffix = (detail == null || detail.isEmpty) ? '' : ', $detail';
+    dev.log(
+        '$op complete: deviceId=$deviceId$completeSuffix, ${sw.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500);
+    return result;
+  } catch (e) {
+    final status =
+        e is GattOperationFailedException ? ' status=${e.status}' : '';
+    dev.log(
+        '$op failed: deviceId=$deviceId$startSuffix, exception=${e.runtimeType}$status, ${sw.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900,
+        error: e);
+    rethrow;
+  }
+}
+
 /// Internal implementation of [Connection] that wraps platform calls.
 ///
 /// This class is created by [Bluey.connect] and should not be instantiated
@@ -290,67 +333,26 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
-    dev.log(
-      'requestMtu start: deviceId=$deviceId, requested=$mtu',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    _mtu = await _loggedGattOp(
+      deviceId: deviceId,
+      op: 'requestMtu',
+      startDetail: 'requested=$mtu',
+      body: () => _platform.requestMtu(_connectionId, mtu),
+      completeDetail: (negotiated) => 'requested=$mtu, negotiated=$negotiated',
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final negotiatedMtu = await _runGattOp(
-        deviceId,
-        'requestMtu',
-        () => _platform.requestMtu(_connectionId, mtu),
-        onSuccess: () => _lifecycle?.recordActivity(),
-      );
-      _mtu = negotiatedMtu;
-      dev.log(
-        'requestMtu complete: deviceId=$deviceId, requested=$mtu, negotiated=$negotiatedMtu, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return _mtu;
-    } catch (e) {
-      dev.log(
-        'requestMtu failed: deviceId=$deviceId, requested=$mtu, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
+    return _mtu;
   }
 
   @override
-  Future<int> readRssi() async {
-    dev.log(
-      'readRssi start: deviceId=$deviceId',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+  Future<int> readRssi() {
+    return _loggedGattOp(
+      deviceId: deviceId,
+      op: 'readRssi',
+      body: () => _platform.readRssi(_connectionId),
+      completeDetail: (rssi) => 'rssi=${rssi}dBm',
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final rssi = await _runGattOp(
-        deviceId,
-        'readRssi',
-        () => _platform.readRssi(_connectionId),
-        onSuccess: () => _lifecycle?.recordActivity(),
-      );
-      dev.log(
-        'readRssi complete: deviceId=$deviceId, rssi=${rssi}dBm, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return rssi;
-    } catch (e) {
-      dev.log(
-        'readRssi failed: deviceId=$deviceId, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
@@ -692,82 +694,41 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
        _onActivity = onActivity;
 
   @override
-  Future<Uint8List> read() async {
+  Future<Uint8List> read() {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    dev.log(
-      'read start: deviceId=$_deviceId, char=$uuid',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    return _loggedGattOp(
+      deviceId: _deviceId,
+      op: 'readCharacteristic',
+      startDetail: 'char=$uuid',
+      body: () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+      completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
+      onSuccess: _onActivity,
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final value = await _runGattOp(
-        _deviceId,
-        'readCharacteristic',
-        () => _platform.readCharacteristic(_connectionId, uuid.toString()),
-        onSuccess: _onActivity,
-      );
-      dev.log(
-        'read complete: deviceId=$_deviceId, char=$uuid, bytes=${value.length}, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-      return value;
-    } catch (e) {
-      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
-      dev.log(
-        'read failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
-  Future<void> write(Uint8List value, {bool withResponse = true}) async {
+  Future<void> write(Uint8List value, {bool withResponse = true}) {
     if (withResponse && !properties.canWrite) {
       throw const OperationNotSupportedException('write');
     }
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    dev.log(
-      'write start: deviceId=$_deviceId, char=$uuid, bytes=${value.length}',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    return _loggedGattOp<void>(
+      deviceId: _deviceId,
+      op: 'writeCharacteristic',
+      startDetail: 'char=$uuid, bytes=${value.length}',
+      body: () => _platform.writeCharacteristic(
+        _connectionId,
+        uuid.toString(),
+        value,
+        withResponse,
+      ),
+      completeDetail: (_) => 'char=$uuid',
+      onSuccess: _onActivity,
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      await _runGattOp(
-        _deviceId,
-        'writeCharacteristic',
-        () => _platform.writeCharacteristic(
-          _connectionId,
-          uuid.toString(),
-          value,
-          withResponse,
-        ),
-        onSuccess: _onActivity,
-      );
-      dev.log(
-        'write complete: deviceId=$_deviceId, char=$uuid, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
-      );
-    } catch (e) {
-      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
-      dev.log(
-        'write failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900, // Level.WARNING
-        error: e,
-      );
-      rethrow;
-    }
   }
 
   @override
