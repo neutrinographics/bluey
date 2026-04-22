@@ -475,5 +475,27 @@ void main() {
 
       server.dispose();
     });
+
+    test('recordActivity is ignored for an untracked (non-lifecycle) client',
+        () {
+      fakeAsync((async) {
+        final events = <String>[];
+        final server = LifecycleServer(
+          platformApi: FakeBlueyPlatform(),
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: (id) => events.add('gone:$id'),
+        );
+
+        // Client never sent a heartbeat — activity alone must not start
+        // tracking them. Otherwise a generic BLE central reading a hosted
+        // service would be spuriously flagged as "gone" after the interval.
+        server.recordActivity('stranger');
+        async.elapse(const Duration(seconds: 20));
+        expect(events, isEmpty);
+
+        server.dispose();
+      });
+    });
   });
 }

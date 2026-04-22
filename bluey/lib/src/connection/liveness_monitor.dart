@@ -18,27 +18,29 @@ class LivenessMonitor {
   /// only fires during genuine idle periods.
   final int maxFailedProbes;
 
-  /// Minimum time since last activity before the monitor will ask
-  /// for a probe. Typically equals the probe tick interval so at most
-  /// one probe is dispatched per idle window.
-  ///
-  /// Mutable via [updateActivityWindow] so [LifecycleClient] can
-  /// adopt a server-negotiated interval without discarding in-flight
-  /// state.
-  Duration activityWindow;
-
   /// Clock injection for deterministic tests.
   final DateTime Function() _now;
 
+  Duration _activityWindow;
   DateTime? _lastActivityAt;
   int _consecutiveFailures = 0;
   bool _probeInFlight = false;
 
   LivenessMonitor({
     required this.maxFailedProbes,
-    required this.activityWindow,
+    required Duration activityWindow,
     DateTime Function()? now,
-  }) : _now = now ?? clock.now;
+  })  : _activityWindow = activityWindow,
+        _now = now ?? clock.now {
+    assert(activityWindow > Duration.zero,
+        'activityWindow must be positive');
+  }
+
+  /// Minimum time since last activity before the monitor will ask
+  /// for a probe. Typically equals the probe tick interval so at most
+  /// one probe is dispatched per idle window. Read-only from outside;
+  /// callers mutate via [updateActivityWindow].
+  Duration get activityWindow => _activityWindow;
 
   /// Any evidence that the peer is alive: a successful GATT op, an
   /// incoming notification, or a completed probe. Resets the failure
@@ -58,14 +60,15 @@ class LivenessMonitor {
     if (_probeInFlight) return false;
     final last = _lastActivityAt;
     if (last == null) return true;
-    return _now().difference(last) >= activityWindow;
+    return _now().difference(last) >= _activityWindow;
   }
 
   /// Swaps in a new activity window (e.g. after negotiating the
   /// server-preferred interval). Preserves in-flight probe state and
   /// the failure counter.
   void updateActivityWindow(Duration window) {
-    activityWindow = window;
+    assert(window > Duration.zero, 'activityWindow must be positive');
+    _activityWindow = window;
   }
 
   /// Called just before dispatching a probe write. Prevents parallel

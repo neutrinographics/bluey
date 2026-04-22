@@ -111,16 +111,20 @@ class LifecycleServer {
     _heartbeatTimers.remove(clientId);
   }
 
-  /// Treats any incoming activity from [clientId] as liveness evidence.
-  /// Resets the per-client timer without requiring a write to the
-  /// control-service characteristic. Called by [BlueyServer] on every
-  /// request from a client that isn't already routed through
-  /// [handleWriteRequest] or [handleReadRequest].
+  /// Treats any incoming activity from [clientId] as liveness evidence,
+  /// refreshing an existing per-client timer so a busy lifecycle client
+  /// isn't disconnected while its user-service traffic keeps flowing.
   ///
-  /// No-op if lifecycle is disabled (interval is null) — matches the
-  /// existing `_resetTimer` behaviour.
+  /// Only clients that have previously identified themselves via a
+  /// heartbeat write are tracked — activity from a non-lifecycle
+  /// central (e.g. a generic BLE app reading a hosted service) is
+  /// ignored so we don't spuriously fire [onClientGone] for a client
+  /// we never promised to track.
+  ///
+  /// No-op if lifecycle is disabled (interval is null).
   void recordActivity(String clientId) {
     if (_interval == null) return;
+    if (!_heartbeatTimers.containsKey(clientId)) return;
     _resetTimer(clientId);
   }
 
