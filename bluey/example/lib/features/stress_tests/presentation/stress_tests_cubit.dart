@@ -6,12 +6,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../application/run_burst_write.dart';
 import '../domain/stress_test.dart';
 import '../domain/stress_test_config.dart';
+import '../domain/stress_test_result.dart';
 import 'stress_tests_state.dart';
 
 class StressTestsCubit extends Cubit<StressTestsState> {
   final RunBurstWrite _runBurstWrite;
   final Connection _connection;
-  StreamSubscription<dynamic>? _activeSub;
+  StreamSubscription<StressTestResult>? _activeSub;
 
   StressTestsCubit({
     required RunBurstWrite runBurstWrite,
@@ -29,26 +30,26 @@ class StressTestsCubit extends Cubit<StressTestsState> {
 
   /// Kicks off the test for [test]. No-op if any other card is already
   /// running.
-  Future<void> run(StressTest test) async {
+  void run(StressTest test) {
     if (state.anyRunning) return;
     final card = state.cards[test]!;
     emit(state.updateCard(test, card.copyWith(isRunning: true)));
 
-    final Stream<dynamic> stream = switch (test) {
+    final Stream<StressTestResult> stream = switch (test) {
       StressTest.burstWrite =>
         _runBurstWrite(card.config as BurstWriteConfig, _connection),
-      _ => Stream<dynamic>.error(
+      _ => Stream<StressTestResult>.error(
           UnimplementedError('Test $test not yet wired'),
         ),
     };
 
     _activeSub = stream.listen(
-      (dynamic result) {
+      (StressTestResult result) {
         emit(state.updateCard(
           test,
           state.cards[test]!.copyWith(
-            result: result as dynamic,
-            isRunning: (result as dynamic).isRunning as bool,
+            result: result,
+            isRunning: result.isRunning,
           ),
         ));
       },

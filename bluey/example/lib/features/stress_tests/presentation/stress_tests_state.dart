@@ -4,6 +4,8 @@ import '../domain/stress_test.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
 
+const Object _absent = Object();
+
 /// One per StressTest enum value. Holds the per-card UI state.
 class TestCardState extends Equatable {
   final StressTest test;
@@ -20,13 +22,15 @@ class TestCardState extends Equatable {
 
   TestCardState copyWith({
     StressTestConfig? config,
-    StressTestResult? result,
+    Object? result = _absent,
     bool? isRunning,
   }) {
     return TestCardState(
       test: test,
       config: config ?? this.config,
-      result: result,
+      result: identical(result, _absent)
+          ? this.result
+          : result as StressTestResult?,
       isRunning: isRunning ?? this.isRunning,
     );
   }
