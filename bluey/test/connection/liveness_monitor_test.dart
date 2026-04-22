@@ -33,7 +33,7 @@ void main() {
     test('recordActivity then shouldSendProbe after window returns true', () {
       final m = buildMonitor(activityWindow: const Duration(seconds: 5));
       m.recordActivity();
-      advance(const Duration(seconds: 5));
+      advance(const Duration(seconds: 5, microseconds: 1));
       expect(m.shouldSendProbe(), isTrue);
     });
 

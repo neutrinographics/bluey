@@ -7,38 +7,56 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
+import 'liveness_monitor.dart';
 
 /// Client-side lifecycle management.
 ///
-/// Discovers the server's control service, sends periodic heartbeats,
-/// and detects server disconnection via write failures. Internal to the
-/// Connection bounded context.
+/// Owns the GATT write mechanism (Timer.periodic + heartbeat char write).
+/// Delegates all liveness policy decisions to an internal [LivenessMonitor]:
+/// when to send a probe, when failures count, when to tear down.
+///
+/// Internal to the Connection bounded context.
 class LifecycleClient {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
-  final int maxFailedHeartbeats;
+  final int _maxFailedHeartbeats;
   final void Function() onServerUnreachable;
 
-  Timer? _heartbeatTimer;
+  late LivenessMonitor _monitor;
+  Timer? _probeTimer;
   String? _heartbeatCharUuid;
-  int _consecutiveFailures = 0;
 
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
-    this.maxFailedHeartbeats = 1,
+    int maxFailedHeartbeats = 1,
     required this.onServerUnreachable,
-  }) : _platform = platformApi,
-       _connectionId = connectionId;
+  })  : _platform = platformApi,
+        _connectionId = connectionId,
+        _maxFailedHeartbeats = maxFailedHeartbeats {
+    _monitor = LivenessMonitor(
+      maxFailedProbes: maxFailedHeartbeats,
+      activityWindow: _defaultHeartbeatInterval,
+    );
+  }
 
-  /// Whether the lifecycle heartbeat is currently running.
-  bool get isRunning => _heartbeatTimer != null;
+  /// Also exposed for [BlueyConnection] tests to inspect: public for
+  /// consistency with the rest of the Connection bounded context.
+  int get maxFailedHeartbeats => _maxFailedHeartbeats;
+
+  /// Whether the heartbeat timer is currently running.
+  bool get isRunning => _probeTimer != null;
+
+  /// Forwarded from [BlueyConnection] on any successful GATT op or
+  /// incoming notification. Treats the peer as demonstrably alive.
+  /// No-op if the lifecycle isn't running.
+  void recordActivity() => _monitor.recordActivity();
 
   /// Starts the heartbeat if the server hosts the control service.
   ///
-  /// [allServices] is the full list of discovered services (including the
-  /// control service). If the control service or its heartbeat characteristic
-  /// is absent, the method returns silently without starting heartbeats.
+  /// [allServices] is the full list of discovered services. If the
+  /// control service or its heartbeat characteristic is absent, the
+  /// method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
     if (_heartbeatCharUuid != null) return;
 
@@ -58,12 +76,12 @@ class LifecycleClient {
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
     dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
-    // Send the first heartbeat immediately so the server (especially iOS,
-    // which has no connection callback) learns about this client as soon as
-    // possible — before the interval read round-trip.
-    _sendHeartbeat();
+    // Send the first heartbeat immediately so the server (especially
+    // iOS, which has no connection callback) learns about this client
+    // as soon as possible — before the interval read round-trip.
+    _sendProbe();
 
-    // Find the interval characteristic and read the server's interval
+    // Find the interval characteristic and read the server's interval.
     final intervalChar = controlService.characteristics
         .where(
           (c) =>
@@ -84,7 +102,11 @@ class LifecycleClient {
         _beginHeartbeat(_defaultHeartbeatInterval);
       });
     } else {
-      _beginHeartbeat(_defaultHeartbeatInterval);
+      // Schedule asynchronously so the initial probe's write-success
+      // is processed by the old monitor before the new one is created.
+      // This keeps _lastActivityAt null on the new monitor so the first
+      // timer tick always sends a probe.
+      Future.microtask(() => _beginHeartbeat(_defaultHeartbeatInterval));
     }
   }
 
@@ -105,12 +127,16 @@ class LifecycleClient {
     }
   }
 
-  /// Stops the heartbeat and cleans up.
+  /// Stops the heartbeat timer and clears the char reference.
+  ///
+  /// Monitor retains state until the next call to [start] →
+  /// [_beginHeartbeat], which recreates it with the chosen interval.
+  /// In practice [LifecycleClient] is per-connection — a new
+  /// connection = new instance — so this edge case rarely matters.
   void stop() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
+    _probeTimer?.cancel();
+    _probeTimer = null;
     _heartbeatCharUuid = null;
-    _consecutiveFailures = 0;
   }
 
   Duration get _defaultHeartbeatInterval => Duration(
@@ -119,16 +145,26 @@ class LifecycleClient {
 
   void _beginHeartbeat(Duration interval) {
     dev.log('heartbeat interval set: ${interval.inMilliseconds}ms', name: 'bluey.lifecycle');
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(interval, (_) {
-      _sendHeartbeat();
-    });
+    // Reinitialise monitor so its activity window matches the server's
+    // chosen interval.
+    _monitor = LivenessMonitor(
+      maxFailedProbes: _maxFailedHeartbeats,
+      activityWindow: interval,
+    );
+    _probeTimer?.cancel();
+    _probeTimer = Timer.periodic(interval, (_) => _tick());
   }
 
-  void _sendHeartbeat() {
+  void _tick() {
+    if (!_monitor.shouldSendProbe()) return;
+    _sendProbe();
+  }
+
+  void _sendProbe() {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
+    _monitor.markProbeInFlight();
     _platform
         .writeCharacteristic(
           _connectionId,
@@ -136,19 +172,23 @@ class LifecycleClient {
           lifecycle.heartbeatValue,
           true,
         )
-        .then((_) {
-      _consecutiveFailures = 0;
-    }).catchError((Object error) {
+        .then((_) => _monitor.recordProbeSuccess())
+        .catchError((Object error) {
       if (!_isDeadPeerSignal(error)) {
+        // Not a dead-peer signal — release the in-flight flag so the
+        // next tick can retry, but do NOT reset the failure counter or
+        // refresh activity. The transient error gives no evidence about
+        // whether the peer is alive.
+        _monitor.cancelProbe();
         return;
       }
-      _consecutiveFailures++;
+      final tripped = _monitor.recordProbeFailure();
       dev.log(
-        'heartbeat failed (counted): $_consecutiveFailures/$maxFailedHeartbeats — ${error.runtimeType}',
+        'heartbeat failed (counted): ${error.runtimeType}',
         name: 'bluey.lifecycle',
         level: 900, // WARNING
       );
-      if (_consecutiveFailures >= maxFailedHeartbeats) {
+      if (tripped) {
         dev.log(
           'heartbeat threshold reached — invoking onServerUnreachable',
           name: 'bluey.lifecycle',
@@ -161,33 +201,8 @@ class LifecycleClient {
   }
 
   /// Whether [error] is evidence that the peer is no longer reachable.
-  ///
-  /// Treated as dead-peer signals:
-  ///
-  /// * [platform.GattOperationTimeoutException] — the peer stopped
-  ///   acknowledging within the per-op timeout.
-  /// * [platform.GattOperationDisconnectedException] — Android's GATT
-  ///   queue drained the pending heartbeat when the link dropped.
-  /// * [platform.GattOperationStatusFailedException] — the peer returned
-  ///   a non-success GATT status. This is the Android-client→iOS-server
-  ///   force-kill path: iOS fires a Service Changed indication on the way
-  ///   out, which invalidates Android's cached characteristic handle, and
-  ///   every subsequent heartbeat write returns GATT_INVALID_HANDLE
-  ///   (0x01). The physical link stays up (iOS's BLE stack still answers
-  ///   link-layer packets after the app dies), so without this branch we
-  ///   would hold the connection open indefinitely.
-  /// * [PlatformException] with code `notFound` or `notConnected` — iOS's
-  ///   CoreBluetooth invalidates the peer's characteristic handles as
-  ///   soon as the peer vanishes, long before `didDisconnect` fires. The
-  ///   resulting `BlueyError.notFound` / `.notConnected` reaches Dart as
-  ///   a raw [PlatformException] (it's not translated by
-  ///   `_translateGattPlatformError`), so we match on the Pigeon error
-  ///   code directly.
-  ///
-  /// Every other error is ignored — there was a time when transient
-  /// "operation in flight" rejections on Android produced false positives;
-  /// Phase 2a's GATT operation queue eliminates that class of error, but
-  /// the safety net remains to guard against future unknowns.
+  /// See spec "Test isolation" and earlier lifecycle fixes for the
+  /// full list of dead-peer signals.
   bool _isDeadPeerSignal(Object error) {
     if (error is platform.GattOperationTimeoutException) return true;
     if (error is platform.GattOperationDisconnectedException) return true;

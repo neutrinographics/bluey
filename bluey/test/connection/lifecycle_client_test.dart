@@ -1006,6 +1006,94 @@ void main() {
         });
       },
     );
+
+    test('recordActivity resets the failure counter', () {
+      fakeAsync((async) {
+        var unreachableFired = false;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(
+          maxFailedHeartbeats: 2,
+          onServerUnreachable: () => unreachableFired = true,
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // First heartbeat succeeds in the initial send. Now cause
+        // timeouts and have activity rescue the connection.
+        fakePlatform.simulateWriteTimeout = true;
+
+        // Failure 1 — below threshold.
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        expect(unreachableFired, isFalse);
+
+        // User op success → recordActivity resets the counter and marks
+        // the peer as recently active, suppressing the very next probe.
+        client.recordActivity();
+
+        // The first tick after recordActivity is suppressed by the recent
+        // activity window — counter stays at 0.
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        expect(unreachableFired, isFalse, reason: 'next tick suppressed, counter was reset');
+
+        // Two more timeouts after the suppressed tick trip the threshold.
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        expect(unreachableFired, isFalse, reason: 'failure 1 of 2 post-reset');
+
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        expect(unreachableFired, isTrue, reason: 'failure 2 of 2 post-reset trips threshold');
+
+        fakePlatform.simulateWriteTimeout = false;
+      });
+    });
+
+    test('recordActivity within probe interval skips next probe send', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(
+          onServerUnreachable: () {},
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // After start, clear baseline heartbeat writes.
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        // Record activity, then let the tick fire. The tick should skip.
+        client.recordActivity();
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+          (c) => c.characteristicUuid == lifecycle.heartbeatCharUuid,
+        );
+        expect(heartbeatWrites, isEmpty,
+            reason: 'recent activity should cause probe tick to skip');
+
+        client.stop();
+      });
+    });
   });
 }
 

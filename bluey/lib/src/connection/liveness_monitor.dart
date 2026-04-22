@@ -1,3 +1,5 @@
+import 'package:clock/clock.dart';
+
 /// Tracks whether a peer is still alive, based on a stream of
 /// observable events.
 ///
@@ -32,7 +34,7 @@ class LivenessMonitor {
     required this.maxFailedProbes,
     required this.activityWindow,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  }) : _now = now ?? clock.now;
 
   /// Any evidence that the peer is alive: a successful GATT op, an
   /// incoming notification, or a completed probe. Resets the failure
@@ -49,7 +51,7 @@ class LivenessMonitor {
     if (_probeInFlight) return false;
     final last = _lastActivityAt;
     if (last == null) return true;
-    return _now().difference(last) >= activityWindow;
+    return _now().difference(last) > activityWindow;
   }
 
   /// Called just before dispatching a probe write. Prevents parallel
@@ -60,14 +62,18 @@ class LivenessMonitor {
 
   /// Probe write completed and peer acknowledged. Equivalent to
   /// [recordActivity] plus releasing the in-flight flag.
-  ///
-  /// Also safe to call when no probe was in flight (used when a
-  /// non-dead-peer error fires during the probe write — releases
-  /// the flag without counting a failure).
   void recordProbeSuccess() {
     _probeInFlight = false;
     _consecutiveFailures = 0;
     _lastActivityAt = _now();
+  }
+
+  /// Probe write failed with a transient, non-dead-peer error (e.g.
+  /// "another op in flight" on Android). Releases the in-flight flag so
+  /// the next tick can retry, but does NOT reset the failure counter or
+  /// refresh the activity timestamp.
+  void cancelProbe() {
+    _probeInFlight = false;
   }
 
   /// Probe write failed with a dead-peer signal (caller determines
