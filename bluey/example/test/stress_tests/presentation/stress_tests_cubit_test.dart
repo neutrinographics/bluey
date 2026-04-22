@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bluey/bluey.dart';
 import 'package:bluey_example/features/stress_tests/application/run_burst_write.dart';
 import 'package:bluey_example/features/stress_tests/application/run_mixed_ops.dart';
+import 'package:bluey_example/features/stress_tests/application/run_soak.dart';
 import 'package:bluey_example/features/stress_tests/domain/stress_test.dart';
 import 'package:bluey_example/features/stress_tests/domain/stress_test_config.dart';
 import 'package:bluey_example/features/stress_tests/domain/stress_test_result.dart';
@@ -14,6 +15,8 @@ class _MockRunBurstWrite extends Mock implements RunBurstWrite {}
 
 class _MockRunMixedOps extends Mock implements RunMixedOps {}
 
+class _MockRunSoak extends Mock implements RunSoak {}
+
 class _MockConnection extends Mock implements Connection {}
 
 class _FakeConnection extends Fake implements Connection {}
@@ -21,6 +24,7 @@ class _FakeConnection extends Fake implements Connection {}
 void main() {
   late _MockRunBurstWrite mockRun;
   late _MockRunMixedOps mockRunMixedOps;
+  late _MockRunSoak mockRunSoak;
   late _MockConnection mockConn;
 
   setUpAll(() {
@@ -31,12 +35,14 @@ void main() {
   setUp(() {
     mockRun = _MockRunBurstWrite();
     mockRunMixedOps = _MockRunMixedOps();
+    mockRunSoak = _MockRunSoak();
     mockConn = _MockConnection();
   });
 
   StressTestsCubit makeCubit() => StressTestsCubit(
         runBurstWrite: mockRun,
         runMixedOps: mockRunMixedOps,
+        runSoak: mockRunSoak,
         connection: mockConn,
       );
 

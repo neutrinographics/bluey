@@ -19,10 +19,47 @@ class ConfigForm extends StatelessWidget {
     final c = config;
     if (c is BurstWriteConfig) return _burst(c);
     if (c is MixedOpsConfig) return _mixedOps(c);
+    if (c is SoakConfig) return _soak(c);
     // Fallback for as-yet-unsupported configs (filled in by Tasks 15-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
       style: TextStyle(color: Colors.grey.shade600),
+    );
+  }
+
+  Widget _soak(SoakConfig c) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _intField(
+          label: 'duration (s)',
+          value: c.duration.inSeconds,
+          onChanged: (v) => onChanged(SoakConfig(
+            duration: Duration(seconds: v),
+            interval: c.interval,
+            payloadBytes: c.payloadBytes,
+          )),
+        ),
+        _intField(
+          label: 'interval (ms)',
+          value: c.interval.inMilliseconds,
+          onChanged: (v) => onChanged(SoakConfig(
+            duration: c.duration,
+            interval: Duration(milliseconds: v),
+            payloadBytes: c.payloadBytes,
+          )),
+        ),
+        _intField(
+          label: 'bytes',
+          value: c.payloadBytes,
+          onChanged: (v) => onChanged(SoakConfig(
+            duration: c.duration,
+            interval: c.interval,
+            payloadBytes: v,
+          )),
+        ),
+      ],
     );
   }
 

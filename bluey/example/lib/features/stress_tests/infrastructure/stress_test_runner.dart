@@ -128,8 +128,52 @@ class StressTestRunner {
   Stream<StressTestResult> runSoak(
     SoakConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runSoak implemented in Task 15');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    final payload = _generatePattern(config.payloadBytes);
+    final cmd = EchoCommand(payload).encode();
+    final endTime = stopwatch.elapsed + config.duration;
+
+    while (stopwatch.elapsed < endTime) {
+      final start = stopwatch.elapsedMicroseconds;
+      try {
+        await stressChar.write(cmd, withResponse: true);
+        result = result.recordSuccess(
+          latency: Duration(
+            microseconds: stopwatch.elapsedMicroseconds - start,
+          ),
+        );
+      } catch (e) {
+        result = result.recordFailure(
+          typeName: e.runtimeType.toString(),
+          status: e is GattOperationFailedException ? e.status : null,
+        );
+      }
+      result = result.withElapsed(stopwatch.elapsed);
+      yield result;
+
+      // Wait until next tick or end-of-test, whichever comes first.
+      final remaining = endTime - stopwatch.elapsed;
+      final waitFor =
+          remaining < config.interval ? remaining : config.interval;
+      if (waitFor > Duration.zero) {
+        await Future<void>.delayed(waitFor);
+      }
+    }
+    stopwatch.stop();
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Stream<StressTestResult> runTimeoutProbe(

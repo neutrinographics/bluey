@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../application/run_burst_write.dart';
 import '../application/run_mixed_ops.dart';
+import '../application/run_soak.dart';
 import '../domain/stress_test.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
@@ -13,15 +14,18 @@ import 'stress_tests_state.dart';
 class StressTestsCubit extends Cubit<StressTestsState> {
   final RunBurstWrite _runBurstWrite;
   final RunMixedOps _runMixedOps;
+  final RunSoak _runSoak;
   final Connection _connection;
   StreamSubscription<StressTestResult>? _activeSub;
 
   StressTestsCubit({
     required RunBurstWrite runBurstWrite,
     required RunMixedOps runMixedOps,
+    required RunSoak runSoak,
     required Connection connection,
   })  : _runBurstWrite = runBurstWrite,
         _runMixedOps = runMixedOps,
+        _runSoak = runSoak,
         _connection = connection,
         super(StressTestsState.initial());
 
@@ -44,6 +48,8 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         _runBurstWrite(card.config as BurstWriteConfig, _connection),
       StressTest.mixedOps =>
         _runMixedOps(card.config as MixedOpsConfig, _connection),
+      StressTest.soak =>
+        _runSoak(card.config as SoakConfig, _connection),
       _ => Stream<StressTestResult>.error(
           UnimplementedError('Test $test not yet wired'),
         ),

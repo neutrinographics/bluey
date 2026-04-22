@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shared/di/service_locator.dart';
 import '../application/run_burst_write.dart';
 import '../application/run_mixed_ops.dart';
+import '../application/run_soak.dart';
 import 'stress_tests_cubit.dart';
 import 'stress_tests_state.dart';
 import 'widgets/test_card.dart';
@@ -19,6 +20,7 @@ class StressTestsScreen extends StatelessWidget {
       create: (_) => StressTestsCubit(
         runBurstWrite: getIt<RunBurstWrite>(),
         runMixedOps: getIt<RunMixedOps>(),
+        runSoak: getIt<RunSoak>(),
         connection: connection,
       ),
       child: Scaffold(

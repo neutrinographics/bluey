@@ -162,4 +162,27 @@ void main() {
       expect(conn.lastRequestedMtu, isNotNull);
     });
   });
+
+  group('StressTestRunner.runSoak', () {
+    test('runs ops for the configured duration at the configured interval',
+        () async {
+      var writes = 0;
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        writes++;
+      };
+
+      const config = SoakConfig(
+        duration: Duration(milliseconds: 250),
+        interval: Duration(milliseconds: 100),
+        payloadBytes: 4,
+      );
+      final results = await runner.runSoak(config, conn).toList();
+
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      // 250ms / 100ms ≈ 2-3 ops + 1 reset = 3-4 writes
+      expect(writes, greaterThanOrEqualTo(2));
+      expect(writes, lessThanOrEqualTo(5));
+    });
+  });
 }
