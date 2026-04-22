@@ -20,7 +20,8 @@ class ConfigForm extends StatelessWidget {
     if (c is BurstWriteConfig) return _burst(c);
     if (c is MixedOpsConfig) return _mixedOps(c);
     if (c is SoakConfig) return _soak(c);
-    // Fallback for as-yet-unsupported configs (filled in by Tasks 15-19)
+    if (c is TimeoutProbeConfig) return _timeoutProbe(c);
+    // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
       style: TextStyle(color: Colors.grey.shade600),
@@ -60,6 +61,16 @@ class ConfigForm extends StatelessWidget {
           )),
         ),
       ],
+    );
+  }
+
+  Widget _timeoutProbe(TimeoutProbeConfig c) {
+    return _intField(
+      label: 'delay past timeout (s)',
+      value: c.delayPastTimeout.inSeconds,
+      onChanged: (v) => onChanged(TimeoutProbeConfig(
+        delayPastTimeout: Duration(seconds: v),
+      )),
     );
   }
 

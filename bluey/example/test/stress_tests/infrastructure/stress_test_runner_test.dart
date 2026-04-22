@@ -185,4 +185,33 @@ void main() {
       expect(writes, lessThanOrEqualTo(5));
     });
   });
+
+  group('StressTestRunner.runTimeoutProbe', () {
+    test('sends DelayAck command sized past the timeout and counts the failure',
+        () async {
+      final writes = <Uint8List>[];
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        writes.add(Uint8List.fromList(value));
+        // For the delay-ack write (opcode 0x03), simulate a timeout.
+        if (value.isNotEmpty && value.first == 0x03) {
+          throw const GattTimeoutException('writeCharacteristic');
+        }
+      };
+
+      final results = await runner
+          .runTimeoutProbe(
+            const TimeoutProbeConfig(delayPastTimeout: Duration(seconds: 2)),
+            conn,
+          )
+          .toList();
+
+      // First write = Reset (0x06), second = DelayAck (0x03).
+      expect(writes[0].first, equals(0x06));
+      expect(writes[1].first, equals(0x03));
+
+      final last = results.last;
+      expect(last.failed, equals(1));
+      expect(last.failuresByType['GattTimeoutException'], equals(1));
+    });
+  });
 }

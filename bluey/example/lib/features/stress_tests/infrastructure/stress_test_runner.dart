@@ -179,8 +179,45 @@ class StressTestRunner {
   Stream<StressTestResult> runTimeoutProbe(
     TimeoutProbeConfig config,
     Connection connection,
-  ) {
-    throw UnimplementedError('runTimeoutProbe implemented in Task 16');
+  ) async* {
+    final stressChar = await _resolveStressChar(connection);
+
+    try {
+      await stressChar.write(const ResetCommand().encode(), withResponse: true);
+    } on Object {
+      yield StressTestResult.initial().finished(elapsed: Duration.zero);
+      return;
+    }
+
+    var result = StressTestResult.initial();
+    final stopwatch = Stopwatch()..start();
+    yield result;
+
+    // Default per-op timeout is 10s; we ask the server to delay that
+    // much plus config.delayPastTimeout so the client-side timer fires
+    // deterministically.
+    const defaultTimeoutMs = 10000;
+    final delayMs = defaultTimeoutMs + config.delayPastTimeout.inMilliseconds;
+
+    final start = stopwatch.elapsedMicroseconds;
+    try {
+      await stressChar.write(
+        DelayAckCommand(delayMs: delayMs).encode(),
+        withResponse: true,
+      );
+      result = result.recordSuccess(
+        latency: Duration(
+          microseconds: stopwatch.elapsedMicroseconds - start,
+        ),
+      );
+    } catch (e) {
+      result = result.recordFailure(
+        typeName: e.runtimeType.toString(),
+        status: e is GattOperationFailedException ? e.status : null,
+      );
+    }
+    stopwatch.stop();
+    yield result.finished(elapsed: stopwatch.elapsed);
   }
 
   Stream<StressTestResult> runFailureInjection(

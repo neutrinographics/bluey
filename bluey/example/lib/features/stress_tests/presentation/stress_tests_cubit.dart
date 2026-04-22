@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../application/run_burst_write.dart';
 import '../application/run_mixed_ops.dart';
 import '../application/run_soak.dart';
+import '../application/run_timeout_probe.dart';
 import '../domain/stress_test.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
@@ -15,6 +16,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
   final RunBurstWrite _runBurstWrite;
   final RunMixedOps _runMixedOps;
   final RunSoak _runSoak;
+  final RunTimeoutProbe _runTimeoutProbe;
   final Connection _connection;
   StreamSubscription<StressTestResult>? _activeSub;
 
@@ -22,10 +24,12 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     required RunBurstWrite runBurstWrite,
     required RunMixedOps runMixedOps,
     required RunSoak runSoak,
+    required RunTimeoutProbe runTimeoutProbe,
     required Connection connection,
   })  : _runBurstWrite = runBurstWrite,
         _runMixedOps = runMixedOps,
         _runSoak = runSoak,
+        _runTimeoutProbe = runTimeoutProbe,
         _connection = connection,
         super(StressTestsState.initial());
 
@@ -50,6 +54,8 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         _runMixedOps(card.config as MixedOpsConfig, _connection),
       StressTest.soak =>
         _runSoak(card.config as SoakConfig, _connection),
+      StressTest.timeoutProbe =>
+        _runTimeoutProbe(card.config as TimeoutProbeConfig, _connection),
       _ => Stream<StressTestResult>.error(
           UnimplementedError('Test $test not yet wired'),
         ),
