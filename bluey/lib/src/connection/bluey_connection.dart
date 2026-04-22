@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -114,6 +115,10 @@ class BlueyConnection implements Connection {
         .listen(
           (platformState) {
             _state = _mapConnectionState(platformState);
+            dev.log(
+              'state transition: → $_state',
+              name: 'bluey.connection',
+            );
             _stateController.add(_state);
           },
           onError: (error) {
@@ -168,6 +173,10 @@ class BlueyConnection implements Connection {
     _serviceChangeSubscription = _platform.serviceChanges
         .where((deviceId) => deviceId == _connectionId)
         .listen((_) {
+          dev.log(
+            'Service Changed received: deviceId=$deviceId',
+            name: 'bluey.gatt',
+          );
           _handleServiceChange();
         });
   }
@@ -186,6 +195,10 @@ class BlueyConnection implements Connection {
     _lifecycle = lifecycleClient;
     _serverId = serverId;
     _cachedServices = null; // invalidate so next services() call filters
+    dev.log(
+      'state transition: → ${ConnectionState.connected}',
+      name: 'bluey.connection',
+    );
     _stateController.add(ConnectionState.connected);
   }
 
@@ -222,6 +235,12 @@ class BlueyConnection implements Connection {
       return _cachedServices!;
     }
 
+    dev.log(
+      'services start: deviceId=$deviceId',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    );
+    final stopwatch = Stopwatch()..start();
     final platformServices = await _translateGattPlatformError(
       deviceId,
       'discoverServices',
@@ -246,6 +265,12 @@ class BlueyConnection implements Connection {
               : allServices;
     }
 
+    dev.log(
+      'services complete: deviceId=$deviceId, count=${_cachedServices!.length}, ${stopwatch.elapsedMilliseconds}ms',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    );
+
     return _cachedServices!;
   }
 
@@ -260,22 +285,65 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
-    final negotiatedMtu = await _translateGattPlatformError(
-      deviceId,
-      'requestMtu',
-      () => _platform.requestMtu(_connectionId, mtu),
+    dev.log(
+      'requestMtu start: deviceId=$deviceId, requested=$mtu',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
-    _mtu = negotiatedMtu;
-    return _mtu;
+    final stopwatch = Stopwatch()..start();
+    try {
+      final negotiatedMtu = await _translateGattPlatformError(
+        deviceId,
+        'requestMtu',
+        () => _platform.requestMtu(_connectionId, mtu),
+      );
+      _mtu = negotiatedMtu;
+      dev.log(
+        'requestMtu complete: deviceId=$deviceId, requested=$mtu, negotiated=$negotiatedMtu, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+      );
+      return _mtu;
+    } catch (e) {
+      dev.log(
+        'requestMtu failed: deviceId=$deviceId, requested=$mtu, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900, // Level.WARNING
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   @override
   Future<int> readRssi() async {
-    return _translateGattPlatformError(
-      deviceId,
-      'readRssi',
-      () => _platform.readRssi(_connectionId),
+    dev.log(
+      'readRssi start: deviceId=$deviceId',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
+    final stopwatch = Stopwatch()..start();
+    try {
+      final rssi = await _translateGattPlatformError(
+        deviceId,
+        'readRssi',
+        () => _platform.readRssi(_connectionId),
+      );
+      dev.log(
+        'readRssi complete: deviceId=$deviceId, rssi=${rssi}dBm, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+      );
+      return rssi;
+    } catch (e) {
+      dev.log(
+        'readRssi failed: deviceId=$deviceId, exception=${e.runtimeType}, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900, // Level.WARNING
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   @override
@@ -287,6 +355,10 @@ class BlueyConnection implements Connection {
     }
 
     _state = ConnectionState.disconnecting;
+    dev.log(
+      'state transition: → $_state',
+      name: 'bluey.connection',
+    );
     _stateController.add(_state);
 
     // Send lifecycle disconnect command if upgraded to Bluey protocol.
@@ -298,6 +370,10 @@ class BlueyConnection implements Connection {
     await _platform.disconnect(_connectionId);
 
     _state = ConnectionState.disconnected;
+    dev.log(
+      'state transition: → $_state',
+      name: 'bluey.connection',
+    );
     _stateController.add(_state);
 
     await _cleanup();
@@ -603,11 +679,34 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    return _translateGattPlatformError(
-      _deviceId,
-      'readCharacteristic',
-      () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+    dev.log(
+      'read start: deviceId=$_deviceId, char=$uuid',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
+    final stopwatch = Stopwatch()..start();
+    try {
+      final value = await _translateGattPlatformError(
+        _deviceId,
+        'readCharacteristic',
+        () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+      );
+      dev.log(
+        'read complete: deviceId=$_deviceId, char=$uuid, bytes=${value.length}, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+      );
+      return value;
+    } catch (e) {
+      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
+      dev.log(
+        'read failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900, // Level.WARNING
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   @override
@@ -618,16 +717,38 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    return _translateGattPlatformError(
-      _deviceId,
-      'writeCharacteristic',
-      () => _platform.writeCharacteristic(
-        _connectionId,
-        uuid.toString(),
-        value,
-        withResponse,
-      ),
+    dev.log(
+      'write start: deviceId=$_deviceId, char=$uuid, bytes=${value.length}',
+      name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
+    final stopwatch = Stopwatch()..start();
+    try {
+      await _translateGattPlatformError(
+        _deviceId,
+        'writeCharacteristic',
+        () => _platform.writeCharacteristic(
+          _connectionId,
+          uuid.toString(),
+          value,
+          withResponse,
+        ),
+      );
+      dev.log(
+        'write complete: deviceId=$_deviceId, char=$uuid, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+      );
+    } catch (e) {
+      final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
+      dev.log(
+        'write failed: deviceId=$_deviceId, char=$uuid, exception=${e.runtimeType}$status, ${stopwatch.elapsedMilliseconds}ms',
+        name: 'bluey.gatt',
+        level: 900, // Level.WARNING
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   @override

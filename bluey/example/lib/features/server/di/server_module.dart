@@ -17,6 +17,7 @@ import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
+import '../application/get_server.dart';
 
 void registerServerDependencies(GetIt getIt) {
   getIt.registerLazySingleton<ServerRepository>(
@@ -68,5 +69,8 @@ void registerServerDependencies(GetIt getIt) {
   );
   getIt.registerFactory<ObserveWriteRequests>(
     () => ObserveWriteRequests(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<GetServer>(
+    () => GetServer(getIt<ServerRepository>()),
   );
 }

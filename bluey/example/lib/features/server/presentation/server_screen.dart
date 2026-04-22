@@ -20,6 +20,7 @@ import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
 import '../application/handle_requests.dart';
+import '../application/get_server.dart';
 import '../infrastructure/server_identity_storage.dart';
 import 'server_cubit.dart';
 import 'server_state.dart';
@@ -79,6 +80,7 @@ class ServerScreen extends StatelessWidget {
             observeDisconnections: getIt<ObserveDisconnections>(),
             observeReadRequests: getIt<ObserveReadRequests>(),
             observeWriteRequests: getIt<ObserveWriteRequests>(),
+            getServer: getIt<GetServer>(),
             identityStorage: getIt<ServerIdentityStorage>(),
           )..initialize(),
       child: const ScaffoldMessenger(child: _ServerView()),
