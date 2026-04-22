@@ -170,7 +170,15 @@ class ServerCubit extends Cubit<ServerScreenState> {
             _addLog('Stress', 'Write handler error: $e');
           }
         } else if (request.responseNeeded) {
-          _addLog('Stress', 'Write dropped: server unavailable');
+          _addLog('Stress', 'Write rejected: server unavailable');
+          try {
+            await _observeWriteRequests.respond(
+              request,
+              status: GattResponseStatus.requestNotSupported,
+            );
+          } catch (e) {
+            _addLog('Error', 'Failed to respond to stress write: $e');
+          }
         }
         return;
       }

@@ -88,7 +88,7 @@ class _BlueyPeer implements BlueyPeer {
       );
       lifecycleClient.start(allServices: allServices);
 
-      dev.log('serverId read: $serverId', name: 'bluey.peer');
+      dev.log('using caller-provided serverId: $serverId', name: 'bluey.peer');
 
       // Upgrade the connection in place so the control service is hidden
       // from the caller's view of services/service/hasService.

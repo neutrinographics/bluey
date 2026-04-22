@@ -19,110 +19,149 @@ class StressTestRunner {
   Stream<StressTestResult> runBurstWrite(
     BurstWriteConfig config,
     Connection connection,
-  ) async* {
-    final stressChar = await _resolveStressChar(connection);
-
-    // Test isolation: clean baseline before measuring. Failures here
-    // abort the run with an empty final snapshot — reset is prologue,
-    // not measurement.
-    try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
-    } on Object {
-      yield StressTestResult.initial().finished(elapsed: Duration.zero);
-      return;
-    }
-
-    var result = StressTestResult.initial();
-    final stopwatch = Stopwatch()..start();
-    yield result;
-
-    final payload = _generatePattern(config.payloadBytes);
-    final cmd = EchoCommand(payload).encode();
-
-    final outcomes = <_OpOutcome>[];
-    final futures = <Future<void>>[];
-    for (var i = 0; i < config.count; i++) {
-      final opStart = stopwatch.elapsedMicroseconds;
-      futures.add(() async {
+  ) {
+    late final StreamController<StressTestResult> controller;
+    controller = StreamController<StressTestResult>(
+      onListen: () async {
         try {
-          await stressChar.write(cmd, withResponse: config.withResponse);
-          outcomes.add(_OpOutcome.success(
-            latency: Duration(
-              microseconds: stopwatch.elapsedMicroseconds - opStart,
-            ),
-          ));
-        } catch (e) {
-          outcomes.add(_OpOutcome.failure(
-            typeName: e.runtimeType.toString(),
-            status: e is GattOperationFailedException ? e.status : null,
-          ));
-        }
-      }());
-    }
-    await Future.wait(futures);
-    stopwatch.stop();
+          final stressChar = await _resolveStressChar(connection);
 
-    for (final o in outcomes) {
-      result = o.success
-          ? result.recordSuccess(latency: o.latency!)
-          : result.recordFailure(typeName: o.typeName!, status: o.status);
-    }
-    yield result.finished(elapsed: stopwatch.elapsed);
+          // Test isolation: clean baseline before measuring. Failures here
+          // abort the run with an empty final snapshot — reset is prologue,
+          // not measurement.
+          try {
+            await stressChar.write(
+                const ResetCommand().encode(), withResponse: true);
+          } on Object {
+            controller
+                .add(StressTestResult.initial().finished(elapsed: Duration.zero));
+            await controller.close();
+            return;
+          }
+
+          var result = StressTestResult.initial();
+          final stopwatch = Stopwatch()..start();
+          controller.add(result);
+
+          final payload = _generatePattern(config.payloadBytes);
+          final cmd = EchoCommand(payload).encode();
+
+          void publish(_OpOutcome outcome) {
+            result = outcome.success
+                ? result.recordSuccess(latency: outcome.latency!)
+                : result.recordFailure(
+                    typeName: outcome.typeName!, status: outcome.status);
+            if (!controller.isClosed) controller.add(result);
+          }
+
+          final futures = <Future<void>>[];
+          for (var i = 0; i < config.count; i++) {
+            final opStart = stopwatch.elapsedMicroseconds;
+            futures.add(() async {
+              try {
+                await stressChar.write(cmd, withResponse: config.withResponse);
+                publish(_OpOutcome.success(
+                  latency: Duration(
+                      microseconds:
+                          stopwatch.elapsedMicroseconds - opStart),
+                ));
+              } catch (e) {
+                publish(_OpOutcome.failure(
+                  typeName: e.runtimeType.toString(),
+                  status:
+                      e is GattOperationFailedException ? e.status : null,
+                ));
+              }
+            }());
+          }
+
+          await Future.wait(futures);
+          stopwatch.stop();
+          if (!controller.isClosed) {
+            controller.add(result.finished(elapsed: stopwatch.elapsed));
+          }
+        } catch (error, stackTrace) {
+          if (!controller.isClosed) controller.addError(error, stackTrace);
+        } finally {
+          if (!controller.isClosed) await controller.close();
+        }
+      },
+    );
+    return controller.stream;
   }
 
   Stream<StressTestResult> runMixedOps(
     MixedOpsConfig config,
     Connection connection,
-  ) async* {
-    final stressChar = await _resolveStressChar(connection);
+  ) {
+    late final StreamController<StressTestResult> controller;
+    controller = StreamController<StressTestResult>(
+      onListen: () async {
+        try {
+          final stressChar = await _resolveStressChar(connection);
 
-    try {
-      await stressChar.write(const ResetCommand().encode(), withResponse: true);
-    } on Object {
-      yield StressTestResult.initial().finished(elapsed: Duration.zero);
-      return;
-    }
+          try {
+            await stressChar.write(
+                const ResetCommand().encode(), withResponse: true);
+          } on Object {
+            controller.add(
+                StressTestResult.initial().finished(elapsed: Duration.zero));
+            await controller.close();
+            return;
+          }
 
-    var result = StressTestResult.initial();
-    final stopwatch = Stopwatch()..start();
-    yield result;
+          var result = StressTestResult.initial();
+          final stopwatch = Stopwatch()..start();
+          controller.add(result);
 
-    final payload = _generatePattern(20);
-    final cmd = EchoCommand(payload).encode();
+          final payload = _generatePattern(20);
+          final cmd = EchoCommand(payload).encode();
 
-    Future<_OpOutcome> recordOp(Future<void> Function() op) async {
-      final start = stopwatch.elapsedMicroseconds;
-      try {
-        await op();
-        return _OpOutcome.success(
-          latency: Duration(
-            microseconds: stopwatch.elapsedMicroseconds - start,
-          ),
-        );
-      } catch (e) {
-        return _OpOutcome.failure(
-          typeName: e.runtimeType.toString(),
-          status: e is GattOperationFailedException ? e.status : null,
-        );
-      }
-    }
+          void publish(_OpOutcome outcome) {
+            result = outcome.success
+                ? result.recordSuccess(latency: outcome.latency!)
+                : result.recordFailure(
+                    typeName: outcome.typeName!, status: outcome.status);
+            if (!controller.isClosed) controller.add(result);
+          }
 
-    final futures = <Future<_OpOutcome>>[];
-    for (var i = 0; i < config.iterations; i++) {
-      futures.add(recordOp(() => stressChar.write(cmd, withResponse: true)));
-      futures.add(recordOp(() => stressChar.read()));
-      futures.add(recordOp(() => connection.services(cache: false)));
-      futures.add(recordOp(() => connection.requestMtu(247)));
-    }
-    final outcomes = await Future.wait(futures);
-    stopwatch.stop();
+          Future<void> recordOp(Future<void> Function() op) async {
+            final start = stopwatch.elapsedMicroseconds;
+            try {
+              await op();
+              publish(_OpOutcome.success(
+                latency: Duration(
+                    microseconds: stopwatch.elapsedMicroseconds - start),
+              ));
+            } catch (e) {
+              publish(_OpOutcome.failure(
+                typeName: e.runtimeType.toString(),
+                status: e is GattOperationFailedException ? e.status : null,
+              ));
+            }
+          }
 
-    for (final o in outcomes) {
-      result = o.success
-          ? result.recordSuccess(latency: o.latency!)
-          : result.recordFailure(typeName: o.typeName!, status: o.status);
-    }
-    yield result.finished(elapsed: stopwatch.elapsed);
+          final futures = <Future<void>>[];
+          for (var i = 0; i < config.iterations; i++) {
+            futures
+                .add(recordOp(() => stressChar.write(cmd, withResponse: true)));
+            futures.add(recordOp(() => stressChar.read()));
+            futures.add(recordOp(() => connection.services(cache: false)));
+            futures.add(recordOp(() => connection.requestMtu(247)));
+          }
+          await Future.wait(futures);
+          stopwatch.stop();
+          if (!controller.isClosed) {
+            controller.add(result.finished(elapsed: stopwatch.elapsed));
+          }
+        } catch (error, stackTrace) {
+          if (!controller.isClosed) controller.addError(error, stackTrace);
+        } finally {
+          if (!controller.isClosed) await controller.close();
+        }
+      },
+    );
+    return controller.stream;
   }
 
   Stream<StressTestResult> runSoak(
@@ -362,6 +401,7 @@ class StressTestRunner {
     // stragglers from a previous (cancelled) burst and are dropped.
     final latenciesPerId = <int, List<Duration>>{};
     int? winningBurstId;
+    int? burstStartedAt;
     final completer = Completer<void>();
 
     final sub = stressChar.notifications.listen((bytes) {
@@ -369,8 +409,11 @@ class StressTestRunner {
       final id = bytes[0];
       // Once a winner is determined, drop notifications from other burst-ids.
       if (winningBurstId != null && id != winningBurstId) return;
-      final latency =
-          Duration(microseconds: stopwatch.elapsedMicroseconds);
+      // Record the moment the first matching notification arrives as the
+      // burst start reference, so latency = time since server started emitting.
+      burstStartedAt ??= stopwatch.elapsedMicroseconds;
+      final latency = Duration(
+          microseconds: stopwatch.elapsedMicroseconds - burstStartedAt!);
       (latenciesPerId[id] ??= []).add(latency);
       if (latenciesPerId[id]!.length >= config.count &&
           !completer.isCompleted) {

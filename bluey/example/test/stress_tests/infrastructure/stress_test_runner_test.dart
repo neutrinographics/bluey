@@ -133,6 +133,29 @@ void main() {
       expect(last.attempted, equals(0),
           reason: 'reset failure should skip all echo writes');
     });
+
+    test('emits incremental snapshots after each individual write completes',
+        () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {};
+
+      final results = await runner
+          .runBurstWrite(
+            const BurstWriteConfig(count: 5, payloadBytes: 4),
+            conn,
+          )
+          .toList();
+
+      // Expect: initial snapshot (attempted=0) + 5 per-write snapshots +
+      // 1 finished snapshot = at least 3 items total (more than just
+      // initial + final).
+      expect(results.length, greaterThan(2),
+          reason: 'should emit intermediate snapshots during the burst');
+      // All intermediate snapshots (excluding the last) should be running.
+      for (final r in results.sublist(0, results.length - 1)) {
+        expect(r.isRunning, isTrue);
+      }
+      expect(results.last.isRunning, isFalse);
+    });
   });
 
   group('StressTestRunner.runMixedOps', () {
@@ -160,6 +183,25 @@ void main() {
       expect(reads, equals(3));
       expect(last.attempted, equals(12)); // 3 iterations × 4 ops
       expect(conn.lastRequestedMtu, isNotNull);
+    });
+
+    test('emits incremental snapshots after each individual op completes',
+        () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {};
+      stressChar.onReadHook = () async => Uint8List(0);
+
+      final results = await runner
+          .runMixedOps(const MixedOpsConfig(iterations: 2), conn)
+          .toList();
+
+      // Expect: initial snapshot + per-op snapshots (2 iterations × 4 ops = 8)
+      // + 1 finished snapshot = more than 2.
+      expect(results.length, greaterThan(2),
+          reason: 'should emit intermediate snapshots during mixed ops');
+      for (final r in results.sublist(0, results.length - 1)) {
+        expect(r.isRunning, isTrue);
+      }
+      expect(results.last.isRunning, isFalse);
     });
   });
 
@@ -278,6 +320,43 @@ void main() {
       final last = results.last;
       expect(last.isRunning, isFalse);
       expect(last.succeeded, equals(5));
+    });
+
+    test('notification latencies are measured from burst start, not test start',
+        () async {
+      // Delay the BurstMe write so elapsed time at test start is non-trivial,
+      // then emit notifications immediately. Latencies should be small
+      // (near zero) rather than inflated by the pre-write elapsed time.
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        if (value.isNotEmpty && value.first == 0x02) {
+          // Small real delay to let stopwatch tick before notifications arrive.
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          Future<void>(() async {
+            for (var i = 0; i < 3; i++) {
+              stressChar.emitNotification(
+                Uint8List.fromList([0x01, 0x10, 0x11, 0x12, 0x13]),
+              );
+            }
+          });
+        }
+      };
+
+      final results = await runner
+          .runNotificationThroughput(
+            const NotificationThroughputConfig(count: 3, payloadBytes: 4),
+            conn,
+          )
+          .toList();
+
+      final last = results.last;
+      expect(last.succeeded, equals(3));
+      // All latencies must be non-negative and much smaller than the total
+      // elapsed time (which includes the reset + BurstMe write time).
+      // They should be in the sub-100ms range; we check < 500ms to be safe.
+      for (final latency in last.latencies) {
+        expect(latency.inMilliseconds, lessThan(500),
+            reason: 'latency should be measured from burst start, not test start');
+      }
     });
 
     test('drops notifications with stale burst-id (different from current)', () async {

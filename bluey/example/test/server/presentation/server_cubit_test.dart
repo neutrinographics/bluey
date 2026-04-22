@@ -40,6 +40,8 @@ void main() {
     registerFallbackValue(MockClient());
     registerFallbackValue(<UUID>[]);
     registerFallbackValue(testServerId);
+    registerFallbackValue(_FakeWriteRequest());
+    registerFallbackValue(GattResponseStatus.success);
   });
 
   setUp(() {
@@ -447,6 +449,12 @@ void main() {
       ).thenAnswer((_) => writeController.stream);
       when(() => mockAddService(any())).thenAnswer((_) async {});
       when(() => mockGetServer()).thenReturn(null);
+      when(
+        () => mockObserveWriteRequests.respond(
+          any(),
+          status: any(named: 'status'),
+        ),
+      ).thenAnswer((_) async {});
     });
 
     tearDown(() async {
@@ -456,7 +464,7 @@ void main() {
     });
 
     blocTest<ServerCubit, ServerScreenState>(
-      'stress write is logged as dropped when server is unavailable and response required',
+      'stress write is rejected with requestNotSupported when server is unavailable and response required',
       build: createCubit,
       act: (cubit) async {
         await cubit.initialize();
@@ -477,10 +485,16 @@ void main() {
           cubit.state.log.any(
             (e) =>
                 e.tag == 'Stress' &&
-                e.message.contains('server unavailable'),
+                e.message.contains('Write rejected: server unavailable'),
           ),
           isTrue,
         );
+        verify(
+          () => mockObserveWriteRequests.respond(
+            any(),
+            status: GattResponseStatus.requestNotSupported,
+          ),
+        ).called(1);
       },
     );
 
@@ -510,3 +524,5 @@ void main() {
     );
   });
 }
+
+class _FakeWriteRequest extends Fake implements WriteRequest {}

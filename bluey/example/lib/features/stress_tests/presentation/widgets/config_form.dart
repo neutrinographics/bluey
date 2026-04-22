@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/stress_test_config.dart';
 
-class ConfigForm extends StatelessWidget {
+class ConfigForm extends StatefulWidget {
   final StressTestConfig config;
   final bool enabled;
   final ValueChanged<StressTestConfig> onChanged;
@@ -15,8 +15,35 @@ class ConfigForm extends StatelessWidget {
   });
 
   @override
+  State<ConfigForm> createState() => _ConfigFormState();
+}
+
+class _ConfigFormState extends State<ConfigForm> {
+  final _controllers = <String, TextEditingController>{};
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _controllerFor(String label, int value) {
+    final existing = _controllers[label];
+    final text = value.toString();
+    if (existing == null) {
+      return _controllers[label] = TextEditingController(text: text);
+    }
+    if (existing.text != text) {
+      existing.text = text;
+    }
+    return existing;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final c = config;
+    final c = widget.config;
     if (c is BurstWriteConfig) return _burst(c);
     if (c is MixedOpsConfig) return _mixedOps(c);
     if (c is SoakConfig) return _soak(c);
@@ -39,7 +66,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'duration (s)',
           value: c.duration.inSeconds,
-          onChanged: (v) => onChanged(SoakConfig(
+          onChanged: (v) => widget.onChanged(SoakConfig(
             duration: Duration(seconds: v),
             interval: c.interval,
             payloadBytes: c.payloadBytes,
@@ -48,7 +75,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'interval (ms)',
           value: c.interval.inMilliseconds,
-          onChanged: (v) => onChanged(SoakConfig(
+          onChanged: (v) => widget.onChanged(SoakConfig(
             duration: c.duration,
             interval: Duration(milliseconds: v),
             payloadBytes: c.payloadBytes,
@@ -57,7 +84,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'bytes',
           value: c.payloadBytes,
-          onChanged: (v) => onChanged(SoakConfig(
+          onChanged: (v) => widget.onChanged(SoakConfig(
             duration: c.duration,
             interval: c.interval,
             payloadBytes: v,
@@ -71,7 +98,7 @@ class ConfigForm extends StatelessWidget {
     return _intField(
       label: 'delay past timeout (s)',
       value: c.delayPastTimeout.inSeconds,
-      onChanged: (v) => onChanged(TimeoutProbeConfig(
+      onChanged: (v) => widget.onChanged(TimeoutProbeConfig(
         delayPastTimeout: Duration(seconds: v),
       )),
     );
@@ -81,7 +108,7 @@ class ConfigForm extends StatelessWidget {
     return _intField(
       label: 'writeCount',
       value: c.writeCount,
-      onChanged: (v) => onChanged(FailureInjectionConfig(writeCount: v)),
+      onChanged: (v) => widget.onChanged(FailureInjectionConfig(writeCount: v)),
     );
   }
 
@@ -89,7 +116,7 @@ class ConfigForm extends StatelessWidget {
     return _intField(
       label: 'iterations',
       value: c.iterations,
-      onChanged: (v) => onChanged(MixedOpsConfig(iterations: v)),
+      onChanged: (v) => widget.onChanged(MixedOpsConfig(iterations: v)),
     );
   }
 
@@ -101,7 +128,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'count',
           value: c.count,
-          onChanged: (v) => onChanged(BurstWriteConfig(
+          onChanged: (v) => widget.onChanged(BurstWriteConfig(
             count: v,
             payloadBytes: c.payloadBytes,
             withResponse: c.withResponse,
@@ -110,7 +137,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'bytes',
           value: c.payloadBytes,
-          onChanged: (v) => onChanged(BurstWriteConfig(
+          onChanged: (v) => widget.onChanged(BurstWriteConfig(
             count: c.count,
             payloadBytes: v,
             withResponse: c.withResponse,
@@ -121,8 +148,8 @@ class ConfigForm extends StatelessWidget {
           children: [
             Checkbox(
               value: c.withResponse,
-              onChanged: enabled
-                  ? (v) => onChanged(BurstWriteConfig(
+              onChanged: widget.enabled
+                  ? (v) => widget.onChanged(BurstWriteConfig(
                         count: c.count,
                         payloadBytes: c.payloadBytes,
                         withResponse: v ?? true,
@@ -144,7 +171,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'requestedMtu',
           value: c.requestedMtu,
-          onChanged: (v) => onChanged(MtuProbeConfig(
+          onChanged: (v) => widget.onChanged(MtuProbeConfig(
             requestedMtu: v,
             payloadBytes: c.payloadBytes,
           )),
@@ -152,7 +179,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'payloadBytes',
           value: c.payloadBytes,
-          onChanged: (v) => onChanged(MtuProbeConfig(
+          onChanged: (v) => widget.onChanged(MtuProbeConfig(
             requestedMtu: c.requestedMtu,
             payloadBytes: v,
           )),
@@ -169,7 +196,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'count',
           value: c.count,
-          onChanged: (v) => onChanged(NotificationThroughputConfig(
+          onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
             count: v,
             payloadBytes: c.payloadBytes,
           )),
@@ -177,7 +204,7 @@ class ConfigForm extends StatelessWidget {
         _intField(
           label: 'payloadBytes',
           value: c.payloadBytes,
-          onChanged: (v) => onChanged(NotificationThroughputConfig(
+          onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
             count: c.count,
             payloadBytes: v,
           )),
@@ -194,8 +221,8 @@ class ConfigForm extends StatelessWidget {
     return SizedBox(
       width: 100,
       child: TextField(
-        enabled: enabled,
-        controller: TextEditingController(text: value.toString()),
+        enabled: widget.enabled,
+        controller: _controllerFor(label, value),
         decoration: InputDecoration(labelText: label, isDense: true),
         keyboardType: TextInputType.number,
         onSubmitted: (s) {
