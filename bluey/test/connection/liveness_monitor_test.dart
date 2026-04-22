@@ -1,0 +1,105 @@
+import 'package:bluey/src/connection/liveness_monitor.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late DateTime fakeNow;
+  LivenessMonitor buildMonitor({
+    int maxFailedProbes = 1,
+    Duration activityWindow = const Duration(seconds: 5),
+  }) {
+    fakeNow = DateTime.utc(2026, 1, 1);
+    return LivenessMonitor(
+      maxFailedProbes: maxFailedProbes,
+      activityWindow: activityWindow,
+      now: () => fakeNow,
+    );
+  }
+
+  void advance(Duration d) => fakeNow = fakeNow.add(d);
+
+  group('LivenessMonitor', () {
+    test('shouldSendProbe is true initially (no activity yet)', () {
+      final m = buildMonitor();
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('recordActivity then shouldSendProbe within window returns false', () {
+      final m = buildMonitor();
+      m.recordActivity();
+      advance(const Duration(seconds: 3));
+      expect(m.shouldSendProbe(), isFalse);
+    });
+
+    test('recordActivity then shouldSendProbe after window returns true', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 5));
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('markProbeInFlight prevents shouldSendProbe from firing again', () {
+      final m = buildMonitor();
+      m.markProbeInFlight();
+      expect(m.shouldSendProbe(), isFalse);
+    });
+
+    test('recordProbeSuccess clears in-flight flag and refreshes activity', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.markProbeInFlight();
+      m.recordProbeSuccess();
+      advance(const Duration(seconds: 3));
+      // In-flight cleared AND activity refreshed.
+      expect(m.shouldSendProbe(), isFalse);
+      advance(const Duration(seconds: 3));
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('recordProbeFailure increments counter and releases in-flight', () {
+      final m = buildMonitor(maxFailedProbes: 3);
+      m.markProbeInFlight();
+      final tripped = m.recordProbeFailure();
+      expect(tripped, isFalse, reason: '1 failure < threshold 3');
+      // In-flight cleared → next tick can probe.
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('recordProbeFailure returns true when threshold is reached', () {
+      final m = buildMonitor(maxFailedProbes: 2);
+      m.markProbeInFlight();
+      expect(m.recordProbeFailure(), isFalse);
+      m.markProbeInFlight();
+      expect(m.recordProbeFailure(), isTrue);
+    });
+
+    test('recordActivity resets the failure counter', () {
+      final m = buildMonitor(maxFailedProbes: 3);
+      m.markProbeInFlight();
+      m.recordProbeFailure(); // counter=1
+      m.markProbeInFlight();
+      m.recordProbeFailure(); // counter=2
+      m.recordActivity(); // should reset to 0
+      m.markProbeInFlight();
+      final tripped = m.recordProbeFailure(); // counter back to 1, not 3
+      expect(tripped, isFalse);
+    });
+
+    test('recordActivity during in-flight probe does not release flag', () {
+      final m = buildMonitor();
+      m.markProbeInFlight();
+      m.recordActivity();
+      // Activity recorded, counter reset — but in-flight flag still true.
+      expect(m.shouldSendProbe(), isFalse);
+      m.recordProbeSuccess();
+      // Now the flag releases.
+      expect(m.shouldSendProbe(), isFalse); // activity is recent
+    });
+
+    test('recordProbeSuccess on non-in-flight monitor is idempotent', () {
+      final m = buildMonitor();
+      // Calling success without a matching markProbeInFlight should be safe
+      // (used when a non-dead-peer error fires — the client releases the flag
+      // without penalty).
+      expect(() => m.recordProbeSuccess(), returnsNormally);
+    });
+  });
+}
