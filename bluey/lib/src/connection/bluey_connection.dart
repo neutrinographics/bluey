@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -43,6 +44,15 @@ Future<T> _runGattOp<T>(
     throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
   } on platform.GattOperationStatusFailedException catch (e) {
     throw GattOperationFailedException(operation, e.status);
+  } on PlatformException catch (e) {
+    // Defensive backstop: any PlatformException that wasn't translated by
+    // the platform adapter (e.g. a new native error code we haven't yet
+    // mapped) gets wrapped so user code only ever catches BlueyException.
+    throw BlueyPlatformException(
+      e.message ?? 'platform error (${e.code})',
+      code: e.code,
+      cause: e,
+    );
   }
 }
 

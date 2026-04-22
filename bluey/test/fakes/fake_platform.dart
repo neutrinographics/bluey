@@ -108,6 +108,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// onLastCancel) that would otherwise produce unhandled async errors.
   bool simulateSetNotificationDisconnected = false;
 
+  /// When non-null, readCharacteristic throws a [PlatformException] with
+  /// this [PlatformException.code]. Models platform-layer errors that are
+  /// emitted BEFORE reaching the typed-exception translation helper (e.g.
+  /// iOS Swift errors with codes not yet mapped by the platform adapter).
+  String? simulateReadPlatformErrorCode;
+
   /// When non-null, writeCharacteristic throws a [PlatformException] with
   /// this [PlatformException.code]. Models platform-layer errors that are
   /// emitted BEFORE reaching the typed-exception translation helper (e.g.
@@ -490,6 +496,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
   ) async {
+    final code = simulateReadPlatformErrorCode;
+    if (code != null) {
+      simulateReadPlatformErrorCode = null;
+      throw PlatformException(code: code);
+    }
+
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
