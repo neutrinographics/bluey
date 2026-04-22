@@ -19,6 +19,31 @@ class ResultsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (r.connectionLost) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.link_off, size: 14, color: Colors.red.shade700),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Connection lost',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Text(
             'Attempted ${r.attempted}  Succeeded ${r.succeeded}  Failed ${r.failed}',
           ),

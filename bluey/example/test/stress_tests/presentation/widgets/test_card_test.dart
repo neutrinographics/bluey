@@ -68,6 +68,45 @@ void main() {
     expect(find.textContaining('GattTimeoutException'), findsOneWidget);
   });
 
+  testWidgets('Results panel shows Connection lost banner when connectionLost is true', (tester) async {
+    final result = StressTestResult.initial()
+        .recordSuccess(latency: const Duration(milliseconds: 10))
+        .markConnectionLost()
+        .recordFailure(typeName: 'DisconnectedException');
+
+    await tester.pumpWidget(wrap(TestCard(
+      test: StressTest.burstWrite,
+      config: const BurstWriteConfig(),
+      result: result,
+      isRunning: false,
+      anyRunning: false,
+      onRun: () {},
+      onStop: () {},
+      onConfigChanged: (_) {},
+    )));
+
+    expect(find.text('Connection lost'), findsOneWidget);
+  });
+
+  testWidgets('Results panel does NOT show Connection lost banner when flag is false', (tester) async {
+    final result = StressTestResult.initial()
+        .recordSuccess(latency: const Duration(milliseconds: 10))
+        .finished(elapsed: const Duration(seconds: 1));
+
+    await tester.pumpWidget(wrap(TestCard(
+      test: StressTest.burstWrite,
+      config: const BurstWriteConfig(),
+      result: result,
+      isRunning: false,
+      anyRunning: false,
+      onRun: () {},
+      onStop: () {},
+      onConfigChanged: (_) {},
+    )));
+
+    expect(find.text('Connection lost'), findsNothing);
+  });
+
   testWidgets('Config form is disabled while running', (tester) async {
     await tester.pumpWidget(wrap(TestCard(
       test: StressTest.burstWrite,

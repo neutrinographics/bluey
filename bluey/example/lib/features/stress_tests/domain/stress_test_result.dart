@@ -26,6 +26,10 @@ class StressTestResult {
   /// Whether the test is still in flight. False after [finished].
   final bool isRunning;
 
+  /// Whether a [DisconnectedException] was observed during the run. Once set
+  /// to true it stays true for the lifetime of the result chain.
+  final bool connectionLost;
+
   const StressTestResult._({
     required this.attempted,
     required this.succeeded,
@@ -35,6 +39,7 @@ class StressTestResult {
     required this.latencies,
     required this.elapsed,
     required this.isRunning,
+    required this.connectionLost,
   });
 
   factory StressTestResult.initial() => const StressTestResult._(
@@ -46,6 +51,7 @@ class StressTestResult {
         latencies: [],
         elapsed: Duration.zero,
         isRunning: true,
+        connectionLost: false,
       );
 
   StressTestResult recordSuccess({required Duration latency}) {
@@ -58,6 +64,7 @@ class StressTestResult {
       latencies: [...latencies, latency],
       elapsed: elapsed,
       isRunning: isRunning,
+      connectionLost: connectionLost,
     );
   }
 
@@ -80,6 +87,7 @@ class StressTestResult {
       latencies: latencies,
       elapsed: elapsed,
       isRunning: isRunning,
+      connectionLost: connectionLost,
     );
   }
 
@@ -93,6 +101,7 @@ class StressTestResult {
       latencies: latencies,
       elapsed: newElapsed,
       isRunning: isRunning,
+      connectionLost: connectionLost,
     );
   }
 
@@ -106,6 +115,23 @@ class StressTestResult {
       latencies: latencies,
       elapsed: elapsed,
       isRunning: false,
+      connectionLost: connectionLost,
+    );
+  }
+
+  /// Returns a new instance with [connectionLost] set to true, preserving all
+  /// other fields. Once the connection is lost it cannot be un-lost.
+  StressTestResult markConnectionLost() {
+    return StressTestResult._(
+      attempted: attempted,
+      succeeded: succeeded,
+      failed: failed,
+      failuresByType: failuresByType,
+      statusCounts: statusCounts,
+      latencies: latencies,
+      elapsed: elapsed,
+      isRunning: isRunning,
+      connectionLost: true,
     );
   }
 

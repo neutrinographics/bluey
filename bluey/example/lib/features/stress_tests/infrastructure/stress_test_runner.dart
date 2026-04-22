@@ -47,6 +47,10 @@ class StressTestRunner {
           final cmd = EchoCommand(payload).encode();
 
           void publish(_OpOutcome outcome) {
+            if (!outcome.success &&
+                outcome.typeName == 'DisconnectedException') {
+              result = result.markConnectionLost();
+            }
             result = outcome.success
                 ? result.recordSuccess(latency: outcome.latency!)
                 : result.recordFailure(
@@ -118,6 +122,10 @@ class StressTestRunner {
           final cmd = EchoCommand(payload).encode();
 
           void publish(_OpOutcome outcome) {
+            if (!outcome.success &&
+                outcome.typeName == 'DisconnectedException') {
+              result = result.markConnectionLost();
+            }
             result = outcome.success
                 ? result.recordSuccess(latency: outcome.latency!)
                 : result.recordFailure(
@@ -195,6 +203,9 @@ class StressTestRunner {
           ),
         );
       } catch (e) {
+        if (e is DisconnectedException) {
+          result = result.markConnectionLost();
+        }
         result = result.recordFailure(
           typeName: e.runtimeType.toString(),
           status: e is GattOperationFailedException ? e.status : null,
@@ -250,6 +261,9 @@ class StressTestRunner {
         ),
       );
     } catch (e) {
+      if (e is DisconnectedException) {
+        result = result.markConnectionLost();
+      }
       result = result.recordFailure(
         typeName: e.runtimeType.toString(),
         status: e is GattOperationFailedException ? e.status : null,
@@ -290,6 +304,9 @@ class StressTestRunner {
           ),
         );
       } catch (e) {
+        if (e is DisconnectedException) {
+          result = result.markConnectionLost();
+        }
         result = result.recordFailure(
           typeName: e.runtimeType.toString(),
           status: e is GattOperationFailedException ? e.status : null,
@@ -328,6 +345,9 @@ class StressTestRunner {
         ),
       );
     } catch (e) {
+      if (e is DisconnectedException) {
+        result = result.markConnectionLost();
+      }
       result = result.recordFailure(
         typeName: e.runtimeType.toString(),
         status: e is GattOperationFailedException ? e.status : null,
@@ -368,6 +388,9 @@ class StressTestRunner {
           ),
         );
       } catch (e) {
+        if (e is DisconnectedException) {
+          result = result.markConnectionLost();
+        }
         result = result.recordFailure(
           typeName: e.runtimeType.toString(),
           status: e is GattOperationFailedException ? e.status : null,
@@ -423,11 +446,25 @@ class StressTestRunner {
     });
 
     // Kick the server.
-    await stressChar.write(
-      BurstMeCommand(count: config.count, payloadSize: config.payloadBytes)
-          .encode(),
-      withResponse: true,
-    );
+    try {
+      await stressChar.write(
+        BurstMeCommand(count: config.count, payloadSize: config.payloadBytes)
+            .encode(),
+        withResponse: true,
+      );
+    } catch (e) {
+      if (e is DisconnectedException) {
+        result = result.markConnectionLost();
+      }
+      result = result.recordFailure(
+        typeName: e.runtimeType.toString(),
+        status: e is GattOperationFailedException ? e.status : null,
+      );
+      await sub.cancel();
+      stopwatch.stop();
+      yield result.finished(elapsed: stopwatch.elapsed);
+      return;
+    }
 
     // Wait for all expected notifications, with a generous timeout
     // proportional to count (1ms per notification + 1s overhead).

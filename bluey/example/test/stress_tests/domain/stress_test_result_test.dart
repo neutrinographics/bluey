@@ -12,6 +12,7 @@ void main() {
       expect(r.statusCounts, isEmpty);
       expect(r.latencies, isEmpty);
       expect(r.isRunning, isTrue);
+      expect(r.connectionLost, isFalse);
     });
 
     test('recordSuccess increments attempted and succeeded', () {
@@ -77,6 +78,31 @@ void main() {
       );
       expect(r.isRunning, isFalse);
       expect(r.elapsed, equals(const Duration(seconds: 3)));
+    });
+
+    test('markConnectionLost flips connectionLost to true while preserving counters', () {
+      final base = StressTestResult.initial()
+          .recordSuccess(latency: const Duration(milliseconds: 5))
+          .recordFailure(typeName: 'GattTimeoutException');
+      final lost = base.markConnectionLost();
+      expect(lost.connectionLost, isTrue);
+      expect(lost.attempted, equals(base.attempted));
+      expect(lost.succeeded, equals(base.succeeded));
+      expect(lost.failed, equals(base.failed));
+    });
+
+    test('recordSuccess called on a connectionLost=true result keeps it true', () {
+      final r = StressTestResult.initial()
+          .markConnectionLost()
+          .recordSuccess(latency: const Duration(milliseconds: 10));
+      expect(r.connectionLost, isTrue);
+    });
+
+    test('recordFailure called on a connectionLost=true result keeps it true', () {
+      final r = StressTestResult.initial()
+          .markConnectionLost()
+          .recordFailure(typeName: 'DisconnectedException');
+      expect(r.connectionLost, isTrue);
     });
   });
 }
