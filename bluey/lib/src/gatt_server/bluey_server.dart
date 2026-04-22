@@ -105,12 +105,14 @@ class BlueyServer implements Server {
     // to the filtered controllers for the public API.
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
       if (!_lifecycle.handleReadRequest(req)) {
+        _lifecycle.recordActivity(req.centralId);
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
       if (!_lifecycle.handleWriteRequest(req)) {
+        _lifecycle.recordActivity(req.centralId);
         _filteredWriteRequestsController.add(req);
       }
     });
