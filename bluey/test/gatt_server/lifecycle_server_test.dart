@@ -417,5 +417,63 @@ void main() {
 
       server.dispose();
     });
+
+    test('recordActivity resets the per-client timer', () {
+      fakeAsync((async) {
+        final events = <String>[];
+        final server = LifecycleServer(
+          platformApi: FakeBlueyPlatform(),
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: (id) => events.add('gone:$id'),
+        );
+
+        const clientId = 'test-client';
+
+        // Prime the server by receiving a heartbeat from the client.
+        server.handleWriteRequest(PlatformWriteRequest(
+          requestId: 1,
+          centralId: clientId,
+          characteristicUuid: lifecycle.heartbeatCharUuid,
+          value: lifecycle.heartbeatValue,
+          responseNeeded: false,
+          offset: 0,
+        ));
+
+        // Advance 9s — just under the timeout.
+        async.elapse(const Duration(seconds: 9));
+        expect(events, isEmpty);
+
+        // Record activity (simulates a non-control-service write arriving).
+        server.recordActivity(clientId);
+
+        // Advance another 9s — total 18s since first heartbeat, but only
+        // 9s since recordActivity, so still within the window.
+        async.elapse(const Duration(seconds: 9));
+        expect(events, isEmpty, reason: 'recordActivity should reset the timer');
+
+        // Another 2s → past the timer from recordActivity → should fire.
+        async.elapse(const Duration(seconds: 2));
+        expect(events, equals(['gone:$clientId']));
+
+        server.dispose();
+      });
+    });
+
+    test('recordActivity is a no-op when lifecycle is disabled (null interval)',
+        () {
+      final server = LifecycleServer(
+        platformApi: FakeBlueyPlatform(),
+        interval: null,
+        serverId: ServerId.generate(),
+        onClientGone: (_) => fail('no client should expire'),
+      );
+
+      // Calling recordActivity when lifecycle is disabled should be safe
+      // and do nothing.
+      expect(() => server.recordActivity('client'), returnsNormally);
+
+      server.dispose();
+    });
   });
 }
