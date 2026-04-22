@@ -21,6 +21,7 @@ class StressTestRunner {
     Connection connection,
   ) {
     late final StreamController<StressTestResult> controller;
+    var cancelled = false;
     controller = StreamController<StressTestResult>(
       onListen: () async {
         try {
@@ -33,20 +34,23 @@ class StressTestRunner {
             await stressChar.write(
                 const ResetCommand().encode(), withResponse: true);
           } on Object {
-            controller
-                .add(StressTestResult.initial().finished(elapsed: Duration.zero));
-            await controller.close();
+            if (!cancelled && !controller.isClosed) {
+              controller
+                  .add(StressTestResult.initial().finished(elapsed: Duration.zero));
+            }
+            if (!controller.isClosed) await controller.close();
             return;
           }
 
           var result = StressTestResult.initial();
           final stopwatch = Stopwatch()..start();
-          controller.add(result);
+          if (!cancelled && !controller.isClosed) controller.add(result);
 
           final payload = _generatePattern(config.payloadBytes);
           final cmd = EchoCommand(payload).encode();
 
           void publish(_OpOutcome outcome) {
+            if (cancelled || controller.isClosed) return;
             if (!outcome.success &&
                 outcome.typeName == 'DisconnectedException') {
               result = result.markConnectionLost();
@@ -55,7 +59,7 @@ class StressTestRunner {
                 ? result.recordSuccess(latency: outcome.latency!)
                 : result.recordFailure(
                     typeName: outcome.typeName!, status: outcome.status);
-            if (!controller.isClosed) controller.add(result);
+            controller.add(result);
           }
 
           final futures = <Future<void>>[];
@@ -81,14 +85,20 @@ class StressTestRunner {
 
           await Future.wait(futures);
           stopwatch.stop();
-          if (!controller.isClosed) {
+          if (!cancelled && !controller.isClosed) {
             controller.add(result.finished(elapsed: stopwatch.elapsed));
           }
         } catch (error, stackTrace) {
-          if (!controller.isClosed) controller.addError(error, stackTrace);
+          if (!cancelled && !controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
         } finally {
           if (!controller.isClosed) await controller.close();
         }
+      },
+      onCancel: () async {
+        cancelled = true;
+        if (!controller.isClosed) await controller.close();
       },
     );
     return controller.stream;
@@ -99,6 +109,7 @@ class StressTestRunner {
     Connection connection,
   ) {
     late final StreamController<StressTestResult> controller;
+    var cancelled = false;
     controller = StreamController<StressTestResult>(
       onListen: () async {
         try {
@@ -108,20 +119,23 @@ class StressTestRunner {
             await stressChar.write(
                 const ResetCommand().encode(), withResponse: true);
           } on Object {
-            controller.add(
-                StressTestResult.initial().finished(elapsed: Duration.zero));
-            await controller.close();
+            if (!cancelled && !controller.isClosed) {
+              controller.add(
+                  StressTestResult.initial().finished(elapsed: Duration.zero));
+            }
+            if (!controller.isClosed) await controller.close();
             return;
           }
 
           var result = StressTestResult.initial();
           final stopwatch = Stopwatch()..start();
-          controller.add(result);
+          if (!cancelled && !controller.isClosed) controller.add(result);
 
           final payload = _generatePattern(20);
           final cmd = EchoCommand(payload).encode();
 
           void publish(_OpOutcome outcome) {
+            if (cancelled || controller.isClosed) return;
             if (!outcome.success &&
                 outcome.typeName == 'DisconnectedException') {
               result = result.markConnectionLost();
@@ -130,7 +144,7 @@ class StressTestRunner {
                 ? result.recordSuccess(latency: outcome.latency!)
                 : result.recordFailure(
                     typeName: outcome.typeName!, status: outcome.status);
-            if (!controller.isClosed) controller.add(result);
+            controller.add(result);
           }
 
           Future<void> recordOp(Future<void> Function() op) async {
@@ -159,14 +173,20 @@ class StressTestRunner {
           }
           await Future.wait(futures);
           stopwatch.stop();
-          if (!controller.isClosed) {
+          if (!cancelled && !controller.isClosed) {
             controller.add(result.finished(elapsed: stopwatch.elapsed));
           }
         } catch (error, stackTrace) {
-          if (!controller.isClosed) controller.addError(error, stackTrace);
+          if (!cancelled && !controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
         } finally {
           if (!controller.isClosed) await controller.close();
         }
+      },
+      onCancel: () async {
+        cancelled = true;
+        if (!controller.isClosed) await controller.close();
       },
     );
     return controller.stream;
@@ -445,7 +465,8 @@ class StressTestRunner {
       }
     });
 
-    // Kick the server.
+    // Kick the server. If the write fails, cancel the sub and return early.
+    var writeSucceeded = true;
     try {
       await stressChar.write(
         BurstMeCommand(count: config.count, payloadSize: config.payloadBytes)
@@ -460,7 +481,12 @@ class StressTestRunner {
         typeName: e.runtimeType.toString(),
         status: e is GattOperationFailedException ? e.status : null,
       );
-      await sub.cancel();
+      writeSucceeded = false;
+    } finally {
+      if (!writeSucceeded) await sub.cancel();
+    }
+
+    if (!writeSucceeded) {
       stopwatch.stop();
       yield result.finished(elapsed: stopwatch.elapsed);
       return;

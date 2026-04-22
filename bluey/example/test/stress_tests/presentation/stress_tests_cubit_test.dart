@@ -121,7 +121,7 @@ void main() {
       cubit.run(StressTest.burstWrite);
       expect(cubit.state.cards[StressTest.burstWrite]!.isRunning, isTrue);
 
-      cubit.stop();
+      await cubit.stop();
       expect(cubit.state.cards[StressTest.burstWrite]!.isRunning, isFalse);
 
       await controller.close();
@@ -141,9 +141,42 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(cubit.state.cards[StressTest.burstWrite]!.result, isNotNull);
 
-      cubit.stop();
+      await cubit.stop();
       expect(cubit.state.cards[StressTest.burstWrite]!.result, isNotNull,
           reason: 'stop() must not erase the intermediate result snapshot');
+
+      await controller.close();
+      await cubit.close();
+    });
+
+    test('stop() drops late stream emissions', () async {
+      final controller = StreamController<StressTestResult>();
+      when(() => mockRun.call(any(), any()))
+          .thenAnswer((_) => controller.stream);
+
+      final cubit = makeCubit();
+      cubit.run(StressTest.burstWrite);
+
+      // Emit before stop — should update card.
+      controller.add(StressTestResult.initial()
+          .recordSuccess(latency: const Duration(milliseconds: 1)));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+          cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
+          equals(1));
+
+      await cubit.stop();
+
+      // Emit AFTER stop — should be dropped.
+      controller.add(StressTestResult.initial()
+          .recordSuccess(latency: const Duration(milliseconds: 1))
+          .recordSuccess(latency: const Duration(milliseconds: 1)));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+          cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
+          equals(1),
+          reason: 'late stream event should not update the card after stop()');
 
       await controller.close();
       await cubit.close();

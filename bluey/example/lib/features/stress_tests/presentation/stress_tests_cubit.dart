@@ -25,6 +25,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
   final RunNotificationThroughput _runNotificationThroughput;
   final Connection _connection;
   StreamSubscription<StressTestResult>? _activeSub;
+  int _runToken = 0;
 
   StressTestsCubit({
     required RunBurstWrite runBurstWrite,
@@ -59,6 +60,8 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     final card = state.cards[test]!;
     emit(state.updateCard(test, card.copyWith(isRunning: true)));
 
+    final token = ++_runToken;
+
     final Stream<StressTestResult> stream = switch (test) {
       StressTest.burstWrite =>
         _runBurstWrite(card.config as BurstWriteConfig, _connection),
@@ -81,6 +84,7 @@ class StressTestsCubit extends Cubit<StressTestsState> {
 
     _activeSub = stream.listen(
       (StressTestResult result) {
+        if (token != _runToken) return;
         emit(state.updateCard(
           test,
           state.cards[test]!.copyWith(
@@ -90,12 +94,14 @@ class StressTestsCubit extends Cubit<StressTestsState> {
         ));
       },
       onDone: () {
+        if (token != _runToken) return;
         emit(state.updateCard(
           test,
           state.cards[test]!.copyWith(isRunning: false),
         ));
       },
       onError: (Object e) {
+        if (token != _runToken) return;
         emit(state.updateCard(
           test,
           state.cards[test]!.copyWith(isRunning: false),
@@ -106,9 +112,11 @@ class StressTestsCubit extends Cubit<StressTestsState> {
 
   /// Cancels the current run. Background ops complete uncounted; the
   /// next run's Reset prologue cleans up server state.
-  void stop() {
-    _activeSub?.cancel();
+  Future<void> stop() async {
+    _runToken++;
+    final sub = _activeSub;
     _activeSub = null;
+    await sub?.cancel();
     final running = state.cards.values.where((c) => c.isRunning).toList();
     for (final r in running) {
       emit(state.updateCard(r.test, r.copyWith(isRunning: false)));
@@ -116,8 +124,8 @@ class StressTestsCubit extends Cubit<StressTestsState> {
   }
 
   @override
-  Future<void> close() {
-    _activeSub?.cancel();
+  Future<void> close() async {
+    await _activeSub?.cancel();
     return super.close();
   }
 }

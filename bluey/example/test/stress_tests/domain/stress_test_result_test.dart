@@ -104,5 +104,25 @@ void main() {
           .recordFailure(typeName: 'DisconnectedException');
       expect(r.connectionLost, isTrue);
     });
+
+    test('failuresByType is unmodifiable', () {
+      final r = StressTestResult.initial()
+          .recordFailure(typeName: 'GattTimeoutException');
+      expect(() => r.failuresByType['X'] = 1, throwsUnsupportedError);
+    });
+
+    test('latencies is unmodifiable', () {
+      final r = StressTestResult.initial()
+          .recordSuccess(latency: const Duration(milliseconds: 10));
+      expect(() => r.latencies.add(Duration.zero), throwsUnsupportedError);
+    });
+
+    test('statusCounts is unmodifiable', () {
+      final r = StressTestResult.initial().recordFailure(
+        typeName: 'GattOperationFailedException',
+        status: 1,
+      );
+      expect(() => r.statusCounts[2] = 1, throwsUnsupportedError);
+    });
   });
 }

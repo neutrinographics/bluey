@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey_example/features/stress_tests/domain/stress_test_config.dart';
+import 'package:bluey_example/features/stress_tests/domain/stress_test_result.dart';
 import 'package:bluey_example/features/stress_tests/infrastructure/stress_test_runner.dart';
 import 'package:bluey_example/shared/stress_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -155,6 +157,37 @@ void main() {
         expect(r.isRunning, isTrue);
       }
       expect(results.last.isRunning, isFalse);
+    });
+
+    test('runBurstWrite stops publishing after subscription is cancelled',
+        () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        // slow writes so we have time to cancel mid-burst
+        if (value.isNotEmpty && value.first == 0x01) {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+        }
+      };
+
+      final stream = runner.runBurstWrite(
+        const BurstWriteConfig(count: 20, payloadBytes: 4),
+        conn,
+      );
+      late StreamSubscription<StressTestResult> sub;
+      var receivedCount = 0;
+      sub = stream.listen((r) {
+        receivedCount++;
+        if (receivedCount == 3) {
+          // Cancel after 3rd emission.
+          sub.cancel();
+        }
+      });
+
+      // Wait for all writes to run in the background.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+
+      // receivedCount should stay small; the writes continued but publishing stopped.
+      expect(receivedCount, equals(3),
+          reason: 'controller should stop publishing after cancel');
     });
   });
 
