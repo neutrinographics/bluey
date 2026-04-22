@@ -49,8 +49,13 @@ class LifecycleClient {
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive.
-  /// No-op if the lifecycle isn't running.
-  void recordActivity() => _monitor.recordActivity();
+  /// No-op if the lifecycle isn't running — prevents lingering
+  /// notification subscriptions from dirtying monitor state after
+  /// [stop] has been called.
+  void recordActivity() {
+    if (!isRunning) return;
+    _monitor.recordActivity();
+  }
 
   /// Starts the heartbeat if the server hosts the control service.
   ///
@@ -102,11 +107,7 @@ class LifecycleClient {
         _beginHeartbeat(_defaultHeartbeatInterval);
       });
     } else {
-      // Schedule asynchronously so the initial probe's write-success
-      // is processed by the old monitor before the new one is created.
-      // This keeps _lastActivityAt null on the new monitor so the first
-      // timer tick always sends a probe.
-      Future.microtask(() => _beginHeartbeat(_defaultHeartbeatInterval));
+      _beginHeartbeat(_defaultHeartbeatInterval);
     }
   }
 
@@ -127,12 +128,10 @@ class LifecycleClient {
     }
   }
 
-  /// Stops the heartbeat timer and clears the char reference.
-  ///
-  /// Monitor retains state until the next call to [start] →
-  /// [_beginHeartbeat], which recreates it with the chosen interval.
-  /// In practice [LifecycleClient] is per-connection — a new
-  /// connection = new instance — so this edge case rarely matters.
+  /// Stops the heartbeat timer and clears the char reference. The
+  /// monitor keeps its accumulated state, but [recordActivity] and
+  /// [_tick] both check [isRunning] so no further state mutation is
+  /// possible after stop.
   void stop() {
     _probeTimer?.cancel();
     _probeTimer = null;
@@ -145,12 +144,9 @@ class LifecycleClient {
 
   void _beginHeartbeat(Duration interval) {
     dev.log('heartbeat interval set: ${interval.inMilliseconds}ms', name: 'bluey.lifecycle');
-    // Reinitialise monitor so its activity window matches the server's
-    // chosen interval.
-    _monitor = LivenessMonitor(
-      maxFailedProbes: _maxFailedHeartbeats,
-      activityWindow: interval,
-    );
+    // Update the monitor in place so a probe in flight from the initial
+    // synchronous send keeps its markProbeInFlight flag intact.
+    _monitor.updateActivityWindow(interval);
     _probeTimer?.cancel();
     _probeTimer = Timer.periodic(interval, (_) => _tick());
   }

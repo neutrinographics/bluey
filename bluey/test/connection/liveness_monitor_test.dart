@@ -30,10 +30,12 @@ void main() {
       expect(m.shouldSendProbe(), isFalse);
     });
 
-    test('recordActivity then shouldSendProbe after window returns true', () {
+    test('recordActivity then shouldSendProbe at window boundary returns true', () {
       final m = buildMonitor(activityWindow: const Duration(seconds: 5));
       m.recordActivity();
-      advance(const Duration(seconds: 5, microseconds: 1));
+      advance(const Duration(seconds: 5));
+      // Boundary is inclusive: a tick co-scheduled with the window
+      // expiry must probe in time to beat the server's matching timer.
       expect(m.shouldSendProbe(), isTrue);
     });
 
@@ -101,6 +103,47 @@ void main() {
       // errors use cancelProbe instead), but keeping idempotence avoids
       // asymmetry bugs if a future caller forgets to markProbeInFlight.
       expect(() => m.recordProbeSuccess(), returnsNormally);
+    });
+
+    test('cancelProbe releases the in-flight flag', () {
+      final m = buildMonitor();
+      m.markProbeInFlight();
+      m.cancelProbe();
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('cancelProbe does NOT reset the failure counter', () {
+      final m = buildMonitor(maxFailedProbes: 2);
+      m.markProbeInFlight();
+      m.recordProbeFailure(); // counter=1
+      m.markProbeInFlight();
+      m.cancelProbe(); // must not zero the counter
+      m.markProbeInFlight();
+      final tripped = m.recordProbeFailure(); // counter=2, tripped
+      expect(tripped, isTrue,
+          reason: 'cancelProbe must not reset the failure counter');
+    });
+
+    test('cancelProbe does NOT refresh the activity timestamp', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 10));
+      m.markProbeInFlight();
+      m.cancelProbe();
+      // 10s since last real activity — cancel must not have updated it.
+      expect(m.shouldSendProbe(), isTrue);
+    });
+
+    test('updateActivityWindow preserves in-flight and counter state', () {
+      final m = buildMonitor(maxFailedProbes: 2);
+      m.markProbeInFlight();
+      m.recordProbeFailure(); // counter=1
+      m.markProbeInFlight();
+      m.updateActivityWindow(const Duration(seconds: 20));
+      // In-flight flag preserved.
+      expect(m.shouldSendProbe(), isFalse);
+      // Counter preserved — next failure still trips at 2.
+      expect(m.recordProbeFailure(), isTrue);
     });
   });
 }

@@ -1036,17 +1036,10 @@ void main() {
         async.flushMicrotasks();
         expect(unreachableFired, isFalse);
 
-        // User op success → recordActivity resets the counter and marks
-        // the peer as recently active, suppressing the very next probe.
+        // User op success → recordActivity resets the counter.
         client.recordActivity();
 
-        // The first tick after recordActivity is suppressed by the recent
-        // activity window — counter stays at 0.
-        async.elapse(const Duration(seconds: 5));
-        async.flushMicrotasks();
-        expect(unreachableFired, isFalse, reason: 'next tick suppressed, counter was reset');
-
-        // Two more timeouts after the suppressed tick trip the threshold.
+        // Two post-reset failures trip the threshold.
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
         expect(unreachableFired, isFalse, reason: 'failure 1 of 2 post-reset');
@@ -1077,19 +1070,22 @@ void main() {
         client.start(allServices: services);
         async.flushMicrotasks();
 
-        // After start, clear baseline heartbeat writes.
+        // Advance partway through the probe interval so activity is
+        // recorded mid-window, not at a tick boundary.
+        async.elapse(const Duration(seconds: 2));
+        async.flushMicrotasks();
         fakePlatform.writeCharacteristicCalls.clear();
 
-        // Record activity, then let the tick fire. The tick should skip.
+        // Activity at T=2s; next tick at T=5s sees difference=3s < 5s window.
         client.recordActivity();
-        async.elapse(const Duration(seconds: 5));
+        async.elapse(const Duration(seconds: 3));
         async.flushMicrotasks();
 
         final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
           (c) => c.characteristicUuid == lifecycle.heartbeatCharUuid,
         );
         expect(heartbeatWrites, isEmpty,
-            reason: 'recent activity should cause probe tick to skip');
+            reason: 'activity within window should cause probe tick to skip');
 
         client.stop();
       });
