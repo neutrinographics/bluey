@@ -43,6 +43,42 @@ sealed class StressCommand {
     switch (opcode) {
       case 0x01:
         return EchoCommand(body);
+      case 0x02:
+        if (body.length < 4) {
+          throw StressProtocolException(
+            opcode: opcode,
+            message: 'BurstMe payload too short (${body.length}, need 4)',
+          );
+        }
+        final view = body.buffer.asByteData(body.offsetInBytes, 4);
+        return BurstMeCommand(
+          count: view.getUint16(0, Endian.little),
+          payloadSize: view.getUint16(2, Endian.little),
+        );
+      case 0x03:
+        if (body.length < 2) {
+          throw StressProtocolException(
+            opcode: opcode,
+            message: 'DelayAck payload too short (${body.length}, need 2)',
+          );
+        }
+        return DelayAckCommand(
+          delayMs: body.buffer
+              .asByteData(body.offsetInBytes, 2)
+              .getUint16(0, Endian.little),
+        );
+      case 0x05:
+        if (body.length < 2) {
+          throw StressProtocolException(
+            opcode: opcode,
+            message: 'SetPayloadSize payload too short (${body.length}, need 2)',
+          );
+        }
+        return SetPayloadSizeCommand(
+          sizeBytes: body.buffer
+              .asByteData(body.offsetInBytes, 2)
+              .getUint16(0, Endian.little),
+        );
       default:
         throw StressProtocolException(
           opcode: opcode,
@@ -74,6 +110,76 @@ class EchoCommand extends StressCommand {
 
   @override
   int get hashCode => Object.hashAll(payload);
+}
+
+/// BurstMe: server fires `count` notifications back-to-back, each
+/// `payloadSize` bytes (deterministic pattern), prepended with a
+/// burst-id byte. Opcode 0x02.
+class BurstMeCommand extends StressCommand {
+  final int count;
+  final int payloadSize;
+  const BurstMeCommand({required this.count, required this.payloadSize});
+
+  @override
+  Uint8List encode() {
+    final out = Uint8List(5);
+    out[0] = 0x02;
+    out.buffer.asByteData().setUint16(1, count, Endian.little);
+    out.buffer.asByteData().setUint16(3, payloadSize, Endian.little);
+    return out;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is BurstMeCommand &&
+      other.count == count &&
+      other.payloadSize == payloadSize;
+
+  @override
+  int get hashCode => Object.hash(count, payloadSize);
+}
+
+/// DelayAck: server waits [delayMs] ms before responding. Opcode 0x03.
+class DelayAckCommand extends StressCommand {
+  final int delayMs;
+  const DelayAckCommand({required this.delayMs});
+
+  @override
+  Uint8List encode() {
+    final out = Uint8List(3);
+    out[0] = 0x03;
+    out.buffer.asByteData().setUint16(1, delayMs, Endian.little);
+    return out;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DelayAckCommand && other.delayMs == delayMs;
+
+  @override
+  int get hashCode => delayMs.hashCode;
+}
+
+/// SetPayloadSize: server's next read returns [sizeBytes] of pattern.
+/// Opcode 0x05.
+class SetPayloadSizeCommand extends StressCommand {
+  final int sizeBytes;
+  const SetPayloadSizeCommand({required this.sizeBytes});
+
+  @override
+  Uint8List encode() {
+    final out = Uint8List(3);
+    out[0] = 0x05;
+    out.buffer.asByteData().setUint16(1, sizeBytes, Endian.little);
+    return out;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SetPayloadSizeCommand && other.sizeBytes == sizeBytes;
+
+  @override
+  int get hashCode => sizeBytes.hashCode;
 }
 
 /// Thrown when stress command bytes can't be decoded.
