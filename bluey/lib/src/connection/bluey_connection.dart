@@ -238,6 +238,7 @@ class BlueyConnection implements Connection {
     dev.log(
       'services start: deviceId=$deviceId',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
     final platformServices = await _translateGattPlatformError(
@@ -267,6 +268,7 @@ class BlueyConnection implements Connection {
     dev.log(
       'services complete: deviceId=$deviceId, count=${_cachedServices!.length}, ${stopwatch.elapsedMilliseconds}ms',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
 
     return _cachedServices!;
@@ -286,6 +288,7 @@ class BlueyConnection implements Connection {
     dev.log(
       'requestMtu start: deviceId=$deviceId, requested=$mtu',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
     try {
@@ -298,6 +301,7 @@ class BlueyConnection implements Connection {
       dev.log(
         'requestMtu complete: deviceId=$deviceId, requested=$mtu, negotiated=$negotiatedMtu, ${stopwatch.elapsedMilliseconds}ms',
         name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
       );
       return _mtu;
     } catch (e) {
@@ -316,6 +320,7 @@ class BlueyConnection implements Connection {
     dev.log(
       'readRssi start: deviceId=$deviceId',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
     try {
@@ -327,6 +332,7 @@ class BlueyConnection implements Connection {
       dev.log(
         'readRssi complete: deviceId=$deviceId, rssi=${rssi}dBm, ${stopwatch.elapsedMilliseconds}ms',
         name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
       );
       return rssi;
     } catch (e) {
@@ -676,6 +682,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     dev.log(
       'read start: deviceId=$_deviceId, char=$uuid',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
     try {
@@ -687,6 +694,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       dev.log(
         'read complete: deviceId=$_deviceId, char=$uuid, bytes=${value.length}, ${stopwatch.elapsedMilliseconds}ms',
         name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
       );
       return value;
     } catch (e) {
@@ -712,6 +720,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     dev.log(
       'write start: deviceId=$_deviceId, char=$uuid, bytes=${value.length}',
       name: 'bluey.gatt',
+      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
     try {
@@ -728,6 +737,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       dev.log(
         'write complete: deviceId=$_deviceId, char=$uuid, ${stopwatch.elapsedMilliseconds}ms',
         name: 'bluey.gatt',
+        level: 500, // Level.FINE — per-op chatter; suppressed in default log views
       );
     } catch (e) {
       final status = e is GattOperationFailedException ? ' status=${e.status}' : '';
