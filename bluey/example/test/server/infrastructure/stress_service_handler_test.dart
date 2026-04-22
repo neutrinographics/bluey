@@ -243,4 +243,93 @@ void main() {
           )).called(1);
     });
   });
+
+  group('StressServiceHandler — Reset', () {
+    test('reset clears all state', () async {
+      final handler = StressServiceHandler();
+
+      WriteRequest writeOf(Uint8List value) => WriteRequest(
+            client: mockClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: value,
+            responseNeeded: true,
+            offset: 0,
+            internalRequestId: 0,
+          );
+
+      // Set state on the handler.
+      await handler.onWrite(
+        writeOf(EchoCommand(Uint8List.fromList([0xAA, 0xBB])).encode()),
+        mockServer,
+      );
+      await handler.onWrite(
+        writeOf(const SetPayloadSizeCommand(sizeBytes: 100).encode()),
+        mockServer,
+      );
+      await handler.onWrite(
+        writeOf(const DropNextCommand().encode()),
+        mockServer,
+      );
+
+      // Now reset.
+      await handler.onWrite(
+        writeOf(const ResetCommand().encode()),
+        mockServer,
+      );
+
+      // _lastEcho cleared → reads return pattern of default size 20.
+      expect(handler.onRead(), hasLength(20));
+
+      // _dropNextWrite cleared → next write echoes normally (not dropped).
+      clearInteractions(mockServer);
+      when(() => mockServer.respondToWrite(any(), status: any(named: 'status')))
+          .thenAnswer((_) async {});
+      when(() => mockServer.notify(any(), data: any(named: 'data')))
+          .thenAnswer((_) async {});
+      final probe = writeOf(EchoCommand(Uint8List.fromList([0x99])).encode());
+      await handler.onWrite(probe, mockServer);
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.success,
+          )).called(1);
+    });
+
+    test('reset interrupts an in-flight burstMe loop', () async {
+      final handler = StressServiceHandler();
+
+      WriteRequest writeOf(Uint8List value) => WriteRequest(
+            client: mockClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: value,
+            responseNeeded: true,
+            offset: 0,
+            internalRequestId: 0,
+          );
+
+      // Configure mockServer.notify so that the second notification
+      // triggers a reset mid-loop.
+      var notifyCount = 0;
+      when(() => mockServer.notify(any(), data: any(named: 'data')))
+          .thenAnswer((_) async {
+        notifyCount++;
+        if (notifyCount == 2) {
+          // Mid-burst: fire a reset that flips _abortBurst.
+          await handler.onWrite(
+            writeOf(const ResetCommand().encode()),
+            mockServer,
+          );
+        }
+      });
+
+      await handler.onWrite(
+        writeOf(const BurstMeCommand(count: 100, payloadSize: 4).encode()),
+        mockServer,
+      );
+
+      // Should have aborted well before 100 — exact count depends on
+      // event-loop microtask ordering, but << 100.
+      expect(notifyCount, lessThan(10),
+          reason: 'reset should have aborted the burst quickly');
+    });
+  });
 }

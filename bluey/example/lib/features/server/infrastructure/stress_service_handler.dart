@@ -22,11 +22,6 @@ class StressServiceHandler {
   /// command, mutates server state, responds and/or notifies as
   /// appropriate.
   Future<void> onWrite(WriteRequest req, Server server) async {
-    if (_dropNextWrite) {
-      _dropNextWrite = false;
-      return; // No response, no notification — client times out.
-    }
-
     final StressCommand cmd;
     try {
       cmd = StressCommand.decode(req.value);
@@ -38,6 +33,13 @@ class StressServiceHandler {
         );
       }
       return;
+    }
+
+    // ResetCommand bypasses the drop-next guard — it is always honored
+    // so the test harness can recover from any state.
+    if (_dropNextWrite && cmd is! ResetCommand) {
+      _dropNextWrite = false;
+      return; // No response, no notification — client times out.
     }
 
     switch (cmd) {
@@ -82,8 +84,11 @@ class StressServiceHandler {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
 
-      // ResetCommand stays as a placeholder until Task 6.
       case ResetCommand():
+        _lastEcho = Uint8List(0);
+        _dropNextWrite = false;
+        _payloadSize = 20;
+        _abortBurst = true; // interrupts any in-flight burstMe loop
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
