@@ -14,11 +14,8 @@ import '../../../shared/stress_protocol.dart';
 class StressServiceHandler {
   Uint8List _lastEcho = Uint8List(0);
   bool _dropNextWrite = false;
-  // ignore: prefer_final_fields — mutated by Tasks 5-6 handlers.
   int _payloadSize = 20;
-  // ignore: unused_field, prefer_final_fields — used by Tasks 5-6 burst handler.
   int _burstId = 0;
-  // ignore: unused_field, prefer_final_fields — used by Tasks 5-6 burst handler.
   bool _abortBurst = false;
 
   /// Processes a write to [StressProtocol.charUuid]. Decodes the
@@ -50,9 +47,43 @@ class StressServiceHandler {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
         await server.notify(UUID(StressProtocol.charUuid), data: payload);
-      // Other cases added in Tasks 5 and 6.
-      case _:
-        // Stub: future opcodes acknowledged but not yet implemented.
+
+      case BurstMeCommand(:final count, :final payloadSize):
+        _abortBurst = false;
+        _burstId = (_burstId + 1) & 0xff;
+        final thisBurstId = _burstId;
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+        for (var i = 0; i < count; i++) {
+          if (_abortBurst) break;
+          final pattern = _generatePattern(payloadSize);
+          final framed = Uint8List(pattern.length + 1)
+            ..[0] = thisBurstId
+            ..setRange(1, pattern.length + 1, pattern);
+          await server.notify(UUID(StressProtocol.charUuid), data: framed);
+        }
+
+      case DelayAckCommand(:final delayMs):
+        await Future<void>.delayed(Duration(milliseconds: delayMs));
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+
+      case DropNextCommand():
+        _dropNextWrite = true;
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+
+      case SetPayloadSizeCommand(:final sizeBytes):
+        _payloadSize = sizeBytes;
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+
+      // ResetCommand stays as a placeholder until Task 6.
+      case ResetCommand():
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }

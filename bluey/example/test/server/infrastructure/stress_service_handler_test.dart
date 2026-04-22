@@ -71,4 +71,176 @@ void main() {
       expect(readResponse, equals(payload));
     });
   });
+
+  group('StressServiceHandler — BurstMe', () {
+    test('burstMe responds success then fires N notifications with burst-id prefix', () async {
+      final handler = StressServiceHandler();
+      final write = WriteRequest(
+        client: mockClient,
+        characteristicId: UUID(StressProtocol.charUuid),
+        value: const BurstMeCommand(count: 3, payloadSize: 4).encode(),
+        responseNeeded: true,
+        offset: 0,
+        internalRequestId: 0,
+      );
+
+      await handler.onWrite(write, mockServer);
+
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.success,
+          )).called(1);
+
+      // 3 notifications, each: [burstId, 0x00, 0x01, 0x02, 0x03]
+      final captured = verify(() => mockServer.notify(
+            any(),
+            data: captureAny(named: 'data'),
+          )).captured.cast<Uint8List>();
+      expect(captured, hasLength(3));
+      final firstBurstId = captured.first.first;
+      for (final notif in captured) {
+        expect(notif.first, equals(firstBurstId),
+            reason: 'all notifs in one burst share id');
+        expect(notif.sublist(1), equals(Uint8List.fromList([0x00, 0x01, 0x02, 0x03])));
+      }
+    });
+
+    test('successive burstMe commands use incrementing burst-ids', () async {
+      final handler = StressServiceHandler();
+      Uint8List makeBurst(int count) =>
+          BurstMeCommand(count: count, payloadSize: 1).encode();
+
+      WriteRequest burstWrite(Uint8List value) => WriteRequest(
+            client: mockClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: value,
+            responseNeeded: true,
+            offset: 0,
+            internalRequestId: 0,
+          );
+
+      await handler.onWrite(burstWrite(makeBurst(1)), mockServer);
+      await handler.onWrite(burstWrite(makeBurst(1)), mockServer);
+
+      final captured = verify(() => mockServer.notify(
+            any(),
+            data: captureAny(named: 'data'),
+          )).captured.cast<Uint8List>();
+      expect(captured, hasLength(2));
+      expect(captured[1].first, equals((captured[0].first + 1) & 0xff));
+    });
+  });
+
+  group('StressServiceHandler — DelayAck', () {
+    test('delayAck waits the requested duration before responding', () async {
+      final handler = StressServiceHandler();
+      final write = WriteRequest(
+        client: mockClient,
+        characteristicId: UUID(StressProtocol.charUuid),
+        value: const DelayAckCommand(delayMs: 50).encode(),
+        responseNeeded: true,
+        offset: 0,
+        internalRequestId: 0,
+      );
+
+      final stopwatch = Stopwatch()..start();
+      await handler.onWrite(write, mockServer);
+      stopwatch.stop();
+
+      expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(50));
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.success,
+          )).called(1);
+    });
+  });
+
+  group('StressServiceHandler — DropNext', () {
+    test('dropNext sets flag; next write is silent and self-clears', () async {
+      final handler = StressServiceHandler();
+
+      WriteRequest writeOf(Uint8List value) => WriteRequest(
+            client: mockClient,
+            characteristicId: UUID(StressProtocol.charUuid),
+            value: value,
+            responseNeeded: true,
+            offset: 0,
+            internalRequestId: 0,
+          );
+
+      // First write: DropNext itself acks normally.
+      final dropCmd = writeOf(const DropNextCommand().encode());
+      await handler.onWrite(dropCmd, mockServer);
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.success,
+          )).called(1);
+      clearInteractions(mockServer);
+      when(() => mockServer.respondToWrite(any(), status: any(named: 'status')))
+          .thenAnswer((_) async {});
+      when(() => mockServer.notify(any(), data: any(named: 'data')))
+          .thenAnswer((_) async {});
+
+      // Second write: dropped silently.
+      final droppedWrite = writeOf(
+        EchoCommand(Uint8List.fromList([0x42])).encode(),
+      );
+      await handler.onWrite(droppedWrite, mockServer);
+      verifyNever(() => mockServer.respondToWrite(
+            any(),
+            status: any(named: 'status'),
+          ));
+      verifyNever(() => mockServer.notify(any(), data: any(named: 'data')));
+
+      // Third write: flag self-cleared, echo normally.
+      final normalWrite = writeOf(
+        EchoCommand(Uint8List.fromList([0x99])).encode(),
+      );
+      await handler.onWrite(normalWrite, mockServer);
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.success,
+          )).called(1);
+    });
+  });
+
+  group('StressServiceHandler — SetPayloadSize', () {
+    test('setPayloadSize changes the size of subsequent reads', () async {
+      final handler = StressServiceHandler();
+      expect(handler.onRead(), hasLength(20)); // default
+
+      final cmd = WriteRequest(
+        client: mockClient,
+        characteristicId: UUID(StressProtocol.charUuid),
+        value: const SetPayloadSizeCommand(sizeBytes: 50).encode(),
+        responseNeeded: true,
+        offset: 0,
+        internalRequestId: 0,
+      );
+      await handler.onWrite(cmd, mockServer);
+
+      expect(handler.onRead(), hasLength(50));
+    });
+  });
+
+  group('StressServiceHandler — unknown opcode', () {
+    test('unknown opcode responds with requestNotSupported', () async {
+      final handler = StressServiceHandler();
+      final write = WriteRequest(
+        client: mockClient,
+        characteristicId: UUID(StressProtocol.charUuid),
+        value: Uint8List.fromList([0xFF]), // unknown opcode
+        responseNeeded: true,
+        offset: 0,
+        internalRequestId: 0,
+      );
+
+      await handler.onWrite(write, mockServer);
+
+      verify(() => mockServer.respondToWrite(
+            any(),
+            status: GattResponseStatus.requestNotSupported,
+          )).called(1);
+    });
+  });
 }
