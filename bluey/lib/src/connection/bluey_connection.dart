@@ -13,26 +13,30 @@ import '../shared/uuid.dart';
 import 'connection.dart';
 import 'lifecycle_client.dart';
 
-/// Runs a GATT op through the error-translation pipeline. Catches the
-/// internal platform-interface exceptions and rethrows them as the
-/// user-facing [BlueyException] sealed hierarchy:
+/// Runs a GATT op through the error-translation pipeline, then fires
+/// [onSuccess] if the op returned without throwing. Used by every
+/// public GATT op on [BlueyConnection] / [BlueyRemoteCharacteristic]
+/// / [BlueyRemoteDescriptor] so activity signals flow uniformly into
+/// [LifecycleClient.recordActivity].
+///
+/// Catches internal platform-interface exceptions and rethrows them
+/// as the user-facing [BlueyException] sealed hierarchy:
 ///
 ///   * [platform.GattOperationTimeoutException] → [GattTimeoutException]
 ///   * [platform.GattOperationDisconnectedException] →
 ///     [DisconnectedException] with [DisconnectReason.linkLoss]
 ///   * [platform.GattOperationStatusFailedException] →
 ///     [GattOperationFailedException] carrying the native status
-///
-/// The platform-interface types stay internal: only [LifecycleClient] (an
-/// internal collaborator) catches them directly. Public callers see only
-/// [BlueyException] subtypes, so they can pattern-match exhaustively.
 Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
-  Future<T> Function() body,
-) async {
+  Future<T> Function() body, {
+  void Function()? onSuccess,
+}) async {
   try {
-    return await body();
+    final result = await body();
+    onSuccess?.call();
+    return result;
   } on platform.GattOperationTimeoutException {
     throw GattTimeoutException(operation);
   } on platform.GattOperationDisconnectedException {
@@ -245,6 +249,7 @@ class BlueyConnection implements Connection {
       deviceId,
       'discoverServices',
       () => _platform.discoverServices(_connectionId),
+      onSuccess: () => _lifecycle?.recordActivity(),
     );
     final allServices = platformServices.map((ps) => _mapService(ps)).toList();
 
@@ -296,6 +301,7 @@ class BlueyConnection implements Connection {
         deviceId,
         'requestMtu',
         () => _platform.requestMtu(_connectionId, mtu),
+        onSuccess: () => _lifecycle?.recordActivity(),
       );
       _mtu = negotiatedMtu;
       dev.log(
@@ -328,6 +334,7 @@ class BlueyConnection implements Connection {
         deviceId,
         'readRssi',
         () => _platform.readRssi(_connectionId),
+        onSuccess: () => _lifecycle?.recordActivity(),
       );
       dev.log(
         'readRssi complete: deviceId=$deviceId, rssi=${rssi}dBm, ${stopwatch.elapsedMilliseconds}ms',
