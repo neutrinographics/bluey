@@ -87,6 +87,13 @@ class ErrorsTest {
     }
 
     @Test
+    fun `NoPendingRequest to gatt-status-failed 0x0A (server)`() {
+        val e = BlueyAndroidError.NoPendingRequest(42L).toServerFlutterError()
+        assertEquals("gatt-status-failed", e.code)
+        assertEquals(0x0A, e.details)
+    }
+
+    @Test
     fun `FailedToOpenGattServer to bluey-unknown (server)`() {
         val e = BlueyAndroidError.FailedToOpenGattServer.toServerFlutterError()
         assertEquals("bluey-unknown", e.code)

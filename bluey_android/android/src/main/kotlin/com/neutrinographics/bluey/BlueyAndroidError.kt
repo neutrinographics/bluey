@@ -41,6 +41,9 @@ internal sealed class BlueyAndroidError(message: String) : Exception(message) {
     data class CentralNotFound(val id: String) :
         BlueyAndroidError("Central not found: $id")
 
+    data class NoPendingRequest(val id: Long) :
+        BlueyAndroidError("No pending request for id: $id")
+
     // --- Server-side setup → bluey-unknown ---
 
     object FailedToOpenGattServer : BlueyAndroidError("Failed to open GATT server")
