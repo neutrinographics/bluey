@@ -6,6 +6,7 @@ import '../../domain/stress_test_config.dart';
 import '../../domain/stress_test_result.dart';
 import 'config_form.dart';
 import 'results_panel.dart';
+import 'stress_test_help_sheet.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ const _kMid = Color(0xFF596064);
 const _kGreen = Color(0xFF006D4A);
 const _kRed = Color(0xFFA83836);
 const _kStopBg = Color(0xFFE3E9ED);
+const _kUuidBg = Color(0xFFF0F4F7);
 
 // ─── Presentation metadata extension ─────────────────────────────────────────
 
@@ -150,27 +152,50 @@ class _CardHeader extends StatelessWidget {
           child: Icon(test._icon, color: test._iconColor, size: 18),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              test.displayName,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _kDark,
-                letterSpacing: -0.45,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                test.displayName,
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _kDark,
+                  letterSpacing: -0.45,
+                ),
               ),
+              Text(
+                test._subtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: _kMid,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => showStressTestHelp(context, test),
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              color: _kUuidBg,
+              shape: BoxShape.circle,
             ),
-            Text(
-              test._subtitle,
+            alignment: Alignment.center,
+            child: Text(
+              'i',
               style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: _kMid,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _kAccent,
               ),
             ),
-          ],
+          ),
         ),
       ],
     );
