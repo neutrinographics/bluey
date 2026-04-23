@@ -40,7 +40,7 @@ class Advertiser(
 
     fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
         if (!hasRequiredPermissions()) {
-            callback(Result.failure(SecurityException("Missing required permissions: BLUETOOTH_ADVERTISE")))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_ADVERTISE")))
             return
         }
 
@@ -51,13 +51,13 @@ class Advertiser(
 
         val adapter = bluetoothAdapter
         if (adapter == null) {
-            callback(Result.failure(IllegalStateException("Bluetooth adapter not available")))
+            callback(Result.failure(BlueyAndroidError.BluetoothAdapterUnavailable))
             return
         }
 
         advertiser = adapter.bluetoothLeAdvertiser
         if (advertiser == null) {
-            callback(Result.failure(IllegalStateException("BLE advertising not supported")))
+            callback(Result.failure(BlueyAndroidError.BleAdvertisingNotSupported))
             return
         }
 
@@ -143,7 +143,7 @@ class Advertiser(
                     ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "Feature unsupported"
                     else -> "Unknown error: $errorCode"
                 }
-                callback(Result.failure(IllegalStateException(errorMessage)))
+                callback(Result.failure(BlueyAndroidError.AdvertisingStartFailed(errorMessage)))
             }
         }
 
