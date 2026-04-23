@@ -315,6 +315,82 @@ final class OpSlotTests: XCTestCase {
         XCTAssertTrue(slot.isEmpty)
     }
 
+    func test_pendingDrops_consumedBeforeFreshOpIsResolved() {
+        // Scenario: op A times out (pendingDrops=1). Then op B is
+        // enqueued. Then a late CB callback arrives for A (represented
+        // as completeHead). pendingDrops must be consumed first so B
+        // is NOT resolved by A's late result. The subsequent CB for B
+        // then resolves B normally.
+        let timers = FakeTimerFactory()
+        let slot = OpSlot<Int>(timerFactory: timers)
+        var rA: Result<Int, Error>?
+        var rB: Result<Int, Error>?
+
+        slot.enqueue(
+            completion: { rA = $0 },
+            timeoutSeconds: 1,
+            makeTimeoutError: TestError(tag: "A-timed-out")
+        )
+        timers.advance(by: 1.1) // A times out, pendingDrops = 1
+        guard case .failure = rA else {
+            XCTFail("A should have timed out")
+            return
+        }
+
+        slot.enqueue(
+            completion: { rB = $0 },
+            timeoutSeconds: 10,
+            makeTimeoutError: TestError(tag: "B-should-not-fire")
+        )
+
+        // Late CB for A arrives: must be dropped, NOT route to B.
+        slot.completeHead(.success(999))
+        XCTAssertNil(rB, "pendingDrop must be consumed before fresh op is resolved")
+
+        // Genuine CB for B now resolves normally.
+        slot.completeHead(.success(42))
+        XCTAssertEqual(try? rB?.get(), 42)
+    }
+
+    func test_pendingDrops_accumulateAcrossMultipleTimeouts() {
+        // Scenario: three ops timeout back-to-back, leaving
+        // pendingDrops = 3. The next three completeHead calls are all
+        // dropped; the fourth (for a fresh op) resolves.
+        let timers = FakeTimerFactory()
+        let slot = OpSlot<Int>(timerFactory: timers)
+
+        for i in 1...3 {
+            slot.enqueue(
+                completion: { _ in },
+                timeoutSeconds: 1,
+                makeTimeoutError: TestError(tag: "t\(i)")
+            )
+        }
+        // Advance enough for all three to time out in sequence.
+        // Each timeout arms the next head's timer (still 1s from its
+        // own head-start), so we advance in 1.1s slices.
+        timers.advance(by: 1.1) // head t1 times out, t2 head, timer armed
+        timers.advance(by: 1.1) // t2 times out, t3 head
+        timers.advance(by: 1.1) // t3 times out
+        XCTAssertTrue(slot.isEmpty)
+
+        // Three late CB deliveries: each must be dropped.
+        var fresh: Result<Int, Error>?
+        slot.enqueue(
+            completion: { fresh = $0 },
+            timeoutSeconds: 10,
+            makeTimeoutError: TestError(tag: "should-not-fire")
+        )
+        slot.completeHead(.success(101)) // drops pendingDrop #1
+        slot.completeHead(.success(102)) // drops pendingDrop #2
+        slot.completeHead(.success(103)) // drops pendingDrop #3
+        XCTAssertNil(fresh, "fresh op must not be resolved while pendingDrops > 0")
+
+        // Next legitimate CB resolves the fresh op.
+        slot.completeHead(.success(200))
+        XCTAssertEqual(try? fresh?.get(), 200)
+    }
+
     func test_drainAll_resetsPendingDrops() {
         let timers = FakeTimerFactory()
         let slot = OpSlot<Int>(timerFactory: timers)
