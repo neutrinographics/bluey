@@ -3,6 +3,7 @@ package com.neutrinographics.bluey
 import android.Manifest
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -63,6 +64,53 @@ class BlueyPluginTest {
 
         verify { mockActivity.startActivity(any()) }
         assertFalse(result!!.getOrThrow())
+    }
+
+    // --- Gap 1 coverage: BlueyPlugin try/catch wrapper ---
+
+    @Test
+    fun `client-role readRssi with null connectionManager delivers bluey-unknown FlutterError`() {
+        // Null out the connectionManager so the plugin's null-guard fires:
+        //   val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+        // NotInitialized falls through to the catch-all BlueyAndroidError branch in
+        // toClientFlutterError() which maps to "bluey-unknown".
+        setPrivateField(plugin, "connectionManager", null)
+
+        val captured = mutableListOf<Result<Long>>()
+        plugin.readRssi("device-1") { captured += it }
+
+        assertEquals(1, captured.size)
+        val failure = captured.single().exceptionOrNull() as FlutterError
+        assertEquals("bluey-unknown", failure.code)
+    }
+
+    @Test
+    fun `server-role addService with CharacteristicNotFound delivers gatt-status-failed 0x0A FlutterError`() {
+        // Inject a mock GattServer whose addService throws CharacteristicNotFound.
+        // On the server dispatch path BlueyPlugin calls toServerFlutterError(), which
+        // maps CharacteristicNotFound → FlutterError("gatt-status-failed", ..., 0x0A).
+        // This is the critical regression guard: the SAME sealed case produces a
+        // DIFFERENT code on the server path vs the client path (where it would be
+        // "gatt-disconnected").
+        val mockGattServer = mockk<GattServer>(relaxed = true)
+        every { mockGattServer.addService(any(), any()) } throws
+            BlueyAndroidError.CharacteristicNotFound("abc")
+        setPrivateField(plugin, "gattServer", mockGattServer)
+
+        val service = LocalServiceDto(
+            uuid = "0000180D-0000-1000-8000-00805F9B34FB",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+
+        val captured = mutableListOf<Result<Unit>>()
+        plugin.addService(service) { captured += it }
+
+        assertEquals(1, captured.size)
+        val failure = captured.single().exceptionOrNull() as FlutterError
+        assertEquals("gatt-status-failed", failure.code)
+        assertEquals(0x0A, failure.details)
     }
 
     private fun setPrivateField(obj: Any, name: String, value: Any?) {
