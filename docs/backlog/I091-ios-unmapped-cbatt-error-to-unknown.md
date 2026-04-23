@@ -1,0 +1,29 @@
+---
+id: I091
+title: "iOS unmapped `CBATTError` codes silently become `bluey-unknown`"
+category: bug
+severity: medium
+platform: ios
+status: open
+last_verified: 2026-04-23
+---
+
+## Symptom
+
+iOS's `NSError.toPigeonError()` maps known `CBATTError` cases (insufficientAuthentication, insufficientEncryption, etc.) to `gatt-status-failed` with the status byte preserved. Unmapped codes — `missingEncryptionKey` (0x0C), `unsupportedGroupType` (0x0E), future additions — fall through to `bluey-unknown` with the status byte lost.
+
+On the Dart side, these become `GattOperationUnknownPlatformException` with no status. Callers that want to distinguish "write rejected for security reasons" from "operation unsupported" can't.
+
+## Location
+
+`bluey_ios/ios/Classes/NSError+Pigeon.swift:26-42` — the `attStatusByte()` extension returns `nil` for unmapped codes.
+
+## Root cause
+
+Explicit allowlist of handled error codes. Everything else is dropped.
+
+## Notes
+
+Fix: extend the allowlist to cover every `CBATTError` case (the enum is finite; Swift-native `switch .allCases` approach). Better: preserve the numeric status code even for unmapped cases — a status-failed with an unknown code is still more useful than an unknown-platform error with no code.
+
+Android-side parallel: `Errors.kt` maps known `BluetoothGatt.GATT_*` constants and has a fallback. Verify symmetry — this entry's Android twin may already be handled correctly, or may have the same allowlist gap.
