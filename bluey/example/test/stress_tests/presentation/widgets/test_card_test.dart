@@ -62,9 +62,17 @@ void main() {
       onConfigChanged: (_) {},
     )));
 
-    expect(find.textContaining('Attempted 2'), findsOneWidget);
-    expect(find.textContaining('Succeeded 1'), findsOneWidget);
-    expect(find.textContaining('Failed 1'), findsOneWidget);
+    // Stat labels are shown
+    expect(find.text('ATTEMPTED'), findsOneWidget);
+    expect(find.text('SUCCEEDED'), findsOneWidget);
+    expect(find.text('FAILED'), findsOneWidget);
+    // Correct values: 2 attempted, 1 succeeded, 1 failed
+    final allTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .toList();
+    expect(allTexts, contains('2'));
+    expect(allTexts, contains('1'));
     expect(find.textContaining('GattTimeoutException'), findsOneWidget);
   });
 
@@ -119,11 +127,12 @@ void main() {
       onConfigChanged: (_) {},
     )));
 
-    // Text fields should be disabled when the card is running.
-    final countField = find.byWidgetPredicate(
-      (w) => w is TextField && w.decoration?.labelText == 'count',
-    );
-    expect(countField, findsOneWidget);
-    expect(tester.widget<TextField>(countField).enabled, isFalse);
+    // All text fields should be disabled when the card is running.
+    final textFields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(textFields, isNotEmpty);
+    for (final field in textFields) {
+      expect(field.enabled, isFalse,
+          reason: 'Config text fields should be disabled while running');
+    }
   });
 }

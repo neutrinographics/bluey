@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../domain/stress_test_config.dart';
+
+const _kUuidBg = Color(0xFFF0F4F7);
+const _kDark = Color(0xFF2C3437);
+const _kMid = Color(0xFF596064);
 
 class ConfigForm extends StatefulWidget {
   final StressTestConfig config;
@@ -51,7 +56,6 @@ class _ConfigFormState extends State<ConfigForm> {
     if (c is FailureInjectionConfig) return _failureInjection(c);
     if (c is MtuProbeConfig) return _mtuProbe(c);
     if (c is NotificationThroughputConfig) return _notifThroughput(c);
-    // Fallback for as-yet-unsupported configs (filled in by Tasks 16-19)
     return Text(
       'Config form for ${c.runtimeType} not implemented yet',
       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -59,36 +63,43 @@ class _ConfigFormState extends State<ConfigForm> {
   }
 
   Widget _soak(SoakConfig c) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _intField(
-          label: 'duration (s)',
-          value: c.duration.inSeconds,
-          onChanged: (v) => widget.onChanged(SoakConfig(
-            duration: Duration(seconds: v),
-            interval: c.interval,
-            payloadBytes: c.payloadBytes,
-          )),
+        Expanded(
+          child: _intField(
+            label: 'DUR (S)',
+            value: c.duration.inSeconds,
+            onChanged: (v) => widget.onChanged(SoakConfig(
+              duration: Duration(seconds: v),
+              interval: c.interval,
+              payloadBytes: c.payloadBytes,
+            )),
+          ),
         ),
-        _intField(
-          label: 'interval (ms)',
-          value: c.interval.inMilliseconds,
-          onChanged: (v) => widget.onChanged(SoakConfig(
-            duration: c.duration,
-            interval: Duration(milliseconds: v),
-            payloadBytes: c.payloadBytes,
-          )),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _intField(
+            label: 'INT (MS)',
+            value: c.interval.inMilliseconds,
+            onChanged: (v) => widget.onChanged(SoakConfig(
+              duration: c.duration,
+              interval: Duration(milliseconds: v),
+              payloadBytes: c.payloadBytes,
+            )),
+          ),
         ),
-        _intField(
-          label: 'bytes',
-          value: c.payloadBytes,
-          onChanged: (v) => widget.onChanged(SoakConfig(
-            duration: c.duration,
-            interval: c.interval,
-            payloadBytes: v,
-          )),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _intField(
+            label: 'BYTES',
+            value: c.payloadBytes,
+            onChanged: (v) => widget.onChanged(SoakConfig(
+              duration: c.duration,
+              interval: c.interval,
+              payloadBytes: v,
+            )),
+          ),
         ),
       ],
     );
@@ -96,7 +107,7 @@ class _ConfigFormState extends State<ConfigForm> {
 
   Widget _timeoutProbe(TimeoutProbeConfig c) {
     return _intField(
-      label: 'delay past timeout (s)',
+      label: 'DELAY PAST TIMEOUT (MS)',
       value: c.delayPastTimeout.inSeconds,
       onChanged: (v) => widget.onChanged(TimeoutProbeConfig(
         delayPastTimeout: Duration(seconds: v),
@@ -106,7 +117,7 @@ class _ConfigFormState extends State<ConfigForm> {
 
   Widget _failureInjection(FailureInjectionConfig c) {
     return _intField(
-      label: 'writeCount',
+      label: 'WRITE COUNT',
       value: c.writeCount,
       onChanged: (v) => widget.onChanged(FailureInjectionConfig(writeCount: v)),
     );
@@ -114,100 +125,128 @@ class _ConfigFormState extends State<ConfigForm> {
 
   Widget _mixedOps(MixedOpsConfig c) {
     return _intField(
-      label: 'iterations',
+      label: 'ITERATIONS',
       value: c.iterations,
       onChanged: (v) => widget.onChanged(MixedOpsConfig(iterations: v)),
     );
   }
 
   Widget _burst(BurstWriteConfig c) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _intField(
-          label: 'count',
-          value: c.count,
-          onChanged: (v) => widget.onChanged(BurstWriteConfig(
-            count: v,
-            payloadBytes: c.payloadBytes,
-            withResponse: c.withResponse,
-          )),
-        ),
-        _intField(
-          label: 'bytes',
-          value: c.payloadBytes,
-          onChanged: (v) => widget.onChanged(BurstWriteConfig(
-            count: c.count,
-            payloadBytes: v,
-            withResponse: c.withResponse,
-          )),
-        ),
         Row(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Checkbox(
-              value: c.withResponse,
-              onChanged: widget.enabled
-                  ? (v) => widget.onChanged(BurstWriteConfig(
-                        count: c.count,
-                        payloadBytes: c.payloadBytes,
-                        withResponse: v ?? true,
-                      ))
-                  : null,
+            Expanded(
+              child: _intField(
+                label: 'COUNT',
+                value: c.count,
+                onChanged: (v) => widget.onChanged(BurstWriteConfig(
+                  count: v,
+                  payloadBytes: c.payloadBytes,
+                  withResponse: c.withResponse,
+                )),
+              ),
             ),
-            const Text('withResponse'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _intField(
+                label: 'BYTES',
+                value: c.payloadBytes,
+                onChanged: (v) => widget.onChanged(BurstWriteConfig(
+                  count: c.count,
+                  payloadBytes: v,
+                  withResponse: c.withResponse,
+                )),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Row(
+            children: [
+              Checkbox(
+                value: c.withResponse,
+                onChanged: widget.enabled
+                    ? (v) => widget.onChanged(BurstWriteConfig(
+                          count: c.count,
+                          payloadBytes: c.payloadBytes,
+                          withResponse: v ?? true,
+                        ))
+                    : null,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'withResponse',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _kMid,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _mtuProbe(MtuProbeConfig c) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _intField(
-          label: 'requestedMtu',
-          value: c.requestedMtu,
-          onChanged: (v) => widget.onChanged(MtuProbeConfig(
-            requestedMtu: v,
-            payloadBytes: c.payloadBytes,
-          )),
+        Expanded(
+          child: _intField(
+            label: 'REQUESTED MTU',
+            value: c.requestedMtu,
+            onChanged: (v) => widget.onChanged(MtuProbeConfig(
+              requestedMtu: v,
+              payloadBytes: c.payloadBytes,
+            )),
+          ),
         ),
-        _intField(
-          label: 'payloadBytes',
-          value: c.payloadBytes,
-          onChanged: (v) => widget.onChanged(MtuProbeConfig(
-            requestedMtu: c.requestedMtu,
-            payloadBytes: v,
-          )),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _intField(
+            label: 'PAYLOAD BYTES',
+            value: c.payloadBytes,
+            onChanged: (v) => widget.onChanged(MtuProbeConfig(
+              requestedMtu: c.requestedMtu,
+              payloadBytes: v,
+            )),
+          ),
         ),
       ],
     );
   }
 
   Widget _notifThroughput(NotificationThroughputConfig c) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _intField(
-          label: 'count',
-          value: c.count,
-          onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
-            count: v,
-            payloadBytes: c.payloadBytes,
-          )),
+        Expanded(
+          child: _intField(
+            label: 'COUNT',
+            value: c.count,
+            onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
+              count: v,
+              payloadBytes: c.payloadBytes,
+            )),
+          ),
         ),
-        _intField(
-          label: 'payloadBytes',
-          value: c.payloadBytes,
-          onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
-            count: c.count,
-            payloadBytes: v,
-          )),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _intField(
+            label: 'PAYLOAD BYTES',
+            value: c.payloadBytes,
+            onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
+              count: c.count,
+              payloadBytes: v,
+            )),
+          ),
         ),
       ],
     );
@@ -218,18 +257,42 @@ class _ConfigFormState extends State<ConfigForm> {
     required int value,
     required ValueChanged<int> onChanged,
   }) {
-    return SizedBox(
-      width: 100,
-      child: TextField(
-        enabled: widget.enabled,
-        controller: _controllerFor(label, value),
-        decoration: InputDecoration(labelText: label, isDense: true),
-        keyboardType: TextInputType.number,
-        onSubmitted: (s) {
-          final parsed = int.tryParse(s);
-          if (parsed != null && parsed > 0) onChanged(parsed);
-        },
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: _kMid,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: _kUuidBg,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: TextField(
+            enabled: widget.enabled,
+            controller: _controllerFor(label, value),
+            decoration: const InputDecoration.collapsed(hintText: null),
+            keyboardType: TextInputType.number,
+            style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: _kDark,
+            ),
+            onSubmitted: (s) {
+              final parsed = int.tryParse(s);
+              if (parsed != null && parsed > 0) onChanged(parsed);
+            },
+          ),
+        ),
+      ],
     );
   }
 }
