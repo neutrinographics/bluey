@@ -710,6 +710,35 @@ void main() {
           );
         },
       );
+
+      test(
+        'writeCharacteristic translates PlatformException(bluey-permission-denied) '
+        'to PlatformPermissionDeniedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(
+              code: 'bluey-permission-denied',
+              message: 'Missing BLUETOOTH_CONNECT permission',
+              details: 'BLUETOOTH_CONNECT',
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformPermissionDeniedException>()
+                  .having((e) => e.permission, 'permission', 'BLUETOOTH_CONNECT')
+                  .having((e) => e.operation, 'operation', 'writeCharacteristic'),
+            ),
+          );
+        },
+      );
     });
   });
 }
