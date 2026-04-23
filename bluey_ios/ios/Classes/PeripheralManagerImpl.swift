@@ -238,7 +238,11 @@ class PeripheralManagerImpl: NSObject {
 
         if let error = error {
             services.removeValue(forKey: serviceUuid)
-            completion(.failure((error as NSError).toPigeonError()))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
+            } else {
+                completion(.failure(BlueyError.unknown.toServerPigeonError()))
+            }
         } else {
             completion(.success(()))
         }
@@ -251,7 +255,11 @@ class PeripheralManagerImpl: NSObject {
         startAdvertisingCompletion = nil
 
         if let error = error {
-            completion(.failure((error as NSError).toPigeonError()))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
+            } else {
+                completion(.failure(BlueyError.unknown.toServerPigeonError()))
+            }
         } else {
             completion(.success(()))
         }
