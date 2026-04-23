@@ -2,7 +2,7 @@
 
 A living index of every known bug, no-op stub, and unimplemented feature in the Bluey library.
 
-This index supersedes `BUGS_ANALYSIS.md` and `ANDROID_IMPLEMENTATION_COMPARISON.md` (both dated January 2026, pre-Phase 2a) as the source of truth for outstanding work. Those files are kept for historical reference; entries here link back to them where relevant.
+This index supersedes the January 2026 historical docs now kept in [`../old/`](../old/) — `BUGS_ANALYSIS.md`, `ANDROID_IMPLEMENTATION_COMPARISON.md`, and `IOS_IMPLEMENTATION_COMPARISON.md`. Those files were written pre-Phase-2a and many of their findings are already fixed; they remain as historical context. Entries here link back to them via `historical_ref:` where relevant.
 
 ## Scope
 
