@@ -139,6 +139,16 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// peer-side Service Changed event after an iOS server force-kill.
   int? simulateWriteStatusFailed;
 
+  Object? _pendingReadError;
+
+  /// Arranges for the next [readCharacteristic] call to throw [error],
+  /// then clears the pending error automatically. Used to inject typed
+  /// platform-interface exceptions (e.g. [PlatformPermissionDeniedException])
+  /// without needing a dedicated named flag per error type.
+  void simulateReadError(Object error) {
+    _pendingReadError = error;
+  }
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -522,6 +532,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
         code: unknownCode,
         message: msg,
       );
+    }
+
+    final pendingError = _pendingReadError;
+    if (pendingError != null) {
+      _pendingReadError = null;
+      // ignore: only_throw_errors
+      throw pendingError;
     }
 
     final connection = _connections[deviceId];
