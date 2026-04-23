@@ -219,97 +219,113 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     // BlueyHostApi implementation
 
     override fun configure(config: BlueyConfigDto, callback: (Result<Unit>) -> Unit) {
-        cleanupOnActivityDestroy = config.cleanupOnActivityDestroy
-        connectionManager?.configure(config)
-        android.util.Log.d("BlueyPlugin", "Configured: cleanupOnActivityDestroy=$cleanupOnActivityDestroy")
-        callback(Result.success(Unit))
+        try {
+            cleanupOnActivityDestroy = config.cleanupOnActivityDestroy
+            connectionManager?.configure(config)
+            android.util.Log.d("BlueyPlugin", "Configured: cleanupOnActivityDestroy=$cleanupOnActivityDestroy")
+            callback(Result.success(Unit))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun getState(callback: (Result<BluetoothStateDto>) -> Unit) {
-        val state = getCurrentBluetoothState()
-        callback(Result.success(state))
+        try {
+            val state = getCurrentBluetoothState()
+            callback(Result.success(state))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun requestEnable(callback: (Result<Boolean>) -> Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+ requires BLUETOOTH_CONNECT permission
-            if (ContextCompat.checkSelfPermission(
-                    context!!,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12+ requires BLUETOOTH_CONNECT permission
+                if (ContextCompat.checkSelfPermission(
+                        context!!,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    callback(Result.success(false))
+                    return
+                }
+            }
+
+            val adapter = bluetoothAdapter
+            if (adapter == null) {
                 callback(Result.success(false))
                 return
             }
-        }
 
-        val adapter = bluetoothAdapter
-        if (adapter == null) {
-            callback(Result.success(false))
-            return
-        }
-
-        if (adapter.isEnabled) {
-            callback(Result.success(true))
-            return
-        }
-
-        // Request enable (only works on older Android versions)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            try {
-                val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                activity?.startActivityForResult(enableIntent, REQUEST_ENABLE_BT)
+            if (adapter.isEnabled) {
                 callback(Result.success(true))
-            } catch (e: Exception) {
+                return
+            }
+
+            // Request enable (only works on older Android versions)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                try {
+                    val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    activity?.startActivityForResult(enableIntent, REQUEST_ENABLE_BT)
+                    callback(Result.success(true))
+                } catch (e: Exception) {
+                    callback(Result.success(false))
+                }
+            } else {
+                // Android 13+ - open Bluetooth settings for the user
+                try {
+                    val settingsIntent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                    activity?.startActivity(settingsIntent)
+                } catch (_: Exception) {
+                    // Settings activity unavailable
+                }
                 callback(Result.success(false))
             }
-        } else {
-            // Android 13+ - open Bluetooth settings for the user
-            try {
-                val settingsIntent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
-                activity?.startActivity(settingsIntent)
-            } catch (_: Exception) {
-                // Settings activity unavailable
-            }
-            callback(Result.success(false))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
         }
     }
 
     override fun authorize(callback: (Result<Boolean>) -> Unit) {
-        val currentActivity = activity
-        if (currentActivity == null) {
-            callback(Result.success(false))
-            return
-        }
+        try {
+            val currentActivity = activity
+            if (currentActivity == null) {
+                callback(Result.success(false))
+                return
+            }
 
-        // Determine which permissions are needed based on Android version
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_ADVERTISE
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        }
+            // Determine which permissions are needed based on Android version
+            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_ADVERTISE
+                )
+            } else {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            }
 
-        // Check if permissions are already granted
-        val allGranted = permissions.all {
-            ContextCompat.checkSelfPermission(context!!, it) == PackageManager.PERMISSION_GRANTED
-        }
+            // Check if permissions are already granted
+            val allGranted = permissions.all {
+                ContextCompat.checkSelfPermission(context!!, it) == PackageManager.PERMISSION_GRANTED
+            }
 
-        if (allGranted) {
-            callback(Result.success(true))
-            return
-        }
+            if (allGranted) {
+                callback(Result.success(true))
+                return
+            }
 
-        // Request permissions
-        permissionCallback = callback
-        ActivityCompat.requestPermissions(currentActivity, permissions, REQUEST_PERMISSIONS)
+            // Request permissions
+            permissionCallback = callback
+            ActivityCompat.requestPermissions(currentActivity, permissions, REQUEST_PERMISSIONS)
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun openSettings(callback: (Result<Unit>) -> Unit) {
@@ -318,21 +334,31 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             context?.startActivity(intent)
             callback(Result.success(Unit))
-        } catch (e: Exception) {
-            callback(Result.failure(e))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
         }
     }
 
     override fun startScan(config: ScanConfigDto, callback: (Result<Unit>) -> Unit) {
-        scanner?.startScan(config, callback) ?: callback(
-            Result.failure(IllegalStateException("Scanner not initialized"))
-        )
+        try {
+            val s = scanner ?: throw BlueyAndroidError.NotInitialized("Scanner")
+            s.startScan(config) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun stopScan(callback: (Result<Unit>) -> Unit) {
-        scanner?.stopScan(callback) ?: callback(
-            Result.failure(IllegalStateException("Scanner not initialized"))
-        )
+        try {
+            val s = scanner ?: throw BlueyAndroidError.NotInitialized("Scanner")
+            s.stopScan { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun connect(
@@ -340,21 +366,36 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         config: ConnectConfigDto,
         callback: (Result<String>) -> Unit
     ) {
-        connectionManager?.connect(deviceId, config, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.connect(deviceId, config) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun disconnect(deviceId: String, callback: (Result<Unit>) -> Unit) {
-        connectionManager?.disconnect(deviceId, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.disconnect(deviceId) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun discoverServices(deviceId: String, callback: (Result<List<ServiceDto>>) -> Unit) {
-        connectionManager?.discoverServices(deviceId, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.discoverServices(deviceId) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun readCharacteristic(
@@ -362,9 +403,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         characteristicUuid: String,
         callback: (Result<ByteArray>) -> Unit
     ) {
-        connectionManager?.readCharacteristic(deviceId, characteristicUuid, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.readCharacteristic(deviceId, characteristicUuid) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun writeCharacteristic(
@@ -374,9 +420,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         withResponse: Boolean,
         callback: (Result<Unit>) -> Unit
     ) {
-        connectionManager?.writeCharacteristic(deviceId, characteristicUuid, value, withResponse, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.writeCharacteristic(deviceId, characteristicUuid, value, withResponse) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun setNotification(
@@ -385,9 +436,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         enable: Boolean,
         callback: (Result<Unit>) -> Unit
     ) {
-        connectionManager?.setNotification(deviceId, characteristicUuid, enable, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.setNotification(deviceId, characteristicUuid, enable) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun readDescriptor(
@@ -395,9 +451,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         descriptorUuid: String,
         callback: (Result<ByteArray>) -> Unit
     ) {
-        connectionManager?.readDescriptor(deviceId, descriptorUuid, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.readDescriptor(deviceId, descriptorUuid) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun writeDescriptor(
@@ -406,51 +467,86 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         value: ByteArray,
         callback: (Result<Unit>) -> Unit
     ) {
-        connectionManager?.writeDescriptor(deviceId, descriptorUuid, value, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.writeDescriptor(deviceId, descriptorUuid, value) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit) {
-        connectionManager?.requestMtu(deviceId, mtu, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.requestMtu(deviceId, mtu) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     override fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
-        connectionManager?.readRssi(deviceId, callback) ?: callback(
-            Result.failure(IllegalStateException("ConnectionManager not initialized"))
-        )
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.readRssi(deviceId) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
     }
 
     // Server (Peripheral) operations
 
     override fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
-        gattServer?.addService(service, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.addService(service) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun removeService(serviceUuid: String, callback: (Result<Unit>) -> Unit) {
-        gattServer?.removeService(serviceUuid, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.removeService(serviceUuid) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
-        // Log the GATT server state before advertising
-        android.util.Log.d("BlueyPlugin", "startAdvertising called - logging GATT server state:")
-        gattServer?.logServerState()
+        try {
+            // Log the GATT server state before advertising
+            android.util.Log.d("BlueyPlugin", "startAdvertising called - logging GATT server state:")
+            gattServer?.logServerState()
 
-        advertiser?.startAdvertising(config, callback) ?: callback(
-            Result.failure(IllegalStateException("Advertiser not initialized"))
-        )
+            val adv = advertiser ?: throw BlueyAndroidError.NotInitialized("Advertiser")
+            adv.startAdvertising(config) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun stopAdvertising(callback: (Result<Unit>) -> Unit) {
-        advertiser?.stopAdvertising(callback) ?: callback(
-            Result.failure(IllegalStateException("Advertiser not initialized"))
-        )
+        try {
+            val adv = advertiser ?: throw BlueyAndroidError.NotInitialized("Advertiser")
+            adv.stopAdvertising { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun notifyCharacteristic(
@@ -458,9 +554,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         value: ByteArray,
         callback: (Result<Unit>) -> Unit
     ) {
-        gattServer?.notifyCharacteristic(characteristicUuid, value, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.notifyCharacteristic(characteristicUuid, value) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun notifyCharacteristicTo(
@@ -469,9 +570,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         value: ByteArray,
         callback: (Result<Unit>) -> Unit
     ) {
-        gattServer?.notifyCharacteristicTo(centralId, characteristicUuid, value, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.notifyCharacteristicTo(centralId, characteristicUuid, value) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun respondToReadRequest(
@@ -480,9 +586,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         value: ByteArray?,
         callback: (Result<Unit>) -> Unit
     ) {
-        gattServer?.respondToReadRequest(requestId, status, value, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.respondToReadRequest(requestId, status, value) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun respondToWriteRequest(
@@ -490,22 +601,36 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         status: GattStatusDto,
         callback: (Result<Unit>) -> Unit
     ) {
-        gattServer?.respondToWriteRequest(requestId, status, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.respondToWriteRequest(requestId, status) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
-        gattServer?.disconnectCentral(centralId, callback) ?: callback(
-            Result.failure(IllegalStateException("GattServer not initialized"))
-        )
+        try {
+            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
+            gs.disconnectCentral(centralId) { result ->
+                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     override fun closeServer(callback: (Result<Unit>) -> Unit) {
-        android.util.Log.d("BlueyPlugin", "closeServer called")
-        advertiser?.cleanup()
-        gattServer?.cleanup()
-        callback(Result.success(Unit))
+        try {
+            android.util.Log.d("BlueyPlugin", "closeServer called")
+            advertiser?.cleanup()
+            gattServer?.cleanup()
+            callback(Result.success(Unit))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
     }
 
     // Private helper methods

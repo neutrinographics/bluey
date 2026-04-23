@@ -64,7 +64,7 @@ class GattServer(
         Log.d("GattServer", "addService: ${service.uuid}")
         if (!hasRequiredPermissions()) {
             Log.d("GattServer", "addService: missing permissions")
-            callback(Result.failure(SecurityException("Missing required permissions")))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
             return
         }
 
@@ -72,7 +72,7 @@ class GattServer(
         val server = gattServer
         if (server == null) {
             Log.d("GattServer", "addService: server is null after ensureServerOpen")
-            callback(Result.failure(IllegalStateException("Failed to open GATT server")))
+            callback(Result.failure(BlueyAndroidError.FailedToOpenGattServer))
             return
         }
 
@@ -84,14 +84,14 @@ class GattServer(
             if (!server.addService(gattService)) {
                 Log.d("GattServer", "addService: server.addService returned false")
                 pendingServiceCallback = null
-                callback(Result.failure(IllegalStateException("Failed to add service")))
+                callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid)))
             }
             Log.d("GattServer", "addService: server.addService returned true, waiting for onServiceAdded")
             // Callback will be invoked in onServiceAdded
         } catch (e: SecurityException) {
             Log.e("GattServer", "addService: SecurityException", e)
             pendingServiceCallback = null
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -110,7 +110,7 @@ class GattServer(
             }
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         } catch (e: Exception) {
             callback(Result.failure(e))
         }
@@ -123,14 +123,14 @@ class GattServer(
     ) {
         val server = gattServer
         if (server == null) {
-            callback(Result.failure(IllegalStateException("GATT server not running")))
+            callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
             return
         }
 
         val normalizedUuid = normalizeUuid(characteristicUuid)
         val characteristic = findCharacteristic(normalizedUuid)
         if (characteristic == null) {
-            callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
+            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
         }
 
@@ -148,7 +148,7 @@ class GattServer(
             }
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -160,20 +160,20 @@ class GattServer(
     ) {
         val server = gattServer
         if (server == null) {
-            callback(Result.failure(IllegalStateException("GATT server not running")))
+            callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
             return
         }
 
         val device = connectedCentrals[centralId]
         if (device == null) {
-            callback(Result.failure(IllegalStateException("Central not connected: $centralId")))
+            callback(Result.failure(BlueyAndroidError.CentralNotFound(centralId)))
             return
         }
 
         val normalizedUuid = normalizeUuid(characteristicUuid)
         val characteristic = findCharacteristic(normalizedUuid)
         if (characteristic == null) {
-            callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
+            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
         }
 
@@ -181,7 +181,7 @@ class GattServer(
             sendNotification(server, device, characteristic, value)
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -193,7 +193,7 @@ class GattServer(
     ) {
         val server = gattServer
         if (server == null) {
-            callback(Result.failure(IllegalStateException("GATT server not running")))
+            callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
             return
         }
 
@@ -211,7 +211,7 @@ class GattServer(
     ) {
         val server = gattServer
         if (server == null) {
-            callback(Result.failure(IllegalStateException("GATT server not running")))
+            callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
             return
         }
 
@@ -235,7 +235,7 @@ class GattServer(
             server.cancelConnection(device)
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -396,7 +396,7 @@ class GattServer(
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     callback(Result.success(Unit))
                 } else {
-                    callback(Result.failure(IllegalStateException("Failed to add service, status: $status")))
+                    callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid.toString(), status)))
                 }
             }
         }

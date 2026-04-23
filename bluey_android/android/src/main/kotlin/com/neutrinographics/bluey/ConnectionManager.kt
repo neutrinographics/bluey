@@ -93,7 +93,7 @@ class ConnectionManager(
     ) {
         // Check permissions
         if (!hasRequiredPermissions()) {
-            callback(Result.failure(SecurityException("Missing required permissions")))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
             return
         }
 
@@ -106,7 +106,7 @@ class ConnectionManager(
         // Get Bluetooth device
         val adapter = bluetoothAdapter
         if (adapter == null) {
-            callback(Result.failure(IllegalStateException("Bluetooth adapter not available")))
+            callback(Result.failure(BlueyAndroidError.BluetoothAdapterUnavailable))
             return
         }
 
@@ -114,7 +114,7 @@ class ConnectionManager(
         try {
             device = adapter.getRemoteDevice(deviceId)
         } catch (e: IllegalArgumentException) {
-            callback(Result.failure(IllegalArgumentException("Invalid device address: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.InvalidDeviceAddress(deviceId)))
             return
         }
 
@@ -153,7 +153,7 @@ class ConnectionManager(
                                 }
                             }
                             notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
-                            pendingCallback(Result.failure(IllegalStateException("Connection timeout")))
+                            pendingCallback(Result.failure(BlueyAndroidError.ConnectionTimeout))
                         }
                     }
                     pendingConnectionTimeouts[deviceId] = timeoutRunnable
@@ -162,11 +162,11 @@ class ConnectionManager(
                 // Don't call callback here - wait for onConnectionStateChange
             } else {
                 notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
-                callback(Result.failure(IllegalStateException("Failed to create GATT connection")))
+                callback(Result.failure(BlueyAndroidError.GattConnectionCreationFailed))
             }
         } catch (e: SecurityException) {
             notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         } catch (e: Exception) {
             notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
             callback(Result.failure(e))
@@ -185,7 +185,7 @@ class ConnectionManager(
             gatt.disconnect()
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         } catch (e: Exception) {
             callback(Result.failure(e))
         }
@@ -194,12 +194,12 @@ class ConnectionManager(
     fun discoverServices(deviceId: String, callback: (Result<List<ServiceDto>>) -> Unit) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(
@@ -220,17 +220,17 @@ class ConnectionManager(
     ) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
-            callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
+            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(ReadCharacteristicOp(characteristic, callback, readCharacteristicTimeoutMs))
@@ -245,17 +245,17 @@ class ConnectionManager(
     ) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
-            callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
+            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         val writeType = if (withResponse) {
@@ -278,12 +278,12 @@ class ConnectionManager(
     ) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
-            callback(Result.failure(IllegalStateException("Characteristic not found: $characteristicUuid")))
+            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
         }
 
@@ -296,7 +296,7 @@ class ConnectionManager(
         val cccdValue: ByteArray
         try {
             if (!gatt.setCharacteristicNotification(characteristic, enable)) {
-                callback(Result.failure(IllegalStateException("Failed to set notification")))
+                callback(Result.failure(BlueyAndroidError.SetNotificationFailed(characteristicUuid)))
                 return
             }
             cccd = characteristic.getDescriptor(CCCD_UUID)
@@ -315,12 +315,12 @@ class ConnectionManager(
                     BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE ?: byteArrayOf(0x01, 0x00)
             }
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(
@@ -335,17 +335,17 @@ class ConnectionManager(
     ) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val descriptor = findDescriptor(gatt, descriptorUuid)
         if (descriptor == null) {
-            callback(Result.failure(IllegalStateException("Descriptor not found: $descriptorUuid")))
+            callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(ReadDescriptorOp(descriptor, callback, readDescriptorTimeoutMs))
@@ -359,17 +359,17 @@ class ConnectionManager(
     ) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val descriptor = findDescriptor(gatt, descriptorUuid)
         if (descriptor == null) {
-            callback(Result.failure(IllegalStateException("Descriptor not found: $descriptorUuid")))
+            callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(WriteDescriptorOp(descriptor, value, callback, writeDescriptorTimeoutMs))
@@ -378,12 +378,12 @@ class ConnectionManager(
     fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(RequestMtuOp(mtu.toInt(), callback, requestMtuTimeoutMs))
@@ -392,12 +392,12 @@ class ConnectionManager(
     fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
         val gatt = connections[deviceId]
         if (gatt == null) {
-            callback(Result.failure(IllegalStateException("Device not connected: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
-            callback(Result.failure(IllegalStateException("No queue for connection: $deviceId")))
+            callback(Result.failure(BlueyAndroidError.NoQueueForConnection))
             return
         }
         queue.enqueue(ReadRssiOp(callback, readRssiTimeoutMs))
@@ -538,13 +538,13 @@ class ConnectionManager(
                         // Connection failed or disconnected - invoke pending callback with error if present
                         val pendingCallback = pendingConnections.remove(deviceId)
                         if (pendingCallback != null) {
-                            val errorMessage = if (status != BluetoothGatt.GATT_SUCCESS) {
-                                "Connection failed with status: $status"
+                            val error = if (status != BluetoothGatt.GATT_SUCCESS) {
+                                statusFailedError("Connection", status)
                             } else {
-                                "Connection failed"
+                                BlueyAndroidError.GattConnectionCreationFailed
                             }
                             handler.post {
-                                pendingCallback.invoke(Result.failure(IllegalStateException(errorMessage)))
+                                pendingCallback.invoke(Result.failure(error))
                             }
                         }
                         // Clean up

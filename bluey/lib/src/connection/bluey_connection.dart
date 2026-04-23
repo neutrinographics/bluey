@@ -30,6 +30,8 @@ import 'lifecycle_client.dart';
 ///     [GattOperationFailedException] carrying the native status
 ///   * [platform.GattOperationUnknownPlatformException] →
 ///     [BlueyPlatformException] preserving the wire-level code
+///   * [platform.PlatformPermissionDeniedException] →
+///     [PermissionDeniedException] wrapping the single denied permission
 Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
@@ -52,6 +54,8 @@ Future<T> _runGattOp<T>(
       code: e.code,
       cause: e,
     );
+  } on platform.PlatformPermissionDeniedException catch (e) {
+    throw PermissionDeniedException([e.permission]);
   } on PlatformException catch (e) {
     // Defensive backstop: any PlatformException that wasn't translated by
     // the platform adapter (e.g. a new native error code we haven't yet

@@ -83,4 +83,23 @@ void main() {
       expect(a, isNot(equals(b)));
     });
   });
+
+  group('PlatformPermissionDeniedException', () {
+    test('carries operation, permission, and message', () {
+      const e = PlatformPermissionDeniedException(
+        'writeCharacteristic',
+        permission: 'BLUETOOTH_CONNECT',
+        message: 'Missing BLUETOOTH_CONNECT permission',
+      );
+      expect(e.operation, 'writeCharacteristic');
+      expect(e.permission, 'BLUETOOTH_CONNECT');
+      expect(e.message, 'Missing BLUETOOTH_CONNECT permission');
+    });
+
+    test('equality by value', () {
+      const a = PlatformPermissionDeniedException('op', permission: 'P');
+      const b = PlatformPermissionDeniedException('op', permission: 'P');
+      expect(a, equals(b));
+    });
+  });
 }

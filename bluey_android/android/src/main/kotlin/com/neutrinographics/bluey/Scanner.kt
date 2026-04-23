@@ -41,14 +41,14 @@ class Scanner(
     fun startScan(config: ScanConfigDto, callback: (Result<Unit>) -> Unit) {
         // Check permissions
         if (!hasRequiredPermissions()) {
-            callback(Result.failure(SecurityException("Missing required permissions")))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_SCAN")))
             return
         }
 
         // Check Bluetooth state
         val adapter = bluetoothAdapter
         if (adapter == null || !adapter.isEnabled) {
-            callback(Result.failure(IllegalStateException("Bluetooth not available or disabled")))
+            callback(Result.failure(BlueyAndroidError.BluetoothNotAvailableOrDisabled))
             return
         }
 
@@ -58,7 +58,7 @@ class Scanner(
         // Get BLE scanner
         bleScanner = adapter.bluetoothLeScanner
         if (bleScanner == null) {
-            callback(Result.failure(IllegalStateException("BLE scanner not available")))
+            callback(Result.failure(BlueyAndroidError.BleScannerNotAvailable))
             return
         }
 
@@ -104,7 +104,7 @@ class Scanner(
 
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_SCAN")))
         } catch (e: Exception) {
             callback(Result.failure(e))
         }

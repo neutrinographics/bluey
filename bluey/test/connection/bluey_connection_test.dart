@@ -120,4 +120,59 @@ void main() {
       }
     });
   });
+
+  group('_runGattOp PlatformPermissionDeniedException translation', () {
+    test('wraps PlatformPermissionDeniedException as PermissionDeniedException',
+        () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      fakePlatform.simulatePeripheral(
+        id: TestDeviceIds.device1,
+        name: 'Test',
+        services: [
+          TestServiceBuilder(TestUuids.customService)
+              .withReadable(TestUuids.customChar1)
+              .build(),
+        ],
+        characteristicValues: {
+          TestUuids.customChar1: Uint8List.fromList([0x01]),
+        },
+      );
+      await fakePlatform.connect(
+        TestDeviceIds.device1,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      fakePlatform.simulateReadError(
+        const platform.PlatformPermissionDeniedException(
+          'readCharacteristic',
+          permission: 'BLUETOOTH_CONNECT',
+          message: 'Missing BLUETOOTH_CONNECT permission',
+        ),
+      );
+
+      final char = BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: true,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+      );
+
+      try {
+        await char.read();
+        fail('expected PermissionDeniedException');
+      } on PermissionDeniedException catch (e) {
+        expect(e.permissions, ['BLUETOOTH_CONNECT']);
+      }
+    });
+  });
 }

@@ -144,3 +144,45 @@ class GattOperationUnknownPlatformException implements Exception {
   @override
   int get hashCode => Object.hash(operation, code, message);
 }
+
+/// A platform operation failed because a required runtime permission was
+/// denied. Currently Android-specific — iOS has no runtime-permission
+/// equivalent that can fire mid-op (the CBManagerState.unauthorized case
+/// is handled via `Bluey.state`).
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into [PermissionDeniedException] at the public API boundary.
+class PlatformPermissionDeniedException implements Exception {
+  /// Name of the platform interface method that triggered the check,
+  /// e.g. `'writeCharacteristic'`. Used for diagnostics.
+  final String operation;
+
+  /// The single missing permission name, e.g. `'BLUETOOTH_CONNECT'`,
+  /// as reported by the native layer.
+  final String permission;
+
+  /// Optional human-readable message from the native layer.
+  final String? message;
+
+  const PlatformPermissionDeniedException(
+    this.operation, {
+    required this.permission,
+    this.message,
+  });
+
+  @override
+  String toString() =>
+      'PlatformPermissionDeniedException: $operation denied '
+      '(permission: $permission)${message != null ? ' - $message' : ''}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlatformPermissionDeniedException &&
+      other.operation == operation &&
+      other.permission == permission &&
+      other.message == message;
+
+  @override
+  int get hashCode => Object.hash(operation, permission, message);
+}

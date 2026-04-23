@@ -710,6 +710,91 @@ void main() {
           );
         },
       );
+
+      test(
+        'writeCharacteristic translates PlatformException(bluey-permission-denied) '
+        'to PlatformPermissionDeniedException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(
+              code: 'bluey-permission-denied',
+              message: 'Missing BLUETOOTH_CONNECT permission',
+              details: 'BLUETOOTH_CONNECT',
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformPermissionDeniedException>()
+                  .having((e) => e.permission, 'permission', 'BLUETOOTH_CONNECT')
+                  .having((e) => e.operation, 'operation', 'writeCharacteristic'),
+            ),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic translates bluey-permission-denied with null details '
+        'to permission "unknown"',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(
+              code: 'bluey-permission-denied',
+              message: 'Missing permission',
+              details: null,
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformPermissionDeniedException>()
+                  .having((e) => e.permission, 'permission', 'unknown'),
+            ),
+          );
+        },
+      );
+
+      test(
+        'writeCharacteristic translates bluey-permission-denied with non-String details '
+        'to permission "unknown"',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(
+              code: 'bluey-permission-denied',
+              message: 'Missing permission',
+              details: 42, // non-String — defensive fallback
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformPermissionDeniedException>()
+                  .having((e) => e.permission, 'permission', 'unknown'),
+            ),
+          );
+        },
+      );
     });
   });
 }

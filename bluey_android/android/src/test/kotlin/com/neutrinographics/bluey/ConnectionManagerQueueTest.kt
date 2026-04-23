@@ -316,9 +316,14 @@ class ConnectionManagerQueueTest {
 
         assertNotNull("callback must fire even when sync enable throws", captured)
         assertTrue(captured!!.isFailure)
-        assertSame(
-            "SecurityException must not be masked by the setNotification path",
-            denied, captured!!.exceptionOrNull(),
+        val error = captured!!.exceptionOrNull()
+        assertTrue(
+            "SecurityException must surface as BlueyAndroidError.PermissionDenied",
+            error is BlueyAndroidError.PermissionDenied,
+        )
+        assertEquals(
+            "BLUETOOTH_CONNECT",
+            (error as BlueyAndroidError.PermissionDenied).permission,
         )
     }
 
