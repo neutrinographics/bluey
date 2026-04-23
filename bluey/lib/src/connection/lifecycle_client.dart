@@ -3,7 +3,6 @@ import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
-import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -197,16 +196,25 @@ class LifecycleClient {
   }
 
   /// Whether [error] is evidence that the peer is no longer reachable.
-  /// See spec "Test isolation" and earlier lifecycle fixes for the
-  /// full list of dead-peer signals.
+  ///
+  /// Treated as dead-peer signals:
+  ///
+  /// * [platform.GattOperationTimeoutException] — the peer stopped
+  ///   acknowledging within the per-op timeout.
+  /// * [platform.GattOperationDisconnectedException] — drained on link
+  ///   drop. iOS maps `BlueyError.notFound` / `notConnected` through
+  ///   `gatt-disconnected` to this exception so the translation below
+  ///   is unchanged from Android's behaviour.
+  /// * [platform.GattOperationStatusFailedException] — Android-client→
+  ///   iOS-server force-kill path: iOS fires a Service Changed
+  ///   indication on the way out, invalidating Android's cached handle;
+  ///   every subsequent heartbeat write returns GATT_INVALID_HANDLE
+  ///   (0x01). Also covers iOS client→iOS server ATT errors now that
+  ///   `CBATTErrorDomain` NSErrors surface as typed.
   bool _isDeadPeerSignal(Object error) {
     if (error is platform.GattOperationTimeoutException) return true;
     if (error is platform.GattOperationDisconnectedException) return true;
     if (error is platform.GattOperationStatusFailedException) return true;
-    if (error is PlatformException &&
-        (error.code == 'notFound' || error.code == 'notConnected')) {
-      return true;
-    }
     return false;
   }
 }

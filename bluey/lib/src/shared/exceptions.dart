@@ -252,7 +252,14 @@ class UnsupportedOperationException extends BlueyException {
 }
 
 /// Generic platform exception for errors that don't fit other categories.
+///
+/// [code] is the platform-originated error code (e.g. a Pigeon error code
+/// like `'bluey-unknown'`, or an iOS `NSError`/`PlatformException` code
+/// pass-through from the defensive catch-all in `_runGattOp`). Null when
+/// the exception is constructed without a known code.
 class BlueyPlatformException extends BlueyException {
-  BlueyPlatformException(String message, {Object? cause})
+  final String? code;
+
+  BlueyPlatformException(String message, {this.code, Object? cause})
     : super(message, cause: cause);
 }

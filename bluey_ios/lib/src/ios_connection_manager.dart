@@ -18,6 +18,7 @@ import 'uuid_utils.dart';
 ///     with the Android contract so that any future native-side mapping
 ///     (e.g. of `CBError` numeric codes) surfaces as the same typed
 ///     exception.
+///   * `'bluey-unknown'` → [GattOperationUnknownPlatformException]
 ///
 /// Other errors propagate unchanged.
 ///
@@ -40,6 +41,13 @@ Future<T> _translateGattPlatformError<T>(
     if (e.code == 'gatt-status-failed') {
       final status = e.details is int ? e.details as int : -1;
       throw GattOperationStatusFailedException(operation, status);
+    }
+    if (e.code == 'bluey-unknown') {
+      throw GattOperationUnknownPlatformException(
+        operation,
+        code: 'bluey-unknown',
+        message: e.message,
+      );
     }
     rethrow;
   }

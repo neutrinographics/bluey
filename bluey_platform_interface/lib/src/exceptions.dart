@@ -101,3 +101,46 @@ class GattOperationStatusFailedException implements Exception {
   @override
   int get hashCode => Object.hash(operation, status);
 }
+
+/// A platform operation failed with a code we couldn't translate into a
+/// specific typed GATT exception (e.g. `BlueyError.unknown` on iOS, or
+/// any `NSError` whose domain/code we haven't mapped). Carries the
+/// wire-level [code] and [message] for diagnostics.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; `BlueyConnection` translates
+/// this into [BlueyPlatformException] at the public API boundary.
+class GattOperationUnknownPlatformException implements Exception {
+  /// Name of the platform interface method that failed, e.g.
+  /// `'writeCharacteristic'`. Used for diagnostics; not parsed by callers.
+  final String operation;
+
+  /// The wire-level error code emitted by the platform adapter (e.g.
+  /// `'bluey-unknown'`). Preserved as-is so the public-API boundary can
+  /// surface it without further lossy translation.
+  final String code;
+
+  /// Human-readable message from the platform layer, if available.
+  final String? message;
+
+  const GattOperationUnknownPlatformException(
+    this.operation, {
+    required this.code,
+    this.message,
+  });
+
+  @override
+  String toString() =>
+      'GattOperationUnknownPlatformException: $operation failed with code "$code"'
+      '${message != null ? ' - $message' : ''}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is GattOperationUnknownPlatformException &&
+      other.operation == operation &&
+      other.code == code &&
+      other.message == message;
+
+  @override
+  int get hashCode => Object.hash(operation, code, message);
+}

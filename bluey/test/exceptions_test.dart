@@ -264,4 +264,19 @@ void main() {
       );
     });
   });
+
+  group('BlueyPlatformException', () {
+    test('exposes message, code, and cause', () {
+      final cause = Exception('underlying');
+      final e = BlueyPlatformException('boom', code: 'widget-broke', cause: cause);
+      expect(e.message, 'boom');
+      expect(e.code, 'widget-broke');
+      expect(e.cause, same(cause));
+    });
+
+    test('code is optional and defaults to null', () {
+      final e = BlueyPlatformException('boom');
+      expect(e.code, isNull);
+    });
+  });
 }

@@ -108,6 +108,23 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// onLastCancel) that would otherwise produce unhandled async errors.
   bool simulateSetNotificationDisconnected = false;
 
+  /// When non-null, readCharacteristic throws a [PlatformException] with
+  /// this [PlatformException.code]. Models platform-layer errors that are
+  /// emitted BEFORE reaching the typed-exception translation helper (e.g.
+  /// iOS Swift errors with codes not yet mapped by the platform adapter).
+  String? simulateReadPlatformErrorCode;
+
+  /// When non-null, readCharacteristic throws a
+  /// [GattOperationUnknownPlatformException] carrying this code and an
+  /// optional [simulateReadUnknownPlatformExceptionMessage]. Models the
+  /// typed exception the iOS adapter emits for `bluey-unknown` errors so
+  /// that `_runGattOp`'s translation branch can be exercised in unit tests
+  /// without a real platform channel.
+  String? simulateReadUnknownPlatformExceptionCode;
+
+  /// Optional message for [simulateReadUnknownPlatformExceptionCode].
+  String? simulateReadUnknownPlatformExceptionMessage;
+
   /// When non-null, writeCharacteristic throws a [PlatformException] with
   /// this [PlatformException.code]. Models platform-layer errors that are
   /// emitted BEFORE reaching the typed-exception translation helper (e.g.
@@ -490,6 +507,23 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
   ) async {
+    final code = simulateReadPlatformErrorCode;
+    if (code != null) {
+      simulateReadPlatformErrorCode = null;
+      throw PlatformException(code: code);
+    }
+    final unknownCode = simulateReadUnknownPlatformExceptionCode;
+    if (unknownCode != null) {
+      simulateReadUnknownPlatformExceptionCode = null;
+      final msg = simulateReadUnknownPlatformExceptionMessage;
+      simulateReadUnknownPlatformExceptionMessage = null;
+      throw GattOperationUnknownPlatformException(
+        'readCharacteristic',
+        code: unknownCode,
+        message: msg,
+      );
+    }
+
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');

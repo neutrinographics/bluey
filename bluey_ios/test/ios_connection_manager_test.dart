@@ -801,6 +801,31 @@ void main() {
           );
         },
       );
+
+      test(
+        'writeCharacteristic translates PlatformException(bluey-unknown) '
+        'to GattOperationUnknownPlatformException',
+        () async {
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
+              .thenThrow(
+            PlatformException(code: 'bluey-unknown', message: 'opaque native error'),
+          );
+
+          await expectLater(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              'char-uuid',
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<GattOperationUnknownPlatformException>()
+                  .having((e) => e.code, 'code', 'bluey-unknown')
+                  .having((e) => e.message, 'message', contains('opaque native error')),
+            ),
+          );
+        },
+      );
     });
   });
 }

@@ -63,7 +63,7 @@ class PeripheralManagerImpl: NSObject {
     func removeService(serviceUuid: String, completion: @escaping (Result<Void, Error>) -> Void) {
         let uuid = serviceUuid.lowercased()
         guard let service = services.removeValue(forKey: uuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
@@ -111,7 +111,7 @@ class PeripheralManagerImpl: NSObject {
     func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
         let uuid = characteristicUuid.lowercased()
         guard let characteristic = characteristics[uuid] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
@@ -121,19 +121,19 @@ class PeripheralManagerImpl: NSObject {
         } else {
             // Queue is full, will retry when isReadyToUpdateSubscribers is called
             // For simplicity, we report failure here
-            completion(.failure(BlueyError.unknown))
+            completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
     }
 
     func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
         let uuid = characteristicUuid.lowercased()
         guard let characteristic = characteristics[uuid] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
         guard let central = centrals[centralId] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
@@ -141,7 +141,7 @@ class PeripheralManagerImpl: NSObject {
         if success {
             completion(.success(()))
         } else {
-            completion(.failure(BlueyError.unknown))
+            completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
     }
 
@@ -149,7 +149,7 @@ class PeripheralManagerImpl: NSObject {
 
     func respondToReadRequest(requestId: Int, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let request = pendingReadRequests.removeValue(forKey: requestId) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
@@ -163,7 +163,7 @@ class PeripheralManagerImpl: NSObject {
 
     func respondToWriteRequest(requestId: Int, status: GattStatusDto, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let requests = pendingWriteRequests.removeValue(forKey: requestId), let firstRequest = requests.first else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
 
@@ -238,7 +238,11 @@ class PeripheralManagerImpl: NSObject {
 
         if let error = error {
             services.removeValue(forKey: serviceUuid)
-            completion(.failure(error))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
+            } else {
+                completion(.failure(BlueyError.unknown.toServerPigeonError()))
+            }
         } else {
             completion(.success(()))
         }
@@ -251,7 +255,11 @@ class PeripheralManagerImpl: NSObject {
         startAdvertisingCompletion = nil
 
         if let error = error {
-            completion(.failure(error))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
+            } else {
+                completion(.failure(BlueyError.unknown.toServerPigeonError()))
+            }
         } else {
             completion(.success(()))
         }

@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -27,6 +28,8 @@ import 'lifecycle_client.dart';
 ///     [DisconnectedException] with [DisconnectReason.linkLoss]
 ///   * [platform.GattOperationStatusFailedException] →
 ///     [GattOperationFailedException] carrying the native status
+///   * [platform.GattOperationUnknownPlatformException] →
+///     [BlueyPlatformException] preserving the wire-level code
 Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
@@ -43,6 +46,21 @@ Future<T> _runGattOp<T>(
     throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
   } on platform.GattOperationStatusFailedException catch (e) {
     throw GattOperationFailedException(operation, e.status);
+  } on platform.GattOperationUnknownPlatformException catch (e) {
+    throw BlueyPlatformException(
+      e.message ?? 'unknown platform error (${e.code})',
+      code: e.code,
+      cause: e,
+    );
+  } on PlatformException catch (e) {
+    // Defensive backstop: any PlatformException that wasn't translated by
+    // the platform adapter (e.g. a new native error code we haven't yet
+    // mapped) gets wrapped so user code only ever catches BlueyException.
+    throw BlueyPlatformException(
+      e.message ?? 'platform error (${e.code})',
+      code: e.code,
+      cause: e,
+    );
   }
 }
 

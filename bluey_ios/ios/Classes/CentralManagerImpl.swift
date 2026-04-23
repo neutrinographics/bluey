@@ -120,18 +120,18 @@ class CentralManagerImpl: NSObject {
     func openSettings(completion: @escaping (Result<Void, Error>) -> Void) {
         #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else {
-            completion(.failure(BlueyError.unknown))
+            completion(.failure(BlueyError.unknown.toClientPigeonError()))
             return
         }
         UIApplication.shared.open(url) { success in
             if success {
                 completion(.success(()))
             } else {
-                completion(.failure(BlueyError.unknown))
+                completion(.failure(BlueyError.unknown.toClientPigeonError()))
             }
         }
         #else
-        completion(.failure(BlueyError.unsupported))
+        completion(.failure(BlueyError.unsupported.toClientPigeonError()))
         #endif
     }
 
@@ -154,7 +154,7 @@ class CentralManagerImpl: NSObject {
 
     func connect(deviceId: String, config: ConnectConfigDto, completion: @escaping (Result<String, Error>) -> Void) {
         guard let peripheral = peripherals[deviceId] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
@@ -178,7 +178,7 @@ class CentralManagerImpl: NSObject {
             self.connectTimers.removeValue(forKey: deviceId)
             if let pendingCompletion = self.connectCompletions.removeValue(forKey: deviceId) {
                 self.centralManager.cancelPeripheralConnection(peripheral)
-                pendingCompletion(.failure(BlueyError.timeout))
+                pendingCompletion(.failure(BlueyError.timeout.toClientPigeonError()))
             }
         }
         connectTimers[deviceId] = timer
@@ -187,7 +187,7 @@ class CentralManagerImpl: NSObject {
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let peripheral = peripherals[deviceId] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
@@ -199,12 +199,12 @@ class CentralManagerImpl: NSObject {
 
     func discoverServices(deviceId: String, completion: @escaping (Result<[ServiceDto], Error>) -> Void) {
         guard let peripheral = peripherals[deviceId] else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -230,12 +230,12 @@ class CentralManagerImpl: NSObject {
     func readCharacteristic(deviceId: String, characteristicUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
         guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -258,12 +258,12 @@ class CentralManagerImpl: NSObject {
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
         guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -295,12 +295,12 @@ class CentralManagerImpl: NSObject {
     func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
         guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -339,12 +339,12 @@ class CentralManagerImpl: NSObject {
     func readDescriptor(deviceId: String, descriptorUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
         guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -367,12 +367,12 @@ class CentralManagerImpl: NSObject {
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
         guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
-            completion(.failure(BlueyError.notFound))
+            completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
 
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -427,7 +427,7 @@ class CentralManagerImpl: NSObject {
 
     func readRssi(deviceId: String, completion: @escaping (Result<Int64, Error>) -> Void) {
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
-            completion(.failure(BlueyError.notConnected))
+            completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return
         }
 
@@ -489,7 +489,11 @@ class CentralManagerImpl: NSObject {
         connectTimers.removeValue(forKey: deviceId)?.cancel()
 
         if let completion = connectCompletions.removeValue(forKey: deviceId) {
-            completion(.failure(error ?? BlueyError.unknown))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
+            } else {
+                completion(.failure(BlueyError.unknown.toClientPigeonError()))
+            }
         }
     }
 
@@ -506,7 +510,9 @@ class CentralManagerImpl: NSObject {
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
 
         // Clear pending completions with error
-        clearPendingCompletions(for: deviceId, error: error ?? BlueyError.unknown)
+        let pigeonError: Error = (error as NSError?)?.toPigeonError()
+            ?? BlueyError.unknown.toClientPigeonError()
+        clearPendingCompletions(for: deviceId, error: pigeonError)
 
         // Notify connection state change
         let event = ConnectionStateEventDto(deviceId: deviceId, state: .disconnected)
@@ -514,8 +520,8 @@ class CentralManagerImpl: NSObject {
 
         // Complete the disconnect
         if let completion = disconnectCompletions.removeValue(forKey: deviceId) {
-            if let error = error {
-                completion(.failure(error))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
             } else {
                 completion(.success(()))
             }
@@ -532,10 +538,10 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
+        if let nsError = error as? NSError {
             discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
             let completion = discoverServicesCompletions.removeValue(forKey: deviceId)
-            completion?(.failure(error))
+            completion?(.failure(nsError.toPigeonError()))
             return
         }
 
@@ -667,8 +673,8 @@ class CentralManagerImpl: NSObject {
         if let completion = readCharacteristicCompletions[deviceId]?.removeValue(forKey: charUuid) {
             // Cancel the pending timeout since the read completed
             readCharacteristicTimers[deviceId]?.removeValue(forKey: charUuid)?.cancel()
-            if let error = error {
-                completion(.failure(error))
+            if let nsError = error as? NSError {
+                completion(.failure(nsError.toPigeonError()))
             } else {
                 let value = characteristic.value ?? Data()
                 completion(.success(FlutterStandardTypedData(bytes: value)))
@@ -701,8 +707,8 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
-            completion(.failure(error))
+        if let nsError = error as? NSError {
+            completion(.failure(nsError.toPigeonError()))
         } else {
             completion(.success(()))
         }
@@ -716,8 +722,8 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
-            completion(.failure(error))
+        if let nsError = error as? NSError {
+            completion(.failure(nsError.toPigeonError()))
         } else {
             completion(.success(()))
         }
@@ -734,8 +740,8 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
-            completion(.failure(error))
+        if let nsError = error as? NSError {
+            completion(.failure(nsError.toPigeonError()))
         } else {
             let value: Data
             switch descriptor.value {
@@ -764,8 +770,8 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
-            completion(.failure(error))
+        if let nsError = error as? NSError {
+            completion(.failure(nsError.toPigeonError()))
         } else {
             completion(.success(()))
         }
@@ -792,8 +798,8 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        if let error = error {
-            completion(.failure(error))
+        if let nsError = error as? NSError {
+            completion(.failure(nsError.toPigeonError()))
         } else {
             completion(.success(rssi.int64Value))
         }
