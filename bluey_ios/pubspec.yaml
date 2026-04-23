@@ -12,8 +12,6 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  bluey:
-    path: ../bluey
   bluey_platform_interface:
     path: ../bluey_platform_interface
 

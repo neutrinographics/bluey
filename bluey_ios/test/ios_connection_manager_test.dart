@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:bluey/bluey.dart' show BlueyPlatformException;
 import 'package:bluey_ios/src/ios_connection_manager.dart';
 import 'package:bluey_ios/src/messages.g.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
@@ -805,7 +804,7 @@ void main() {
 
       test(
         'writeCharacteristic translates PlatformException(bluey-unknown) '
-        'to BlueyPlatformException',
+        'to GattOperationUnknownPlatformException',
         () async {
           when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
               .thenThrow(
@@ -820,8 +819,8 @@ void main() {
               true,
             ),
             throwsA(
-              isA<BlueyPlatformException>()
-                  .having((e) => e.code, 'code', 'unknown')
+              isA<GattOperationUnknownPlatformException>()
+                  .having((e) => e.code, 'code', 'bluey-unknown')
                   .having((e) => e.message, 'message', contains('opaque native error')),
             ),
           );
