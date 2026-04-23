@@ -104,7 +104,7 @@ class Scanner(
 
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_SCAN")))
         } catch (e: Exception) {
             callback(Result.failure(e))
         }

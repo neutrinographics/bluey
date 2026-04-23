@@ -91,7 +91,7 @@ class GattServer(
         } catch (e: SecurityException) {
             Log.e("GattServer", "addService: SecurityException", e)
             pendingServiceCallback = null
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -110,7 +110,7 @@ class GattServer(
             }
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         } catch (e: Exception) {
             callback(Result.failure(e))
         }
@@ -148,7 +148,7 @@ class GattServer(
             }
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -181,7 +181,7 @@ class GattServer(
             sendNotification(server, device, characteristic, value)
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 
@@ -235,7 +235,7 @@ class GattServer(
             server.cancelConnection(device)
             callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
 

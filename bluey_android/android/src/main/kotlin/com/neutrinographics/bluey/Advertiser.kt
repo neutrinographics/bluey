@@ -150,7 +150,7 @@ class Advertiser(
         try {
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, advertiseCallback)
         } catch (e: SecurityException) {
-            callback(Result.failure(e))
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_ADVERTISE")))
         }
     }
 
