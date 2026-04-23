@@ -27,28 +27,17 @@ class CentralManagerImpl: NSObject {
     private var characteristics: [String: [String: CBCharacteristic]] = [:] // [deviceId: [charUuid: char]]
     private var descriptors: [String: [String: CBDescriptor]] = [:] // [deviceId: [descUuid: desc]]
 
-    // Completion handlers
-    private var connectCompletions: [String: (Result<Void, Error>) -> Void] = [:]
-    private var disconnectCompletions: [String: (Result<Void, Error>) -> Void] = [:]
-    private var discoverServicesCompletions: [String: (Result<[ServiceDto], Error>) -> Void] = [:]
-    private var readCharacteristicCompletions: [String: [String: (Result<FlutterStandardTypedData, Error>) -> Void]] = [:]
-    private var writeCharacteristicCompletions: [String: [String: (Result<Void, Error>) -> Void]] = [:]
-    private var notifyCompletions: [String: [String: (Result<Void, Error>) -> Void]] = [:]
-    private var readDescriptorCompletions: [String: [String: (Result<FlutterStandardTypedData, Error>) -> Void]] = [:]
-    private var writeDescriptorCompletions: [String: [String: (Result<Void, Error>) -> Void]] = [:]
-    private var readRssiCompletions: [String: (Result<Int64, Error>) -> Void] = [:]
-
-    // Timeout work items — kept alongside completion maps so that a completed
-    // operation's timer can be cancelled. Without this, a stale timer from a
-    // finished operation will fire and cancel a newer operation that happens
-    // to reuse the same completion key (same characteristic/device).
-    private var connectTimers: [String: DispatchWorkItem] = [:]
-    private var discoverServicesTimers: [String: DispatchWorkItem] = [:]
-    private var readCharacteristicTimers: [String: [String: DispatchWorkItem]] = [:]
-    private var writeCharacteristicTimers: [String: [String: DispatchWorkItem]] = [:]
-    private var readDescriptorTimers: [String: [String: DispatchWorkItem]] = [:]
-    private var writeDescriptorTimers: [String: [String: DispatchWorkItem]] = [:]
-    private var readRssiTimers: [String: DispatchWorkItem] = [:]
+    // Pending completion slots — one FIFO per (device, key). Each OpSlot
+    // owns its head-of-queue timer. See OpSlot.swift for semantics.
+    private var connectSlots: [String: OpSlot<Void>] = [:]
+    private var disconnectSlots: [String: OpSlot<Void>] = [:]
+    private var discoverServicesSlots: [String: OpSlot<[ServiceDto]>] = [:]
+    private var readCharacteristicSlots: [String: [String: OpSlot<FlutterStandardTypedData>]] = [:]
+    private var writeCharacteristicSlots: [String: [String: OpSlot<Void>]] = [:]
+    private var notifySlots: [String: [String: OpSlot<Void>]] = [:]
+    private var readDescriptorSlots: [String: [String: OpSlot<FlutterStandardTypedData>]] = [:]
+    private var writeDescriptorSlots: [String: [String: OpSlot<Void>]] = [:]
+    private var readRssiSlots: [String: OpSlot<Int64>] = [:]
 
     // Configurable timeout values — set via configure(), defaults match previous hardcoded values
     private var connectTimeout: TimeInterval = 30.0
@@ -158,31 +147,35 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        connectCompletions[deviceId] = { result in
-            switch result {
-            case .success:
-                completion(.success(deviceId))
-            case .failure(let error):
-                completion(.failure(error))
-            }
-        }
-
-        centralManager.connect(peripheral, options: nil)
-
-        // Schedule timeout
         let timeoutSeconds = config.timeoutMs != nil
             ? TimeInterval(config.timeoutMs!) / 1000.0
             : connectTimeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.connectTimers.removeValue(forKey: deviceId)
-            if let pendingCompletion = self.connectCompletions.removeValue(forKey: deviceId) {
-                self.centralManager.cancelPeripheralConnection(peripheral)
-                pendingCompletion(.failure(BlueyError.timeout.toClientPigeonError()))
-            }
-        }
-        connectTimers[deviceId] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds, execute: timer)
+
+        let slot = connectSlots[deviceId] ?? OpSlot<Void>()
+        connectSlots[deviceId] = slot
+        slot.enqueue(
+            completion: { [weak self] result in
+                switch result {
+                case .success:
+                    completion(.success(deviceId))
+                case .failure(let err):
+                    // Cancel the underlying CoreBluetooth attempt only if
+                    // the peripheral isn't already connected. Stacked
+                    // connects could queue behind a successful head; if
+                    // such a queued entry later times out, we must not
+                    // tear down the live connection belonging to the
+                    // caller that already got its success.
+                    if let manager = self?.centralManager,
+                       peripheral.state != .connected {
+                        manager.cancelPeripheralConnection(peripheral)
+                    }
+                    completion(.failure(err))
+                }
+            },
+            timeoutSeconds: timeoutSeconds,
+            makeTimeoutError: BlueyError.timeout.toClientPigeonError()
+        )
+        centralManager.connect(peripheral, options: nil)
     }
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -191,7 +184,13 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        disconnectCompletions[deviceId] = completion
+        let slot = disconnectSlots[deviceId] ?? OpSlot<Void>()
+        disconnectSlots[deviceId] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: 30.0,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Disconnect timed out", details: nil)
+        )
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
@@ -208,21 +207,20 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        discoverServicesCompletions[deviceId] = completion
+        let slot = discoverServicesSlots[deviceId] ?? OpSlot<[ServiceDto]>()
+        discoverServicesSlots[deviceId] = slot
+        slot.enqueue(
+            completion: { [weak self] result in
+                // Clear per-discovery tracking regardless of outcome so a
+                // subsequent call starts fresh.
+                self?.pendingServiceDiscovery.removeValue(forKey: deviceId)
+                self?.pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
+                completion(result)
+            },
+            timeoutSeconds: discoverServicesTimeout,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Service discovery timed out", details: nil)
+        )
         peripheral.discoverServices(nil)
-
-        // Schedule timeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.discoverServicesTimers.removeValue(forKey: deviceId)
-            if let pendingCompletion = self.discoverServicesCompletions.removeValue(forKey: deviceId) {
-                self.pendingServiceDiscovery.removeValue(forKey: deviceId)
-                self.pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
-                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Service discovery timed out", details: nil)))
-            }
-        }
-        discoverServicesTimers[deviceId] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + discoverServicesTimeout, execute: timer)
     }
 
     // MARK: - Characteristic Operations
@@ -240,19 +238,14 @@ class CentralManagerImpl: NSObject {
         }
 
         let cacheKey = characteristic.uuid.uuidString.lowercased()
-        readCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
+        let slot = readCharacteristicSlots[deviceId, default: [:]][cacheKey] ?? OpSlot<FlutterStandardTypedData>()
+        readCharacteristicSlots[deviceId, default: [:]][cacheKey] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: readCharacteristicTimeout,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Read characteristic timed out", details: nil)
+        )
         peripheral.readValue(for: characteristic)
-
-        // Schedule timeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.readCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
-            if let pendingCompletion = self.readCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Read characteristic timed out", details: nil)))
-            }
-        }
-        readCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + readCharacteristicTimeout, execute: timer)
     }
 
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -271,18 +264,13 @@ class CentralManagerImpl: NSObject {
 
         if withResponse {
             let cacheKey = characteristic.uuid.uuidString.lowercased()
-            writeCharacteristicCompletions[deviceId, default: [:]][cacheKey] = completion
-
-            // Schedule timeout
-            let timer = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
-                self.writeCharacteristicTimers[deviceId]?.removeValue(forKey: cacheKey)
-                if let pendingCompletion = self.writeCharacteristicCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                    pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Write characteristic timed out", details: nil)))
-                }
-            }
-            writeCharacteristicTimers[deviceId, default: [:]][cacheKey] = timer
-            DispatchQueue.main.asyncAfter(deadline: .now() + writeCharacteristicTimeout, execute: timer)
+            let slot = writeCharacteristicSlots[deviceId, default: [:]][cacheKey] ?? OpSlot<Void>()
+            writeCharacteristicSlots[deviceId, default: [:]][cacheKey] = slot
+            slot.enqueue(
+                completion: completion,
+                timeoutSeconds: writeCharacteristicTimeout,
+                makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Write characteristic timed out", details: nil)
+            )
         }
 
         peripheral.writeValue(value.data, for: characteristic, type: type)
@@ -305,7 +293,13 @@ class CentralManagerImpl: NSObject {
         }
 
         let cacheKey = characteristic.uuid.uuidString.lowercased()
-        notifyCompletions[deviceId, default: [:]][cacheKey] = completion
+        let slot = notifySlots[deviceId, default: [:]][cacheKey] ?? OpSlot<Void>()
+        notifySlots[deviceId, default: [:]][cacheKey] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: 10.0,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Set notification timed out", details: nil)
+        )
         peripheral.setNotifyValue(enable, for: characteristic)
     }
 
@@ -349,19 +343,14 @@ class CentralManagerImpl: NSObject {
         }
 
         let cacheKey = descriptor.uuid.uuidString.lowercased()
-        readDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
+        let slot = readDescriptorSlots[deviceId, default: [:]][cacheKey] ?? OpSlot<FlutterStandardTypedData>()
+        readDescriptorSlots[deviceId, default: [:]][cacheKey] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: readDescriptorTimeout,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Read descriptor timed out", details: nil)
+        )
         peripheral.readValue(for: descriptor)
-
-        // Schedule timeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.readDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
-            if let pendingCompletion = self.readDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Read descriptor timed out", details: nil)))
-            }
-        }
-        readDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + readDescriptorTimeout, execute: timer)
     }
 
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -377,19 +366,14 @@ class CentralManagerImpl: NSObject {
         }
 
         let cacheKey = descriptor.uuid.uuidString.lowercased()
-        writeDescriptorCompletions[deviceId, default: [:]][cacheKey] = completion
+        let slot = writeDescriptorSlots[deviceId, default: [:]][cacheKey] ?? OpSlot<Void>()
+        writeDescriptorSlots[deviceId, default: [:]][cacheKey] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: writeDescriptorTimeout,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Write descriptor timed out", details: nil)
+        )
         peripheral.writeValue(value.data, for: descriptor)
-
-        // Schedule timeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.writeDescriptorTimers[deviceId]?.removeValue(forKey: cacheKey)
-            if let pendingCompletion = self.writeDescriptorCompletions[deviceId]?.removeValue(forKey: cacheKey) {
-                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "Write descriptor timed out", details: nil)))
-            }
-        }
-        writeDescriptorTimers[deviceId, default: [:]][cacheKey] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + writeDescriptorTimeout, execute: timer)
     }
 
     /// Finds a descriptor by UUID, handling both short and full UUID formats.
@@ -431,19 +415,14 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        readRssiCompletions[deviceId] = completion
+        let slot = readRssiSlots[deviceId] ?? OpSlot<Int64>()
+        readRssiSlots[deviceId] = slot
+        slot.enqueue(
+            completion: completion,
+            timeoutSeconds: readRssiTimeout,
+            makeTimeoutError: PigeonError(code: "gatt-timeout", message: "RSSI read timed out", details: nil)
+        )
         peripheral.readRSSI()
-
-        // Schedule timeout
-        let timer = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.readRssiTimers.removeValue(forKey: deviceId)
-            if let pendingCompletion = self.readRssiCompletions.removeValue(forKey: deviceId) {
-                pendingCompletion(.failure(PigeonError(code: "gatt-timeout", message: "RSSI read timed out", details: nil)))
-            }
-        }
-        readRssiTimers[deviceId] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + readRssiTimeout, execute: timer)
     }
 
     // MARK: - CBCentralManagerDelegate callbacks
@@ -473,28 +452,16 @@ class CentralManagerImpl: NSObject {
         let event = ConnectionStateEventDto(deviceId: deviceId, state: .connected)
         flutterApi.onConnectionStateChanged(event: event) { _ in }
 
-        // Cancel the pending timeout since the connection completed
-        connectTimers.removeValue(forKey: deviceId)?.cancel()
-
         // Complete the connection
-        if let completion = connectCompletions.removeValue(forKey: deviceId) {
-            completion(.success(()))
-        }
+        connectSlots[deviceId]?.completeHead(.success(()))
     }
 
     func didFailToConnect(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
 
-        // Cancel the pending timeout since the connect attempt resolved
-        connectTimers.removeValue(forKey: deviceId)?.cancel()
-
-        if let completion = connectCompletions.removeValue(forKey: deviceId) {
-            if let nsError = error as? NSError {
-                completion(.failure(nsError.toPigeonError()))
-            } else {
-                completion(.failure(BlueyError.unknown.toClientPigeonError()))
-            }
-        }
+        let err: Error = (error as? NSError)?.toPigeonError()
+            ?? BlueyError.unknown.toClientPigeonError()
+        connectSlots[deviceId]?.completeHead(.failure(err))
     }
 
     func didDisconnectPeripheral(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
@@ -509,7 +476,21 @@ class CentralManagerImpl: NSObject {
         pendingServiceDiscovery.removeValue(forKey: deviceId)
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
 
-        // Clear pending completions with error
+        // Pop the head of any user-initiated disconnect BEFORE draining
+        // other slots, so the caller that invoked `disconnect()` gets
+        // success (not the `gatt-disconnected` drain error). We do NOT
+        // remove the slot from the map here; any additional queued
+        // disconnect entries are drained by `clearPendingCompletions`
+        // below so no completion is orphaned.
+        if let disconnectSlot = disconnectSlots[deviceId], !disconnectSlot.isEmpty {
+            if let nsError = error as? NSError {
+                disconnectSlot.completeHead(.failure(nsError.toPigeonError()))
+            } else {
+                disconnectSlot.completeHead(.success(()))
+            }
+        }
+
+        // Drain all remaining pending completions with the disconnect error.
         let pigeonError: Error = (error as NSError?)?.toPigeonError()
             ?? BlueyError.unknown.toClientPigeonError()
         clearPendingCompletions(for: deviceId, error: pigeonError)
@@ -517,15 +498,6 @@ class CentralManagerImpl: NSObject {
         // Notify connection state change
         let event = ConnectionStateEventDto(deviceId: deviceId, state: .disconnected)
         flutterApi.onConnectionStateChanged(event: event) { _ in }
-
-        // Complete the disconnect
-        if let completion = disconnectCompletions.removeValue(forKey: deviceId) {
-            if let nsError = error as? NSError {
-                completion(.failure(nsError.toPigeonError()))
-            } else {
-                completion(.success(()))
-            }
-        }
     }
 
     // MARK: - CBPeripheralDelegate callbacks
@@ -534,14 +506,12 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
 
         // Check if we have a pending completion - if not, this might be a re-discovery
-        guard discoverServicesCompletions[deviceId] != nil else {
+        guard let slot = discoverServicesSlots[deviceId], !slot.isEmpty else {
             return
         }
 
         if let nsError = error as? NSError {
-            discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
-            let completion = discoverServicesCompletions.removeValue(forKey: deviceId)
-            completion?(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
             return
         }
 
@@ -549,9 +519,7 @@ class CentralManagerImpl: NSObject {
 
         // If no services, complete immediately
         if cbServices.isEmpty {
-            discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
-            let completion = discoverServicesCompletions.removeValue(forKey: deviceId)
-            completion?(.success([]))
+            slot.completeHead(.success([]))
             return
         }
 
@@ -646,14 +614,6 @@ class CentralManagerImpl: NSObject {
         pendingServiceDiscovery.removeValue(forKey: deviceId)
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
 
-        // Cancel the pending timeout since discovery completed
-        discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
-
-        // Get the completion handler
-        guard let completion = discoverServicesCompletions.removeValue(forKey: deviceId) else {
-            return
-        }
-
         // Build the final service DTOs with all discovered characteristics and descriptors
         let cbServices = peripheral.services ?? []
         var serviceDtos: [ServiceDto] = []
@@ -662,22 +622,20 @@ class CentralManagerImpl: NSObject {
             serviceDtos.append(service.toDto())
         }
 
-        completion(.success(serviceDtos))
+        discoverServicesSlots[deviceId]?.completeHead(.success(serviceDtos))
     }
 
     func didUpdateCharacteristicValue(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
 
-        // Check if this was a read request
-        if let completion = readCharacteristicCompletions[deviceId]?.removeValue(forKey: charUuid) {
-            // Cancel the pending timeout since the read completed
-            readCharacteristicTimers[deviceId]?.removeValue(forKey: charUuid)?.cancel()
+        // Check if this was a read request (slot has pending entries)
+        if let slot = readCharacteristicSlots[deviceId]?[charUuid], !slot.isEmpty {
             if let nsError = error as? NSError {
-                completion(.failure(nsError.toPigeonError()))
+                slot.completeHead(.failure(nsError.toPigeonError()))
             } else {
                 let value = characteristic.value ?? Data()
-                completion(.success(FlutterStandardTypedData(bytes: value)))
+                slot.completeHead(.success(FlutterStandardTypedData(bytes: value)))
             }
             return
         }
@@ -698,19 +656,14 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
 
-        // Cancel the pending timeout since the write completed. Done
-        // unconditionally (even if there's no completion) to be defensive
-        // against delegate/cache ordering quirks.
-        writeCharacteristicTimers[deviceId]?.removeValue(forKey: charUuid)?.cancel()
-
-        guard let completion = writeCharacteristicCompletions[deviceId]?.removeValue(forKey: charUuid) else {
+        guard let slot = writeCharacteristicSlots[deviceId]?[charUuid] else {
             return
         }
 
         if let nsError = error as? NSError {
-            completion(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
         } else {
-            completion(.success(()))
+            slot.completeHead(.success(()))
         }
     }
 
@@ -718,14 +671,14 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
 
-        guard let completion = notifyCompletions[deviceId]?.removeValue(forKey: charUuid) else {
+        guard let slot = notifySlots[deviceId]?[charUuid] else {
             return
         }
 
         if let nsError = error as? NSError {
-            completion(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
         } else {
-            completion(.success(()))
+            slot.completeHead(.success(()))
         }
     }
 
@@ -733,15 +686,12 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let descUuid = descriptor.uuid.uuidString.lowercased()
 
-        // Cancel the pending timeout since the read completed
-        readDescriptorTimers[deviceId]?.removeValue(forKey: descUuid)?.cancel()
-
-        guard let completion = readDescriptorCompletions[deviceId]?.removeValue(forKey: descUuid) else {
+        guard let slot = readDescriptorSlots[deviceId]?[descUuid] else {
             return
         }
 
         if let nsError = error as? NSError {
-            completion(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
         } else {
             let value: Data
             switch descriptor.value {
@@ -755,7 +705,7 @@ class CentralManagerImpl: NSObject {
             default:
                 value = Data()
             }
-            completion(.success(FlutterStandardTypedData(bytes: value)))
+            slot.completeHead(.success(FlutterStandardTypedData(bytes: value)))
         }
     }
 
@@ -763,17 +713,14 @@ class CentralManagerImpl: NSObject {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let descUuid = descriptor.uuid.uuidString.lowercased()
 
-        // Cancel the pending timeout since the write completed
-        writeDescriptorTimers[deviceId]?.removeValue(forKey: descUuid)?.cancel()
-
-        guard let completion = writeDescriptorCompletions[deviceId]?.removeValue(forKey: descUuid) else {
+        guard let slot = writeDescriptorSlots[deviceId]?[descUuid] else {
             return
         }
 
         if let nsError = error as? NSError {
-            completion(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
         } else {
-            completion(.success(()))
+            slot.completeHead(.success(()))
         }
     }
 
@@ -791,61 +738,51 @@ class CentralManagerImpl: NSObject {
     func didReadRSSI(peripheral: CBPeripheral, rssi: NSNumber, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
 
-        // Cancel the pending timeout since the RSSI read completed
-        readRssiTimers.removeValue(forKey: deviceId)?.cancel()
-
-        guard let completion = readRssiCompletions.removeValue(forKey: deviceId) else {
+        guard let slot = readRssiSlots[deviceId] else {
             return
         }
 
         if let nsError = error as? NSError {
-            completion(.failure(nsError.toPigeonError()))
+            slot.completeHead(.failure(nsError.toPigeonError()))
         } else {
-            completion(.success(rssi.int64Value))
+            slot.completeHead(.success(rssi.int64Value))
         }
     }
 
     // MARK: - Helpers
 
     private func clearPendingCompletions(for deviceId: String, error: Error) {
-        // Cancel all pending timers for this device so they cannot fire
-        // against a future operation that reuses the same key.
-        connectTimers.removeValue(forKey: deviceId)?.cancel()
-        discoverServicesTimers.removeValue(forKey: deviceId)?.cancel()
-        readCharacteristicTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
-        writeCharacteristicTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
-        readDescriptorTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
-        writeDescriptorTimers.removeValue(forKey: deviceId)?.values.forEach { $0.cancel() }
-        readRssiTimers.removeValue(forKey: deviceId)?.cancel()
+        // Drain all per-(device, key) slot maps — each OpSlot cancels its
+        // own timers and fires all pending completions with the error.
+        connectSlots.removeValue(forKey: deviceId)?.drainAll(error)
+        disconnectSlots.removeValue(forKey: deviceId)?.drainAll(error)
+        discoverServicesSlots.removeValue(forKey: deviceId)?.drainAll(error)
+        readRssiSlots.removeValue(forKey: deviceId)?.drainAll(error)
 
-        // Clear all pending completions for this device with error
-        if let completions = readCharacteristicCompletions.removeValue(forKey: deviceId) {
-            for (_, completion) in completions {
-                completion(.failure(error))
+        if let slots = readCharacteristicSlots.removeValue(forKey: deviceId) {
+            for (_, slot) in slots {
+                slot.drainAll(error)
             }
         }
-        if let completions = writeCharacteristicCompletions.removeValue(forKey: deviceId) {
-            for (_, completion) in completions {
-                completion(.failure(error))
+        if let slots = writeCharacteristicSlots.removeValue(forKey: deviceId) {
+            for (_, slot) in slots {
+                slot.drainAll(error)
             }
         }
-        if let completions = notifyCompletions.removeValue(forKey: deviceId) {
-            for (_, completion) in completions {
-                completion(.failure(error))
+        if let slots = notifySlots.removeValue(forKey: deviceId) {
+            for (_, slot) in slots {
+                slot.drainAll(error)
             }
         }
-        if let completions = readDescriptorCompletions.removeValue(forKey: deviceId) {
-            for (_, completion) in completions {
-                completion(.failure(error))
+        if let slots = readDescriptorSlots.removeValue(forKey: deviceId) {
+            for (_, slot) in slots {
+                slot.drainAll(error)
             }
         }
-        if let completions = writeDescriptorCompletions.removeValue(forKey: deviceId) {
-            for (_, completion) in completions {
-                completion(.failure(error))
+        if let slots = writeDescriptorSlots.removeValue(forKey: deviceId) {
+            for (_, slot) in slots {
+                slot.drainAll(error)
             }
-        }
-        if let completion = readRssiCompletions.removeValue(forKey: deviceId) {
-            completion(.failure(error))
         }
     }
 }
