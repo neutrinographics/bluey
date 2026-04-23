@@ -8,9 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/di/service_locator.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../../shared/presentation/error_snackbar.dart';
-import '../../connection/domain/connection_settings.dart';
 import '../../connection/presentation/connection_screen.dart';
-import '../../connection/presentation/connection_settings_cubit.dart';
 import '../application/scan_for_devices.dart';
 import '../application/stop_scan.dart';
 import '../application/get_bluetooth_state.dart';
@@ -166,11 +164,6 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.tune, color: _kHeaderText, size: 22),
-                tooltip: 'Connection settings',
-                onPressed: () => _showConnectionSettings(context),
-              ),
             ],
           ),
         ),
@@ -178,64 +171,6 @@ class _TopBar extends StatelessWidget {
     );
   }
 
-  void _showConnectionSettings(BuildContext context) {
-    final cubit = getIt<ConnectionSettingsCubit>();
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return BlocProvider<ConnectionSettingsCubit>.value(
-          value: cubit,
-          child: const _ConnectionSettingsDialog(),
-        );
-      },
-    );
-  }
-}
-
-class _ConnectionSettingsDialog extends StatelessWidget {
-  const _ConnectionSettingsDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<ConnectionSettingsCubit, ConnectionSettings>(
-      builder: (context, settings) {
-        final cubit = context.read<ConnectionSettingsCubit>();
-        return AlertDialog(
-          title: const Text('Connection settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Max failed heartbeats: ${settings.maxFailedHeartbeats}',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const Text(
-                'Consecutive heartbeat failures that trigger a local '
-                'disconnect. Higher values tolerate transient BLE hiccups.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF596064)),
-              ),
-              Slider(
-                value: settings.maxFailedHeartbeats.toDouble(),
-                min: 1,
-                max: 10,
-                divisions: 9,
-                label: '${settings.maxFailedHeartbeats}',
-                onChanged:
-                    (value) => cubit.setMaxFailedHeartbeats(value.round()),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 // -- Main scanner content --
