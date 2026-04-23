@@ -396,7 +396,7 @@ class GattServer(
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     callback(Result.success(Unit))
                 } else {
-                    callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid.toString())))
+                    callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid.toString(), status)))
                 }
             }
         }

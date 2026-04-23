@@ -45,8 +45,11 @@ internal sealed class BlueyAndroidError(message: String) : Exception(message) {
 
     object FailedToOpenGattServer : BlueyAndroidError("Failed to open GATT server")
 
-    data class FailedToAddService(val uuid: String) :
-        BlueyAndroidError("Failed to add service: $uuid")
+    data class FailedToAddService(val uuid: String, val status: Int? = null) :
+        BlueyAndroidError(
+            if (status != null) "Failed to add service: $uuid (status=$status)"
+            else "Failed to add service: $uuid"
+        )
 
     // --- System state → bluey-unknown ---
 

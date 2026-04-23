@@ -138,4 +138,35 @@ class ErrorsTest {
         assertEquals("bluey-unknown", e.code)
         assertEquals(thrown.javaClass.simpleName, e.message)
     }
+
+    // --- Already-translated FlutterError pass-through (regression guard) ---
+    // The inner layers (GattOpQueue, ConnectionManager.statusFailedError)
+    // emit their own FlutterError with gatt-* codes. The BlueyPlugin wrapper's
+    // recoverCatching on async callbacks will call toXFlutterError on those
+    // errors; the pass-through prevents the outer wrap from overwriting
+    // the wire code to bluey-unknown.
+
+    @Test
+    fun `pre-existing FlutterError passes through unchanged (client)`() {
+        val inner = FlutterError("gatt-timeout", "write timed out", null)
+        val e = inner.toClientFlutterError()
+        assertEquals("gatt-timeout", e.code)
+        assertEquals("write timed out", e.message)
+    }
+
+    @Test
+    fun `pre-existing FlutterError with details passes through unchanged (client)`() {
+        val inner = FlutterError("gatt-status-failed", "write failed", 0x0D)
+        val e = inner.toClientFlutterError()
+        assertEquals("gatt-status-failed", e.code)
+        assertEquals(0x0D, e.details)
+    }
+
+    @Test
+    fun `pre-existing FlutterError passes through unchanged (server)`() {
+        val inner = FlutterError("gatt-disconnected", "link lost", null)
+        val e = inner.toServerFlutterError()
+        assertEquals("gatt-disconnected", e.code)
+        assertEquals("link lost", e.message)
+    }
 }
