@@ -1345,6 +1345,56 @@ void main() {
         async.flushMicrotasks();
       });
     });
+
+    test('I078: recordActivity during interval-read window shifts the probe deadline', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextReadCharacteristic();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        // T=0: initial heartbeat dispatched synchronously inside start().
+        final writesAfterStart = fakePlatform.writeCharacteristicCalls.length;
+
+        // T=3s: simulate a user GATT op completing INSIDE the interval-read
+        // window. Without I078's fix this call would be dropped silently.
+        async.elapse(const Duration(seconds: 3));
+        client.recordActivity();
+        async.flushMicrotasks();
+
+        // Resolve the interval-read at T=3s with 10s interval → monitor
+        // activityWindow becomes 5s (half). Probe deadline = _lastActivityAt
+        // + activityWindow = T=3s + 5s = T=8s.
+        fakePlatform.resolveHeldRead(
+            lifecycle.encodeInterval(const Duration(seconds: 10)));
+        async.flushMicrotasks();
+
+        // Advance to T=7s (total elapsed 7s, so 4s more from T=3s). No
+        // probe should have fired yet.
+        async.elapse(const Duration(seconds: 4));
+        async.flushMicrotasks();
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterStart,
+            reason: 'recordActivity at T=3s must push probe deadline to T=8s');
+
+        // Advance past T=8s → probe should now fire.
+        async.elapse(const Duration(seconds: 2));
+        async.flushMicrotasks();
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterStart + 1,
+            reason: 'probe fires at T=8s (activity at T=3s + window 5s)');
+
+        client.stop();
+      });
+    });
   });
 }
 
