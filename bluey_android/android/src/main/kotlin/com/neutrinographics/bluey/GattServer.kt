@@ -47,6 +47,14 @@ class GattServer(
     // Track notification subscriptions: characteristicUuid -> Set<centralId>
     private val subscriptions = mutableMapOf<String, MutableSet<String>>()
 
+    // Pending ATT requests keyed by native Android requestId (cast to Long).
+    // Populated on binder thread in onCharacteristic{Read,Write}Request;
+    // drained on main thread in respondTo{Read,Write}Request, on central
+    // disconnect, and on cleanup(). See PendingRequestRegistry for the
+    // thread-safety argument.
+    private val pendingReadRequests = PendingRequestRegistry<PendingRead>()
+    private val pendingWriteRequests = PendingRequestRegistry<PendingWrite>()
+
     // Pending callbacks for async service addition
     private var pendingServiceCallback: ((Result<Unit>) -> Unit)? = null
 
@@ -407,31 +415,29 @@ class GattServer(
             offset: Int,
             characteristic: BluetoothGattCharacteristic
         ) {
-            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid}")
+            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId")
+
+            // Stash pending entry BEFORE posting to Flutter so the main
+            // thread can never see a respondToRead before the put has
+            // happened. synchronized in the registry establishes
+            // happens-before with the main-thread pop.
+            pendingReadRequests.put(
+                requestId.toLong(),
+                PendingRead(device, requestId, offset)
+            )
+
             val request = ReadRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
                 characteristicUuid = characteristic.uuid.toString(),
                 offset = offset.toLong()
             )
-            // Must dispatch to main thread for Flutter platform channel
+            // Must dispatch to main thread for Flutter platform channel.
             handler.post {
                 flutterApi.onReadRequest(request) {}
             }
-
-            // Auto-respond with success for now (simplified implementation)
-            // A production version would wait for respondToReadRequest
-            try {
-                gattServer?.sendResponse(
-                    device,
-                    requestId,
-                    BluetoothGatt.GATT_SUCCESS,
-                    offset,
-                    characteristic.value ?: ByteArray(0)
-                )
-            } catch (e: SecurityException) {
-                // Permission revoked
-            }
+            // Intentionally NO sendResponse here — Dart's respondToRead
+            // is the only code path that sends the response.
         }
 
         override fun onCharacteristicWriteRequest(

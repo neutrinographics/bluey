@@ -268,4 +268,41 @@ class GattServerTest {
         // Verify cancelConnection was called on the correct device
         verify { mockBluetoothGattServer.cancelConnection(mockDevice) }
     }
+
+    @Test
+    fun `onCharacteristicReadRequest does not call sendResponse`() {
+        // Open the server.
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicReadRequest(
+            mockDevice,
+            42, // requestId
+            0,  // offset
+            mockCharacteristic
+        )
+
+        // Flutter is notified.
+        verify { mockFlutterApi.onReadRequest(any(), any()) }
+
+        // BUT: sendResponse is NOT called from the binder thread.
+        verify(exactly = 0) {
+            mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
+        }
+    }
 }
