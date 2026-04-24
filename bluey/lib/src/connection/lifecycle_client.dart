@@ -65,6 +65,12 @@ class LifecycleClient {
   @visibleForTesting
   Duration get activityWindowForTest => _monitor.activityWindow;
 
+  /// Exposed for tests: the monitor's last-recorded activity timestamp
+  /// (updated by successful GATT ops, incoming notifications, and
+  /// successful probe acks). Not intended for production use.
+  @visibleForTesting
+  DateTime? get lastActivityAtForTest => _monitor.lastActivityAt;
+
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
   /// shifts the probe deadline forward by [_monitor.activityWindow].
@@ -229,11 +235,13 @@ class LifecycleClient {
           true,
         )
         .then((_) {
+      if (!_isRunning) return;
       _monitor.recordProbeSuccess();
       // Success refreshed lastActivity → monitor deadline is now
       // exactly activityWindow from now. No explicit override.
       _scheduleProbe();
     }).catchError((Object error) {
+      if (!_isRunning) return;
       if (!_isDeadPeerSignal(error)) {
         // Transient platform error — release in-flight, retry after a
         // full activityWindow (the monitor deadline has already elapsed

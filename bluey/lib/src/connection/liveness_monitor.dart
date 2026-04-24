@@ -1,4 +1,5 @@
 import 'package:clock/clock.dart';
+import 'package:meta/meta.dart';
 
 /// Tracks whether a peer is still alive, based on a stream of
 /// observable events.
@@ -41,6 +42,11 @@ class LivenessMonitor {
   /// one probe is dispatched per idle window. Read-only from outside;
   /// callers mutate via [updateActivityWindow].
   Duration get activityWindow => _activityWindow;
+
+  /// Last recorded activity timestamp, or null if no activity has been
+  /// observed. Exposed for [LifecycleClient]'s test-only accessor.
+  @visibleForTesting
+  DateTime? get lastActivityAt => _lastActivityAt;
 
   /// Whether a probe is currently in flight. Needed by callers that
   /// schedule the next probe from timer callbacks — a fired timer must

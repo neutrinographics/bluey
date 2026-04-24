@@ -1178,6 +1178,133 @@ void main() {
       },
     );
 
+    test('I070: probe-write success after stop() does not mutate monitor activity', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Fixture defaults intervalValue to 10s → heartbeat interval = 5s.
+        // Elapse 6s so the probe timer fires and dispatches. Hold the
+        // probe-write so stop() can happen while the write is in flight.
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        final activityBefore = client.lastActivityAtForTest;
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Late success resolves after stop. Without the .then guard,
+        // _monitor.recordProbeSuccess() would mutate _lastActivityAt.
+        fakePlatform.resolveHeldWrite();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(client.isRunning, isFalse);
+        expect(client.lastActivityAtForTest, activityBefore,
+            reason: 'late probe success must not refresh the activity timestamp after stop()');
+      });
+    });
+
+    test('I070: probe-write transient failure after stop() does not mutate monitor', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        final activityBefore = client.lastActivityAtForTest;
+        final writesBefore = fakePlatform.writeCharacteristicCalls.length;
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Transient (non-dead-peer) error — e.g. a platform-layer Exception.
+        fakePlatform.failHeldWrite(Exception('transient platform error'));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(client.isRunning, isFalse);
+        // The transient-failure branch, without the guard, would call
+        // _monitor.cancelProbe() (no-op post-stop since stop() already did)
+        // and _scheduleProbe (also no-op since _heartbeatCharUuid is null).
+        // Neither currently mutates _lastActivityAt, so the timestamp
+        // assertion below is defense-in-depth: it locks in that future
+        // additions to the transient branch won't sneak past the guard.
+        expect(client.lastActivityAtForTest, activityBefore,
+            reason: 'late transient-failure path must not refresh activity timestamp after stop()');
+        expect(fakePlatform.writeCharacteristicCalls.length, writesBefore);
+      });
+    });
+
+    test('I070: probe-write dead-peer failure after stop() does not fire onServerUnreachable', () {
+      fakeAsync((async) {
+        var unreachableCalls = 0;
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(
+          onServerUnreachable: () => unreachableCalls++,
+        ).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Dead-peer signal. With maxFailedHeartbeats defaulting to 1,
+        // without the guard the late .catchError invokes
+        // recordProbeFailure (→ threshold tripped) → onServerUnreachable.
+        fakePlatform.failHeldWrite(
+          const platform.GattOperationTimeoutException('writeCharacteristic'),
+        );
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(unreachableCalls, 0,
+            reason: 'onServerUnreachable must not fire after stop()');
+      });
+    });
+
     test('stop() releases in-flight probe so monitor does not strand probeInFlight', () {
       fakeAsync((async) {
         late LifecycleClient client;
