@@ -707,4 +707,44 @@ class GattServerTest {
         gattServer.respondToWriteRequest(4L, GattStatusDto.SUCCESS) { bWriteResult = it }
         assertTrue("B's write should succeed", bWriteResult?.isSuccess == true)
     }
+
+    @Test
+    fun `cleanup() clears all pending requests`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicReadRequest(mockDevice, 1, 0, mockCharacteristic)
+        capturedCallback!!.onCharacteristicWriteRequest(mockDevice, 2, mockCharacteristic, false, true, 0, byteArrayOf(0x01))
+
+        gattServer.cleanup()
+
+        // After cleanup the server ref is null — respond hits the NotInitialized check
+        // BEFORE reaching the registry. Re-open the server to exercise the registry state.
+        // Calling addService again re-opens the server via ensureServerOpen.
+        gattServer.addService(service) {}
+
+        var readResult: Result<Unit>? = null
+        gattServer.respondToReadRequest(1L, GattStatusDto.SUCCESS, byteArrayOf()) { readResult = it }
+        assertTrue(readResult?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+
+        var writeResult: Result<Unit>? = null
+        gattServer.respondToWriteRequest(2L, GattStatusDto.SUCCESS) { writeResult = it }
+        assertTrue(writeResult?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+    }
 }

@@ -309,6 +309,8 @@ class GattServer(
         connectedCentrals.clear()
         centralMtus.clear()
         subscriptions.clear()
+        pendingReadRequests.clear()
+        pendingWriteRequests.clear()
         pendingServiceCallback = null
     }
 
