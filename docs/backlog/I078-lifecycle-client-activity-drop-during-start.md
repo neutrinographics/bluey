@@ -4,8 +4,9 @@ title: `LifecycleClient.recordActivity()` silently drops signals during `start()
 category: bug
 severity: low
 platform: both
-status: open
-last_verified: 2026-04-24
+status: fixed
+last_verified: 2026-04-25
+fixed_in: 2faf062
 related: [I077]
 ---
 
