@@ -60,15 +60,19 @@ Prose sections (in this order, any may be omitted if empty):
 
 Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, etc.).
 
-1. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
+1. **I070 + I073 + I078** — Lifecycle client guards. *Est. 1 day.* Tiny `_isRunning` flag + `start()` idempotency check + activity-signal handling during the `start()` → interval-read window. Prevents the zombie-timer pattern that accumulates across disconnect cycles. Promoted to #1 because (a) I070 is `high` severity, (b) the `LifecycleClient` code is warm after the I077 fix, and (c) small PR — cheap momentum before the larger #3/#4 blocks.
 
-2. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
+2. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
 
-3. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
+3. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
 
-4. **I070 + I073** — Lifecycle client guards. *Est. 1 day.* Tiny `_isRunning` flag + `start()` idempotency check. Prevents the zombie-timer pattern that accumulates across disconnect cycles.
+4. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
 
-Everything else (the other 40-odd open entries) can proceed opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
+Opportunistic one-offs — pick up when you're already in nearby code:
+
+- **I009** — `BlueyServer.respondToRead`/`respondToWrite` leak an internal platform-interface exception. Medium severity, one-file fix in the server error-translation path; natural to grab next time you're in `android_server.dart` / `ios_server.dart`.
+
+Everything else (the other 40-odd open entries) can also proceed opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
 
 ---
 
