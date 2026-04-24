@@ -83,6 +83,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [writeCharacteristic] in order.
   final List<WriteCharacteristicCall> writeCharacteristicCalls = [];
 
+  /// Records every call to [readCharacteristic] in order.
+  final List<ReadCharacteristicCall> readCharacteristicCalls = [];
+
   // === Test Helpers ===
 
   /// When true, writeCharacteristic calls will throw to simulate a dead server.
@@ -107,6 +110,92 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// fire-and-forget paths in BlueyRemoteCharacteristic (onFirstListen /
   /// onLastCancel) that would otherwise produce unhandled async errors.
   bool simulateSetNotificationDisconnected = false;
+
+  /// When non-null, the next call to [readCharacteristic] consumes
+  /// this completer instead of resolving immediately. Consumed (set
+  /// to null) as soon as the read call fires, so a subsequent read
+  /// falls through to normal handling.
+  Completer<Uint8List>? _heldRead;
+
+  /// Once a held read has been consumed by [readCharacteristic], the
+  /// completer is parked here so [resolveHeldRead]/[failHeldRead] can
+  /// find it. Cleared when resolve or fail is called.
+  Completer<Uint8List>? _heldReadInFlight;
+
+  /// Arranges for the next [readCharacteristic] call to be held
+  /// indefinitely. Call [resolveHeldRead] or [failHeldRead] to release it.
+  void holdNextReadCharacteristic() {
+    _heldRead = Completer<Uint8List>();
+  }
+
+  /// Resolves the currently-held read future with [value]. Works
+  /// whether or not the held read has already been consumed by a
+  /// [readCharacteristic] call.
+  void resolveHeldRead(Uint8List value) {
+    final held = _heldReadInFlight ?? _heldRead;
+    if (held == null) {
+      throw StateError('No held readCharacteristic to resolve');
+    }
+    _heldRead = null;
+    _heldReadInFlight = null;
+    held.complete(value);
+  }
+
+  /// Fails the currently-held read future with [error]. Works whether
+  /// or not the held read has already been consumed by a
+  /// [readCharacteristic] call.
+  void failHeldRead(Object error) {
+    final held = _heldReadInFlight ?? _heldRead;
+    if (held == null) {
+      throw StateError('No held readCharacteristic to fail');
+    }
+    _heldRead = null;
+    _heldReadInFlight = null;
+    held.completeError(error);
+  }
+
+  /// When non-null, the next call to [writeCharacteristic] consumes
+  /// this completer instead of resolving immediately. Consumed (set
+  /// to null) as soon as the write call fires, so a subsequent write
+  /// falls through to normal handling.
+  Completer<void>? _heldWrite;
+
+  /// Once a held write has been consumed by [writeCharacteristic], the
+  /// completer is parked here so [resolveHeldWrite]/[failHeldWrite]
+  /// can find it. Cleared when resolve or fail is called.
+  Completer<void>? _heldWriteInFlight;
+
+  /// Arranges for the next [writeCharacteristic] call to be held
+  /// indefinitely. Call [resolveHeldWrite] or [failHeldWrite] to release it.
+  void holdNextWriteCharacteristic() {
+    _heldWrite = Completer<void>();
+  }
+
+  /// Resolves the currently-held write future successfully. Works
+  /// whether or not the held write has already been consumed by a
+  /// [writeCharacteristic] call.
+  void resolveHeldWrite() {
+    final held = _heldWriteInFlight ?? _heldWrite;
+    if (held == null) {
+      throw StateError('No held writeCharacteristic to resolve');
+    }
+    _heldWrite = null;
+    _heldWriteInFlight = null;
+    held.complete();
+  }
+
+  /// Fails the currently-held write future with [error]. Works whether
+  /// or not the held write has already been consumed by a
+  /// [writeCharacteristic] call.
+  void failHeldWrite(Object error) {
+    final held = _heldWriteInFlight ?? _heldWrite;
+    if (held == null) {
+      throw StateError('No held writeCharacteristic to fail');
+    }
+    _heldWrite = null;
+    _heldWriteInFlight = null;
+    held.completeError(error);
+  }
 
   /// When non-null, readCharacteristic throws a [PlatformException] with
   /// this [PlatformException.code]. Models platform-layer errors that are
@@ -138,6 +227,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// most notably status 0x01 (`GATT_INVALID_HANDLE`) that follows a
   /// peer-side Service Changed event after an iOS server force-kill.
   int? simulateWriteStatusFailed;
+
+  /// When true, the next [writeCharacteristic] call throws synchronously
+  /// (before returning a Future). Models a misbehaving non-async platform
+  /// impl — `LifecycleClient.start()` must unwind cleanly if this happens.
+  /// Auto-clears after one throw.
+  bool simulateSyncWriteThrow = false;
 
   Object? _pendingReadError;
 
@@ -517,6 +612,18 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
   ) async {
+    readCharacteristicCalls.add(ReadCharacteristicCall(
+      deviceId: deviceId,
+      characteristicUuid: characteristicUuid,
+    ));
+
+    final held = _heldRead;
+    if (held != null) {
+      _heldRead = null;
+      _heldReadInFlight = held;
+      return held.future;
+    }
+
     final code = simulateReadPlatformErrorCode;
     if (code != null) {
       simulateReadPlatformErrorCode = null;
@@ -560,7 +667,28 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String characteristicUuid,
     Uint8List value,
     bool withResponse,
+  ) {
+    if (simulateSyncWriteThrow) {
+      simulateSyncWriteThrow = false;
+      throw StateError('simulated synchronous writeCharacteristic throw');
+    }
+    return _writeCharacteristicAsync(
+        deviceId, characteristicUuid, value, withResponse);
+  }
+
+  Future<void> _writeCharacteristicAsync(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
   ) async {
+    final held = _heldWrite;
+    if (held != null) {
+      _heldWrite = null;
+      _heldWriteInFlight = held;
+      return held.future;
+    }
+
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
     }
@@ -951,6 +1079,17 @@ class RespondWriteCall {
   RespondWriteCall({
     required this.requestId,
     required this.status,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.readCharacteristic].
+class ReadCharacteristicCall {
+  final String deviceId;
+  final String characteristicUuid;
+
+  const ReadCharacteristicCall({
+    required this.deviceId,
+    required this.characteristicUuid,
   });
 }
 

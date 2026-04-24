@@ -1071,6 +1071,429 @@ void main() {
         });
       },
     );
+
+    test('start() is idempotent when interval-read is in flight', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextReadCharacteristic();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        // First start dispatched the initial heartbeat write and the interval read.
+        final writesAfterFirst = fakePlatform.writeCharacteristicCalls.length;
+        final readsAfterFirst = fakePlatform.readCharacteristicCalls.length;
+
+        // Second start() before the interval-read resolves — must be a no-op.
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterFirst,
+            reason: 'second start() must not dispatch another heartbeat write');
+        expect(fakePlatform.readCharacteristicCalls.length, readsAfterFirst,
+            reason: 'second start() must not dispatch another interval-read');
+        expect(client.isRunning, isTrue);
+
+        // Clean up the held future so fakeAsync doesn't complain.
+        fakePlatform.resolveHeldRead(lifecycle.encodeInterval(const Duration(seconds: 10)));
+        async.flushMicrotasks();
+        client.stop();
+      });
+    });
+
+    // I070: interval-read callbacks must not mutate monitor state after stop().
+    //
+    // The pre-existing _heartbeatCharUuid == null guard already blocks probe
+    // writes, but _beginHeartbeat calls _monitor.updateActivityWindow BEFORE
+    // _scheduleProbe. Without the _isRunning guard added in the production
+    // fix, a late .then callback would silently mutate activityWindow on a
+    // stopped client. The .catchError branch shares the same guard pattern;
+    // a single test on the .then path drives both guards.
+    test(
+      'I070: interval-read success after stop() does not mutate monitor activityWindow',
+      () {
+        fakeAsync((async) {
+          late LifecycleClient client;
+          late FakeBlueyPlatform fakePlatform;
+          late List<RemoteService> services;
+
+          // Use intervalValue: 12s so the fixture interval (12s → 6s half)
+          // differs from the client's hardcoded default (5s). The monitor is
+          // initialised at 5s and stays there until the interval-read resolves.
+          _setUpConnectedClient(
+            onServerUnreachable: () {},
+            intervalValue: const Duration(seconds: 12),
+          ).then((fixture) {
+            client = fixture.client;
+            services = fixture.services;
+            fakePlatform = fixture.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          fakePlatform.holdNextReadCharacteristic();
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Capture pre-stop() state: activityWindow is still the client's
+          // default (5s) because the interval-read is still pending.
+          final windowBefore = client.activityWindowForTest;
+          final writesBefore = fakePlatform.writeCharacteristicCalls.length;
+
+          client.stop();
+          async.flushMicrotasks();
+
+          // Late interval-read succeeds with a DIFFERENT value: 8s → 4s half.
+          // Without the guard, _beginHeartbeat would call
+          // _monitor.updateActivityWindow(4s), mutating state on a stopped client.
+          fakePlatform.resolveHeldRead(
+              lifecycle.encodeInterval(const Duration(seconds: 8)));
+          async.flushMicrotasks();
+
+          // Any armed timer would fire within 60 s.
+          async.elapse(const Duration(seconds: 60));
+          async.flushMicrotasks();
+
+          expect(client.isRunning, isFalse);
+          expect(
+            client.activityWindowForTest,
+            windowBefore,
+            reason:
+                'stopped client must not have its monitor mutated by a late interval-read',
+          );
+          expect(
+            fakePlatform.writeCharacteristicCalls.length,
+            writesBefore,
+            reason: 'no probe may dispatch after stop()',
+          );
+        });
+      },
+    );
+
+    test('I070: probe-write success after stop() does not mutate monitor activity', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Fixture defaults intervalValue to 10s → heartbeat interval = 5s.
+        // Elapse 6s so the probe timer fires and dispatches. Hold the
+        // probe-write so stop() can happen while the write is in flight.
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        final activityBefore = client.lastActivityAtForTest;
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Late success resolves after stop. Without the .then guard,
+        // _monitor.recordProbeSuccess() would mutate _lastActivityAt.
+        fakePlatform.resolveHeldWrite();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(client.isRunning, isFalse);
+        expect(client.lastActivityAtForTest, activityBefore,
+            reason: 'late probe success must not refresh the activity timestamp after stop()');
+      });
+    });
+
+    test('I070: probe-write transient failure after stop() does not mutate monitor', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        final activityBefore = client.lastActivityAtForTest;
+        final writesBefore = fakePlatform.writeCharacteristicCalls.length;
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Transient (non-dead-peer) error — e.g. a platform-layer Exception.
+        fakePlatform.failHeldWrite(Exception('transient platform error'));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(client.isRunning, isFalse);
+        // The transient-failure branch, without the guard, would call
+        // _monitor.cancelProbe() (no-op post-stop since stop() already did)
+        // and _scheduleProbe (also no-op since _heartbeatCharUuid is null).
+        // Neither currently mutates _lastActivityAt, so the timestamp
+        // assertion below is defense-in-depth: it locks in that future
+        // additions to the transient branch won't sneak past the guard.
+        expect(client.lastActivityAtForTest, activityBefore,
+            reason: 'late transient-failure path must not refresh activity timestamp after stop()');
+        expect(fakePlatform.writeCharacteristicCalls.length, writesBefore);
+      });
+    });
+
+    test('I070: probe-write dead-peer failure after stop() does not fire onServerUnreachable', () {
+      fakeAsync((async) {
+        var unreachableCalls = 0;
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(
+          onServerUnreachable: () => unreachableCalls++,
+        ).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        client.stop();
+        async.flushMicrotasks();
+
+        // Dead-peer signal. With maxFailedHeartbeats defaulting to 1,
+        // without the guard the late .catchError invokes
+        // recordProbeFailure (→ threshold tripped) → onServerUnreachable.
+        fakePlatform.failHeldWrite(
+          const platform.GattOperationTimeoutException('writeCharacteristic'),
+        );
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 60));
+        async.flushMicrotasks();
+
+        expect(unreachableCalls, 0,
+            reason: 'onServerUnreachable must not fire after stop()');
+      });
+    });
+
+    test('stop() releases in-flight probe so monitor does not strand probeInFlight', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        // Start normally so interval-read resolves and the probe timer is armed.
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Fixture defaults intervalValue to 10s → heartbeat interval = 5s.
+        // Elapse 6s so the probe timer fires and dispatches.
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        // Sanity: a probe is now in flight.
+        expect(client.probeInFlightForTest, isTrue,
+            reason: 'probe should be in flight after tick + dispatch');
+
+        // Call stop() while the write is still pending.
+        client.stop();
+
+        // Assert: probeInFlight is released synchronously even though
+        // the write future has not resolved.
+        expect(client.probeInFlightForTest, isFalse,
+            reason: 'stop() must release the monitor in-flight flag');
+
+        // Clean up the held future so fakeAsync doesn't complain.
+        fakePlatform.resolveHeldWrite();
+        async.flushMicrotasks();
+      });
+    });
+
+    test('start() with no control service leaves _isRunning false and is retryable', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      // First: a regular (non-Bluey) device with no control service.
+      fakePlatform.simulatePeripheral(
+        id: _deviceAddress,
+        name: 'Regular Device',
+        services: const [
+          platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
+
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final platformServicesNoControl =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final domainServicesNoControl = platformServicesNoControl
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      final client = LifecycleClient(
+        platformApi: fakePlatform,
+        connectionId: _deviceAddress,
+        onServerUnreachable: () {},
+      );
+
+      client.start(
+          allServices: List<RemoteService>.from(domainServicesNoControl));
+
+      // No control service found — start() must NOT commit to running.
+      expect(client.isRunning, isFalse,
+          reason: 'start() without a control service must not commit');
+
+      // Disconnect, re-simulate the same address as a full Bluey server,
+      // reconnect, re-discover. This gives us a fresh services list that
+      // includes the control service.
+      await fakePlatform.disconnect(_deviceAddress);
+      fakePlatform.simulateBlueyServer(
+        address: _deviceAddress,
+        serverId: ServerId.generate(),
+      );
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+      final platformServicesWithControl =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final domainServicesWithControl = platformServicesWithControl
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      client.start(
+          allServices: List<RemoteService>.from(domainServicesWithControl));
+
+      expect(client.isRunning, isTrue,
+          reason: 'retry with control service must succeed');
+
+      client.stop();
+    });
+
+    test('start() unwinds fully when writeCharacteristic throws synchronously', () async {
+      final fixture = await _setUpConnectedClient(onServerUnreachable: () {});
+      final client = fixture.client;
+      final fakePlatform = fixture.fakePlatform;
+      final services = fixture.services;
+
+      fakePlatform.simulateSyncWriteThrow = true;
+
+      Object? caught;
+      try {
+        client.start(allServices: services);
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught, isA<StateError>(),
+          reason: 'synchronous throw must propagate out of start()');
+      expect(client.isRunning, isFalse,
+          reason: '_isRunning must be cleared on sync-throw unwind');
+      expect(client.probeInFlightForTest, isFalse,
+          reason: 'monitor probeInFlight must be released');
+
+      // A second start() with a healthy platform must be able to run.
+      fakePlatform.simulateSyncWriteThrow = false;
+      client.start(allServices: services);
+      expect(client.isRunning, isTrue);
+
+      client.stop();
+    });
+
+    test('I078: recordActivity during interval-read window shifts the probe deadline', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextReadCharacteristic();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        // T=0: initial heartbeat dispatched synchronously inside start().
+        final writesAfterStart = fakePlatform.writeCharacteristicCalls.length;
+
+        // T=3s: simulate a user GATT op completing INSIDE the interval-read
+        // window. Without I078's fix this call would be dropped silently.
+        async.elapse(const Duration(seconds: 3));
+        client.recordActivity();
+        async.flushMicrotasks();
+
+        // Resolve the interval-read at T=3s with 10s interval → monitor
+        // activityWindow becomes 5s (half). Probe deadline = _lastActivityAt
+        // + activityWindow = T=3s + 5s = T=8s.
+        fakePlatform.resolveHeldRead(
+            lifecycle.encodeInterval(const Duration(seconds: 10)));
+        async.flushMicrotasks();
+
+        // Advance to T=7s (total elapsed 7s, so 4s more from T=3s). No
+        // probe should have fired yet.
+        async.elapse(const Duration(seconds: 4));
+        async.flushMicrotasks();
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterStart,
+            reason: 'recordActivity at T=3s must push probe deadline to T=8s');
+
+        // Advance past T=8s → probe should now fire.
+        async.elapse(const Duration(seconds: 2));
+        async.flushMicrotasks();
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterStart + 1,
+            reason: 'probe fires at T=8s (activity at T=3s + window 5s)');
+
+        client.stop();
+      });
+    });
   });
 }
 

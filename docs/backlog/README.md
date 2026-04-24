@@ -60,7 +60,7 @@ Prose sections (in this order, any may be omitted if empty):
 
 Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, etc.).
 
-1. **I079 + I070 + I073 + I078** — Lifecycle client correctness. *Est. 1–2 days.* Combines (a) heartbeat probe starvation behind long user ops — the highest-impact lifecycle bug, reproducible on every timeout-probe stress test, causes spurious disconnects on any slow op — with (b) the smaller guards cluster: `_isRunning` flag + `start()` idempotency + activity-signal handling during the `start()` → interval-read window. All four fixes live in `LifecycleClient` + `LivenessMonitor`; the code is warm after I077; fixing I079 likely requires routing user-op completions into `recordActivity()`, which is a natural place to bundle I078's activity-signal correctness. Ship as one PR.
+1. **I079** — Lifecycle server tolerates pending requests. *Est. 1 day, one PR.* Root cause re-diagnosed during planning: the BLE ATT link serializes client-initiated requests natively, so a long-running user op holds the wire and heartbeats can't get out. The right fix is server-side — `LifecycleServer` should not declare a client gone while it's still holding a pending read/write request for that client, because holding the request is itself proof the link is alive. Fix lives in `lifecycle_server.dart` + request/response wiring in `bluey_server.dart`. Split from #1 because it's a different file, different bounded context, and a different change shape (tolerance policy, not timer-callback guards).
 
 2. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
 
@@ -93,14 +93,11 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
 | [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-interface exception | medium |
-| [I070](I070-lifecycle-client-late-promise-callbacks.md) | LifecycleClient late promise callbacks fire after `stop()` | high |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
-| [I073](I073-lifecycle-client-start-not-idempotent.md) | `LifecycleClient.start()` is not idempotent | low |
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
-| [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | low |
 | [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | Heartbeat probe starves behind long user ops, causing spurious server-initiated disconnects | high |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
@@ -177,7 +174,10 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 |---|---|---|
 | [I020](I020-gatt-server-auto-respond-characteristic-write.md) | GATT server auto-respond on characteristic write | `3539a42` |
 | [I021](I021-gatt-server-auto-respond-characteristic-read.md) | GATT server auto-respond on characteristic read | `3539a42` |
+| [I070](I070-lifecycle-client-late-promise-callbacks.md) | LifecycleClient late promise callbacks fire after `stop()` | `2faf062` |
+| [I073](I073-lifecycle-client-start-not-idempotent.md) | `LifecycleClient.start()` is not idempotent | `2faf062` |
 | [I077](I077-lifecycle-client-disconnect-storm.md) | Client appears to toggle connected/disconnected during heartbeat activity | `0b97cc6` |
+| [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | `2faf062` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |

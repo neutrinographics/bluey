@@ -4,8 +4,9 @@ title: LifecycleClient late promise callbacks can fire after `stop()`
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-25
+fixed_in: 2faf062
 ---
 
 ## Symptom

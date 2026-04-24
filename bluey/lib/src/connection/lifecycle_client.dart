@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -24,7 +25,17 @@ class LifecycleClient {
 
   late LivenessMonitor _monitor;
   Timer? _probeTimer;
+
+  /// UUID of the server's heartbeat characteristic, once we've found
+  /// it during `start()`. Not a running sentinel — use [_isRunning] for
+  /// that. Nulled by `stop()`.
   String? _heartbeatCharUuid;
+
+  /// Authoritative "running" sentinel. True from the moment `start()`
+  /// commits to run (after its pre-commit null checks pass) until
+  /// `stop()` clears it. Distinct from `_heartbeatCharUuid`, which
+  /// indicates only "we know which char to write heartbeats to".
+  bool _isRunning = false;
 
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
@@ -44,8 +55,25 @@ class LifecycleClient {
   /// consistency with the rest of the Connection bounded context.
   int get maxFailedHeartbeats => _maxFailedHeartbeats;
 
-  /// Whether the heartbeat timer is currently running.
-  bool get isRunning => _probeTimer != null;
+  /// Whether the heartbeat client has committed to running and has
+  /// not yet been stopped.
+  bool get isRunning => _isRunning;
+
+  /// Exposed for tests: whether the internal monitor is currently
+  /// tracking an in-flight probe. Not intended for production use.
+  @visibleForTesting
+  bool get probeInFlightForTest => _monitor.probeInFlight;
+
+  /// Exposed for tests: the monitor's current activity window.
+  /// Not intended for production use.
+  @visibleForTesting
+  Duration get activityWindowForTest => _monitor.activityWindow;
+
+  /// Exposed for tests: the monitor's last-recorded activity timestamp
+  /// (updated by successful GATT ops, incoming notifications, and
+  /// successful probe acks). Not intended for production use.
+  @visibleForTesting
+  DateTime? get lastActivityAtForTest => _monitor.lastActivityAt;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
@@ -66,7 +94,7 @@ class LifecycleClient {
   /// control service or its heartbeat characteristic is absent, the
   /// method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
-    if (_heartbeatCharUuid != null) return;
+    if (_isRunning) return;
 
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
@@ -81,36 +109,46 @@ class LifecycleClient {
         .firstOrNull;
     if (heartbeatChar == null) return;
 
+    // Commit point — from here on, any synchronous failure must
+    // fully unwind so the class never exposes a partial-start state.
+    _isRunning = true;
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
     dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
-    // Send the first heartbeat immediately so the server (especially
-    // iOS, which has no connection callback) learns about this client
-    // as soon as possible — before the interval read round-trip.
-    _sendProbe();
+    try {
+      // Send the first heartbeat immediately so the server (especially
+      // iOS, which has no connection callback) learns about this client
+      // as soon as possible — before the interval read round-trip.
+      _sendProbe();
 
-    // Find the interval characteristic and read the server's interval.
-    final intervalChar = controlService.characteristics
-        .where(
-          (c) =>
-              c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
-        )
-        .firstOrNull;
+      // Find the interval characteristic and read the server's interval.
+      final intervalChar = controlService.characteristics
+          .where(
+            (c) =>
+                c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
+          )
+          .firstOrNull;
 
-    if (intervalChar != null) {
-      _platform
-          .readCharacteristic(_connectionId, intervalChar.uuid.toString())
-          .then((bytes) {
-        final serverInterval = lifecycle.decodeInterval(bytes);
-        final heartbeatInterval = Duration(
-          milliseconds: serverInterval.inMilliseconds ~/ 2,
-        );
-        _beginHeartbeat(heartbeatInterval);
-      }).catchError((_) {
+      if (intervalChar != null) {
+        _platform
+            .readCharacteristic(_connectionId, intervalChar.uuid.toString())
+            .then((bytes) {
+          if (!_isRunning) return;
+          final serverInterval = lifecycle.decodeInterval(bytes);
+          final heartbeatInterval = Duration(
+            milliseconds: serverInterval.inMilliseconds ~/ 2,
+          );
+          _beginHeartbeat(heartbeatInterval);
+        }).catchError((_) {
+          if (!_isRunning) return;
+          _beginHeartbeat(_defaultHeartbeatInterval);
+        });
+      } else {
         _beginHeartbeat(_defaultHeartbeatInterval);
-      });
-    } else {
-      _beginHeartbeat(_defaultHeartbeatInterval);
+      }
+    } catch (_) {
+      stop();
+      rethrow;
     }
   }
 
@@ -131,14 +169,20 @@ class LifecycleClient {
     }
   }
 
-  /// Stops the heartbeat timer and clears the char reference. The
-  /// monitor keeps its accumulated state, but [recordActivity] and
-  /// [_scheduleProbe] both check [isRunning] / [_heartbeatCharUuid] so
-  /// no further state mutation is possible after stop.
+  /// Stops the heartbeat timer and clears the char reference. Releases
+  /// any in-flight probe flag via [LivenessMonitor.cancelProbe] so the
+  /// monitor does not strand [probeInFlight] if a write was pending at
+  /// teardown. The failure counter and activity timestamp are retained
+  /// (they are irrelevant because this instance is not reused after
+  /// stop()). After stop(): `recordActivity` bails on the `isRunning`
+  /// guard; `_scheduleProbe` and `_sendProbeOrDefer` bail on the
+  /// `_heartbeatCharUuid == null` guard.
   void stop() {
+    _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
     _heartbeatCharUuid = null;
+    _monitor.cancelProbe();
   }
 
   Duration get _defaultHeartbeatInterval => Duration(
@@ -202,11 +246,13 @@ class LifecycleClient {
           true,
         )
         .then((_) {
+      if (!_isRunning) return;
       _monitor.recordProbeSuccess();
       // Success refreshed lastActivity → monitor deadline is now
       // exactly activityWindow from now. No explicit override.
       _scheduleProbe();
     }).catchError((Object error) {
+      if (!_isRunning) return;
       if (!_isDeadPeerSignal(error)) {
         // Transient platform error — release in-flight, retry after a
         // full activityWindow (the monitor deadline has already elapsed

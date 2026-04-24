@@ -4,8 +4,9 @@ title: "`LifecycleClient.start()` is not idempotent"
 category: bug
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-25
+fixed_in: 2faf062
 related: [I070]
 ---
 
