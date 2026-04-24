@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
@@ -115,6 +116,8 @@ class LifecycleClient {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
+    // [I077] log who initiated disconnect
+    debugPrint('[I077] CLIENT sendDisconnectCommand writing 0x00 to $_connectionId');
     try {
       await _platform.writeCharacteristic(
         _connectionId,
@@ -159,6 +162,8 @@ class LifecycleClient {
     final charUuid = _heartbeatCharUuid;
     if (charUuid == null) return;
 
+    // [I077] log every probe attempt
+    debugPrint('[I077] CLIENT _sendProbe writing 0x01 to $_connectionId');
     _monitor.markProbeInFlight();
     _platform
         .writeCharacteristic(
@@ -167,13 +172,13 @@ class LifecycleClient {
           lifecycle.heartbeatValue,
           true,
         )
-        .then((_) => _monitor.recordProbeSuccess())
+        .then((_) {
+          debugPrint('[I077] CLIENT _sendProbe SUCCESS');
+          _monitor.recordProbeSuccess();
+        })
         .catchError((Object error) {
+      debugPrint('[I077] CLIENT _sendProbe error=${error.runtimeType} isDeadPeer=${_isDeadPeerSignal(error)}');
       if (!_isDeadPeerSignal(error)) {
-        // Not a dead-peer signal — release the in-flight flag so the
-        // next tick can retry, but do NOT reset the failure counter or
-        // refresh activity. The transient error gives no evidence about
-        // whether the peer is alive.
         _monitor.cancelProbe();
         return;
       }
@@ -184,6 +189,7 @@ class LifecycleClient {
         level: 900, // WARNING
       );
       if (tripped) {
+        debugPrint('[I077] CLIENT heartbeat threshold tripped — calling onServerUnreachable');
         dev.log(
           'heartbeat threshold reached — invoking onServerUnreachable',
           name: 'bluey.lifecycle',

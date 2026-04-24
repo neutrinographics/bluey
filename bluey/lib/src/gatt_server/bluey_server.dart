@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
@@ -54,7 +56,8 @@ class BlueyServer implements Server {
       platformApi: _platform,
       interval: lifecycleInterval,
       serverId: _serverId,
-      onClientGone: _handleClientDisconnected,
+      // [I077] tag the source so we can tell lifecycle paths apart from native.
+      onClientGone: (id) => _handleClientDisconnected(id, source: 'lifecycle'),
       onHeartbeatReceived: _trackClientIfNeeded,
     );
     // Eagerly add the control service so it's available for incoming
@@ -97,7 +100,8 @@ class BlueyServer implements Server {
     _centralDisconnectionsSub = _platform.centralDisconnections.listen((
       clientId,
     ) {
-      _handleClientDisconnected(clientId);
+      // [I077] tag the source so we can tell this from lifecycle paths.
+      _handleClientDisconnected(clientId, source: 'native');
     });
 
     // Subscribe to platform request streams and route internally.
@@ -370,7 +374,11 @@ class BlueyServer implements Server {
 
   // === Lifecycle management ===
 
-  void _handleClientDisconnected(String clientId) {
+  void _handleClientDisconnected(String clientId, {String source = 'unknown'}) {
+    // [I077] tag every disconnect with its origin: native | lifecycle | unknown.
+    debugPrint(
+      '[I077] _handleClientDisconnected source=$source clientId=$clientId tracked=${_connectedClients.containsKey(clientId)}',
+    );
     dev.log(
       'central disconnected: $clientId',
       name: 'bluey.server',
