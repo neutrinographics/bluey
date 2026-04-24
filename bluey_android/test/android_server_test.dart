@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey_android/src/android_server.dart';
@@ -280,6 +281,23 @@ void main() {
 
           expect(captured[1], equals(expectedDto));
         }
+      });
+
+      test(
+          'propagates gatt-status-failed PlatformException as GattOperationStatusFailedException',
+          () async {
+        when(() => mockHostApi.respondToReadRequest(any(), any(), any()))
+            .thenThrow(PlatformException(
+          code: 'gatt-status-failed',
+          message: 'No pending request for id: 999',
+          details: 0x0A,
+        ));
+
+        expect(
+          () => server.respondToReadRequest(
+              999, PlatformGattStatus.success, null),
+          throwsA(isA<GattOperationStatusFailedException>()),
+        );
       });
     });
 
