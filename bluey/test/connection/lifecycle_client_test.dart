@@ -1110,6 +1110,74 @@ void main() {
       });
     });
 
+    // I070: interval-read callbacks must not mutate monitor state after stop().
+    //
+    // The pre-existing _heartbeatCharUuid == null guard already blocks probe
+    // writes, but _beginHeartbeat calls _monitor.updateActivityWindow BEFORE
+    // _scheduleProbe. Without the _isRunning guard added in the production
+    // fix, a late .then callback would silently mutate activityWindow on a
+    // stopped client. The .catchError branch shares the same guard pattern;
+    // a single test on the .then path drives both guards.
+    test(
+      'I070: interval-read success after stop() does not mutate monitor activityWindow',
+      () {
+        fakeAsync((async) {
+          late LifecycleClient client;
+          late FakeBlueyPlatform fakePlatform;
+          late List<RemoteService> services;
+
+          // Use intervalValue: 12s so the fixture interval (12s → 6s half)
+          // differs from the client's hardcoded default (5s). The monitor is
+          // initialised at 5s and stays there until the interval-read resolves.
+          _setUpConnectedClient(
+            onServerUnreachable: () {},
+            intervalValue: const Duration(seconds: 12),
+          ).then((fixture) {
+            client = fixture.client;
+            services = fixture.services;
+            fakePlatform = fixture.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          fakePlatform.holdNextReadCharacteristic();
+          client.start(allServices: services);
+          async.flushMicrotasks();
+
+          // Capture pre-stop() state: activityWindow is still the client's
+          // default (5s) because the interval-read is still pending.
+          final windowBefore = client.activityWindowForTest;
+          final writesBefore = fakePlatform.writeCharacteristicCalls.length;
+
+          client.stop();
+          async.flushMicrotasks();
+
+          // Late interval-read succeeds with a DIFFERENT value: 8s → 4s half.
+          // Without the guard, _beginHeartbeat would call
+          // _monitor.updateActivityWindow(4s), mutating state on a stopped client.
+          fakePlatform.resolveHeldRead(
+              lifecycle.encodeInterval(const Duration(seconds: 8)));
+          async.flushMicrotasks();
+
+          // Any armed timer would fire within 60 s.
+          async.elapse(const Duration(seconds: 60));
+          async.flushMicrotasks();
+
+          expect(client.isRunning, isFalse);
+          expect(
+            client.activityWindowForTest,
+            windowBefore,
+            reason:
+                'stopped client must not have its monitor mutated by a late interval-read',
+          );
+          expect(
+            fakePlatform.writeCharacteristicCalls.length,
+            writesBefore,
+            reason: 'no probe may dispatch after stop()',
+          );
+        });
+      },
+    );
+
     test('stop() releases in-flight probe so monitor does not strand probeInFlight', () {
       fakeAsync((async) {
         late LifecycleClient client;

@@ -60,6 +60,11 @@ class LifecycleClient {
   @visibleForTesting
   bool get probeInFlightForTest => _monitor.probeInFlight;
 
+  /// Exposed for tests: the monitor's current activity window.
+  /// Not intended for production use.
+  @visibleForTesting
+  Duration get activityWindowForTest => _monitor.activityWindow;
+
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
   /// shifts the probe deadline forward by [_monitor.activityWindow].
@@ -115,12 +120,14 @@ class LifecycleClient {
       _platform
           .readCharacteristic(_connectionId, intervalChar.uuid.toString())
           .then((bytes) {
+        if (!_isRunning) return;
         final serverInterval = lifecycle.decodeInterval(bytes);
         final heartbeatInterval = Duration(
           milliseconds: serverInterval.inMilliseconds ~/ 2,
         );
         _beginHeartbeat(heartbeatInterval);
       }).catchError((_) {
+        if (!_isRunning) return;
         _beginHeartbeat(_defaultHeartbeatInterval);
       });
     } else {
