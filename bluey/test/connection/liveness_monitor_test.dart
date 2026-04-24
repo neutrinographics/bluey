@@ -168,5 +168,52 @@ void main() {
       // Counter preserved — next failure still trips at 2.
       expect(m.recordProbeFailure(), isTrue);
     });
+
+    test('timeUntilNextProbe returns activityWindow when no activity recorded yet', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      // lastActivity is null — deadline falls back to a full activityWindow
+      // from now, so the first schedule after construction is activityWindow.
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 5));
+    });
+
+    test('timeUntilNextProbe returns activityWindow immediately after recordActivity', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 5));
+    });
+
+    test('timeUntilNextProbe decreases as clock advances', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 3));
+    });
+
+    test('timeUntilNextProbe returns Duration.zero once deadline has passed', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 10));
+      expect(m.timeUntilNextProbe(), Duration.zero,
+          reason: 'Never returns a negative value; caller should probe immediately');
+    });
+
+    test('timeUntilNextProbe reflects updateActivityWindow', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      m.updateActivityWindow(const Duration(seconds: 10));
+      // With the new 10s window, 8s remain.
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 8));
+    });
+
+    test('timeUntilNextProbe is not affected by markProbeInFlight', () {
+      // The in-flight flag is a separate dimension — the deadline
+      // still advances in real time regardless of whether a probe is pending.
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      m.markProbeInFlight();
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 3));
+    });
   });
 }

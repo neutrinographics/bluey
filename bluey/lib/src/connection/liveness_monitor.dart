@@ -55,6 +55,24 @@ class LivenessMonitor {
     _lastActivityAt = _now();
   }
 
+  /// How long from now until the next probe is due.
+  ///
+  /// Returns [Duration.zero] if the deadline is already past — caller
+  /// should probe immediately. Returns [activityWindow] if no activity
+  /// has been recorded yet, giving the caller a sensible first deadline.
+  ///
+  /// The in-flight flag is a separate dimension: this method reports
+  /// the deadline regardless, so the caller can make a unified
+  /// "time to probe" decision (via a one-shot timer) without needing
+  /// to special-case the in-flight branch.
+  Duration timeUntilNextProbe() {
+    final last = _lastActivityAt;
+    if (last == null) return _activityWindow;
+    final elapsed = _now().difference(last);
+    final remaining = _activityWindow - elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
   /// Tick-time decision: should we send a probe this tick? False if
   /// a probe is already pending, or activity is recent within the
   /// window. Uses `>=` at the boundary so the first tick after the
