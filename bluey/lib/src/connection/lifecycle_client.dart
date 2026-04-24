@@ -25,6 +25,10 @@ class LifecycleClient {
 
   late LivenessMonitor _monitor;
   Timer? _probeTimer;
+
+  /// UUID of the server's heartbeat characteristic, once we've found
+  /// it during `start()`. Not a running sentinel — use [_isRunning] for
+  /// that. Nulled by `stop()`.
   String? _heartbeatCharUuid;
 
   /// Authoritative "running" sentinel. True from the moment `start()`
