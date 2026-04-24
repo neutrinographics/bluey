@@ -459,4 +459,40 @@ class GattServerTest {
             }
         }
     }
+
+    @Test
+    fun `onCharacteristicWriteRequest (responseNeeded, not prepared) stashes and does not call sendResponse`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicWriteRequest(
+            mockDevice,
+            55,    // requestId
+            mockCharacteristic,
+            false, // preparedWrite
+            true,  // responseNeeded
+            0,     // offset
+            byteArrayOf(0x0A)
+        )
+
+        verify { mockFlutterApi.onWriteRequest(any(), any()) }
+
+        // No binder-thread sendResponse.
+        verify(exactly = 0) {
+            mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
+        }
+    }
 }

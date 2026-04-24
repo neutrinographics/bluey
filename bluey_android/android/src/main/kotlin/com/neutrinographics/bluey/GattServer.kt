@@ -462,7 +462,8 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
-            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid}")
+            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded")
+
             val request = WriteRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
@@ -471,13 +472,24 @@ class GattServer(
                 offset = offset.toLong(),
                 responseNeeded = responseNeeded
             )
-            // Must dispatch to main thread for Flutter platform channel
+
+            // Stash only for the "simple write with response" path. The
+            // responseNeeded=false path has no response to send, and the
+            // preparedWrite=true path keeps its existing auto-respond echo
+            // behavior (owned by I050).
+            if (responseNeeded && !preparedWrite) {
+                pendingWriteRequests.put(
+                    requestId.toLong(),
+                    PendingWrite(device, requestId, offset, value)
+                )
+            }
+
             handler.post {
                 flutterApi.onWriteRequest(request) {}
             }
 
-            // Auto-respond if needed (simplified implementation)
-            if (responseNeeded) {
+            // Preserved auto-respond path for prepared writes (I050).
+            if (responseNeeded && preparedWrite) {
                 try {
                     gattServer?.sendResponse(
                         device,
@@ -487,7 +499,7 @@ class GattServer(
                         value
                     )
                 } catch (e: SecurityException) {
-                    // Permission revoked
+                    // Permission revoked.
                 }
             }
         }
