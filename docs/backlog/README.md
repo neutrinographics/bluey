@@ -60,15 +60,13 @@ Prose sections (in this order, any may be omitted if empty):
 
 Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, etc.).
 
-1. **I020 + I021** — Android GATT server auto-respond on characteristic read/write. *Est. 2–3 days.* Unblocks stress tests (timeout probe, failure injection), restores the server-side request/response contract. Coherent single PR: shared `pendingXxxRequests` scaffolding, same status mapping, same disconnect-drain.
+1. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
 
-2. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
+2. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
 
-3. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
+3. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
 
-4. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
-
-5. **I070 + I073** — Lifecycle client guards. *Est. 1 day.* Tiny `_isRunning` flag + `start()` idempotency check. Prevents the zombie-timer pattern that accumulates across disconnect cycles.
+4. **I070 + I073** — Lifecycle client guards. *Est. 1 day.* Tiny `_isRunning` flag + `start()` idempotency check. Prevents the zombie-timer pattern that accumulates across disconnect cycles.
 
 Everything else (the other 40-odd open entries) can proceed opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
 
@@ -88,6 +86,7 @@ Everything else (the other 40-odd open entries) can proceed opportunistically �
 | [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC → UUID truncation | medium |
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
+| [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-interface exception | medium |
 | [I070](I070-lifecycle-client-late-promise-callbacks.md) | LifecycleClient late promise callbacks fire after `stop()` | high |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
@@ -95,6 +94,7 @@ Everything else (the other 40-odd open entries) can proceed opportunistically �
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I077](I077-lifecycle-client-disconnect-storm.md) | Client appears to toggle connected/disconnected during heartbeat activity | medium |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 
@@ -122,8 +122,6 @@ Everything else (the other 40-odd open entries) can proceed opportunistically �
 
 | ID | Title | Severity |
 |---|---|---|
-| [I020](I020-gatt-server-auto-respond-characteristic-write.md) | GATT server auto-respond on characteristic write | critical |
-| [I021](I021-gatt-server-auto-respond-characteristic-read.md) | GATT server auto-respond on characteristic read | critical |
 | [I022](I022-gatt-server-descriptor-read-no-dart-api.md) | Descriptor read auto-responded; no Dart API | medium |
 | [I023](I023-gatt-server-notification-sent-no-tracking.md) | `onNotificationSent` not tracked for completion | medium |
 | [I024](I024-gatt-server-mtu-change-not-propagated.md) | Server-side MTU change not propagated to Dart | medium |
@@ -169,6 +167,8 @@ Everything else (the other 40-odd open entries) can proceed opportunistically �
 
 | ID | Title | Fixed in |
 |---|---|---|
+| [I020](I020-gatt-server-auto-respond-characteristic-write.md) | GATT server auto-respond on characteristic write | `3539a42` |
+| [I021](I021-gatt-server-auto-respond-characteristic-read.md) | GATT server auto-respond on characteristic read | `3539a42` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |

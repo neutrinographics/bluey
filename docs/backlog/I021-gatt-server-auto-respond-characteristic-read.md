@@ -4,8 +4,9 @@ title: GATT server auto-respond on characteristic read
 category: no-op
 severity: critical
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-24
+fixed_in: 3539a42
 historical_ref: BUGS-ANALYSIS-#7
 related: [I020]
 ---

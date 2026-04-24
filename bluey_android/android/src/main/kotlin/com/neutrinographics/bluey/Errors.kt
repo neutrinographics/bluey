@@ -47,7 +47,8 @@ internal fun Throwable.toServerFlutterError(): FlutterError = when (this) {
     is BlueyAndroidError.PermissionDenied ->
         FlutterError("bluey-permission-denied", message, permission)
     is BlueyAndroidError.CharacteristicNotFound,
-    is BlueyAndroidError.CentralNotFound ->
+    is BlueyAndroidError.CentralNotFound,
+    is BlueyAndroidError.NoPendingRequest ->
         FlutterError("gatt-status-failed", message, 0x0A)
     is BlueyAndroidError ->
         FlutterError("bluey-unknown", message, null)

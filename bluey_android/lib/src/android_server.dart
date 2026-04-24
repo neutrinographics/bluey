@@ -1,7 +1,36 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
+
+/// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
+/// matching typed platform-interface exception for server-side operations:
+///
+///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
+///     the native status extracted from `details`.
+///
+/// Other errors propagate unchanged.
+///
+/// Kept package-private so the same wrapper can be used by every server
+/// operation in this file without leaking translation logic into the
+/// platform interface contract.
+Future<T> _translateServerPlatformError<T>(
+  String operation,
+  Future<T> Function() body,
+) async {
+  try {
+    return await body();
+  } on PlatformException catch (e) {
+    if (e.code == 'gatt-status-failed') {
+      // Native status arrives in `details` as an int. Sentinel -1 handles
+      // the rare marshaling paths where it could come back null / non-int.
+      final status = e.details is int ? e.details as int : -1;
+      throw GattOperationStatusFailedException(operation, status);
+    }
+    rethrow;
+  }
+}
 
 /// Handles GATT server (peripheral) operations for the Android platform.
 ///
@@ -122,10 +151,13 @@ class AndroidServer {
     PlatformGattStatus status,
     Uint8List? value,
   ) async {
-    await _hostApi.respondToReadRequest(
-      requestId,
-      _mapGattStatusToDto(status),
-      value,
+    await _translateServerPlatformError(
+      'respondToReadRequest',
+      () => _hostApi.respondToReadRequest(
+        requestId,
+        _mapGattStatusToDto(status),
+        value,
+      ),
     );
   }
 
@@ -134,9 +166,12 @@ class AndroidServer {
     int requestId,
     PlatformGattStatus status,
   ) async {
-    await _hostApi.respondToWriteRequest(
-      requestId,
-      _mapGattStatusToDto(status),
+    await _translateServerPlatformError(
+      'respondToWriteRequest',
+      () => _hostApi.respondToWriteRequest(
+        requestId,
+        _mapGattStatusToDto(status),
+      ),
     );
   }
 

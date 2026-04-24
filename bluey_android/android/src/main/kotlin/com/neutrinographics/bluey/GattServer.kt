@@ -47,6 +47,14 @@ class GattServer(
     // Track notification subscriptions: characteristicUuid -> Set<centralId>
     private val subscriptions = mutableMapOf<String, MutableSet<String>>()
 
+    // Pending ATT requests keyed by native Android requestId (cast to Long).
+    // Populated on binder thread in onCharacteristic{Read,Write}Request;
+    // drained on main thread in respondTo{Read,Write}Request, on central
+    // disconnect, and on cleanup(). See PendingRequestRegistry for the
+    // thread-safety argument.
+    private val pendingReadRequests = PendingRequestRegistry<PendingRead>()
+    private val pendingWriteRequests = PendingRequestRegistry<PendingWrite>()
+
     // Pending callbacks for async service addition
     private var pendingServiceCallback: ((Result<Unit>) -> Unit)? = null
 
@@ -197,11 +205,24 @@ class GattServer(
             return
         }
 
-        // requestId encodes both the device hashcode and offset
-        // For simplicity, we store pending requests with device reference
-        // This is a simplified implementation - a production version would
-        // track pending requests with their associated device
-        callback(Result.success(Unit))
+        val pending = pendingReadRequests.pop(requestId)
+        if (pending == null) {
+            callback(Result.failure(BlueyAndroidError.NoPendingRequest(requestId)))
+            return
+        }
+
+        try {
+            server.sendResponse(
+                pending.device,
+                pending.requestId,
+                status.toAndroidStatus(),
+                pending.offset,
+                value ?: ByteArray(0)
+            )
+            callback(Result.success(Unit))
+        } catch (e: SecurityException) {
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+        }
     }
 
     fun respondToWriteRequest(
@@ -215,7 +236,25 @@ class GattServer(
             return
         }
 
-        callback(Result.success(Unit))
+        val pending = pendingWriteRequests.pop(requestId)
+        if (pending == null) {
+            callback(Result.failure(BlueyAndroidError.NoPendingRequest(requestId)))
+            return
+        }
+
+        try {
+            // ATT Write Response PDU carries no payload — pass null.
+            server.sendResponse(
+                pending.device,
+                pending.requestId,
+                status.toAndroidStatus(),
+                pending.offset,
+                null
+            )
+            callback(Result.success(Unit))
+        } catch (e: SecurityException) {
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+        }
     }
 
     fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
@@ -270,6 +309,8 @@ class GattServer(
         connectedCentrals.clear()
         centralMtus.clear()
         subscriptions.clear()
+        pendingReadRequests.clear()
+        pendingWriteRequests.clear()
         pendingServiceCallback = null
     }
 
@@ -376,10 +417,23 @@ class GattServer(
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
-                    // Remove from all subscriptions
+                    // Remove from all subscriptions.
                     subscriptions.values.forEach { it.remove(deviceId) }
 
-                    // Must dispatch to main thread for Flutter platform channel
+                    // Drain pending ATT requests for this central — no point
+                    // keeping them; sendResponse would fail once the device is gone.
+                    // Runs synchronously inside the binder callback so the main
+                    // thread cannot observe a partial disconnect state.
+                    val drainedReads = pendingReadRequests.drainWhere { it.device.address == deviceId }
+                    val drainedWrites = pendingWriteRequests.drainWhere { it.device.address == deviceId }
+                    if (drainedReads.isNotEmpty() || drainedWrites.isNotEmpty()) {
+                        Log.d(
+                            "GattServer",
+                            "Drained ${drainedReads.size} read(s) and ${drainedWrites.size} write(s) on disconnect of $deviceId"
+                        )
+                    }
+
+                    // Must dispatch to main thread for Flutter platform channel.
                     handler.post {
                         flutterApi.onCentralDisconnected(deviceId) {}
                     }
@@ -407,31 +461,29 @@ class GattServer(
             offset: Int,
             characteristic: BluetoothGattCharacteristic
         ) {
-            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid}")
+            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId")
+
+            // Stash pending entry BEFORE posting to Flutter so the main
+            // thread can never see a respondToRead before the put has
+            // happened. synchronized in the registry establishes
+            // happens-before with the main-thread pop.
+            pendingReadRequests.put(
+                requestId.toLong(),
+                PendingRead(device, requestId, offset)
+            )
+
             val request = ReadRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
                 characteristicUuid = characteristic.uuid.toString(),
                 offset = offset.toLong()
             )
-            // Must dispatch to main thread for Flutter platform channel
+            // Must dispatch to main thread for Flutter platform channel.
             handler.post {
                 flutterApi.onReadRequest(request) {}
             }
-
-            // Auto-respond with success for now (simplified implementation)
-            // A production version would wait for respondToReadRequest
-            try {
-                gattServer?.sendResponse(
-                    device,
-                    requestId,
-                    BluetoothGatt.GATT_SUCCESS,
-                    offset,
-                    characteristic.value ?: ByteArray(0)
-                )
-            } catch (e: SecurityException) {
-                // Permission revoked
-            }
+            // Intentionally NO sendResponse here — Dart's respondToRead
+            // is the only code path that sends the response.
         }
 
         override fun onCharacteristicWriteRequest(
@@ -443,7 +495,8 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
-            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid}")
+            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded")
+
             val request = WriteRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
@@ -452,13 +505,24 @@ class GattServer(
                 offset = offset.toLong(),
                 responseNeeded = responseNeeded
             )
-            // Must dispatch to main thread for Flutter platform channel
+
+            // Stash only for the "simple write with response" path. The
+            // responseNeeded=false path has no response to send, and the
+            // preparedWrite=true path keeps its existing auto-respond echo
+            // behavior (owned by I050).
+            if (responseNeeded && !preparedWrite) {
+                pendingWriteRequests.put(
+                    requestId.toLong(),
+                    PendingWrite(device, requestId, offset, value)
+                )
+            }
+
             handler.post {
                 flutterApi.onWriteRequest(request) {}
             }
 
-            // Auto-respond if needed (simplified implementation)
-            if (responseNeeded) {
+            // Preserved auto-respond path for prepared writes (I050).
+            if (responseNeeded && preparedWrite) {
                 try {
                     gattServer?.sendResponse(
                         device,
@@ -468,7 +532,7 @@ class GattServer(
                         value
                     )
                 } catch (e: SecurityException) {
-                    // Permission revoked
+                    // Permission revoked.
                 }
             }
         }
