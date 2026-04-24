@@ -6,9 +6,9 @@
 
 ## Goal
 
-Three known bugs in `LifecycleClient` all share the same root cause: the class has no authoritative "running" sentinel. Today it reads `_probeTimer != null` via the `isRunning` getter in some places and `_heartbeatCharUuid != null` in others, and neither correctly represents "`start()` has been called and `stop()` has not."
+Three known bugs in `LifecycleClient` all share the same root cause: the class has no authoritative "running" sentinel. Today it reads `_probeTimer != null` via the `isRunning` getter in some places and `_heartbeatCharUuid != null` in others, and neither correctly represents "`start()` has committed to run and `stop()` has not yet unwound it."
 
-The fix is to add a single `_isRunning` flag that is flipped on at the very top of `start()` and cleared at the very top of `stop()`, and to consult it in every place where the class currently guards on a stale proxy.
+The fix is to add a single `_isRunning` flag that is set at the commit point inside `start()` (after the pre-commit null checks pass) and cleared at the top of `stop()`, and to consult it in every place where the class currently guards on a stale proxy. `start()` itself becomes transactional: either the object transitions cleanly into the running state or it does not transition at all — no partial-start state can outlive the call.
 
 ## Why each bug exists
 
@@ -33,42 +33,103 @@ Calling `start()` twice before the first's interval-read has resolved overwrites
 
 ### The `_isRunning` sentinel
 
+`_isRunning` is the authoritative "I have committed to running and have not been stopped" flag. Its lifecycle is atomic: a call to `start()` either transitions the object cleanly into the running state (flag up, heartbeat char set, probe scheduled or interval-read dispatched) or leaves it fully in the pre-start state. There is no partial-start state that outlives the call.
+
 ```dart
 class LifecycleClient {
   bool _isRunning = false;
 
   void start({required List<RemoteService> allServices}) {
-    if (_isRunning) return;                    // I073 guard
-    _isRunning = true;                          // flag up BEFORE any async work
-    // ... existing body (find control service, set _heartbeatCharUuid,
-    //     dispatch first heartbeat, read interval)
+    if (_isRunning) return;                         // I073 guard
+
+    // Pre-commit: failing these checks means we never had work to do.
+    // `_isRunning` stays false so a later retry (e.g. after service
+    // discovery finds the control service) can still start us.
+    final controlService = allServices
+        .where((s) => lifecycle.isControlService(s.uuid.toString()))
+        .firstOrNull;
+    if (controlService == null) return;
+
+    final heartbeatChar = controlService.characteristics
+        .where((c) => c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid)
+        .firstOrNull;
+    if (heartbeatChar == null) return;
+
+    // Commit point. From here on, any failure must fully unwind —
+    // `_isRunning = true` is an invariant and cannot leak.
+    _isRunning = true;
+    _heartbeatCharUuid = heartbeatChar.uuid.toString();
+    dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
+
+    try {
+      _sendProbe();
+
+      final intervalChar = controlService.characteristics
+          .where((c) => c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid)
+          .firstOrNull;
+
+      if (intervalChar != null) {
+        _platform
+            .readCharacteristic(_connectionId, intervalChar.uuid.toString())
+            .then((bytes) {
+          if (!_isRunning) return;               // I070 guard
+          final serverInterval = lifecycle.decodeInterval(bytes);
+          _beginHeartbeat(Duration(milliseconds: serverInterval.inMilliseconds ~/ 2));
+        }).catchError((_) {
+          if (!_isRunning) return;               // I070 guard
+          _beginHeartbeat(_defaultHeartbeatInterval);
+        });
+      } else {
+        _beginHeartbeat(_defaultHeartbeatInterval);
+      }
+    } catch (_) {
+      // A synchronous throw from a platform call (or any line inside
+      // the try block) would leave the object in an inconsistent
+      // state. Unwind fully and re-raise so the caller sees the real
+      // failure instead of a silent inert client.
+      stop();
+      rethrow;
+    }
   }
 
   void stop() {
-    _isRunning = false;                         // flag down at top of stop()
+    _isRunning = false;                           // flag down at top of stop()
     _probeTimer?.cancel();
     _probeTimer = null;
     _heartbeatCharUuid = null;
-    _monitor.cancelProbe();                     // release any in-flight probe
+    _monitor.cancelProbe();                       // release any in-flight probe
   }
 
-  bool get isRunning => _isRunning;             // getter now reflects the flag
+  bool get isRunning => _isRunning;               // getter reflects the flag
 }
 ```
 
 `_heartbeatCharUuid` is kept as a separate field, but its meaning is narrowed: it's now strictly "we discovered a heartbeat characteristic on this server and know its UUID for writes." It is **not** a running-sentinel. The in-code comment on the field should say so explicitly, so future readers don't re-conflate the two.
 
-### Callback guards
+### Why two sentinels, not one
 
-Every promise callback that would mutate state or schedule work consults `_isRunning` first:
+One could imagine making `_isRunning` a computed getter based on observable state (e.g. `_heartbeatCharUuid != null`). That conflation is what produced I078 in the first place — `_heartbeatCharUuid != null` means "we know a heartbeat char UUID" and that meaning doesn't cleanly capture "`start()` has committed to run." Keeping them as two fields with precisely-scoped meanings keeps each invariant local and checkable.
 
-- `start()`'s interval-read `.then` and `.catchError` at lines 101-111.
-- `_sendProbe`'s `.then` at line 204.
-- `_sendProbe`'s `.catchError` at line 209.
+### The commit-point discipline
 
-Each gets `if (!_isRunning) return;` as its first statement. Inside the probe-failure `.catchError`, the check precedes all monitor mutation, so `_monitor.cancelProbe()` / `_monitor.recordProbeFailure()` do not run after `stop()`.
+Three categories of failure are handled explicitly:
 
-Re-entrancy concern: `onServerUnreachable()` (called from the failure `.catchError` when the threshold trips) typically triggers a connection tear-down, which in turn calls `_lifecycle.stop()`. The handler calls `stop()` immediately before `onServerUnreachable()`, so a re-entrant `stop()` is idempotent (already handled by the `_isRunning` check).
+| Failure point | Result | Rationale |
+|---|---|---|
+| No control service or heartbeat char found | Early return before commit. `_isRunning` stays `false`. A later retry with a different `allServices` list can proceed. | These are legitimate "this server doesn't speak our protocol" outcomes, not exceptions. |
+| Synchronous throw from a platform call after commit | `stop()` unwinds everything; exception is rethrown. | The class owns its invariants; it must not leave partial state for the caller to clean up. |
+| Asynchronous platform failure (interval read rejects) | Handled by the existing `.catchError` fallback → `_beginHeartbeat(_defaultHeartbeatInterval)`. | Graceful degradation: we still run heartbeats, just with the default interval. |
+
+The `.catchError` callbacks also check `_isRunning` first (see I070 guards) so that a late rejection arriving after `stop()` does not accidentally re-arm timers.
+
+### `_sendProbe` callback guards
+
+The pseudocode above shows the `_isRunning` guard in the `start()` interval-read callbacks. The same guard is also added to both `_sendProbe` callbacks:
+
+- `.then` (on successful heartbeat write) — guards before `_monitor.recordProbeSuccess` and the follow-on `_scheduleProbe`.
+- `.catchError` (on failed heartbeat write) — guards before `_monitor.cancelProbe` / `_monitor.recordProbeFailure` and any follow-on scheduling or `onServerUnreachable` invocation.
+
+Re-entrancy concern: `onServerUnreachable()` (called from the failure `.catchError` when the threshold trips) typically triggers a connection tear-down, which in turn calls `_lifecycle.stop()`. The existing code calls `stop()` immediately before `onServerUnreachable()` in this path, so a re-entrant `stop()` call from the downstream tear-down is idempotent (already handled by the `_isRunning` check).
 
 Monitor cleanup: before the callback guards land, the `.then` / `.catchError` paths were responsible for releasing `_monitor._probeInFlight` via `recordProbeSuccess` / `recordProbeFailure` / `cancelProbe`. Adding `if (!_isRunning) return;` at the top of those callbacks blocks that release. To compensate, `stop()` explicitly calls `_monitor.cancelProbe()` so the in-flight flag is released synchronously when the client is torn down. This matters because `LivenessMonitor` instances are long-lived relative to any single probe, and a stranded `_probeInFlight = true` would prevent future probes from being dispatched if the client were ever restarted.
 
@@ -122,6 +183,20 @@ Plus the symmetric case:
 2. Call `recordActivity()` — simulates a user GATT op completing during the window.
 3. Resolve the interval-read.
 4. Assert: the monitor's `_lastActivityAt` reflects the step-2 timestamp (i.e. the first scheduled probe's deadline is `activityWindow` from step 2, not from the interval-read resolution).
+
+### Partial-start — pre-commit early return leaves state clean
+
+Two cases, one per early return:
+
+1. `start(allServices: <no control service>)`. Assert: `isRunning == false`, `_heartbeatCharUuid == null`, no timer armed. Then `start(allServices: <with control service>)`. Assert: starts normally — the earlier failed attempt did not block the retry.
+2. `start(allServices: <control service without heartbeat char>)`. Assert: same — `isRunning == false`, state untouched, retryable.
+
+### Partial-start — synchronous throw after commit unwinds fully
+
+1. Configure `FakeBlueyPlatform` so `writeCharacteristic` throws synchronously (not via a rejected Future) — simulates a platform-layer sync throw.
+2. Call `start(allServices: <valid services>)` → expect the exception to propagate out.
+3. Assert: `isRunning == false`, `_heartbeatCharUuid == null`, no timer armed, `_monitor.probeInFlight == false`. The object is back in its pre-`start()` state.
+4. Call `start()` again with a non-throwing platform → assert: starts normally.
 
 ## Rollout & compatibility
 
