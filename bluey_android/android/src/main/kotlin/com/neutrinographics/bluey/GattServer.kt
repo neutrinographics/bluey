@@ -205,11 +205,24 @@ class GattServer(
             return
         }
 
-        // requestId encodes both the device hashcode and offset
-        // For simplicity, we store pending requests with device reference
-        // This is a simplified implementation - a production version would
-        // track pending requests with their associated device
-        callback(Result.success(Unit))
+        val pending = pendingReadRequests.pop(requestId)
+        if (pending == null) {
+            callback(Result.failure(BlueyAndroidError.NoPendingRequest(requestId)))
+            return
+        }
+
+        try {
+            server.sendResponse(
+                pending.device,
+                pending.requestId,
+                status.toAndroidStatus(),
+                pending.offset,
+                value ?: ByteArray(0)
+            )
+            callback(Result.success(Unit))
+        } catch (e: SecurityException) {
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+        }
     }
 
     fun respondToWriteRequest(

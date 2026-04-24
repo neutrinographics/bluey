@@ -305,4 +305,47 @@ class GattServerTest {
             mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
         }
     }
+
+    @Test
+    fun `respondToReadRequest with known id calls sendResponse with Dart-supplied value and status`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        // Stash a pending read.
+        capturedCallback!!.onCharacteristicReadRequest(mockDevice, 42, 3, mockCharacteristic)
+
+        // Dart responds.
+        val value = byteArrayOf(0x01, 0x02, 0x03)
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToReadRequest(42L, GattStatusDto.SUCCESS, value) {
+            resultSeen = it
+        }
+
+        // sendResponse called with the stashed device + offset, Dart-supplied status + value.
+        verify(exactly = 1) {
+            mockBluetoothGattServer.sendResponse(
+                mockDevice,
+                42,
+                android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                3,
+                value
+            )
+        }
+        assertTrue("respond callback should succeed", resultSeen?.isSuccess == true)
+    }
 }
