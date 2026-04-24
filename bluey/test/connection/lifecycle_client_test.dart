@@ -1346,6 +1346,75 @@ void main() {
       });
     });
 
+    test('start() with no control service leaves _isRunning false and is retryable', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      // First: a regular (non-Bluey) device with no control service.
+      fakePlatform.simulatePeripheral(
+        id: _deviceAddress,
+        name: 'Regular Device',
+        services: const [
+          platform.PlatformService(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            isPrimary: true,
+            characteristics: [],
+            includedServices: [],
+          ),
+        ],
+      );
+
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final platformServicesNoControl =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final domainServicesNoControl = platformServicesNoControl
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      final client = LifecycleClient(
+        platformApi: fakePlatform,
+        connectionId: _deviceAddress,
+        onServerUnreachable: () {},
+      );
+
+      client.start(
+          allServices: List<RemoteService>.from(domainServicesNoControl));
+
+      // No control service found — start() must NOT commit to running.
+      expect(client.isRunning, isFalse,
+          reason: 'start() without a control service must not commit');
+
+      // Disconnect, re-simulate the same address as a full Bluey server,
+      // reconnect, re-discover. This gives us a fresh services list that
+      // includes the control service.
+      await fakePlatform.disconnect(_deviceAddress);
+      fakePlatform.simulateBlueyServer(
+        address: _deviceAddress,
+        serverId: ServerId.generate(),
+      );
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+      final platformServicesWithControl =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final domainServicesWithControl = platformServicesWithControl
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      client.start(
+          allServices: List<RemoteService>.from(domainServicesWithControl));
+
+      expect(client.isRunning, isTrue,
+          reason: 'retry with control service must succeed');
+
+      client.stop();
+    });
+
     test('I078: recordActivity during interval-read window shifts the probe deadline', () {
       fakeAsync((async) {
         late LifecycleClient client;
