@@ -348,4 +348,115 @@ class GattServerTest {
         }
         assertTrue("respond callback should succeed", resultSeen?.isSuccess == true)
     }
+
+    @Test
+    fun `respondToReadRequest with unknown id fails with NoPendingRequest`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToReadRequest(999L, GattStatusDto.SUCCESS, byteArrayOf()) {
+            resultSeen = it
+        }
+
+        assertTrue("result should be failure", resultSeen?.isFailure == true)
+        val exc = resultSeen?.exceptionOrNull()
+        assertTrue(
+            "expected NoPendingRequest, got $exc",
+            exc is BlueyAndroidError.NoPendingRequest
+        )
+        assertEquals(999L, (exc as BlueyAndroidError.NoPendingRequest).id)
+
+        verify(exactly = 0) {
+            mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `respondToReadRequest with null value sends empty ByteArray`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicReadRequest(mockDevice, 10, 0, mockCharacteristic)
+
+        gattServer.respondToReadRequest(10L, GattStatusDto.SUCCESS, null) {}
+
+        // sendResponse must receive an empty ByteArray, not null.
+        val valueSlot = slot<ByteArray>()
+        verify {
+            mockBluetoothGattServer.sendResponse(
+                mockDevice,
+                10,
+                android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                0,
+                capture(valueSlot)
+            )
+        }
+        assertEquals(0, valueSlot.captured.size)
+    }
+
+    @Test
+    fun `respondToReadRequest maps each GattStatusDto to the correct BluetoothGatt constant`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        val cases = listOf(
+            GattStatusDto.SUCCESS to android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+            GattStatusDto.READ_NOT_PERMITTED to android.bluetooth.BluetoothGatt.GATT_READ_NOT_PERMITTED,
+            GattStatusDto.WRITE_NOT_PERMITTED to android.bluetooth.BluetoothGatt.GATT_WRITE_NOT_PERMITTED,
+            GattStatusDto.INVALID_OFFSET to android.bluetooth.BluetoothGatt.GATT_INVALID_OFFSET,
+            GattStatusDto.INVALID_ATTRIBUTE_LENGTH to android.bluetooth.BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH,
+            GattStatusDto.INSUFFICIENT_AUTHENTICATION to android.bluetooth.BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION,
+            GattStatusDto.INSUFFICIENT_ENCRYPTION to android.bluetooth.BluetoothGatt.GATT_INSUFFICIENT_ENCRYPTION,
+            GattStatusDto.REQUEST_NOT_SUPPORTED to android.bluetooth.BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED,
+        )
+
+        for ((idx, case) in cases.withIndex()) {
+            val (dto, expected) = case
+            val reqId = (100 + idx)
+            capturedCallback!!.onCharacteristicReadRequest(mockDevice, reqId, 0, mockCharacteristic)
+            gattServer.respondToReadRequest(reqId.toLong(), dto, byteArrayOf()) {}
+
+            verify {
+                mockBluetoothGattServer.sendResponse(
+                    mockDevice,
+                    reqId,
+                    expected,
+                    0,
+                    any()
+                )
+            }
+        }
+    }
 }
