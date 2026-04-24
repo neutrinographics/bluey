@@ -24,7 +24,8 @@ void main() {
   });
 
   group('BlueyConnection activity — own methods', () {
-    test('requestMtu success causes the next heartbeat tick to skip', () {
+    test('requestMtu on success records activity so the probe deadline resets',
+        () {
       fakeAsync((async) {
         fakePlatform.simulateBlueyServer(
           address: TestDeviceIds.device1,
@@ -54,17 +55,17 @@ void main() {
         conn.requestMtu(247);
         async.flushMicrotasks();
 
-        // Advance through one full tick interval (5s default).
-        // With activity recorded just now, the tick's shouldSendProbe
-        // should return false.
-        async.elapse(const Duration(seconds: 5));
+        // Advance just under one activity window (4s of 5s). The deadline-
+        // driven scheduler reset the probe deadline to T+5s when requestMtu
+        // recorded activity, so at T+4s no probe has fired yet.
+        async.elapse(const Duration(seconds: 4));
         async.flushMicrotasks();
 
         final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
           (c) => c.characteristicUuid == lifecycle.heartbeatCharUuid,
         );
         expect(heartbeatWrites, isEmpty,
-            reason: 'tick within activity window should skip');
+            reason: 'within the activity window after requestMtu, no probe');
 
         conn.disconnect();
         bluey.dispose();
