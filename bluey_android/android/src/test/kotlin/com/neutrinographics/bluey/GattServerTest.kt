@@ -495,4 +495,71 @@ class GattServerTest {
             mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
         }
     }
+
+    @Test
+    fun `respondToWriteRequest with known id calls sendResponse with null payload`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicWriteRequest(
+            mockDevice, 77, mockCharacteristic, false, true, 5, byteArrayOf(0xFF.toByte())
+        )
+
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToWriteRequest(77L, GattStatusDto.SUCCESS) {
+            resultSeen = it
+        }
+
+        // sendResponse called with stashed device + requestId + offset, Dart's status, and null value.
+        verify(exactly = 1) {
+            mockBluetoothGattServer.sendResponse(
+                mockDevice,
+                77,
+                android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                5,
+                null
+            )
+        }
+        assertTrue("respond callback should succeed", resultSeen?.isSuccess == true)
+    }
+
+    @Test
+    fun `respondToWriteRequest with unknown id fails with NoPendingRequest`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToWriteRequest(888L, GattStatusDto.SUCCESS) {
+            resultSeen = it
+        }
+
+        val exc = resultSeen?.exceptionOrNull()
+        assertTrue(
+            "expected NoPendingRequest, got $exc",
+            exc is BlueyAndroidError.NoPendingRequest
+        )
+        assertEquals(888L, (exc as BlueyAndroidError.NoPendingRequest).id)
+
+        verify(exactly = 0) {
+            mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
+        }
+    }
 }

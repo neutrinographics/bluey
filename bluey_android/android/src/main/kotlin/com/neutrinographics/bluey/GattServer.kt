@@ -236,7 +236,25 @@ class GattServer(
             return
         }
 
-        callback(Result.success(Unit))
+        val pending = pendingWriteRequests.pop(requestId)
+        if (pending == null) {
+            callback(Result.failure(BlueyAndroidError.NoPendingRequest(requestId)))
+            return
+        }
+
+        try {
+            // ATT Write Response PDU carries no payload — pass null.
+            server.sendResponse(
+                pending.device,
+                pending.requestId,
+                status.toAndroidStatus(),
+                pending.offset,
+                null
+            )
+            callback(Result.success(Unit))
+        } catch (e: SecurityException) {
+            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+        }
     }
 
     fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
