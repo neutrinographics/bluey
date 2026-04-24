@@ -83,6 +83,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [writeCharacteristic] in order.
   final List<WriteCharacteristicCall> writeCharacteristicCalls = [];
 
+  /// Records every call to [readCharacteristic] in order.
+  final List<ReadCharacteristicCall> readCharacteristicCalls = [];
+
   // === Test Helpers ===
 
   /// When true, writeCharacteristic calls will throw to simulate a dead server.
@@ -107,6 +110,45 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// fire-and-forget paths in BlueyRemoteCharacteristic (onFirstListen /
   /// onLastCancel) that would otherwise produce unhandled async errors.
   bool simulateSetNotificationDisconnected = false;
+
+  /// When non-null, the next call to [readCharacteristic] consumes
+  /// this completer instead of resolving immediately. Consumed (set
+  /// to null) as soon as the read call fires, so a subsequent read
+  /// falls through to normal handling.
+  Completer<Uint8List>? _heldRead;
+
+  /// Once a held read has been consumed by [readCharacteristic], the
+  /// completer is parked here so [resolveHeldRead]/[failHeldRead] can
+  /// find it. Cleared when resolve or fail is called.
+  Completer<Uint8List>? _heldReadInFlight;
+
+  /// Arranges for the next [readCharacteristic] call to be held
+  /// indefinitely. Call [resolveHeldRead] or [failHeldRead] to release it.
+  void holdNextReadCharacteristic() {
+    _heldRead = Completer<Uint8List>();
+  }
+
+  /// Resolves the currently-held read future with [value].
+  void resolveHeldRead(Uint8List value) {
+    final held = _heldReadInFlight ?? _heldRead;
+    if (held == null) {
+      throw StateError('No held readCharacteristic to resolve');
+    }
+    _heldRead = null;
+    _heldReadInFlight = null;
+    held.complete(value);
+  }
+
+  /// Fails the currently-held read future with [error].
+  void failHeldRead(Object error) {
+    final held = _heldReadInFlight ?? _heldRead;
+    if (held == null) {
+      throw StateError('No held readCharacteristic to fail');
+    }
+    _heldRead = null;
+    _heldReadInFlight = null;
+    held.completeError(error);
+  }
 
   /// When non-null, readCharacteristic throws a [PlatformException] with
   /// this [PlatformException.code]. Models platform-layer errors that are
@@ -517,6 +559,18 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
   ) async {
+    readCharacteristicCalls.add(ReadCharacteristicCall(
+      deviceId: deviceId,
+      characteristicUuid: characteristicUuid,
+    ));
+
+    final held = _heldRead;
+    if (held != null) {
+      _heldRead = null;
+      _heldReadInFlight = held;
+      return held.future;
+    }
+
     final code = simulateReadPlatformErrorCode;
     if (code != null) {
       simulateReadPlatformErrorCode = null;
@@ -951,6 +1005,17 @@ class RespondWriteCall {
   RespondWriteCall({
     required this.requestId,
     required this.status,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.readCharacteristic].
+class ReadCharacteristicCall {
+  final String deviceId;
+  final String characteristicUuid;
+
+  const ReadCharacteristicCall({
+    required this.deviceId,
+    required this.characteristicUuid,
   });
 }
 

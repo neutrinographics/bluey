@@ -1071,6 +1071,44 @@ void main() {
         });
       },
     );
+
+    test('start() is idempotent when interval-read is in flight', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        fakePlatform.holdNextReadCharacteristic();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        // First start dispatched the initial heartbeat write and the interval read.
+        final writesAfterFirst = fakePlatform.writeCharacteristicCalls.length;
+        final readsAfterFirst = fakePlatform.readCharacteristicCalls.length;
+
+        // Second start() before the interval-read resolves — must be a no-op.
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        expect(fakePlatform.writeCharacteristicCalls.length, writesAfterFirst,
+            reason: 'second start() must not dispatch another heartbeat write');
+        expect(fakePlatform.readCharacteristicCalls.length, readsAfterFirst,
+            reason: 'second start() must not dispatch another interval-read');
+        expect(client.isRunning, isTrue);
+
+        // Clean up the held future so fakeAsync doesn't complain.
+        fakePlatform.resolveHeldRead(lifecycle.encodeInterval(const Duration(seconds: 10)));
+        async.flushMicrotasks();
+        client.stop();
+      });
+    });
   });
 }
 

@@ -26,6 +26,12 @@ class LifecycleClient {
   Timer? _probeTimer;
   String? _heartbeatCharUuid;
 
+  /// Authoritative "running" sentinel. True from the moment `start()`
+  /// commits to run (after its pre-commit null checks pass) until
+  /// `stop()` clears it. Distinct from `_heartbeatCharUuid`, which
+  /// indicates only "we know which char to write heartbeats to".
+  bool _isRunning = false;
+
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
@@ -44,8 +50,9 @@ class LifecycleClient {
   /// consistency with the rest of the Connection bounded context.
   int get maxFailedHeartbeats => _maxFailedHeartbeats;
 
-  /// Whether the heartbeat timer is currently running.
-  bool get isRunning => _probeTimer != null;
+  /// Whether the heartbeat client has committed to running and has
+  /// not yet been stopped.
+  bool get isRunning => _isRunning;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
@@ -66,7 +73,7 @@ class LifecycleClient {
   /// control service or its heartbeat characteristic is absent, the
   /// method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
-    if (_heartbeatCharUuid != null) return;
+    if (_isRunning) return;
 
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
@@ -81,6 +88,7 @@ class LifecycleClient {
         .firstOrNull;
     if (heartbeatChar == null) return;
 
+    _isRunning = true;
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
     dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
@@ -132,10 +140,12 @@ class LifecycleClient {
   }
 
   /// Stops the heartbeat timer and clears the char reference. The
-  /// monitor keeps its accumulated state, but [recordActivity] and
-  /// [_scheduleProbe] both check [isRunning] / [_heartbeatCharUuid] so
-  /// no further state mutation is possible after stop.
+  /// monitor keeps its accumulated state. After stop(): `recordActivity`
+  /// bails on the `isRunning` guard; `_scheduleProbe` and
+  /// `_sendProbeOrDefer` bail on the `_heartbeatCharUuid == null`
+  /// guard. No further state mutation is possible.
   void stop() {
+    _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
     _heartbeatCharUuid = null;
