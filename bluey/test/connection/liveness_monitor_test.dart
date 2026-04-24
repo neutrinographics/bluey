@@ -134,6 +134,29 @@ void main() {
       expect(m.shouldSendProbe(), isTrue);
     });
 
+    test('probeInFlight getter reflects markProbeInFlight + release', () {
+      final m = buildMonitor();
+      expect(m.probeInFlight, isFalse);
+      m.markProbeInFlight();
+      expect(m.probeInFlight, isTrue);
+      m.recordProbeSuccess();
+      expect(m.probeInFlight, isFalse);
+    });
+
+    test('probeInFlight released by cancelProbe', () {
+      final m = buildMonitor();
+      m.markProbeInFlight();
+      m.cancelProbe();
+      expect(m.probeInFlight, isFalse);
+    });
+
+    test('probeInFlight released by recordProbeFailure', () {
+      final m = buildMonitor(maxFailedProbes: 3);
+      m.markProbeInFlight();
+      m.recordProbeFailure();
+      expect(m.probeInFlight, isFalse);
+    });
+
     test('updateActivityWindow preserves in-flight and counter state', () {
       final m = buildMonitor(maxFailedProbes: 2);
       m.markProbeInFlight();

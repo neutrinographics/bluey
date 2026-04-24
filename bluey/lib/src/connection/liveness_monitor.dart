@@ -42,6 +42,11 @@ class LivenessMonitor {
   /// callers mutate via [updateActivityWindow].
   Duration get activityWindow => _activityWindow;
 
+  /// Whether a probe is currently in flight. Needed by callers that
+  /// schedule the next probe from timer callbacks — a fired timer must
+  /// not send a new probe while a previous one is still pending.
+  bool get probeInFlight => _probeInFlight;
+
   /// Any evidence that the peer is alive: a successful GATT op, an
   /// incoming notification, or a completed probe. Resets the failure
   /// counter and refreshes the activity timestamp.
