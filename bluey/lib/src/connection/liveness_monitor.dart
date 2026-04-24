@@ -50,6 +50,11 @@ class LivenessMonitor {
   /// Any evidence that the peer is alive: a successful GATT op, an
   /// incoming notification, or a completed probe. Resets the failure
   /// counter and refreshes the activity timestamp.
+  ///
+  /// **Caller contract:** this shifts the probe deadline forward by
+  /// [activityWindow]. Callers that arm a timer against
+  /// [timeUntilNextProbe] must cancel and reschedule after calling this —
+  /// otherwise the stale timer fires earlier than the deadline.
   void recordActivity() {
     _consecutiveFailures = 0;
     _lastActivityAt = _now();

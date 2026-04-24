@@ -1046,21 +1046,18 @@ void main() {
           async.flushMicrotasks();
           client.recordActivity();
 
-          // Advance to T=5s total. Under the old polling model, a probe
-          // would NOT fire here (shouldSendProbe returns false because
-          // activity is recent). Under the new scheduling model, a probe
-          // also does not fire here (deadline is T=8). Both agree.
+          // Advance to T=5s total. Activity at T=3 reset the deadline to
+          // T=8, so no probe has fired yet — deadline is still in the future.
           async.elapse(const Duration(seconds: 2));
           async.flushMicrotasks();
           expect(
             fakePlatform.writeCharacteristicCalls.length,
             initialProbeCount,
-            reason: 'At T=5s, recent activity means no probe yet',
+            reason: 'At T=5s, deadline is T=8 so no probe yet',
           );
 
-          // Advance to T=8s total. Under the old polling model, the next
-          // tick is at T=10s, so no probe yet. Under the new scheduling
-          // model, the deadline is T=8, so a probe fires here.
+          // Advance to T=8s total. Deadline reached — one probe fires exactly
+          // at recordActivity + activityWindow, not at some fixed tick interval.
           async.elapse(const Duration(seconds: 3));
           async.flushMicrotasks();
           expect(
