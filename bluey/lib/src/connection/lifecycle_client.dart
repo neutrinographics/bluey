@@ -10,7 +10,8 @@ import 'liveness_monitor.dart';
 
 /// Client-side lifecycle management.
 ///
-/// Owns the GATT write mechanism (Timer.periodic + heartbeat char write).
+/// Owns the GATT write mechanism (deadline-scheduled Timer + heartbeat
+/// char write).
 /// Delegates all liveness policy decisions to an internal [LivenessMonitor]:
 /// when to send a probe, when failures count, when to tear down.
 ///
@@ -47,13 +48,16 @@ class LifecycleClient {
   bool get isRunning => _probeTimer != null;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
-  /// incoming notification. Treats the peer as demonstrably alive.
+  /// incoming notification. Treats the peer as demonstrably alive and
+  /// shifts the probe deadline forward by [_monitor.activityWindow].
   /// No-op if the lifecycle isn't running — prevents lingering
   /// notification subscriptions from dirtying monitor state after
   /// [stop] has been called.
   void recordActivity() {
     if (!isRunning) return;
     _monitor.recordActivity();
+    // Deadline shifted — supersede the pending timer.
+    _scheduleProbe();
   }
 
   /// Starts the heartbeat if the server hosts the control service.
@@ -129,8 +133,8 @@ class LifecycleClient {
 
   /// Stops the heartbeat timer and clears the char reference. The
   /// monitor keeps its accumulated state, but [recordActivity] and
-  /// [_tick] both check [isRunning] so no further state mutation is
-  /// possible after stop.
+  /// [_scheduleProbe] both check [isRunning] / [_heartbeatCharUuid] so
+  /// no further state mutation is possible after stop.
   void stop() {
     _probeTimer?.cancel();
     _probeTimer = null;
@@ -146,12 +150,42 @@ class LifecycleClient {
     // Update the monitor in place so a probe in flight from the initial
     // synchronous send keeps its markProbeInFlight flag intact.
     _monitor.updateActivityWindow(interval);
-    _probeTimer?.cancel();
-    _probeTimer = Timer.periodic(interval, (_) => _tick());
+    _scheduleProbe();
   }
 
-  void _tick() {
-    if (!_monitor.shouldSendProbe()) return;
+  /// Cancel any pending scheduled probe and schedule a new one.
+  ///
+  /// If [after] is null (default), the delay is computed from the
+  /// monitor's current deadline — appropriate after a probe success or
+  /// after external [recordActivity] shifts the deadline forward.
+  ///
+  /// If [after] is non-null, the delay is that explicit duration —
+  /// appropriate after a probe failure, where the monitor's deadline
+  /// would already have elapsed (producing an immediate-retry cadence
+  /// that diverges from the original polling behaviour). Failure paths
+  /// pass [_monitor.activityWindow] to preserve the roughly-one-probe-
+  /// per-window rate-limit that polling produced implicitly.
+  ///
+  /// No-op if the client has been stopped.
+  void _scheduleProbe({Duration? after}) {
+    if (_heartbeatCharUuid == null) return;
+    _probeTimer?.cancel();
+    final delay = after ?? _monitor.timeUntilNextProbe();
+    _probeTimer = Timer(delay, _sendProbeOrDefer);
+  }
+
+  /// Timer callback. Sends a probe unless one is already in flight
+  /// (in which case the in-flight probe's completion handler will
+  /// reschedule). Re-verifies the deadline in case [recordActivity]
+  /// raced the timer firing — if activity just shifted the deadline
+  /// forward, reschedule instead of probing now.
+  void _sendProbeOrDefer() {
+    if (_heartbeatCharUuid == null) return;
+    if (_monitor.probeInFlight) return;
+    if (_monitor.timeUntilNextProbe() > Duration.zero) {
+      _scheduleProbe();
+      return;
+    }
     _sendProbe();
   }
 
@@ -167,14 +201,19 @@ class LifecycleClient {
           lifecycle.heartbeatValue,
           true,
         )
-        .then((_) => _monitor.recordProbeSuccess())
-        .catchError((Object error) {
+        .then((_) {
+      _monitor.recordProbeSuccess();
+      // Success refreshed lastActivity → monitor deadline is now
+      // exactly activityWindow from now. No explicit override.
+      _scheduleProbe();
+    }).catchError((Object error) {
       if (!_isDeadPeerSignal(error)) {
-        // Not a dead-peer signal — release the in-flight flag so the
-        // next tick can retry, but do NOT reset the failure counter or
-        // refresh activity. The transient error gives no evidence about
-        // whether the peer is alive.
+        // Transient platform error — release in-flight, retry after a
+        // full activityWindow (the monitor deadline has already elapsed
+        // by the time we got here, so without the explicit delay we'd
+        // hammer the peer with immediate retries).
         _monitor.cancelProbe();
+        _scheduleProbe(after: _monitor.activityWindow);
         return;
       }
       final tripped = _monitor.recordProbeFailure();
@@ -191,7 +230,12 @@ class LifecycleClient {
         );
         stop();
         onServerUnreachable();
+        // No reschedule — connection is tearing down.
+        return;
       }
+      // Under-threshold dead-peer signal: retry one activityWindow later
+      // (same rate-limit as the transient path).
+      _scheduleProbe(after: _monitor.activityWindow);
     });
   }
 
