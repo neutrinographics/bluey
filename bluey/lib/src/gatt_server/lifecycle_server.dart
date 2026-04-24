@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
@@ -50,12 +49,6 @@ class LifecycleServer {
       return false;
     }
 
-    // [I077] log incoming write bytes + branch taken
-    final hex = req.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    debugPrint(
-      '[I077] handleWriteRequest: clientId=${req.centralId} value=0x$hex len=${req.value.length} responseNeeded=${req.responseNeeded}',
-    );
-
     // Auto-respond if the platform requires it
     if (req.responseNeeded) {
       _platform.respondToWriteRequest(
@@ -74,12 +67,10 @@ class LifecycleServer {
 
     if (req.value.isNotEmpty && req.value[0] == lifecycle.disconnectValue[0]) {
       // Client is disconnecting cleanly
-      debugPrint('[I077] branch=disconnect-command clientId=$clientId');
       cancelTimer(clientId);
       onClientGone(clientId);
     } else {
       // Heartbeat — reset the timer
-      debugPrint('[I077] branch=heartbeat clientId=$clientId');
       _resetTimer(clientId);
     }
 
@@ -151,10 +142,6 @@ class LifecycleServer {
 
     _heartbeatTimers[clientId]?.cancel();
     _heartbeatTimers[clientId] = Timer(interval, () {
-      // [I077] timer fire = no heartbeat within interval
-      debugPrint(
-        '[I077] heartbeat-timer FIRED clientId=$clientId interval=${interval.inMilliseconds}ms',
-      );
       _heartbeatTimers.remove(clientId);
       onClientGone(clientId);
     });

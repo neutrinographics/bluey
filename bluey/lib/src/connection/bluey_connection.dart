@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter/services.dart' show PlatformException;
@@ -380,8 +379,6 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> disconnect() async {
-    // [I077] log every disconnect attempt with current state
-    debugPrint('[I077] CLIENT BlueyConnection.disconnect() called — state=$_state connectionId=$_connectionId stack=${StackTrace.current.toString().split("\n").take(5).join(" | ")}');
     // Idempotent: if already disconnected or disconnecting, do nothing
     if (_state == ConnectionState.disconnected ||
         _state == ConnectionState.disconnecting) {

@@ -495,9 +495,7 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
-            // [I077] Include value bytes so we can see what the client actually wrote.
-            val hex = value.joinToString("") { "%02x".format(it) }
-            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded offset=$offset value=0x$hex (${value.size} bytes)")
+            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded")
 
             val request = WriteRequestDto(
                 requestId = requestId.toLong(),
