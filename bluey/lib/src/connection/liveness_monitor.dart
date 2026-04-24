@@ -42,25 +42,40 @@ class LivenessMonitor {
   /// callers mutate via [updateActivityWindow].
   Duration get activityWindow => _activityWindow;
 
+  /// Whether a probe is currently in flight. Needed by callers that
+  /// schedule the next probe from timer callbacks — a fired timer must
+  /// not send a new probe while a previous one is still pending.
+  bool get probeInFlight => _probeInFlight;
+
   /// Any evidence that the peer is alive: a successful GATT op, an
   /// incoming notification, or a completed probe. Resets the failure
   /// counter and refreshes the activity timestamp.
+  ///
+  /// **Caller contract:** this shifts the probe deadline forward by
+  /// [activityWindow]. Callers that arm a timer against
+  /// [timeUntilNextProbe] must cancel and reschedule after calling this —
+  /// otherwise the stale timer fires earlier than the deadline.
   void recordActivity() {
     _consecutiveFailures = 0;
     _lastActivityAt = _now();
   }
 
-  /// Tick-time decision: should we send a probe this tick? False if
-  /// a probe is already pending, or activity is recent within the
-  /// window. Uses `>=` at the boundary so the first tick after the
-  /// window expires sends a heartbeat in time to beat the server's
-  /// matching per-client timeout — with `>` the boundary slides the
-  /// heartbeat out to the NEXT tick, racing the server timer.
-  bool shouldSendProbe() {
-    if (_probeInFlight) return false;
+  /// How long from now until the next probe is due.
+  ///
+  /// Returns [Duration.zero] if the deadline is already past — caller
+  /// should probe immediately. Returns [activityWindow] if no activity
+  /// has been recorded yet, giving the caller a sensible first deadline.
+  ///
+  /// The in-flight flag is a separate dimension: this method reports
+  /// the deadline regardless, so the caller can make a unified
+  /// "time to probe" decision (via a one-shot timer) without needing
+  /// to special-case the in-flight branch.
+  Duration timeUntilNextProbe() {
     final last = _lastActivityAt;
-    if (last == null) return true;
-    return _now().difference(last) >= _activityWindow;
+    if (last == null) return _activityWindow;
+    final elapsed = _now().difference(last);
+    final remaining = _activityWindow - elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
   }
 
   /// Swaps in a new activity window (e.g. after negotiating the
@@ -72,7 +87,7 @@ class LivenessMonitor {
   }
 
   /// Called just before dispatching a probe write. Prevents parallel
-  /// probes — next tick will skip via [shouldSendProbe].
+  /// probes — [probeInFlight] will be true until the probe completes.
   void markProbeInFlight() {
     _probeInFlight = true;
   }

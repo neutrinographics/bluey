@@ -18,42 +18,16 @@ void main() {
   void advance(Duration d) => fakeNow = fakeNow.add(d);
 
   group('LivenessMonitor', () {
-    test('shouldSendProbe is true initially (no activity yet)', () {
-      final m = buildMonitor();
-      expect(m.shouldSendProbe(), isTrue);
-    });
-
-    test('recordActivity then shouldSendProbe within window returns false', () {
-      final m = buildMonitor();
-      m.recordActivity();
-      advance(const Duration(seconds: 3));
-      expect(m.shouldSendProbe(), isFalse);
-    });
-
-    test('recordActivity then shouldSendProbe at window boundary returns true', () {
-      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
-      m.recordActivity();
-      advance(const Duration(seconds: 5));
-      // Boundary is inclusive: a tick co-scheduled with the window
-      // expiry must probe in time to beat the server's matching timer.
-      expect(m.shouldSendProbe(), isTrue);
-    });
-
-    test('markProbeInFlight prevents shouldSendProbe from firing again', () {
-      final m = buildMonitor();
-      m.markProbeInFlight();
-      expect(m.shouldSendProbe(), isFalse);
-    });
-
     test('recordProbeSuccess clears in-flight flag and refreshes activity', () {
       final m = buildMonitor(activityWindow: const Duration(seconds: 5));
       m.markProbeInFlight();
       m.recordProbeSuccess();
       advance(const Duration(seconds: 3));
       // In-flight cleared AND activity refreshed.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isFalse);
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 2));
       advance(const Duration(seconds: 3));
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.timeUntilNextProbe(), Duration.zero);
     });
 
     test('recordProbeFailure increments counter and releases in-flight', () {
@@ -61,8 +35,8 @@ void main() {
       m.markProbeInFlight();
       final tripped = m.recordProbeFailure();
       expect(tripped, isFalse, reason: '1 failure < threshold 3');
-      // In-flight cleared → next tick can probe.
-      expect(m.shouldSendProbe(), isTrue);
+      // In-flight cleared.
+      expect(m.probeInFlight, isFalse);
     });
 
     test('recordProbeFailure returns true when threshold is reached', () {
@@ -90,10 +64,10 @@ void main() {
       m.markProbeInFlight();
       m.recordActivity();
       // Activity recorded, counter reset — but in-flight flag still true.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isTrue);
       m.recordProbeSuccess();
       // Now the flag releases.
-      expect(m.shouldSendProbe(), isFalse); // activity is recent
+      expect(m.probeInFlight, isFalse);
     });
 
     test('recordProbeSuccess on non-in-flight monitor is idempotent', () {
@@ -109,7 +83,7 @@ void main() {
       final m = buildMonitor();
       m.markProbeInFlight();
       m.cancelProbe();
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.probeInFlight, isFalse);
     });
 
     test('cancelProbe does NOT reset the failure counter', () {
@@ -131,7 +105,30 @@ void main() {
       m.markProbeInFlight();
       m.cancelProbe();
       // 10s since last real activity — cancel must not have updated it.
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.timeUntilNextProbe(), Duration.zero);
+    });
+
+    test('probeInFlight getter reflects markProbeInFlight + release', () {
+      final m = buildMonitor();
+      expect(m.probeInFlight, isFalse);
+      m.markProbeInFlight();
+      expect(m.probeInFlight, isTrue);
+      m.recordProbeSuccess();
+      expect(m.probeInFlight, isFalse);
+    });
+
+    test('probeInFlight released by cancelProbe', () {
+      final m = buildMonitor();
+      m.markProbeInFlight();
+      m.cancelProbe();
+      expect(m.probeInFlight, isFalse);
+    });
+
+    test('probeInFlight released by recordProbeFailure', () {
+      final m = buildMonitor(maxFailedProbes: 3);
+      m.markProbeInFlight();
+      m.recordProbeFailure();
+      expect(m.probeInFlight, isFalse);
     });
 
     test('updateActivityWindow preserves in-flight and counter state', () {
@@ -141,9 +138,56 @@ void main() {
       m.markProbeInFlight();
       m.updateActivityWindow(const Duration(seconds: 20));
       // In-flight flag preserved.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isTrue);
       // Counter preserved — next failure still trips at 2.
       expect(m.recordProbeFailure(), isTrue);
+    });
+
+    test('timeUntilNextProbe returns activityWindow when no activity recorded yet', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      // lastActivity is null — deadline falls back to a full activityWindow
+      // from now, so the first schedule after construction is activityWindow.
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 5));
+    });
+
+    test('timeUntilNextProbe returns activityWindow immediately after recordActivity', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 5));
+    });
+
+    test('timeUntilNextProbe decreases as clock advances', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 3));
+    });
+
+    test('timeUntilNextProbe returns Duration.zero once deadline has passed', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 10));
+      expect(m.timeUntilNextProbe(), Duration.zero,
+          reason: 'Never returns a negative value; caller should probe immediately');
+    });
+
+    test('timeUntilNextProbe reflects updateActivityWindow', () {
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      m.updateActivityWindow(const Duration(seconds: 10));
+      // With the new 10s window, 8s remain.
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 8));
+    });
+
+    test('timeUntilNextProbe is not affected by markProbeInFlight', () {
+      // The in-flight flag is a separate dimension — the deadline
+      // still advances in real time regardless of whether a probe is pending.
+      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
+      m.recordActivity();
+      advance(const Duration(seconds: 2));
+      m.markProbeInFlight();
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 3));
     });
   });
 }

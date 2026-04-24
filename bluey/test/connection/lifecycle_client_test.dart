@@ -1008,6 +1008,69 @@ void main() {
         client.stop();
       });
     });
+
+    test(
+      'I077 regression: recordActivity reschedules probe to exactly '
+      'activityWindow from now (not next periodic tick)',
+      () {
+        fakeAsync((async) {
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+
+          // Set up the full connected lifecycle client (10s server interval →
+          // 5s client heartbeat window).
+          _setUpConnectedClient(
+            onServerUnreachable: () {},
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+
+          // Let the start() sequence settle: initial probe + interval read +
+          // schedule the first periodic/one-shot timer. After this elapse,
+          // the initial probe has written, completed, and recorded activity.
+          async.elapse(const Duration(milliseconds: 100));
+          async.flushMicrotasks();
+          final initialProbeCount = fakePlatform.writeCharacteristicCalls.length;
+          expect(initialProbeCount, greaterThanOrEqualTo(1),
+              reason: 'start() should have issued the initial probe');
+
+          // At T=3s, simulate a user op completing. recordActivity must
+          // reset the deadline so the next probe is due at T=3+5 = 8s.
+          async.elapse(const Duration(seconds: 3));
+          async.flushMicrotasks();
+          client.recordActivity();
+
+          // Advance to T=5s total. Activity at T=3 reset the deadline to
+          // T=8, so no probe has fired yet — deadline is still in the future.
+          async.elapse(const Duration(seconds: 2));
+          async.flushMicrotasks();
+          expect(
+            fakePlatform.writeCharacteristicCalls.length,
+            initialProbeCount,
+            reason: 'At T=5s, deadline is T=8 so no probe yet',
+          );
+
+          // Advance to T=8s total. Deadline reached — one probe fires exactly
+          // at recordActivity + activityWindow, not at some fixed tick interval.
+          async.elapse(const Duration(seconds: 3));
+          async.flushMicrotasks();
+          expect(
+            fakePlatform.writeCharacteristicCalls.length,
+            initialProbeCount + 1,
+            reason: 'Deadline-driven scheduler must probe at '
+                'recordActivity + activityWindow, not at the next periodic tick',
+          );
+
+          client.stop();
+        });
+      },
+    );
   });
 }
 
