@@ -6,7 +6,7 @@ severity: high
 platform: domain
 status: fixed
 last_verified: 2026-04-25
-fixed_in: 2faf062
+fixed_in: 136fa47
 ---
 
 ## Symptom
