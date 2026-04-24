@@ -60,13 +60,15 @@ Prose sections (in this order, any may be omitted if empty):
 
 Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, etc.).
 
-1. **I070 + I073 + I078** — Lifecycle client guards. *Est. 1 day.* Tiny `_isRunning` flag + `start()` idempotency check + activity-signal handling during the `start()` → interval-read window. Prevents the zombie-timer pattern that accumulates across disconnect cycles. Promoted to #1 because (a) I070 is `high` severity, (b) the `LifecycleClient` code is warm after the I077 fix, and (c) small PR — cheap momentum before the larger #3/#4 blocks.
+1. **I079 + I070 + I073 + I078** — Lifecycle client correctness. *Est. 1–2 days.* Combines (a) heartbeat probe starvation behind long user ops — the highest-impact lifecycle bug, reproducible on every timeout-probe stress test, causes spurious disconnects on any slow op — with (b) the smaller guards cluster: `_isRunning` flag + `start()` idempotency + activity-signal handling during the `start()` → interval-read window. All four fixes live in `LifecycleClient` + `LivenessMonitor`; the code is warm after I077; fixing I079 likely requires routing user-op completions into `recordActivity()`, which is a natural place to bundle I078's activity-signal correctness. Ship as one PR.
 
 2. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
 
 3. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
 
 4. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
+
+5. **I087 + I091 (follow-up after #1)** — Disconnect-path error translation & auto-reconnect recovery on iOS. *Est. ≤1 day, investigative.* After I079 is fixed, re-run the failure-injection stress test. If I087 still reproduces, triage whether it's the example app's reconnect policy or a missing `ConnectionState.disconnected` emission on the unmapped-`CBATTError` disconnect path; fix I091's allowlist in the same pass. If I087 doesn't reproduce without the artificial starvation, close it with a verification note.
 
 Opportunistic one-offs — pick up when you're already in nearby code:
 
@@ -99,6 +101,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
 | [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | low |
+| [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | Heartbeat probe starves behind long user ops, causing spurious server-initiated disconnects | high |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 
@@ -164,6 +167,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I053](I053-capabilities-matrix-incomplete.md) | `Capabilities` matrix incomplete | medium |
 | [I084](I084-reconnect-loses-subscriptions.md) | Reconnected central loses subscriptions silently | medium |
 | [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout | medium |
+| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after disconnect with unmapped platform error | medium |
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
 
