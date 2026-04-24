@@ -415,10 +415,23 @@ class GattServer(
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
-                    // Remove from all subscriptions
+                    // Remove from all subscriptions.
                     subscriptions.values.forEach { it.remove(deviceId) }
 
-                    // Must dispatch to main thread for Flutter platform channel
+                    // Drain pending ATT requests for this central — no point
+                    // keeping them; sendResponse would fail once the device is gone.
+                    // Runs synchronously inside the binder callback so the main
+                    // thread cannot observe a partial disconnect state.
+                    val drainedReads = pendingReadRequests.drainWhere { it.device.address == deviceId }
+                    val drainedWrites = pendingWriteRequests.drainWhere { it.device.address == deviceId }
+                    if (drainedReads.isNotEmpty() || drainedWrites.isNotEmpty()) {
+                        Log.d(
+                            "GattServer",
+                            "Drained ${drainedReads.size} read(s) and ${drainedWrites.size} write(s) on disconnect of $deviceId"
+                        )
+                    }
+
+                    // Must dispatch to main thread for Flutter platform channel.
                     handler.post {
                         flutterApi.onCentralDisconnected(deviceId) {}
                     }

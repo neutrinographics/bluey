@@ -647,4 +647,64 @@ class GattServerTest {
         gattServer.respondToWriteRequest(40L, GattStatusDto.SUCCESS) { resultSeen = it }
         assertTrue(resultSeen?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
     }
+
+    @Test
+    fun `onConnectionStateChange(DISCONNECTED) drains pending requests for that central only`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val deviceA = mockk<BluetoothDevice>(relaxed = true)
+        every { deviceA.address } returns "AA:AA:AA:AA:AA:AA"
+        val deviceB = mockk<BluetoothDevice>(relaxed = true)
+        every { deviceB.address } returns "BB:BB:BB:BB:BB:BB"
+
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onReadRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+        every { mockFlutterApi.onCentralConnected(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+        every { mockFlutterApi.onCentralDisconnected(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        // Connect both centrals and stash one read + one write for each.
+        capturedCallback!!.onConnectionStateChange(deviceA, 0, BluetoothProfile.STATE_CONNECTED)
+        capturedCallback!!.onConnectionStateChange(deviceB, 0, BluetoothProfile.STATE_CONNECTED)
+        capturedCallback!!.onCharacteristicReadRequest(deviceA, 1, 0, mockCharacteristic)
+        capturedCallback!!.onCharacteristicWriteRequest(deviceA, 2, mockCharacteristic, false, true, 0, byteArrayOf(0x01))
+        capturedCallback!!.onCharacteristicReadRequest(deviceB, 3, 0, mockCharacteristic)
+        capturedCallback!!.onCharacteristicWriteRequest(deviceB, 4, mockCharacteristic, false, true, 0, byteArrayOf(0x02))
+
+        // Disconnect only A.
+        capturedCallback!!.onConnectionStateChange(deviceA, 0, BluetoothProfile.STATE_DISCONNECTED)
+
+        // A's pending entries are drained — respond fails.
+        var aReadResult: Result<Unit>? = null
+        gattServer.respondToReadRequest(1L, GattStatusDto.SUCCESS, byteArrayOf()) { aReadResult = it }
+        assertTrue(aReadResult?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+
+        var aWriteResult: Result<Unit>? = null
+        gattServer.respondToWriteRequest(2L, GattStatusDto.SUCCESS) { aWriteResult = it }
+        assertTrue(aWriteResult?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+
+        // B's pending entries survive — respond succeeds.
+        var bReadResult: Result<Unit>? = null
+        gattServer.respondToReadRequest(3L, GattStatusDto.SUCCESS, byteArrayOf()) { bReadResult = it }
+        assertTrue("B's read should succeed", bReadResult?.isSuccess == true)
+
+        var bWriteResult: Result<Unit>? = null
+        gattServer.respondToWriteRequest(4L, GattStatusDto.SUCCESS) { bWriteResult = it }
+        assertTrue("B's write should succeed", bWriteResult?.isSuccess == true)
+    }
 }
