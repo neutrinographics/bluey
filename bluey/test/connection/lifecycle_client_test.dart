@@ -1109,6 +1109,47 @@ void main() {
         client.stop();
       });
     });
+
+    test('stop() releases in-flight probe so monitor does not strand probeInFlight', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late FakeBlueyPlatform fakePlatform;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((fixture) {
+          client = fixture.client;
+          services = fixture.services;
+          fakePlatform = fixture.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        // Start normally so interval-read resolves and the probe timer is armed.
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Fixture defaults intervalValue to 10s → heartbeat interval = 5s.
+        // Elapse 6s so the probe timer fires and dispatches.
+        fakePlatform.holdNextWriteCharacteristic();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        // Sanity: a probe is now in flight.
+        expect(client.probeInFlightForTest, isTrue,
+            reason: 'probe should be in flight after tick + dispatch');
+
+        // Call stop() while the write is still pending.
+        client.stop();
+
+        // Assert: probeInFlight is released synchronously even though
+        // the write future has not resolved.
+        expect(client.probeInFlightForTest, isFalse,
+            reason: 'stop() must release the monitor in-flight flag');
+
+        // Clean up the held future so fakeAsync doesn't complain.
+        fakePlatform.resolveHeldWrite();
+        async.flushMicrotasks();
+      });
+    });
   });
 }
 

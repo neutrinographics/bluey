@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -53,6 +54,11 @@ class LifecycleClient {
   /// Whether the heartbeat client has committed to running and has
   /// not yet been stopped.
   bool get isRunning => _isRunning;
+
+  /// Exposed for tests: whether the internal monitor is currently
+  /// tracking an in-flight probe. Not intended for production use.
+  @visibleForTesting
+  bool get probeInFlightForTest => _monitor.probeInFlight;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
@@ -139,16 +145,20 @@ class LifecycleClient {
     }
   }
 
-  /// Stops the heartbeat timer and clears the char reference. The
-  /// monitor keeps its accumulated state. After stop(): `recordActivity`
-  /// bails on the `isRunning` guard; `_scheduleProbe` and
-  /// `_sendProbeOrDefer` bail on the `_heartbeatCharUuid == null`
-  /// guard. No further state mutation is possible.
+  /// Stops the heartbeat timer and clears the char reference. Releases
+  /// any in-flight probe flag via [LivenessMonitor.cancelProbe] so the
+  /// monitor does not strand [probeInFlight] if a write was pending at
+  /// teardown. The failure counter and activity timestamp are retained
+  /// (they are irrelevant because this instance is not reused after
+  /// stop()). After stop(): `recordActivity` bails on the `isRunning`
+  /// guard; `_scheduleProbe` and `_sendProbeOrDefer` bail on the
+  /// `_heartbeatCharUuid == null` guard.
   void stop() {
     _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
     _heartbeatCharUuid = null;
+    _monitor.cancelProbe();
   }
 
   Duration get _defaultHeartbeatInterval => Duration(

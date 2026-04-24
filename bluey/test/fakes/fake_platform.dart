@@ -128,7 +128,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     _heldRead = Completer<Uint8List>();
   }
 
-  /// Resolves the currently-held read future with [value].
+  /// Resolves the currently-held read future with [value]. Works
+  /// whether or not the held read has already been consumed by a
+  /// [readCharacteristic] call.
   void resolveHeldRead(Uint8List value) {
     final held = _heldReadInFlight ?? _heldRead;
     if (held == null) {
@@ -139,7 +141,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     held.complete(value);
   }
 
-  /// Fails the currently-held read future with [error].
+  /// Fails the currently-held read future with [error]. Works whether
+  /// or not the held read has already been consumed by a
+  /// [readCharacteristic] call.
   void failHeldRead(Object error) {
     final held = _heldReadInFlight ?? _heldRead;
     if (held == null) {
@@ -147,6 +151,49 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     }
     _heldRead = null;
     _heldReadInFlight = null;
+    held.completeError(error);
+  }
+
+  /// When non-null, the next call to [writeCharacteristic] consumes
+  /// this completer instead of resolving immediately. Consumed (set
+  /// to null) as soon as the write call fires, so a subsequent write
+  /// falls through to normal handling.
+  Completer<void>? _heldWrite;
+
+  /// Once a held write has been consumed by [writeCharacteristic], the
+  /// completer is parked here so [resolveHeldWrite]/[failHeldWrite]
+  /// can find it. Cleared when resolve or fail is called.
+  Completer<void>? _heldWriteInFlight;
+
+  /// Arranges for the next [writeCharacteristic] call to be held
+  /// indefinitely. Call [resolveHeldWrite] or [failHeldWrite] to release it.
+  void holdNextWriteCharacteristic() {
+    _heldWrite = Completer<void>();
+  }
+
+  /// Resolves the currently-held write future successfully. Works
+  /// whether or not the held write has already been consumed by a
+  /// [writeCharacteristic] call.
+  void resolveHeldWrite() {
+    final held = _heldWriteInFlight ?? _heldWrite;
+    if (held == null) {
+      throw StateError('No held writeCharacteristic to resolve');
+    }
+    _heldWrite = null;
+    _heldWriteInFlight = null;
+    held.complete();
+  }
+
+  /// Fails the currently-held write future with [error]. Works whether
+  /// or not the held write has already been consumed by a
+  /// [writeCharacteristic] call.
+  void failHeldWrite(Object error) {
+    final held = _heldWriteInFlight ?? _heldWrite;
+    if (held == null) {
+      throw StateError('No held writeCharacteristic to fail');
+    }
+    _heldWrite = null;
+    _heldWriteInFlight = null;
     held.completeError(error);
   }
 
@@ -615,6 +662,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     Uint8List value,
     bool withResponse,
   ) async {
+    final held = _heldWrite;
+    if (held != null) {
+      _heldWrite = null;
+      _heldWriteInFlight = held;
+      return held.future;
+    }
+
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
     }
