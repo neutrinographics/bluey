@@ -18,42 +18,16 @@ void main() {
   void advance(Duration d) => fakeNow = fakeNow.add(d);
 
   group('LivenessMonitor', () {
-    test('shouldSendProbe is true initially (no activity yet)', () {
-      final m = buildMonitor();
-      expect(m.shouldSendProbe(), isTrue);
-    });
-
-    test('recordActivity then shouldSendProbe within window returns false', () {
-      final m = buildMonitor();
-      m.recordActivity();
-      advance(const Duration(seconds: 3));
-      expect(m.shouldSendProbe(), isFalse);
-    });
-
-    test('recordActivity then shouldSendProbe at window boundary returns true', () {
-      final m = buildMonitor(activityWindow: const Duration(seconds: 5));
-      m.recordActivity();
-      advance(const Duration(seconds: 5));
-      // Boundary is inclusive: a tick co-scheduled with the window
-      // expiry must probe in time to beat the server's matching timer.
-      expect(m.shouldSendProbe(), isTrue);
-    });
-
-    test('markProbeInFlight prevents shouldSendProbe from firing again', () {
-      final m = buildMonitor();
-      m.markProbeInFlight();
-      expect(m.shouldSendProbe(), isFalse);
-    });
-
     test('recordProbeSuccess clears in-flight flag and refreshes activity', () {
       final m = buildMonitor(activityWindow: const Duration(seconds: 5));
       m.markProbeInFlight();
       m.recordProbeSuccess();
       advance(const Duration(seconds: 3));
       // In-flight cleared AND activity refreshed.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isFalse);
+      expect(m.timeUntilNextProbe(), const Duration(seconds: 2));
       advance(const Duration(seconds: 3));
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.timeUntilNextProbe(), Duration.zero);
     });
 
     test('recordProbeFailure increments counter and releases in-flight', () {
@@ -61,8 +35,8 @@ void main() {
       m.markProbeInFlight();
       final tripped = m.recordProbeFailure();
       expect(tripped, isFalse, reason: '1 failure < threshold 3');
-      // In-flight cleared → next tick can probe.
-      expect(m.shouldSendProbe(), isTrue);
+      // In-flight cleared.
+      expect(m.probeInFlight, isFalse);
     });
 
     test('recordProbeFailure returns true when threshold is reached', () {
@@ -90,10 +64,10 @@ void main() {
       m.markProbeInFlight();
       m.recordActivity();
       // Activity recorded, counter reset — but in-flight flag still true.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isTrue);
       m.recordProbeSuccess();
       // Now the flag releases.
-      expect(m.shouldSendProbe(), isFalse); // activity is recent
+      expect(m.probeInFlight, isFalse);
     });
 
     test('recordProbeSuccess on non-in-flight monitor is idempotent', () {
@@ -109,7 +83,7 @@ void main() {
       final m = buildMonitor();
       m.markProbeInFlight();
       m.cancelProbe();
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.probeInFlight, isFalse);
     });
 
     test('cancelProbe does NOT reset the failure counter', () {
@@ -131,7 +105,7 @@ void main() {
       m.markProbeInFlight();
       m.cancelProbe();
       // 10s since last real activity — cancel must not have updated it.
-      expect(m.shouldSendProbe(), isTrue);
+      expect(m.timeUntilNextProbe(), Duration.zero);
     });
 
     test('probeInFlight getter reflects markProbeInFlight + release', () {
@@ -164,7 +138,7 @@ void main() {
       m.markProbeInFlight();
       m.updateActivityWindow(const Duration(seconds: 20));
       // In-flight flag preserved.
-      expect(m.shouldSendProbe(), isFalse);
+      expect(m.probeInFlight, isTrue);
       // Counter preserved — next failure still trips at 2.
       expect(m.recordProbeFailure(), isTrue);
     });

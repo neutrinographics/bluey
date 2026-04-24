@@ -73,19 +73,6 @@ class LivenessMonitor {
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
-  /// Tick-time decision: should we send a probe this tick? False if
-  /// a probe is already pending, or activity is recent within the
-  /// window. Uses `>=` at the boundary so the first tick after the
-  /// window expires sends a heartbeat in time to beat the server's
-  /// matching per-client timeout — with `>` the boundary slides the
-  /// heartbeat out to the NEXT tick, racing the server timer.
-  bool shouldSendProbe() {
-    if (_probeInFlight) return false;
-    final last = _lastActivityAt;
-    if (last == null) return true;
-    return _now().difference(last) >= _activityWindow;
-  }
-
   /// Swaps in a new activity window (e.g. after negotiating the
   /// server-preferred interval). Preserves in-flight probe state and
   /// the failure counter.
@@ -95,7 +82,7 @@ class LivenessMonitor {
   }
 
   /// Called just before dispatching a probe write. Prevents parallel
-  /// probes — next tick will skip via [shouldSendProbe].
+  /// probes — [probeInFlight] will be true until the probe completes.
   void markProbeInFlight() {
     _probeInFlight = true;
   }
