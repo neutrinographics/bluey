@@ -228,6 +228,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// peer-side Service Changed event after an iOS server force-kill.
   int? simulateWriteStatusFailed;
 
+  /// When true, the next [writeCharacteristic] call throws synchronously
+  /// (before returning a Future). Models a misbehaving non-async platform
+  /// impl — `LifecycleClient.start()` must unwind cleanly if this happens.
+  /// Auto-clears after one throw.
+  bool simulateSyncWriteThrow = false;
+
   Object? _pendingReadError;
 
   /// Arranges for the next [readCharacteristic] call to throw [error],
@@ -657,6 +663,20 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> writeCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) {
+    if (simulateSyncWriteThrow) {
+      simulateSyncWriteThrow = false;
+      throw StateError('simulated synchronous writeCharacteristic throw');
+    }
+    return _writeCharacteristicAsync(
+        deviceId, characteristicUuid, value, withResponse);
+  }
+
+  Future<void> _writeCharacteristicAsync(
     String deviceId,
     String characteristicUuid,
     Uint8List value,

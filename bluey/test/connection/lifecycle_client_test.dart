@@ -1415,6 +1415,36 @@ void main() {
       client.stop();
     });
 
+    test('start() unwinds fully when writeCharacteristic throws synchronously', () async {
+      final fixture = await _setUpConnectedClient(onServerUnreachable: () {});
+      final client = fixture.client;
+      final fakePlatform = fixture.fakePlatform;
+      final services = fixture.services;
+
+      fakePlatform.simulateSyncWriteThrow = true;
+
+      Object? caught;
+      try {
+        client.start(allServices: services);
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught, isA<StateError>(),
+          reason: 'synchronous throw must propagate out of start()');
+      expect(client.isRunning, isFalse,
+          reason: '_isRunning must be cleared on sync-throw unwind');
+      expect(client.probeInFlightForTest, isFalse,
+          reason: 'monitor probeInFlight must be released');
+
+      // A second start() with a healthy platform must be able to run.
+      fakePlatform.simulateSyncWriteThrow = false;
+      client.start(allServices: services);
+      expect(client.isRunning, isTrue);
+
+      client.stop();
+    });
+
     test('I078: recordActivity during interval-read window shifts the probe deadline', () {
       fakeAsync((async) {
         late LifecycleClient client;

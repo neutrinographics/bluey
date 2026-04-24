@@ -105,39 +105,46 @@ class LifecycleClient {
         .firstOrNull;
     if (heartbeatChar == null) return;
 
+    // Commit point — from here on, any synchronous failure must
+    // fully unwind so the class never exposes a partial-start state.
     _isRunning = true;
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
     dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
-    // Send the first heartbeat immediately so the server (especially
-    // iOS, which has no connection callback) learns about this client
-    // as soon as possible — before the interval read round-trip.
-    _sendProbe();
+    try {
+      // Send the first heartbeat immediately so the server (especially
+      // iOS, which has no connection callback) learns about this client
+      // as soon as possible — before the interval read round-trip.
+      _sendProbe();
 
-    // Find the interval characteristic and read the server's interval.
-    final intervalChar = controlService.characteristics
-        .where(
-          (c) =>
-              c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
-        )
-        .firstOrNull;
+      // Find the interval characteristic and read the server's interval.
+      final intervalChar = controlService.characteristics
+          .where(
+            (c) =>
+                c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
+          )
+          .firstOrNull;
 
-    if (intervalChar != null) {
-      _platform
-          .readCharacteristic(_connectionId, intervalChar.uuid.toString())
-          .then((bytes) {
-        if (!_isRunning) return;
-        final serverInterval = lifecycle.decodeInterval(bytes);
-        final heartbeatInterval = Duration(
-          milliseconds: serverInterval.inMilliseconds ~/ 2,
-        );
-        _beginHeartbeat(heartbeatInterval);
-      }).catchError((_) {
-        if (!_isRunning) return;
+      if (intervalChar != null) {
+        _platform
+            .readCharacteristic(_connectionId, intervalChar.uuid.toString())
+            .then((bytes) {
+          if (!_isRunning) return;
+          final serverInterval = lifecycle.decodeInterval(bytes);
+          final heartbeatInterval = Duration(
+            milliseconds: serverInterval.inMilliseconds ~/ 2,
+          );
+          _beginHeartbeat(heartbeatInterval);
+        }).catchError((_) {
+          if (!_isRunning) return;
+          _beginHeartbeat(_defaultHeartbeatInterval);
+        });
+      } else {
         _beginHeartbeat(_defaultHeartbeatInterval);
-      });
-    } else {
-      _beginHeartbeat(_defaultHeartbeatInterval);
+      }
+    } catch (_) {
+      stop();
+      rethrow;
     }
   }
 
