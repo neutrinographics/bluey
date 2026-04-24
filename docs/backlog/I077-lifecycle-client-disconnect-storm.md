@@ -4,8 +4,9 @@ title: Client appears to toggle connected/disconnected during heartbeat activity
 category: bug
 severity: medium
 platform: both
-status: open
+status: fixed
 last_verified: 2026-04-24
+fixed_in: 0b97cc6
 related: [I020, I021]
 ---
 
