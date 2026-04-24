@@ -86,6 +86,7 @@ Everything else (the other 40-odd open entries) can proceed opportunistically â€
 | [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC â†’ UUID truncation | medium |
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
+| [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-interface exception | medium |
 | [I070](I070-lifecycle-client-late-promise-callbacks.md) | LifecycleClient late promise callbacks fire after `stop()` | high |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
@@ -93,6 +94,7 @@ Everything else (the other 40-odd open entries) can proceed opportunistically â€
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I077](I077-lifecycle-client-disconnect-storm.md) | Client appears to toggle connected/disconnected during heartbeat activity | medium |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 
