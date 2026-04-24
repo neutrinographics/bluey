@@ -562,4 +562,89 @@ class GattServerTest {
             mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
         }
     }
+
+    @Test
+    fun `onCharacteristicWriteRequest with responseNeeded=false does not stash and does not call sendResponse`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicWriteRequest(
+            mockDevice, 30, mockCharacteristic,
+            false, // preparedWrite
+            false, // responseNeeded
+            0,
+            byteArrayOf(0x42)
+        )
+
+        // Flutter is still notified — the write is visible to Dart.
+        verify { mockFlutterApi.onWriteRequest(any(), any()) }
+
+        // No sendResponse from binder thread.
+        verify(exactly = 0) {
+            mockBluetoothGattServer.sendResponse(any(), any(), any(), any(), any())
+        }
+
+        // The id must NOT be in the registry — respondToWrite would fail.
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToWriteRequest(30L, GattStatusDto.SUCCESS) { resultSeen = it }
+        assertTrue(resultSeen?.isFailure == true)
+        assertTrue(resultSeen?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+    }
+
+    @Test
+    fun `onCharacteristicWriteRequest with preparedWrite=true preserves auto-respond echo`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockFlutterApi.onWriteRequest(any(), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        val value = byteArrayOf(0xAA.toByte(), 0xBB.toByte())
+        capturedCallback!!.onCharacteristicWriteRequest(
+            mockDevice, 40, mockCharacteristic,
+            true,  // preparedWrite
+            true,  // responseNeeded
+            7,
+            value
+        )
+
+        // Existing auto-respond behavior preserved for prepared writes (I050 owns this path).
+        verify(exactly = 1) {
+            mockBluetoothGattServer.sendResponse(
+                mockDevice,
+                40,
+                android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                7,
+                value
+            )
+        }
+
+        // The id must NOT be in the registry — prepared writes bypass the Dart-mediated path.
+        var resultSeen: Result<Unit>? = null
+        gattServer.respondToWriteRequest(40L, GattStatusDto.SUCCESS) { resultSeen = it }
+        assertTrue(resultSeen?.exceptionOrNull() is BlueyAndroidError.NoPendingRequest)
+    }
 }
