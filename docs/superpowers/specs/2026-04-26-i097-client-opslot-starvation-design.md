@@ -1,8 +1,8 @@
-# Client-Side LifecycleClient: User Ops as First-Class Liveness Signals (I097)
+# Client-Side LifecycleClient: Time-Based Peer-Silence Detection (I097)
 
 **Status:** proposed
 **Date:** 2026-04-26
-**Scope:** `bluey` package — `LifecycleClient` + `BlueyConnection` only. No platform-interface change, no native change, no protocol change.
+**Scope:** `bluey` package — `LifecycleClient`, `LivenessMonitor`, `BlueyConnection`. Removes the `maxFailedHeartbeats` public parameter and adds `peerSilenceTimeout`. No platform-interface change, no native change, no protocol change.
 **Backlog entry:** [I097](../../backlog/I097-client-opslot-starves-heartbeat.md).
 
 ## Problem
@@ -11,148 +11,181 @@ The failure-injection stress test reliably tears down the client connection at a
 
 Walking the chain: server drops echo #0 → CoreBluetooth's per-peripheral write-with-response queue holds the next heartbeat (CB serialises writes-with-response, doesn't dispatch the next until the in-flight one gets a `didWriteValueFor` callback) → heartbeat sits in CB's internal queue, never goes on the wire → our OpSlot's per-op timer fires → heartbeat surfaces as `GattOperationTimeoutException` to `LifecycleClient`.
 
-`LifecycleClient._isDeadPeerSignal` lumps all `GattOperationTimeoutException` together. There's no way for the Dart side to tell "server didn't respond" (real dead-peer) from "CB held my write while another op was in flight" (local serialisation, peer is fine). So the dead-peer counter trips, the client tears down a healthy connection.
+The current count-based mechanism (`maxFailedHeartbeats` consecutive failures) has two structural problems beyond the immediate bug:
+
+1. **Asymmetric trip rate by failure source.** Heartbeat probes have a 10 s OpSlot timeout plus 5 s reschedule = 15 s per probe cycle. User-op failures can occur in tight loops with no inter-failure gap. Without rate-limiting, a busy connection can trip much faster than an idle one.
+2. **Misleading user-facing semantics.** `maxFailedHeartbeats` = 3 looks like "3 strikes," but the actual time-to-disconnect depends on probe cadence, op timeouts, and traffic patterns. A user wanting "disconnect after N seconds of silence" can't express it cleanly.
 
 ## Root cause
 
-The lifecycle layer treats heartbeat probes as the *only* source of dead-peer evidence, and fires probes on a fixed cadence regardless of whether user ops are concurrently providing the same evidence. This produces two problems:
+The lifecycle layer treats heartbeat probes as the *only* source of dead-peer evidence and counts failures rather than measuring silence. This produces three problems:
 
 1. **Redundant probing during active use.** While a user op is in flight, that op is itself an outstanding peer probe — its outcome (success, status-failure, wire-timeout, or disconnect) tells us about the peer. Layering an additional heartbeat probe on top adds nothing on the *evidence* side and creates the queue contention the bug describes on the *cost* side.
-2. **Missed signals from user ops.** When a user op times out, that timeout is a dead-peer signal in exactly the same way a timed-out heartbeat is — "we sent something, the peer didn't answer." Today's design discards this signal: only heartbeat-probe failures feed the dead-peer counter. Authoritative detection requires using *all* the evidence we have.
+2. **Missed signals from user ops.** When a user op times out, that timeout is a dead-peer signal in exactly the same way a timed-out heartbeat is — "we sent something, the peer didn't answer." Today's design discards this signal.
+3. **Count semantics conflate frequency with duration.** Threshold = 3 means different things at different traffic patterns. A time-based contract is more predictable and matches user mental models.
 
-## Symmetry with I079
+## Symmetry with I079 (and where the symmetry ends)
 
-I079 (server-side, fixed) refused to declare a client dead while the server held a pending request from it — using "the link is provably alive because it just delivered a request" as the override. I097 strengthens the same principle on the *client* side and makes it bidirectional: user ops are first-class liveness signals.
+I079 (server-side, fixed) refused to declare a client dead while the server held a pending request from it — using "the link is provably alive because it just delivered a request" as the override. I097 strengthens the same principle on the client side: user ops are first-class liveness signals.
 
-| Side | Idle policy | Active-evidence rule |
+But the underlying *trigger* semantics differ between sides, for principled reasons:
+
+| Side | Trigger model | Why |
 |---|---|---|
-| Server (I079) | Per-client timer counts up; trips at interval | Pending request from client → pause timer (request itself is proof of life) |
-| Client (I097) | Probe deadline counts down; failure counts toward threshold | User op pending → defer probe (op itself is the probe). User op outcome → feed into the same threshold counter |
+| Server (`LifecycleServer`) | Watchdog from last activity. Timer counts up since last heartbeat receipt; pending requests pause the timer; trip when interval elapsed without activity AND nothing pending. | Server passively *receives* heartbeats. There are no per-event failures — only absence of events. |
+| Client (`LifecycleClient` post-fix) | Death-watch from first failure. Timer armed only on failure event; cancelled on any success; ignores pending state. | Client *initiates* exchanges and observes responses. Failure events exist explicitly (op timeouts). Pausing on pending ops would create a trap where rapid failures never trip. |
 
-Same principle on both sides: the lifecycle layer treats *active op outcomes* as its primary liveness signal. The idle-detection probe (server timer / client heartbeat) only kicks in during quiet periods.
+Both sides:
+- Track pending exchanges (server: per-request-id Set; client: simple count).
+- Reset on peer-originated activity.
+- Fire a callback on prolonged silence.
+
+The shared concept is **peer-silence detection with pending-exchange awareness**. The implementations diverge because the *direction of initiation* differs. Forcing a unified implementation would either bloat the abstraction or distort one side.
+
+The DDD win comes from shared **vocabulary** ("peer silence," "pending exchange," "watchdog" / "death watch"), shared **protocol layer** (already in `bluey/lib/src/lifecycle.dart`), and explicit cross-references between the two sides — not from extracting shared *code*.
 
 ## Goals
 
-Two complementary mechanisms:
+Three complementary mechanisms on the client side:
 
-1. **Defer probes while user ops pending.** `LifecycleClient` tracks a per-connection count of in-flight user ops via `markUserOpStarted/Ended`. While count > 0, scheduled probes defer rather than fire — the in-flight op is itself an outstanding peer probe.
+1. **Defer probes while user ops pending.** `LifecycleClient` tracks a count of in-flight user ops via `markUserOpStarted/Ended`. While count > 0, scheduled probes defer rather than fire — avoids CoreBluetooth queue contention.
 
-2. **User-op outcomes feed the dead-peer counter.** When a user op times out, treat it the same way a heartbeat-probe timeout is treated: increment the counter, potentially trip the threshold. When a user op succeeds, reset the counter (already the case via the existing `recordActivity` call).
+2. **User-op outcomes feed the silence detector.** When a user op times out, that's a dead-peer signal indistinguishable from a timed-out heartbeat. When a user op succeeds, that's activity (already handled via `recordActivity`).
 
-Combined, the lifecycle layer authoritatively detects dead peer using *every* available signal:
-
-| Scenario | Behaviour |
-|---|---|
-| Idle, peer healthy | Periodic probes succeed; counter stays at 0 |
-| Idle, peer dies | Probe fails; counter increments; trip after threshold |
-| Active use, peer healthy | Probes deferred; user ops succeed; counter stays at 0 |
-| Active use, one op fails (failure-injection scenario) | One counter increment; next op succeeds, counter resets. Recovery if tolerance ≥ 2 |
-| Active use, all ops fail (peer dead) | Counter increments per failed op; trip after threshold |
+3. **Time-based silence detection.** The `LivenessMonitor` (renamed `PeerSilenceMonitor`, since "liveness" is a poor name post-refactor) tracks `_firstFailureAt`. On any failure event from any source, sets `_firstFailureAt` (if null) and arms a `Timer` for `firstFailureAt + peerSilenceTimeout`. Any activity (success / notification / probe ack) clears `_firstFailureAt` and cancels the timer. Timer firing → `onServerUnreachable`.
 
 ## Non-goals
 
-- **Not changing the platform interface.** No new exception types, no new fields on existing exceptions. The signal already crosses the boundary as `GattOperationTimeoutException`; we just route it through the lifecycle layer in addition to the user.
-- **Not surfacing CoreBluetooth queue state from iOS.** Avoided in favour of the higher-level reframe — heartbeats are deferred during user-op pendency, so the contention scenario simply doesn't occur.
-- **Not changing the heartbeat write protocol.** Same characteristic, same value, same cadence formula. Heartbeats still serve the secondary purpose of keeping the server's I079 timer fed during idle periods.
-- **Not changing existing predicates.** `_isDeadPeerSignal` (used for heartbeat probes) keeps its current taxonomy. A separate, narrower predicate is used for user-op failures (timeout only — see below).
-- **Not changing `maxFailedHeartbeats` defaults or semantics.** Counter and threshold logic stay exactly the same; the threshold simply now sees signals from both heartbeats and user ops.
+- **Not changing the platform interface.** No new exception types, no new fields. Existing `GattOperationTimeoutException` is the signal we route into the silence detector.
+- **Not surfacing CoreBluetooth queue state from iOS.** Avoided in favour of the higher-level reframe.
+- **Not changing the heartbeat write protocol.** Same characteristic, same value, same scheduling. Heartbeats still serve the secondary purpose of feeding the server's I079 timer during idle periods.
+- **Not unifying client and server silence-detection implementations.** Trigger semantics differ; sharing would distort.
+- **Not changing `_isDeadPeerSignal`'s heartbeat-probe taxonomy.** Heartbeats use the existing wide net (timeout / disconnect / statusFailed). User ops use a narrower predicate (timeout only).
 
 ## Decisions locked
 
-1. **Counter, not boolean, for in-flight user ops.** Use `int _pendingUserOps` because a connection can have multiple ops in flight across different OpSlots (different characteristics) — counter handles concurrent ops naturally.
-2. **`finally`-wrapped accounting in `BlueyConnection`.** Markers fire in `try { mark; await op; on success: recordActivity } catch { recordUserOpFailure(error) } finally { unmark; }` so a thrown exception still decrements the counter. Leaks would be catastrophic — once leaked, probes never fire again.
-3. **Different predicate for user-op failures vs heartbeat failures.** Heartbeats use the existing `_isDeadPeerSignal` (timeout / disconnect / statusFailed) — wide net, justified by the Service-Changed force-kill case. User ops use a narrower predicate: **timeout only**. Disconnect is already handled by the platform-level disconnect callback (separate path that tears down the connection); statusFailed at the user-op level can mean ATT errors like WriteNotPermitted that don't imply dead peer.
-4. **Both mechanisms feed the same counter.** No separate "user-op failure counter" — `recordProbeFailure` is the single increment path. Whether the failure came from a heartbeat probe or a user op is invisible to the counter.
-5. **Counter increments are rate-limited to one per `activityWindow`.** Without rate limiting, a tight loop of rapidly-failing user ops could trip the threshold in well under one heartbeat interval — much faster than an idle peer would trip. With rate limiting, a busy connection fails at approximately the same rate as an idle connection (both bounded by `threshold × activityWindow` minimum trip time). Multiple failures within a single window collapse to one increment.
-6. **Defer-only, not skip-and-cancel-deadline.** When `_sendProbeOrDefer` defers, it reschedules per the existing cadence (one `activityWindow` later). Once the user op completes, the next scheduled probe attempt fires normally.
-7. **Threshold-trip path is unchanged.** When the counter trips, the existing logic runs as is: stop, fire `onServerUnreachable`, no further reschedule.
+1. **Replace `maxFailedHeartbeats` (count) with `peerSilenceTimeout` (Duration).** The library has no consumers outside `bluey/example`; we update the example app's tolerance segments to express durations. Default = `4 × activityWindow` ≈ 20 s (rationale: covers a typical 10 s user-op stall with margin, well past the failure-injection scenario timing). Public on `bluey.connect()` and `bluey.peer()`.
+2. **Rename `LivenessMonitor` → `PeerSilenceMonitor`.** Domain-accurate naming; "liveness" was vague.
+3. **Counter, not boolean, for in-flight user ops.** A connection can have multiple ops in flight across different OpSlots — counter handles concurrent ops naturally.
+4. **`finally`-wrapped accounting in `BlueyConnection`.** `try { mark; await op; on success: recordActivity } catch (error) { recordUserOpFailure(error); rethrow } finally { unmark }` so a thrown exception still decrements the counter.
+5. **Different predicate for user-op failures vs heartbeat failures.** Heartbeats: existing wide net (timeout / disconnect / statusFailed). User ops: timeout only. Disconnect is handled by the platform-level disconnect callback (separate path); statusFailed at the user-op level can mean ATT errors that don't imply dead peer.
+6. **Death-watch ignores pending state.** Once `_firstFailureAt` is set, the timer runs to completion regardless of whether subsequent user ops start or end. Cancelled only by success. Avoids the all-ops-fail trap (where pausing on pending would mean the timer never fires when a user keeps queuing failing ops).
+7. **Single firing of `onServerUnreachable`.** When the timer fires, the lifecycle stops itself and fires the callback once. Subsequent failures are no-ops.
 
 ## Architecture
 
-Three files change (LivenessMonitor, LifecycleClient, BlueyConnection). None touch the platform interface or native code.
+Three files change. None touch the platform interface or native code.
 
-### `LivenessMonitor` — rate-limited counter increments
+### `LivenessMonitor` → `PeerSilenceMonitor` (renamed + restructured)
 
-Add a `_lastIncrementAt` field. Modify `recordProbeFailure` to gate at `activityWindow`. Clear the timestamp on success-paths.
+The existing `LivenessMonitor` had count-based semantics. Post-refactor, it's a time-based silence detector.
+
+Public surface:
 
 ```dart
-DateTime? _lastIncrementAt;
+class PeerSilenceMonitor {
+  final Duration peerSilenceTimeout;
+  final void Function() onSilent;     // fired when timer expires
+  final DateTime Function() _now;
 
-bool recordProbeFailure() {
-  _probeInFlight = false;
-  // I097: rate-limit increments to once per activityWindow so a busy
-  // connection fails at approximately the same rate as an idle one.
-  // Multiple failures within a single window collapse to one increment.
-  final last = _lastIncrementAt;
-  if (last != null && _now().difference(last) < _activityWindow) {
-    return _consecutiveFailures >= maxFailedProbes;
-  }
-  _lastIncrementAt = _now();
-  _consecutiveFailures++;
-  return _consecutiveFailures >= maxFailedProbes;
-}
+  Duration _activityWindow;            // probe scheduling cadence (unchanged)
+  DateTime? _lastActivityAt;
+  DateTime? _firstFailureAt;           // null = no death watch active
+  Timer? _deathTimer;
+  bool _probeInFlight = false;
+  bool _running = false;
 
-// In recordActivity and recordProbeSuccess, also clear the rate-limit
-// timestamp so the next failure starts a fresh window:
-void recordActivity() {
-  _consecutiveFailures = 0;
-  _lastActivityAt = _now();
-  _lastIncrementAt = null;
-}
+  PeerSilenceMonitor({
+    required this.peerSilenceTimeout,
+    required this.onSilent,
+    required Duration activityWindow,
+    DateTime Function()? now,
+  });
 
-void recordProbeSuccess() {
-  _probeInFlight = false;
-  _consecutiveFailures = 0;
-  _lastActivityAt = _now();
-  _lastIncrementAt = null;
+  void start();
+  void stop();    // cancels _deathTimer
+
+  // — Activity reset path —
+  void recordActivity();         // clears _firstFailureAt, cancels timer
+  void recordProbeSuccess();     // alias for recordActivity + clears probeInFlight
+
+  // — Failure / silence path —
+  void recordPeerFailure();      // sets _firstFailureAt if null, arms timer
+  void cancelProbe();            // transient: just clears probeInFlight, no failure recording
+  void markProbeInFlight();
+
+  // — Probe scheduling (unchanged) —
+  Duration get activityWindow;
+  Duration timeUntilNextProbe();
+  void updateActivityWindow(Duration window);
+
+  // — Test inspection —
+  @visibleForTesting bool get probeInFlight;
+  @visibleForTesting DateTime? get lastActivityAt;
+  @visibleForTesting DateTime? get firstFailureAt;
+  @visibleForTesting bool get isDeathWatchActive;
 }
 ```
 
-The transient-error path (`cancelProbe`) does NOT clear `_lastIncrementAt` — transient errors are neither successes nor counted failures, and shouldn't reset the rate-limit window.
-
-### `LifecycleClient` — counter, deferral, user-op outcome handling
-
-
-New private field, three new public methods:
+Implementation sketch of the core methods:
 
 ```dart
-/// Count of user-initiated ops currently pending on this connection.
-/// Probes are deferred while > 0 — the in-flight op is itself an
-/// outstanding peer probe.
+void recordPeerFailure() {
+  if (!_running) return;
+  _firstFailureAt ??= _now();
+  if (_deathTimer != null) return;  // already armed
+  final deadline = _firstFailureAt!.add(peerSilenceTimeout);
+  final remaining = deadline.difference(_now());
+  if (remaining.isNegative || remaining == Duration.zero) {
+    _deathTimer = null;
+    onSilent();
+    return;
+  }
+  _deathTimer = Timer(remaining, _fireSilent);
+}
+
+void _fireSilent() {
+  _deathTimer = null;
+  if (!_running) return;
+  onSilent();
+  _running = false;       // single-fire
+}
+
+void recordActivity() {
+  _firstFailureAt = null;
+  _deathTimer?.cancel();
+  _deathTimer = null;
+  _lastActivityAt = _now();
+}
+```
+
+Note that `recordActivity()` no longer involves a counter; it just clears the failure timestamp.
+
+### `LifecycleClient` — pending tracking, deferral, user-op outcome handling
+
+```dart
 int _pendingUserOps = 0;
 
-/// Called by [BlueyConnection] when a user GATT op is dispatched.
 void markUserOpStarted() {
   _pendingUserOps++;
 }
 
-/// Called by [BlueyConnection] when a user GATT op completes (success
-/// or failure). Symmetric with [markUserOpStarted]. Decrement only.
 void markUserOpEnded() {
   if (_pendingUserOps > 0) _pendingUserOps--;
 }
 
 /// Called by [BlueyConnection] when a user GATT op fails. Filters by
-/// predicate: timeouts increment the dead-peer counter (and may trip
-/// onServerUnreachable); other errors are no-ops at this layer.
-///
-/// User-op disconnects are deliberately not counted here: the platform
-/// disconnect callback already triggers tear-down through a separate
-/// path. User-op statusFailed errors are deliberately not counted: at
-/// the user level they can mean ATT errors (WriteNotPermitted, etc.)
-/// that don't imply dead peer.
+/// predicate: timeouts feed the silence detector; other errors are
+/// no-ops at this layer (e.g. WriteNotPermitted is application-level,
+/// not dead-peer; disconnect is handled by the platform callback).
 void recordUserOpFailure(Object error) {
   if (!_isRunning) return;
   if (error is! platform.GattOperationTimeoutException) return;
-  final tripped = _monitor.recordProbeFailure();
-  if (tripped) {
-    stop();
-    onServerUnreachable();
-  }
+  _monitor.recordPeerFailure();
 }
 ```
 
-Modify `_sendProbeOrDefer` (currently lines 226–234 of `lifecycle_client.dart`):
+Modify `_sendProbeOrDefer`:
 
 ```dart
 void _sendProbeOrDefer() {
@@ -172,7 +205,7 @@ void _sendProbeOrDefer() {
 }
 ```
 
-Stop semantics stay correct: `stop()` doesn't need to touch `_pendingUserOps` (it's per-instance, discarded with the connection). `recordUserOpFailure` early-returns when not running.
+The `onServerUnreachable` callback that LifecycleClient takes is now invoked via `PeerSilenceMonitor.onSilent` rather than from inside `_sendProbe`'s catchError. The catchError just routes timeouts to `_monitor.recordPeerFailure()`.
 
 ### `BlueyConnection` — wrap user-op call sites
 
@@ -198,107 +231,152 @@ try {
 }
 ```
 
-The four current `recordActivity` sites (`bluey_connection.dart:317, :364, :376, :619`) all need the wrapper, except the notification-stream callback at `:619` (notifications aren't outbound user ops — keeps just `recordActivity`). The plan will list each site explicitly.
+The four current `recordActivity` sites (`bluey_connection.dart:317, :364, :376, :619`) all need the wrapper, except the notification-stream callback at `:619` (notifications aren't outbound user ops — keeps just `recordActivity`).
 
-`_lifecycle` is null when no Bluey peer is configured on the connection. The `?.` chain just no-ops — counter stays at zero on the (non-existent) lifecycle, deferral logic doesn't apply. Safe.
+### Public API change in `Bluey`
+
+`bluey.connect()` and `bluey.peer()` parameter rename:
+
+```dart
+// Before:
+Future<Connection> connect(
+  Device device, {
+  Duration? timeout,
+  ConnectionSettings settings,        // contained int maxFailedHeartbeats
+}) ...
+
+// After:
+Future<Connection> connect(
+  Device device, {
+  Duration? timeout,
+  ConnectionSettings settings,        // now contains Duration peerSilenceTimeout
+}) ...
+```
+
+`ConnectionSettings`:
+
+```dart
+// Before:
+final int maxFailedHeartbeats;
+const ConnectionSettings({this.maxFailedHeartbeats = 1});
+
+// After:
+final Duration peerSilenceTimeout;
+const ConnectionSettings({
+  this.peerSilenceTimeout = const Duration(seconds: 20),
+});
+```
+
+The example app's `ConnectionSettingsCubit` and `ToleranceControl` segmented control are updated to express durations instead of counts. Three segments:
+
+| Old label / count | New label / duration |
+|---|---|
+| Strict (1) | Strict (10 s) |
+| Tolerant (3) | Tolerant (30 s) |
+| Very tolerant (5) | Very tolerant (60 s) |
+
+The numeric values are illustrative; final values can be tuned during implementation. The default (20 s) sits between Strict and Tolerant.
 
 ## TDD
 
-Tests live in `bluey/test/connection/`. Three layers.
+Tests live in `bluey/test/connection/`.
 
-### `LivenessMonitor` (`bluey/test/connection/liveness_monitor_test.dart`)
+### `PeerSilenceMonitor` (`bluey/test/connection/liveness_monitor_test.dart` — file kept, contents updated; if rename is desired, that's a follow-up)
 
-Three new tests for rate-limiting:
+Five new / rewritten tests:
 
-A. **First failure increments.** Fresh monitor. Call `recordProbeFailure()` once. Verify counter is 1.
-B. **Failure within activityWindow does not increment.** Call `recordProbeFailure()` at t=0. Advance time by `activityWindow / 2`. Call `recordProbeFailure()` again. Verify counter is still 1.
-C. **Failure after activityWindow increments.** Call `recordProbeFailure()` at t=0. Advance time by `activityWindow + 1ms`. Call again. Verify counter is 2.
-D. **Success clears rate-limit window.** Call `recordProbeFailure()` at t=0. Advance by `activityWindow / 2`. Call `recordActivity()`. Advance another `1ms`. Call `recordProbeFailure()`. Verify counter is 1 (fresh window — not blocked).
+A. **`recordPeerFailure` arms timer.** Fresh monitor, started, no activity. Call `recordPeerFailure()`. Verify `firstFailureAt` is non-null and `isDeathWatchActive` is true.
+B. **Activity cancels death watch.** Failure → activity. Verify `firstFailureAt` is null and `isDeathWatchActive` is false.
+C. **Multiple failures don't reset deadline.** Failure at t=0, failure at t=5. Verify `firstFailureAt` is still 0 (the *first* failure), and timer fires at 0 + peerSilenceTimeout.
+D. **`onSilent` fires after `peerSilenceTimeout`.** Failure at t=0, advance fakeAsync past peerSilenceTimeout. Verify callback fired exactly once.
+E. **`stop` cancels timer; `onSilent` does not fire.** Failure → stop → advance time. Verify callback not called.
 
 ### `LifecycleClient` (`bluey/test/connection/lifecycle_client_test.dart`)
 
 Five new tests:
 
-1. **Probe deferred while user op pending.** Set up a tracked client with a future probe deadline. Call `markUserOpStarted()`. Advance time past the deadline. Verify: no probe write attempted.
-2. **Probe fires after user op ends.** Same setup. Call `markUserOpStarted()`, advance, verify deferred. Call `markUserOpEnded()`. Advance one `activityWindow`. Verify: probe write attempted.
-3. **Multiple concurrent user ops correctly counted.** Two `markUserOpStarted()` calls. One `markUserOpEnded()`. Verify probe still deferred. Second `markUserOpEnded()`. Verify probe fires on the next tick.
-4. **`recordUserOpFailure` with timeout increments counter.** Set `maxFailedProbes=1`. Call `recordUserOpFailure(GattOperationTimeoutException(...))`. Verify `onServerUnreachable` fires.
-5. **`recordUserOpFailure` with non-timeout is no-op.** Same setup but pass `GattOperationStatusFailedException` or a generic exception. Verify `onServerUnreachable` does NOT fire.
-
-These pin both the deferral and the user-op-failure-counting contracts.
+1. **Probe deferred while user op pending.** Tracked client, future probe deadline. `markUserOpStarted()`, advance past deadline. Verify no probe write attempted.
+2. **Probe fires after user op ends.** Same setup. `markUserOpStarted()`, advance, verify deferred. `markUserOpEnded()`. Advance one `activityWindow`. Verify probe attempted.
+3. **Multiple concurrent user ops correctly counted.** Two `markUserOpStarted()` calls, one `markUserOpEnded()` — probe still deferred. Second `markUserOpEnded()` — probe fires.
+4. **`recordUserOpFailure` with timeout feeds the monitor.** Spy on the monitor (or inject a fake). Call with `GattOperationTimeoutException`. Verify `recordPeerFailure` was called.
+5. **`recordUserOpFailure` with non-timeout is a no-op.** Same setup, pass `GattOperationStatusFailedException` or generic exception. Verify `recordPeerFailure` was NOT called.
 
 ### `BlueyConnection` (`bluey/test/connection/bluey_connection_test.dart`)
 
 Three new tests covering the wrapping:
 
-6. **User op success → markStarted then markEnded; recordActivity called.** Issue a write that succeeds. Verify counter went up then down; verify `recordActivity` was called.
-7. **User op timeout → markStarted, recordUserOpFailure, markEnded.** Make the platform throw `GattOperationTimeoutException`. Verify the failure was recorded; verify the counter still returns to zero (no leak).
-8. **User op other failure → markStarted, recordUserOpFailure (no-op), markEnded.** Make the platform throw a non-timeout exception. Verify the counter returns to zero. Verify the threshold isn't tripped.
-
-These pin the connection-side accounting.
+6. **User op success: markStarted, recordActivity, markEnded.**
+7. **User op timeout: markStarted, recordUserOpFailure(timeout), markEnded.**
+8. **User op other failure: markStarted, recordUserOpFailure(other) (filtered out by predicate), markEnded.**
 
 ### Existing tests
 
-Existing `LifecycleClient` and `BlueyConnection` tests continue to pass — the new code is additive. No semantic changes to existing methods.
+Existing tests need updates for the renamed `maxFailedHeartbeats` parameter and the count-based `recordProbeFailure` mechanism. Specifically:
+- Any test that passes `maxFailedHeartbeats: N` becomes `peerSilenceTimeout: durationN`.
+- Tests that asserted on `_consecutiveFailures` or trip-after-N-count-semantics get rewritten to assert on the time-based behavior.
 
 ## Caveats
 
+### Why time-based wins over count-based
+
+A predictable, single-knob contract — "if the peer is silent for X seconds, the connection is declared dead" — beats a multi-knob count-with-rate-limiting design on every axis we evaluated:
+
+- **User mental model:** "30 seconds" is concrete; "3 failures, rate-limited to 5 s, give or take 25 % depending on traffic pattern" is not.
+- **DDD purity:** the domain concept is *peer silence*, a duration. A wall-clock timer expresses that directly.
+- **Implementation simplicity:** one timer, one timestamp, no rate-limit gating logic.
+- **Symmetry with I079:** server uses a wall-clock timer keyed off interval; client now uses one keyed off silence-timeout. Different trigger conditions but same *kind* of mechanism.
+
 ### What if a user op stalls forever?
 
-The user op itself has a per-op timeout (10 s default at OpSlot level). When it expires, `recordUserOpFailure` fires (incrementing the counter, possibly tripping), `markUserOpEnded` fires (in `finally`). Worst case: a single op stall delays dead-peer detection by the user-op timeout window, but the failure is then captured authoritatively.
+The user op itself has a per-op timeout (10 s default at OpSlot level). When it expires, `recordUserOpFailure` arms the death watch (if not already armed) and `markUserOpEnded` fires (in `finally`). If subsequent ops keep failing, the death watch runs to completion and trips at `firstFailureAt + peerSilenceTimeout`, regardless of pending state.
 
 ### Failure-injection scenario walkthrough
 
-Default settings, `maxFailedHeartbeats = 1`:
+Default settings (`peerSilenceTimeout = 20 s`):
 
-- t=0: echo #0 starts. count=1, counter=0.
-- t=5: probe deadline ticks, deferred (count=1).
-- t=10: echo #0 times out. `recordUserOpFailure(timeout)` → counter=1, tripped → `onServerUnreachable` → disconnect. Count=0 (in `finally`).
-- Test ends with: 1 user-op timeout + N-1 disconnects. **Same as today's behaviour at tolerance=1.** Strict tolerance is intentionally aggressive — that's the point.
+- t=0: prologue Reset succeeds → `recordActivity` → `firstFailureAt = null`.
+- t=ε: prologue DropNext succeeds → `recordActivity`.
+- t=ε: echo #0 sent, server drops it.
+- t=10: echo #0 times out → `recordUserOpFailure(timeout)` → `firstFailureAt = 10`, timer armed for t=30.
+- t=10+ε: echo #1 starts. count=1. Probe deferred (existing in-flight op) — irrelevant to the death watch.
+- t=10+latency: echo #1 succeeds → `recordActivity` → `firstFailureAt = null`, timer cancelled.
+- Subsequent echoes succeed, no further failures.
+- Test ends with: 1 timeout + 9 successes. **Recovery.**
 
-`maxFailedHeartbeats = 3`:
+`peerSilenceTimeout = 10 s` ("Strict"):
 
-- t=0–10: as above, but counter=1 doesn't trip.
-- t=10+ε: echo #1 starts. count=1, deferred probe rescheduled.
-- t≈10+latency: echo #1 succeeds. `recordActivity` → counter=0.
-- Subsequent echoes succeed.
-- Test ends with: 1 timeout + 9 successes. **Recovery scenario achieved.**
+- t=10: echo #0 fails. Timer armed for t=20.
+- t=20: timer fires → `onSilent` → disconnect.
+- Echoes still queued or attempted after t=20 fail with `DisconnectedException`.
+- User sees: 1 timeout + N-1 disconnects. **Tight policy as intended.**
 
-`maxFailedHeartbeats = 5`, ALL user ops fail (peer truly dead):
+All ops fail (peer truly dead), `peerSilenceTimeout = 30 s`:
 
-- Each echo times out → counter increments. After 5 timeouts → trip → disconnect.
-- User sees: 5 user-op timeouts + N-5 disconnects. **Authoritative detection at threshold.**
+- t=10: op #1 fails. `firstFailureAt = 10`, timer for t=40.
+- t=20, 30, ...: subsequent ops fail. `firstFailureAt` unchanged. Timer continues to t=40.
+- t=40: timer fires → disconnect. **Authoritative detection.**
 
-### Why `markUserOpEnded` doesn't trigger an immediate probe
+### Server-side stays as-is
 
-`markUserOpEnded` only decrements the counter. It doesn't reschedule. The next probe still fires on the previously scheduled timer. This avoids storms of probe firings if many ops complete in quick succession. The minor latency cost (next probe could be up to one `activityWindow` away) is acceptable — in practice ops completing rapidly means activity is healthy.
+`LifecycleServer` continues to use its current watchdog-from-last-activity model. The semantics differ from the client side because the server doesn't observe explicit failure events — it observes presence-or-absence of heartbeats. The two sides share the *concept* (peer silence detection with pending awareness) but the *trigger* differs by direction of initiation.
 
-### Edge case: disconnect mid-op
-
-When the connection drops mid-op, the platform layer drains the in-flight op with `GattOperationDisconnectedException`. The `catch` block fires `recordUserOpFailure(disconnect-exception)` — but the predicate filter (`is GattOperationTimeoutException` only) means this is a no-op. The disconnect path proceeds via its own (existing, unaffected) mechanism: the platform's disconnect callback stops the lifecycle and tears down the cubit's connection.
-
-### Predicate scoping for user-op failures
-
-The choice to count *only* `GattOperationTimeoutException` (and not `GattOperationStatusFailedException`) for user ops is deliberate:
-
-- A user-op timeout can be queue-blocking (false positive for dead-peer) OR genuinely "peer didn't answer" (true positive). At higher tolerance settings (≥3), single false positives are absorbed by subsequent successes resetting the counter. At tolerance=1, false positives still trip — that's by design.
-- A user-op statusFailed code is much more often application-meaningful (read-not-permitted, attribute-not-found) than dead-peer. Counting it would produce frequent false-positive trips with no compensating benefit.
-
-If experience shows status-failed *should* count for some specific status codes (e.g., `GATT_INVALID_HANDLE` after Service Changed), the predicate can be widened in a follow-up. Keep it narrow for now.
+A short cross-reference doc-comment on each lifecycle class will point to the other as a sibling implementation of the shared concept. No code is shared between them beyond what's already in `bluey/lib/src/lifecycle.dart` (protocol layer).
 
 ## Risks and rollback
 
 **Risks:**
 
-- A `markUserOpStarted` without matching `markUserOpEnded` would leak the counter, suppressing probes forever. Mitigation: `try { ... } finally { ... }` wrapping at every call site, plus the test that asserts no leak on op failure.
-- A peer that succeeds at user ops but fails at heartbeats (some weird ATT permissioning edge case where the heartbeat char is locked but other chars aren't) would now have user-op successes resetting the counter, potentially masking the heartbeat-only failures. Theoretically possible but exceedingly unlikely; the lifecycle char is configured by the library, not by the application.
+- A `markUserOpStarted` without matching `markUserOpEnded` would leak the counter. Doesn't affect the death watch (which is failure-triggered, not pendency-triggered), but does suppress probes from firing. Mitigation: `try { ... } finally { ... }` wrapping at every call site, plus tests for the no-leak invariant on op failure.
+- The `peerSilenceTimeout = 20 s` default is a guess. If real-world use shows it's too short (legitimate slow peers tripping incorrectly) or too long (slow detection of dead peers in the field), it can be tuned without API changes.
 
-**Rollback:** revert the two-file change. No state, no migration, no schema.
+**Rollback:** revert the multi-file change. Public API change means consumers (the example app) need to migrate, but there's only one consumer.
 
 ## Backlog hygiene
 
 After landing:
 
-1. Update `docs/backlog/I097-client-opslot-starves-heartbeat.md`: `status: open` → `fixed`, add `fixed_in: <sha>`, replace Notes with: "Fixed in `<sha>` by deferring heartbeat probes while user ops are in flight, AND treating user-op timeouts as first-class dead-peer signals that feed the same threshold counter as heartbeat-probe failures. Mirror image of I079 with bidirectional symmetry: both sides of the protocol now use active-op outcomes as their primary liveness signal, with idle-detection probes/timers only kicking in during quiet periods."
+1. Update `docs/backlog/I097-client-opslot-starves-heartbeat.md`: `status: open` → `fixed`, add `fixed_in: <sha>`, replace Notes with: "Fixed in `<sha>` by switching the client-side lifecycle from count-based heartbeat-failure detection to time-based peer-silence detection. Heartbeat probes defer while user ops are in flight; user-op timeouts feed the same silence detector that heartbeat-probe timeouts feed; the detector is a wall-clock death-watch from first failure that resets on any successful exchange."
 2. Update `docs/backlog/README.md`: move I097 from Open → Fixed.
-3. Update the example app's `failureInjection.readingResults`: now that I097 is fixed, the "tolerant recovery" outcome is reachable with `maxFailedHeartbeats=3` or higher. Restore the original two-scenario description (Strict → cascade, Tolerant → recovery) and remove the I097 caveat. One-file edit on the same branch.
+3. Update the example app's `failureInjection.readingResults`: now that I097 is fixed, the recovery scenario is reachable. Restore the original two-scenario description (Strict → cascade, Tolerant → recovery) and remove the I097 caveat. One-file edit on the same branch.
+4. Update the example app's `ToleranceControl` and `ToleranceIndicator`: segments now express durations ("Strict (10 s)" / "Tolerant (30 s)" / "Very tolerant (60 s)"). The labels and underlying values change; the UI shape is unchanged.
+5. Optional follow-up: rename the file `liveness_monitor.dart` → `peer_silence_monitor.dart`. Not required for correctness; nice to have for naming consistency.
