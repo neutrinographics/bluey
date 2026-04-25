@@ -146,7 +146,6 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
 | [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | Disconnect of already-disconnected peripheral waits for timeout | low |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
-| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after failure-injection-style disconnect | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
 
@@ -180,10 +179,11 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |
 | [I103](I103-scan-timeout-double-emit.md) | Scan timeout fires after manual stop | Scanner refactor |
 
-### Wontfix — documented platform limitations
+### Wontfix — documented platform limitations & superseded premises
 
 | ID | Title | Platform |
 |---|---|---|
+| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after failure-injection-style disconnect (premise was wrong post-I079) | ios |
 | [I200](I200-ios-bonding-not-exposed.md) | iOS does not expose bonding / PHY / connection parameters | ios |
 | [I201](I201-ios-client-disconnect-callback.md) | iOS has no client disconnect callback (mitigated) | ios |
 | [I202](I202-ios-cancel-peripheral-unreliable.md) | iOS `cancelPeripheralConnection` unreliable | ios |

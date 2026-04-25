@@ -4,7 +4,7 @@ title: Connection doesn't auto-reconnect after failure-injection-style disconnec
 category: bug
 severity: medium
 platform: ios
-status: open
+status: wontfix
 last_verified: 2026-04-25
 related: [I079, I091, I090, I096]
 ---
@@ -41,12 +41,21 @@ Unconfirmed. Candidates:
 
 ## Notes
 
-**Update 2026-04-25:** [I096](I096-ios-nil-disconnect-error-to-unknown.md) was a *necessary* sub-fix — it eliminated the `bluey-unknown` exception from the disconnect cascade, which was hypothesised in this entry's original Notes as the likely root cause. After landing I096, on-device verification shows the cascade is now well-typed (`1 GattTimeoutException + 9 GattOperationDisconnectedException`, no `bluey-unknown`) — but **the connection still does not reconnect.**
+**Resolution 2026-04-25 (wontfix).** This entry's premise — "the connection should auto-reconnect after failure-injection-style disconnect" — was inherited from a comparison to the **timeout-probe** test that no longer applies post-I079. Pre-I079, both tests caused a disconnect (because of I079's starvation false-positive), and the timeout-probe's "auto-reconnect after disconnect" was the visible recovery path. Post-I079, the timeout-probe **no longer disconnects at all** — there's no longer a "compare to timeout-probe reconnecting" example. The expectation that failure-injection should also auto-reconnect was carried forward incorrectly.
 
-That confirms hypothesis #2 from this entry's original "Root cause" section: the **example-app reconnect cubit** is the actual blocker. The cubit isn't reacting to `GattOperationDisconnectedException` either. I087 stays open until the cubit fix lands.
+Re-examining the failure-injection chain post-I079 / post-I096:
 
-Refined location: `bluey/example/lib/features/connection/presentation/connection_cubit.dart` — needs investigation of how the cubit observes disconnects, what triggers reconnect, and what (if anything) gates reconnect from firing in this scenario.
+1. Server drops a response (deliberate).
+2. Client times out cleanly → `GattTimeoutException`.
+3. `LifecycleClient` correctly counts the failed heartbeat and (with default `maxFailedHeartbeats=1`) declares the peer unreachable.
+4. Client tears down via `cancelPeripheralConnection` — correct policy given the information available.
+5. Queued ops drain as typed `GattOperationDisconnectedException` (post-I096 — no more `bluey-unknown`).
+6. Connection ends in `disconnected` state; example-app dialog offers a manual "Reconnect" button.
 
-Symptom updated post-I096: the cascade is now `1 GattTimeoutException + N-1 GattOperationDisconnectedException` (no `bluey-unknown`). The "no reconnect" outcome remains. Tagged `platform: ios` because the failure-injection scenario only reproduces on iOS-client → Android-server today (the OpSlot serialization on iOS is what shapes this exact sequence) — but the cubit code at fault is shared Dart, not iOS-specific.
+**Every step is correct, deliberate library behaviour.** The disconnect *is* the expected outcome of injecting a failure that crosses the dead-peer threshold. The cubit's lack of auto-reconnect is a deliberate UX choice (manual control via the existing dialog), not a bug.
 
-I091 remains open for the original CBATTError allowlist concern (no production evidence it fires; low priority).
+What's actually open here is a **descriptive** issue: the failure-injection test's help text claims "writeCount − 1 successes" as the healthy outcome, which never matches the post-I079 reality. That is being addressed separately as a stress-test description audit, plus exposing `maxFailedHeartbeats` as a tunable in the example app so users can demonstrate both the disconnect-cascade scenario (low tolerance) and the recovery scenario (higher tolerance).
+
+I096 remains correctly closed — it was a real bug (semantically wrong error mapping) and its fix stands on its own merits regardless of this entry's resolution.
+
+I091 remains open for the original `CBATTError` allowlist concern (no production evidence it fires; low priority).
