@@ -310,6 +310,11 @@ class BlueyServer implements Server {
     required GattResponseStatus status,
     Uint8List? value,
   }) async {
+    final clientId = (request.client as BlueyClient)._platformId;
+    // Drain pending state BEFORE the platform call so the obligation is
+    // discharged even if respondToReadRequest throws (stale request id,
+    // platform error, etc.).
+    _lifecycle.requestCompleted(clientId, request.internalRequestId);
     await _platform.respondToReadRequest(
       request.internalRequestId,
       _mapGattResponseStatusToPlatform(status),
@@ -322,6 +327,9 @@ class BlueyServer implements Server {
     WriteRequest request, {
     required GattResponseStatus status,
   }) async {
+    final clientId = (request.client as BlueyClient)._platformId;
+    // Drain pending state BEFORE the platform call — see respondToRead.
+    _lifecycle.requestCompleted(clientId, request.internalRequestId);
     await _platform.respondToWriteRequest(
       request.internalRequestId,
       _mapGattResponseStatusToPlatform(status),
