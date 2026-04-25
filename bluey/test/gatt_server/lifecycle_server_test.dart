@@ -622,5 +622,26 @@ void main() {
         server.dispose();
       });
     });
+
+    test('requestStarted is ignored for an untracked client', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        // No prior heartbeat — client is untracked. requestStarted must
+        // not implicitly track them.
+        server.requestStarted('stranger', 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty);
+
+        server.dispose();
+      });
+    });
   });
 }
