@@ -592,5 +592,35 @@ void main() {
         server.dispose();
       });
     });
+
+    test('cancelTimer clears pending requests for the client', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+        server.requestStarted(_clientId, 1);
+
+        // Simulate platform-level disconnect cleanup.
+        server.cancelTimer(_clientId);
+
+        // Late respond from the app — must be a no-op.
+        server.requestCompleted(_clientId, 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty,
+            reason: 'cancelTimer cleared the entry; '
+                'requestCompleted must not re-arm the timer');
+
+        server.dispose();
+      });
+    });
   });
 }
