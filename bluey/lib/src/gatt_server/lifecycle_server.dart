@@ -128,6 +128,41 @@ class LifecycleServer {
     _resetTimer(clientId);
   }
 
+  /// Marks that the server has accepted a request from [clientId] and
+  /// owes a response. Adds [requestId] to the client's pending-request
+  /// set and pauses the client's heartbeat-timeout timer until all
+  /// pending requests for the client have completed.
+  ///
+  /// No-op for untracked clients (no prior heartbeat). Lifecycle policy
+  /// is opt-in: a generic BLE central reading a hosted service must not
+  /// be implicitly tracked as a Bluey peer.
+  ///
+  /// No-op if lifecycle is disabled (interval is null).
+  void requestStarted(String clientId, int requestId) {
+    if (_interval == null) return;
+    final state = _clients[clientId];
+    if (state == null) return;
+    state.pendingRequests.add(requestId);
+    _resetTimer(clientId);
+  }
+
+  /// Marks a previously-started request as complete. If the client has
+  /// no further pending requests, restarts the heartbeat-timeout timer
+  /// with a fresh interval (treated as activity).
+  ///
+  /// Idempotent: completing an unknown id is a no-op.
+  ///
+  /// No-op if lifecycle is disabled (interval is null).
+  void requestCompleted(String clientId, int requestId) {
+    if (_interval == null) return;
+    final state = _clients[clientId];
+    if (state == null) return;
+    if (!state.pendingRequests.remove(requestId)) return;
+    if (state.pendingRequests.isEmpty) {
+      _resetTimer(clientId);
+    }
+  }
+
   /// Cancels all heartbeat timers and clears all per-client state.
   void dispose() {
     for (final state in _clients.values) {
