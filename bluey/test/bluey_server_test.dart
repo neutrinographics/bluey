@@ -889,7 +889,7 @@ void main() {
 
     group('Lifecycle activity on non-control-service requests', () {
       test(
-        'incoming write to a non-control-service char resets client liveness timer',
+        'incoming write-without-response to a non-control-service char resets client liveness timer',
         () {
           fakeAsync((async) {
             final server = bluey.server(
@@ -934,8 +934,9 @@ void main() {
             async.elapse(const Duration(seconds: 9));
             expect(disconnections, isEmpty);
 
-            // Send a write to the user service — should reset the timer even
-            // though it's not a control-service write.
+            // Send a write-without-response to the user service — should reset
+            // the timer via recordActivity even though it's not a control-service
+            // write.
             mockPlatform.emitWriteRequest(
               platform.PlatformWriteRequest(
                 requestId: 2,
@@ -943,7 +944,7 @@ void main() {
                 characteristicUuid: userCharUuid,
                 value: Uint8List.fromList([0x99]),
                 offset: 0,
-                responseNeeded: true,
+                responseNeeded: false,
               ),
             );
             async.flushMicrotasks();
@@ -955,7 +956,7 @@ void main() {
               disconnections,
               isEmpty,
               reason:
-                  'non-control-service write should reset the liveness timer',
+                  'write-without-response to non-control-service char should reset the liveness timer',
             );
 
             // 2s more → past the 10s window from the user write → should fire.
