@@ -31,67 +31,74 @@ Two concerns surfaced during the I079 / I096 / I087 sequence:
 
 ## Decisions locked
 
-1. **Control location:** stress-test screen, top of the screen above the test cards. Collocated with what it affects.
-2. **Control shape:** segmented control with three named options — `Strict (1)`, `Tolerant (3)`, `Very tolerant (5)`. Default is `Strict (1)` (matches library default).
-3. **Behaviour on change:** disconnect → reconnect with new value → surface a brief inline status (`Reconnecting…`) → resume.
-4. **Disabled-while-running:** the segmented control is disabled while any test is running (same gating that the per-test Run buttons already have).
+1. **Control location: connection screen**, not stress-tests screen. Reasoning: `StressTestsScreen` receives the `Connection` as a constructor param via `Navigator.push`, and `StressTestsCubit` captures that reference at construction. A mid-screen reconnect would leave the cubit holding a dead connection — ops would fail until the user manually re-entered the screen. Restructuring `StressTestsCubit` to observe a connection stream instead of capturing a ref is a non-trivial refactor for a demonstrative feature. The connection screen already owns the settings (line 54 of `connection_screen.dart`: `settings: getIt<ConnectionSettingsCubit>().state`), so the natural placement is there. Users switch scenarios via "back → change → forward" — two extra taps, same educational outcome.
+2. **Stress-tests screen gets a read-only indicator** showing the active tolerance, so users running tests can see what mode they're in without leaving the screen. Tapping the indicator pops back to the connection screen for changes.
+3. **Control shape on connection screen:** segmented control with three named options — `Strict (1)`, `Tolerant (3)`, `Very tolerant (5)`. Default is `Strict (1)` (matches library default).
+4. **Behaviour on change:** dispatch `setMaxFailedHeartbeats(N)` on `ConnectionSettingsCubit`. The connection cubit observes the settings cubit and triggers a reconnect via the new `applySettings` method (disconnect → reconnect with new value → resume). The connection screen's existing `_showDisconnectedDialog` is suppressed during this user-initiated transition.
 5. **Persistence:** session-only via the existing `ConnectionSettingsCubit`. The control's selected segment derives from the cubit's current state.
 6. **Description scope:** all 7 tests get audited. Most will get small subtitle sharpenings. Failure-injection gets a full rewrite of `readingResults`. Timeout-probe gets a small update to mention the post-I079 reality.
 
 ## Architecture
 
-### UI: a new `_ConnectionToleranceBar` widget
+### UI: a new `_ToleranceControl` widget on the connection screen
 
-New file: `bluey/example/lib/features/stress_tests/presentation/widgets/connection_tolerance_bar.dart`.
+New file: `bluey/example/lib/features/connection/presentation/widgets/tolerance_control.dart`.
 
-A small horizontal strip rendered above the test grid in `stress_tests_screen.dart`. Reads `ConnectionSettingsCubit` state, dispatches `setMaxFailedHeartbeats` on segment tap. When `state.connectionState == connecting`, shows an inline `Reconnecting…` indicator beside the device name.
+A horizontal segmented control rendered on the connection screen, near the existing service-list area (above or below the Stress Tests button — final placement decided in the plan based on layout fit). Reads `ConnectionSettingsCubit` state, dispatches `setMaxFailedHeartbeats` on segment tap.
 
-The widget is purely presentational; it does not own connection lifecycle. It calls into `ConnectionSettingsCubit` (which doesn't touch the connection) and into `ConnectionCubit` (which owns the disconnect/reconnect mechanics).
+When tapped:
+1. Widget calls `connectionSettingsCubit.setMaxFailedHeartbeats(N)`.
+2. The `ConnectionCubit` (which now subscribes to the settings cubit — see below) observes the change and triggers `applySettings(updatedSettings)`.
+3. The connection screen's existing connection-state UI handles the transient `connecting` state visibly (the user already sees "Connecting…" on initial connect; this just re-uses that path).
+4. Once reconnected, the user can proceed to Stress Tests.
 
-### Cubit: `ConnectionCubit.applySettings(settings)`
+The widget is purely presentational. It does not own connection lifecycle.
 
-New method on `ConnectionCubit`:
+### Cubit: `ConnectionCubit` subscribes to `ConnectionSettingsCubit`
+
+`ConnectionCubit`'s constructor changes to accept `ConnectionSettingsCubit` (or `Stream<ConnectionSettings>`) and subscribe to it:
 
 ```dart
-/// Applies new connection settings by tearing down the current connection
-/// and reconnecting. Used when the user changes tolerance mid-session.
-Future<void> applySettings(ConnectionSettings newSettings) async {
+ConnectionCubit({
+  required Device device,
+  required ConnectToDevice connectToDevice,
+  required DisconnectDevice disconnectDevice,
+  required GetServices getServices,
+  required ConnectionSettingsCubit settingsCubit,
+}) : ... {
+  _settings = settingsCubit.state;
+  _settingsSubscription = settingsCubit.stream.listen(_handleSettingsChange);
+}
+
+Future<void> _handleSettingsChange(ConnectionSettings newSettings) async {
   if (newSettings == _settings) return;
   _settings = newSettings;
-
-  final hadConnection = state.connection != null;
-  await _stateSubscription?.cancel();
-  _stateSubscription = null;
-  await state.connection?.disconnect();
-  emit(state.withoutConnection());
-
-  if (hadConnection) {
+  if (state.connection != null) {
+    // User-initiated change; reconnect to apply.
+    _suppressDisconnectDialog = true;
+    await state.connection?.disconnect();
+    _suppressDisconnectDialog = false;
     await connect();
   }
 }
 ```
 
-This goes alongside the existing `connect()` / `disconnect()`. The bar widget calls `cubit.applySettings(settings.copyWith(maxFailedHeartbeats: N))` on segment tap. The `ConnectionSettingsCubit` is updated by the same dispatch path.
+A flag `_suppressDisconnectDialog` is read by the existing `_stateSubscription.listen` handler so the "Device disconnected" error is not emitted during a user-initiated tolerance change.
 
-The "no auto-reconnect on involuntary disconnect" policy from I087's wontfix is preserved: this method is only called from explicit user action via the new control.
+### Read-only indicator on the stress-tests screen
 
-### `_ConnectionToleranceBar` UI shape
+`stress_tests_screen.dart` adds a small status pill in the top bar showing the active tolerance:
 
 ```
-┌─────────────────────────────────────────────────┐
-│ Heartbeat tolerance:  [Strict] [Tolerant] [Very │
-│ Pixel 6a                            tolerant]   │
-└─────────────────────────────────────────────────┘
+┌──────────────────┐
+│ Stress Tests     │
+│ Tolerance: Strict│  ← read-only chip; tap pops back to connection screen
+└──────────────────┘
 ```
 
-On tap of an unselected segment:
-1. Widget calls `connectionSettingsCubit.setMaxFailedHeartbeats(N)`.
-2. Widget calls `connectionCubit.applySettings(updatedSettings)`.
-3. Cubit transitions through `disconnected → connecting → connected`.
-4. Widget shows `Reconnecting with tolerance=N…` while `connectionState == connecting`.
-5. Once `connected`, the bar resumes its normal layout.
+This widget reads `getIt<ConnectionSettingsCubit>().state.maxFailedHeartbeats` and renders the corresponding label. Tapping it calls `Navigator.of(context).pop()` to return to the connection screen where the user can change it.
 
-If the new connection fails, the existing disconnect dialog flow handles it (same as if any connection attempt fails).
+This indicator is purely informational; no settings logic lives here.
 
 ### Description audit
 
@@ -126,26 +133,33 @@ The current subtitle is also duplicated between two files — opportunistic clea
 
 ### Cubit changes
 
-`ConnectionCubit` has existing tests at `bluey/example/test/features/connection/presentation/connection_cubit_test.dart` (or similar — verify path during plan). Add:
+Existing tests at `bluey/example/test/connection/presentation/connection_cubit_test.dart` use `bloc_test`'s `blocTest` helper. The cubit constructor signature changes (adds `ConnectionSettingsCubit`), so existing tests need a small update to pass a settings cubit. Then add:
 
-- **Red 1:** `applySettings(newSettings)` re-uses the existing connection's tear-down + connect-again machinery; the test asserts that calling `applySettings` with a different `maxFailedHeartbeats` results in the cubit calling `_disconnectDevice` and then `_connectToDevice` again with the new settings.
-- **Red 2:** `applySettings` with the same settings is a no-op (no disconnect, no reconnect).
-- **Red 3:** `applySettings` while no connection is active just updates `_settings` without attempting connect.
+- **Red 1:** When the settings cubit emits a new value with a different `maxFailedHeartbeats`, the connection cubit triggers a reconnect — visible as a `disconnected → connecting → connected` state sequence and a fresh call to `_connectToDevice` with the new settings.
+- **Red 2:** When the settings cubit emits the same value, no reconnect occurs.
+- **Red 3:** When the settings cubit changes while no connection is active, no reconnect attempt is made (settings just track for the next connect).
+- **Red 4:** Verify the "Device disconnected" error is suppressed during a user-initiated tolerance change (the existing assertion behavior on involuntary disconnects is preserved).
 
-### Bar widget changes
+### Tolerance-control widget tests
 
-`bluey/example/test/features/stress_tests/presentation/widgets/` already contains widget tests. Add `connection_tolerance_bar_test.dart`:
+New file: `bluey/example/test/connection/presentation/widgets/tolerance_control_test.dart`:
 
-- Renders three segments with correct labels.
-- The currently-selected segment matches the cubit's current state.
-- Tap on an unselected segment dispatches `setMaxFailedHeartbeats(N)` AND calls `applySettings` on the connection cubit.
-- Disabled when any stress test is running.
+- Renders three segments with correct labels (`Strict`, `Tolerant`, `Very tolerant`).
+- The currently-selected segment matches the cubit's `maxFailedHeartbeats` state (1 → Strict, 3 → Tolerant, 5 → Very tolerant).
+- Tap on an unselected segment dispatches `setMaxFailedHeartbeats(N)` on the settings cubit.
+
+### Stress-tests indicator widget tests
+
+New file: `bluey/example/test/stress_tests/presentation/widgets/tolerance_indicator_test.dart`:
+
+- Renders the current tolerance label.
+- Tapping pops the navigator (back to connection screen).
 
 ### Description audit
 
-Existing tests in `bluey/example/test/features/stress_tests/presentation/widgets/stress_test_help_sheet_test.dart` may assert specific strings. We **first** check what's asserted; for any string that's about to change, the test is updated to match the new wording (the tests are documenting our presentation contract — if we change the contract, we change the tests).
+Existing tests at `bluey/example/test/stress_tests/presentation/widgets/stress_test_help_sheet_test.dart` only assert structural elements (display name appears, section labels exist, info button is on each card) — they do NOT assert specific subtitle or `whatItDoes`/`readingResults` wording. Reviewed during spec drafting. So changing wording does not require test updates.
 
-Subtitle moved from duplicated extensions to a single domain extension: existing tests that read `_subtitle` need updating to read from the new location. Tests for the domain `StressTest` enum (if any) get a new test verifying each test has a non-empty subtitle. We don't unit-test specific wording at the domain level — that's UI concern.
+Subtitle is currently duplicated between `test_card.dart` and `stress_test_help_sheet.dart`. Refactor: move to a single `subtitle` extension on the domain `StressTest` enum in `stress_test.dart` (alongside `displayName`). Both views read from there. Removes duplication.
 
 ## Caveats
 
