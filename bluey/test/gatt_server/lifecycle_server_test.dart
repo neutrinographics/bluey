@@ -559,5 +559,38 @@ void main() {
         server.dispose();
       });
     });
+
+    test('timer stays suppressed while ANY request is pending', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+
+        server.requestStarted(_clientId, 1);
+        server.requestStarted(_clientId, 2);
+
+        // Complete one — the other is still open.
+        server.requestCompleted(_clientId, 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty, reason: 'request 2 still pending');
+
+        // Complete the other — set is now empty, timer re-arms.
+        server.requestCompleted(_clientId, 2);
+
+        async.elapse(const Duration(seconds: 11));
+        expect(gone, [_clientId]);
+
+        server.dispose();
+      });
+    });
   });
 }
