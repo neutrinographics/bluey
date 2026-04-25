@@ -18,6 +18,7 @@ import '../application/get_services.dart';
 import 'connection_cubit.dart';
 import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
+import 'widgets/tolerance_control.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -642,6 +643,16 @@ class _DeviceInfoCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          // Heartbeat tolerance control — affects how the lifecycle layer
+          // reacts to slow / dropped peer responses. Changing it triggers a
+          // transparent reconnect via ConnectionCubit.
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: BlocProvider<ConnectionSettingsCubit>.value(
+              value: getIt<ConnectionSettingsCubit>(),
+              child: const ToleranceControl(),
             ),
           ),
           // Stress Tests button (visible only when peer hosts the stress service)
