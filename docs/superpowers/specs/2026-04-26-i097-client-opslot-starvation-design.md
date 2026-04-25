@@ -172,6 +172,26 @@ The user op itself has a per-op timeout (10 s default at OpSlot level). When it 
 
 Heartbeats wouldn't fire — but that's fine, because the constant op stream is itself the liveness signal. The server-side I079 fix already handles this on the receiving end (server tolerates as long as activity flows). Symmetric: client doesn't need a redundant probe.
 
+### What if every user op fails (all timeout, none succeed)?
+
+In a tight loop where the user issues ops back-to-back and each one times out:
+
+- Probes defer continuously (the count is > 0 most of the time; the gap between ops is sub-millisecond in a tight `await` loop).
+- `recordActivity` is never called (no successful ops).
+- `recordProbeFailure` is never called (no probes fired to fail).
+- **The lifecycle layer's `onServerUnreachable` is never triggered.**
+
+This is *intentional* and is the central trade-off of the design. The lifecycle layer's purpose is *idle detection* — to catch a peer that has gone silent. If the user code is actively trying to talk to the peer, the user code IS the probe: each op's exception (timeout, disconnect, status-failed) is itself a dead-peer signal that the user already observes. The lifecycle layer firing a redundant `onServerUnreachable` on top would be either:
+
+- Race-prone (if it tears down a connection the user is mid-retry on), or
+- Redundant (if the user has already noticed every op failing and reacted).
+
+So the right behaviour is: while the user is actively asking the peer questions, trust the user to handle the answers. The lifecycle layer's tear-down resumes when the user goes quiet.
+
+This *does* mean a connection where the peer is dead AND the user keeps queuing failing ops will not see a lifecycle-layer disconnect — it will see N consecutive `GattOperationTimeoutException`s from the user's perspective. The user's own retry / give-up policy is what governs in that case. We consider this the correct division of responsibility: the library reports the truth; the application decides what to do with it.
+
+(For applications that want the old behaviour — automatic disconnect on N consecutive failures regardless of source — that's an application-layer policy, not a lifecycle-protocol policy. Out of scope here.)
+
 ### Edge case: disconnect mid-op
 
 When the connection drops mid-op, the platform layer drains the in-flight op with `GattOperationDisconnectedException`. That fires the `finally`, decrementing the counter. `LifecycleClient` is then stopped via `onServerUnreachable` or the platform's disconnect event — no further probes scheduled. Counter state on the dead `LifecycleClient` is irrelevant.
