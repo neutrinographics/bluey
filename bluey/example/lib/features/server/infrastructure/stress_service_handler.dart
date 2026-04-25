@@ -39,6 +39,11 @@ class StressServiceHandler {
     // so the test harness can recover from any state.
     if (_dropNextWrite && cmd is! ResetCommand) {
       _dropNextWrite = false;
+      // [DIAG] Temporary — confirm the server is only dropping ONE write per
+      // DropNextCommand. If this prints more than once during a single test
+      // run, the server is the source of multiple timeouts. Revert before
+      // landing.
+      print('[FAILURE-INJ-DIAG] server dropping write: ${cmd.runtimeType}');
       return; // No response, no notification — client times out.
     }
 
