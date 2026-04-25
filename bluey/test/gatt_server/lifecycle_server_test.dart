@@ -525,5 +525,39 @@ void main() {
         server.dispose();
       });
     });
+
+    test('requestCompleted restarts the heartbeat-timeout window', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+        server.requestStarted(_clientId, 42);
+
+        // Hold for 30s — still alive (suppressed).
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty);
+
+        // Response sent — pending drains.
+        server.requestCompleted(_clientId, 42);
+
+        // Within the fresh interval: still alive.
+        async.elapse(const Duration(seconds: 9));
+        expect(gone, isEmpty);
+
+        // Past the interval since completion: gone fires.
+        async.elapse(const Duration(seconds: 2));
+        expect(gone, [_clientId]);
+
+        server.dispose();
+      });
+    });
   });
 }
