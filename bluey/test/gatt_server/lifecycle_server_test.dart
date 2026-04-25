@@ -497,5 +497,33 @@ void main() {
         server.dispose();
       });
     });
+
+    test('pending request suppresses heartbeat timeout', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        // Track the client via a heartbeat write.
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+
+        // App-level request begins. Server is now holding it.
+        server.requestStarted(_clientId, 42);
+
+        // Advance well past the 10s heartbeat-timeout window.
+        async.elapse(const Duration(seconds: 30));
+
+        // Server must NOT declare the client gone — we're holding its request.
+        expect(gone, isEmpty);
+
+        server.dispose();
+      });
+    });
   });
 }
