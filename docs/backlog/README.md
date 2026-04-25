@@ -148,6 +148,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
+| [I097](I097-client-opslot-starves-heartbeat.md) | Client-side OpSlot starvation causes false-positive heartbeat failures | medium |
 
 ### Open — cross-platform unimplemented features
 
