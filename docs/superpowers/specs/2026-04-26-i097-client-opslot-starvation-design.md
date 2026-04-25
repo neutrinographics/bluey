@@ -1,4 +1,4 @@
-# Client-Side LifecycleClient: Defer Probes While User Ops Pending (I097)
+# Client-Side LifecycleClient: User Ops as First-Class Liveness Signals (I097)
 
 **Status:** proposed
 **Date:** 2026-04-26
@@ -15,72 +15,99 @@ Walking the chain: server drops echo #0 → CoreBluetooth's per-peripheral write
 
 ## Root cause
 
-The lifecycle layer fires a *redundant* signal. While a user op is in flight, that op is itself an outstanding peer probe — its outcome (success, status-failure, wire-timeout, or disconnect) tells us about the peer. Layering an additional heartbeat probe on top adds nothing on the *evidence* side and creates the exact contention the bug describes on the *cost* side.
+The lifecycle layer treats heartbeat probes as the *only* source of dead-peer evidence, and fires probes on a fixed cadence regardless of whether user ops are concurrently providing the same evidence. This produces two problems:
 
-Heartbeats only carry information when the connection is otherwise *idle*. During active use, the user ops carry the same information.
+1. **Redundant probing during active use.** While a user op is in flight, that op is itself an outstanding peer probe — its outcome (success, status-failure, wire-timeout, or disconnect) tells us about the peer. Layering an additional heartbeat probe on top adds nothing on the *evidence* side and creates the queue contention the bug describes on the *cost* side.
+2. **Missed signals from user ops.** When a user op times out, that timeout is a dead-peer signal in exactly the same way a timed-out heartbeat is — "we sent something, the peer didn't answer." Today's design discards this signal: only heartbeat-probe failures feed the dead-peer counter. Authoritative detection requires using *all* the evidence we have.
 
 ## Symmetry with I079
 
-I079 (server-side, fixed) refused to declare a client dead while the server held a pending request from it — using "the link is provably alive because it just delivered a request" as the override. I097 is the structural mirror: the *client* refuses to fire a redundant heartbeat probe while it has its own outstanding op to the peer — using "the user op is itself a probe" as the override.
+I079 (server-side, fixed) refused to declare a client dead while the server held a pending request from it — using "the link is provably alive because it just delivered a request" as the override. I097 strengthens the same principle on the *client* side and makes it bidirectional: user ops are first-class liveness signals.
 
-| Side | Idle policy | Active-evidence override |
+| Side | Idle policy | Active-evidence rule |
 |---|---|---|
-| Server (I079) | Per-client timer counts up; trips at interval | Pending request from client → pause timer |
-| Client (I097) | Per-deadline probe fires; failure counts toward threshold | Own op pending → defer probe |
+| Server (I079) | Per-client timer counts up; trips at interval | Pending request from client → pause timer (request itself is proof of life) |
+| Client (I097) | Probe deadline counts down; failure counts toward threshold | User op pending → defer probe (op itself is the probe). User op outcome → feed into the same threshold counter |
 
-Same principle on both sides: the lifecycle layer doesn't fire its idle-detection mechanism while there's independent evidence of an active exchange. Once both sides land, the design is uniform.
+Same principle on both sides: the lifecycle layer treats *active op outcomes* as its primary liveness signal. The idle-detection probe (server timer / client heartbeat) only kicks in during quiet periods.
 
 ## Goals
 
-- `LifecycleClient` tracks a per-connection count of in-flight user ops via two methods: `markUserOpStarted()` and `markUserOpEnded()`.
-- `_sendProbeOrDefer` checks the count before firing. If `> 0`, defer (reschedule), do not fire.
-- `BlueyConnection` wraps each user-initiated GATT op (read, write, descriptor read/write, MTU request, set-notification, …) with `markUserOpStarted` before dispatch and `markUserOpEnded` in a `finally` block — so the count tracks pendency regardless of outcome.
+Two complementary mechanisms:
+
+1. **Defer probes while user ops pending.** `LifecycleClient` tracks a per-connection count of in-flight user ops via `markUserOpStarted/Ended`. While count > 0, scheduled probes defer rather than fire — the in-flight op is itself an outstanding peer probe.
+
+2. **User-op outcomes feed the dead-peer counter.** When a user op times out, treat it the same way a heartbeat-probe timeout is treated: increment the counter, potentially trip the threshold. When a user op succeeds, reset the counter (already the case via the existing `recordActivity` call).
+
+Combined, the lifecycle layer authoritatively detects dead peer using *every* available signal:
+
+| Scenario | Behaviour |
+|---|---|
+| Idle, peer healthy | Periodic probes succeed; counter stays at 0 |
+| Idle, peer dies | Probe fails; counter increments; trip after threshold |
+| Active use, peer healthy | Probes deferred; user ops succeed; counter stays at 0 |
+| Active use, one op fails (failure-injection scenario) | One counter increment; next op succeeds, counter resets. Recovery if tolerance ≥ 2 |
+| Active use, all ops fail (peer dead) | Counter increments per failed op; trip after threshold |
 
 ## Non-goals
 
-- **Not changing `_isDeadPeerSignal`'s classification.** The error-type taxonomy stays as is. The fix lives entirely above it: probes that get deferred never reach `_isDeadPeerSignal` in the first place.
-- **Not surfacing OpSlot transmission state from iOS.** Avoided in favour of the higher-level reframe — heartbeats are for idle detection, so the contention scenario simply doesn't occur once the deferral lands.
-- **Not changing `recordActivity`.** Successful user ops still call it, which still resets the failure counter and shifts the next deadline. The deferral is a separate gate orthogonal to that.
-- **Not changing `maxFailedHeartbeats` defaults or semantics.** Counter and threshold logic stay exactly the same; they only kick in when a probe actually fires (no in-flight user op).
-- **Not bypassing CoreBluetooth's queue.** That queue's serialisation is fine — the fix just stops firing redundant probes while it's busy with user traffic.
-- **Not addressing user-op timeout handling.** When a user op times out, the user sees the exception (correct). The probe-deferral logic doesn't affect that path.
+- **Not changing the platform interface.** No new exception types, no new fields on existing exceptions. The signal already crosses the boundary as `GattOperationTimeoutException`; we just route it through the lifecycle layer in addition to the user.
+- **Not surfacing CoreBluetooth queue state from iOS.** Avoided in favour of the higher-level reframe — heartbeats are deferred during user-op pendency, so the contention scenario simply doesn't occur.
+- **Not changing the heartbeat write protocol.** Same characteristic, same value, same cadence formula. Heartbeats still serve the secondary purpose of keeping the server's I079 timer fed during idle periods.
+- **Not changing existing predicates.** `_isDeadPeerSignal` (used for heartbeat probes) keeps its current taxonomy. A separate, narrower predicate is used for user-op failures (timeout only — see below).
+- **Not changing `maxFailedHeartbeats` defaults or semantics.** Counter and threshold logic stay exactly the same; the threshold simply now sees signals from both heartbeats and user ops.
 
 ## Decisions locked
 
-1. **Counter, not boolean.** Use `int _pendingUserOps` because a connection can have multiple ops in flight across different OpSlots (different characteristics) — counter handles concurrent ops naturally; boolean would either over- or under-count.
-2. **`finally`-wrapped accounting in `BlueyConnection`.** Markers fire in `try { mark; await op; } finally { unmark; }` so a thrown exception (timeout, disconnect, etc.) still decrements the counter. Leaks would be catastrophic — once leaked, probes never fire again.
-3. **Defer-only, not skip-and-cancel-deadline.** When `_sendProbeOrDefer` defers, it reschedules per the existing cadence (one `activityWindow` later). Doesn't reset the failure counter, doesn't skip the deadline — just postpones this specific tick. Once the user op completes, the next probe attempt fires normally.
-4. **Threshold-trip path is unchanged.** When a probe *does* fire and *does* fail with a dead-peer signal (idle period + peer genuinely silent), the existing trip logic runs as is.
-5. **Markers are domain-internal, no platform contract.** `markUserOpStarted/Ended` live on `LifecycleClient`. `BlueyConnection` is the sole caller. Other consumers (peer module, etc.) reach the lifecycle through `BlueyConnection`, so they get the right behaviour transparently.
+1. **Counter, not boolean, for in-flight user ops.** Use `int _pendingUserOps` because a connection can have multiple ops in flight across different OpSlots (different characteristics) — counter handles concurrent ops naturally.
+2. **`finally`-wrapped accounting in `BlueyConnection`.** Markers fire in `try { mark; await op; on success: recordActivity } catch { recordUserOpFailure(error) } finally { unmark; }` so a thrown exception still decrements the counter. Leaks would be catastrophic — once leaked, probes never fire again.
+3. **Different predicate for user-op failures vs heartbeat failures.** Heartbeats use the existing `_isDeadPeerSignal` (timeout / disconnect / statusFailed) — wide net, justified by the Service-Changed force-kill case. User ops use a narrower predicate: **timeout only**. Disconnect is already handled by the platform-level disconnect callback (separate path that tears down the connection); statusFailed at the user-op level can mean ATT errors like WriteNotPermitted that don't imply dead peer.
+4. **Both mechanisms feed the same counter.** No separate "user-op failure counter" — `recordProbeFailure` is the single increment path. Whether the failure came from a heartbeat probe or a user op is invisible to the counter.
+5. **Defer-only, not skip-and-cancel-deadline.** When `_sendProbeOrDefer` defers, it reschedules per the existing cadence (one `activityWindow` later). Once the user op completes, the next scheduled probe attempt fires normally.
+6. **Threshold-trip path is unchanged.** When the counter trips, the existing logic runs as is: stop, fire `onServerUnreachable`, no further reschedule.
 
 ## Architecture
 
 Two files change. Neither edit touches the platform interface or native code.
 
-### `LifecycleClient` — counter + deferral
+### `LifecycleClient` — counter, deferral, user-op outcome handling
 
-New private field and methods:
+New private field, three new public methods:
 
 ```dart
 /// Count of user-initiated ops currently pending on this connection.
-/// Probes are deferred while > 0 — see I097. Maintained by
-/// [markUserOpStarted] / [markUserOpEnded] from [BlueyConnection].
+/// Probes are deferred while > 0 — the in-flight op is itself an
+/// outstanding peer probe.
 int _pendingUserOps = 0;
 
 /// Called by [BlueyConnection] when a user GATT op is dispatched.
-/// While the count is > 0, scheduled probes defer rather than fire,
-/// because the in-flight op is itself an outstanding peer probe and
-/// its outcome will tell us about the peer's liveness.
 void markUserOpStarted() {
   _pendingUserOps++;
 }
 
 /// Called by [BlueyConnection] when a user GATT op completes (success
-/// or failure). Symmetric with [markUserOpStarted]. Decrement only;
-/// does not itself fire a probe — the next scheduled tick will fire
-/// normally if the count reaches zero before then.
+/// or failure). Symmetric with [markUserOpStarted]. Decrement only.
 void markUserOpEnded() {
   if (_pendingUserOps > 0) _pendingUserOps--;
+}
+
+/// Called by [BlueyConnection] when a user GATT op fails. Filters by
+/// predicate: timeouts increment the dead-peer counter (and may trip
+/// onServerUnreachable); other errors are no-ops at this layer.
+///
+/// User-op disconnects are deliberately not counted here: the platform
+/// disconnect callback already triggers tear-down through a separate
+/// path. User-op statusFailed errors are deliberately not counted: at
+/// the user level they can mean ATT errors (WriteNotPermitted, etc.)
+/// that don't imply dead peer.
+void recordUserOpFailure(Object error) {
+  if (!_isRunning) return;
+  if (error is! platform.GattOperationTimeoutException) return;
+  final tripped = _monitor.recordProbeFailure();
+  if (tripped) {
+    stop();
+    onServerUnreachable();
+  }
 }
 ```
 
@@ -104,15 +131,11 @@ void _sendProbeOrDefer() {
 }
 ```
 
-The deferral path uses the same reschedule cadence as the existing `_monitor.timeUntilNextProbe() > 0` early-return path: one `activityWindow` later. No new state machine, no new tunables.
-
-Stop semantics stay correct: `stop()` doesn't need to touch `_pendingUserOps` because once `_isRunning` is false, `_sendProbeOrDefer` early-returns on the first `_heartbeatCharUuid == null` check. Lingering ops in `BlueyConnection` will still call `markUserOpEnded` (decrementing harmlessly), and the count is per-instance — discarded when the connection is replaced.
+Stop semantics stay correct: `stop()` doesn't need to touch `_pendingUserOps` (it's per-instance, discarded with the connection). `recordUserOpFailure` early-returns when not running.
 
 ### `BlueyConnection` — wrap user-op call sites
 
-Each user-op method on `BlueyConnection` (the same call sites that already invoke `_lifecycle?.recordActivity()` on success) wraps the platform call in a `try { markStarted; await; recordActivity } finally { markEnded; }`. The four current sites (`bluey/lib/src/connection/bluey_connection.dart:317, :364, :376, :619`) all need the wrapper.
-
-Pseudo-shape (concrete code per site differs by op type):
+Each user-op method on `BlueyConnection` (the same call sites that already invoke `_lifecycle?.recordActivity()` on success) wraps the platform call:
 
 ```dart
 // Before:
@@ -126,14 +149,17 @@ try {
   final result = await _platform.writeCharacteristic(...);
   _lifecycle?.recordActivity();
   return result;
+} catch (error) {
+  _lifecycle?.recordUserOpFailure(error);
+  rethrow;
 } finally {
   _lifecycle?.markUserOpEnded();
 }
 ```
 
-The four sites cover read, write, set-notification, and the notification-stream callback (the last is for activity recording on inbound notifications — that one *doesn't* wrap because notifications aren't outbound user ops). The plan will list each site explicitly with the exact diff.
+The four current `recordActivity` sites (`bluey_connection.dart:317, :364, :376, :619`) all need the wrapper, except the notification-stream callback at `:619` (notifications aren't outbound user ops — keeps just `recordActivity`). The plan will list each site explicitly.
 
-Edge case: `_lifecycle` is null when no Bluey peer is configured on the connection. The `?.markUserOpStarted()` chain just no-ops — counter stays at zero on the (non-existent) lifecycle, deferral logic doesn't apply. Safe.
+`_lifecycle` is null when no Bluey peer is configured on the connection. The `?.` chain just no-ops — counter stays at zero on the (non-existent) lifecycle, deferral logic doesn't apply. Safe.
 
 ## TDD
 
@@ -141,20 +167,23 @@ Tests live in `bluey/test/connection/`. Three layers.
 
 ### `LifecycleClient` (`bluey/test/connection/lifecycle_client_test.dart`)
 
-Three new tests:
+Five new tests:
 
 1. **Probe deferred while user op pending.** Set up a tracked client with a future probe deadline. Call `markUserOpStarted()`. Advance time past the deadline. Verify: no probe write attempted.
 2. **Probe fires after user op ends.** Same setup. Call `markUserOpStarted()`, advance, verify deferred. Call `markUserOpEnded()`. Advance one `activityWindow`. Verify: probe write attempted.
-3. **Multiple concurrent user ops correctly counted.** Two `markUserOpStarted()` calls. One `markUserOpEnded()`. Verify probe is still deferred. Second `markUserOpEnded()`. Verify probe fires on the next tick.
+3. **Multiple concurrent user ops correctly counted.** Two `markUserOpStarted()` calls. One `markUserOpEnded()`. Verify probe still deferred. Second `markUserOpEnded()`. Verify probe fires on the next tick.
+4. **`recordUserOpFailure` with timeout increments counter.** Set `maxFailedProbes=1`. Call `recordUserOpFailure(GattOperationTimeoutException(...))`. Verify `onServerUnreachable` fires.
+5. **`recordUserOpFailure` with non-timeout is no-op.** Same setup but pass `GattOperationStatusFailedException` or a generic exception. Verify `onServerUnreachable` does NOT fire.
 
-These pin the deferral contract.
+These pin both the deferral and the user-op-failure-counting contracts.
 
 ### `BlueyConnection` (`bluey/test/connection/bluey_connection_test.dart`)
 
-Two new tests covering the wrapping:
+Three new tests covering the wrapping:
 
-4. **User op success → markStarted called before, markEnded called after.** Use a fake platform + a spy `LifecycleClient` (or a `LivenessMonitor`-like double that exposes the counter). Issue a write that succeeds. Verify: counter went up then down.
-5. **User op failure → markEnded still called.** Make the platform throw. Verify the counter still returns to zero (no leak).
+6. **User op success → markStarted then markEnded; recordActivity called.** Issue a write that succeeds. Verify counter went up then down; verify `recordActivity` was called.
+7. **User op timeout → markStarted, recordUserOpFailure, markEnded.** Make the platform throw `GattOperationTimeoutException`. Verify the failure was recorded; verify the counter still returns to zero (no leak).
+8. **User op other failure → markStarted, recordUserOpFailure (no-op), markEnded.** Make the platform throw a non-timeout exception. Verify the counter returns to zero. Verify the threshold isn't tripped.
 
 These pin the connection-side accounting.
 
@@ -166,52 +195,60 @@ Existing `LifecycleClient` and `BlueyConnection` tests continue to pass — the 
 
 ### What if a user op stalls forever?
 
-The user op itself has a per-op timeout (10 s default at OpSlot level). When it expires, `markUserOpEnded` fires (in the `finally`), the count returns to zero, and the next probe tick can fire. Worst case we delay dead-peer detection by one user-op timeout window — reasonable, since the user op's own timeout is itself a dead-peer signal.
+The user op itself has a per-op timeout (10 s default at OpSlot level). When it expires, `recordUserOpFailure` fires (incrementing the counter, possibly tripping), `markUserOpEnded` fires (in `finally`). Worst case: a single op stall delays dead-peer detection by the user-op timeout window, but the failure is then captured authoritatively.
 
-### What if the user dispatches ops back-to-back without idle gaps?
+### Failure-injection scenario walkthrough
 
-Heartbeats wouldn't fire — but that's fine, because the constant op stream is itself the liveness signal. The server-side I079 fix already handles this on the receiving end (server tolerates as long as activity flows). Symmetric: client doesn't need a redundant probe.
+Default settings, `maxFailedHeartbeats = 1`:
 
-### What if every user op fails (all timeout, none succeed)?
+- t=0: echo #0 starts. count=1, counter=0.
+- t=5: probe deadline ticks, deferred (count=1).
+- t=10: echo #0 times out. `recordUserOpFailure(timeout)` → counter=1, tripped → `onServerUnreachable` → disconnect. Count=0 (in `finally`).
+- Test ends with: 1 user-op timeout + N-1 disconnects. **Same as today's behaviour at tolerance=1.** Strict tolerance is intentionally aggressive — that's the point.
 
-In a tight loop where the user issues ops back-to-back and each one times out:
+`maxFailedHeartbeats = 3`:
 
-- Probes defer continuously (the count is > 0 most of the time; the gap between ops is sub-millisecond in a tight `await` loop).
-- `recordActivity` is never called (no successful ops).
-- `recordProbeFailure` is never called (no probes fired to fail).
-- **The lifecycle layer's `onServerUnreachable` is never triggered.**
+- t=0–10: as above, but counter=1 doesn't trip.
+- t=10+ε: echo #1 starts. count=1, deferred probe rescheduled.
+- t≈10+latency: echo #1 succeeds. `recordActivity` → counter=0.
+- Subsequent echoes succeed.
+- Test ends with: 1 timeout + 9 successes. **Recovery scenario achieved.**
 
-This is *intentional* and is the central trade-off of the design. The lifecycle layer's purpose is *idle detection* — to catch a peer that has gone silent. If the user code is actively trying to talk to the peer, the user code IS the probe: each op's exception (timeout, disconnect, status-failed) is itself a dead-peer signal that the user already observes. The lifecycle layer firing a redundant `onServerUnreachable` on top would be either:
+`maxFailedHeartbeats = 5`, ALL user ops fail (peer truly dead):
 
-- Race-prone (if it tears down a connection the user is mid-retry on), or
-- Redundant (if the user has already noticed every op failing and reacted).
+- Each echo times out → counter increments. After 5 timeouts → trip → disconnect.
+- User sees: 5 user-op timeouts + N-5 disconnects. **Authoritative detection at threshold.**
 
-So the right behaviour is: while the user is actively asking the peer questions, trust the user to handle the answers. The lifecycle layer's tear-down resumes when the user goes quiet.
+### Why `markUserOpEnded` doesn't trigger an immediate probe
 
-This *does* mean a connection where the peer is dead AND the user keeps queuing failing ops will not see a lifecycle-layer disconnect — it will see N consecutive `GattOperationTimeoutException`s from the user's perspective. The user's own retry / give-up policy is what governs in that case. We consider this the correct division of responsibility: the library reports the truth; the application decides what to do with it.
-
-(For applications that want the old behaviour — automatic disconnect on N consecutive failures regardless of source — that's an application-layer policy, not a lifecycle-protocol policy. Out of scope here.)
+`markUserOpEnded` only decrements the counter. It doesn't reschedule. The next probe still fires on the previously scheduled timer. This avoids storms of probe firings if many ops complete in quick succession. The minor latency cost (next probe could be up to one `activityWindow` away) is acceptable — in practice ops completing rapidly means activity is healthy.
 
 ### Edge case: disconnect mid-op
 
-When the connection drops mid-op, the platform layer drains the in-flight op with `GattOperationDisconnectedException`. That fires the `finally`, decrementing the counter. `LifecycleClient` is then stopped via `onServerUnreachable` or the platform's disconnect event — no further probes scheduled. Counter state on the dead `LifecycleClient` is irrelevant.
+When the connection drops mid-op, the platform layer drains the in-flight op with `GattOperationDisconnectedException`. The `catch` block fires `recordUserOpFailure(disconnect-exception)` — but the predicate filter (`is GattOperationTimeoutException` only) means this is a no-op. The disconnect path proceeds via its own (existing, unaffected) mechanism: the platform's disconnect callback stops the lifecycle and tears down the cubit's connection.
 
-### Why this is structurally simpler than the heuristic
+### Predicate scoping for user-op failures
 
-The earlier draft proposed a `livenessWindow` heuristic. That approach trusts a time-based proxy ("recent activity exists, so probably alive") to decide whether to discount a misclassified probe. This approach addresses the misclassification by preventing the misclassified probe from firing in the first place. No magic numbers, no proxy semantics — direct cause-and-effect.
+The choice to count *only* `GattOperationTimeoutException` (and not `GattOperationStatusFailedException`) for user ops is deliberate:
+
+- A user-op timeout can be queue-blocking (false positive for dead-peer) OR genuinely "peer didn't answer" (true positive). At higher tolerance settings (≥3), single false positives are absorbed by subsequent successes resetting the counter. At tolerance=1, false positives still trip — that's by design.
+- A user-op statusFailed code is much more often application-meaningful (read-not-permitted, attribute-not-found) than dead-peer. Counting it would produce frequent false-positive trips with no compensating benefit.
+
+If experience shows status-failed *should* count for some specific status codes (e.g., `GATT_INVALID_HANDLE` after Service Changed), the predicate can be widened in a follow-up. Keep it narrow for now.
 
 ## Risks and rollback
 
 **Risks:**
 
 - A `markUserOpStarted` without matching `markUserOpEnded` would leak the counter, suppressing probes forever. Mitigation: `try { ... } finally { ... }` wrapping at every call site, plus the test that asserts no leak on op failure.
-- A probe is *correctly* needed during a long-running user op (e.g., 60 s OTA write) — peer dies mid-op. The user op's own timeout (10 s default) catches this before the missing probes matter. No new failure mode.
+- A peer that succeeds at user ops but fails at heartbeats (some weird ATT permissioning edge case where the heartbeat char is locked but other chars aren't) would now have user-op successes resetting the counter, potentially masking the heartbeat-only failures. Theoretically possible but exceedingly unlikely; the lifecycle char is configured by the library, not by the application.
 
 **Rollback:** revert the two-file change. No state, no migration, no schema.
 
 ## Backlog hygiene
 
 After landing:
-1. Update `docs/backlog/I097-client-opslot-starves-heartbeat.md`: `status: open` → `fixed`, add `fixed_in: <sha>`, replace Notes with: "Fixed in `<sha>` by deferring heartbeat probes while user ops are in flight on the same connection. Mirror image of I079: while the client has an outstanding op to the peer, that op is itself an outstanding peer probe — firing a redundant heartbeat would only contend with it on CoreBluetooth's per-peripheral write queue. The deferral eliminates the contention that produced the false-positive."
+
+1. Update `docs/backlog/I097-client-opslot-starves-heartbeat.md`: `status: open` → `fixed`, add `fixed_in: <sha>`, replace Notes with: "Fixed in `<sha>` by deferring heartbeat probes while user ops are in flight, AND treating user-op timeouts as first-class dead-peer signals that feed the same threshold counter as heartbeat-probe failures. Mirror image of I079 with bidirectional symmetry: both sides of the protocol now use active-op outcomes as their primary liveness signal, with idle-detection probes/timers only kicking in during quiet periods."
 2. Update `docs/backlog/README.md`: move I097 from Open → Fixed.
 3. Update the example app's `failureInjection.readingResults`: now that I097 is fixed, the "tolerant recovery" outcome is reachable with `maxFailedHeartbeats=3` or higher. Restore the original two-scenario description (Strict → cascade, Tolerant → recovery) and remove the I097 caveat. One-file edit on the same branch.
