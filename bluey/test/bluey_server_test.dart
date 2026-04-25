@@ -969,6 +969,68 @@ void main() {
       );
     });
 
+    group('I079 — pending-request tolerance', () {
+      test(
+        'I079 — does not declare client gone while holding a pending '
+        'write-with-response',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // 1. Track the client by simulating a heartbeat write arrival.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 2. Simulate an app-level write-with-response arriving.
+            WriteRequest? captured;
+            server.writeRequests.listen((r) => captured = r);
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 99,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xAB]),
+              responseNeeded: true,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // 3. App takes 30s to respond. Heartbeat-timeout would normally
+            //    fire at 10s — verify it does NOT.
+            async.elapse(const Duration(seconds: 30));
+            expect(disconnections, isEmpty,
+                reason: 'I079: server must tolerate its own pending response');
+
+            // 4. App finally responds.
+            unawaited(server.respondToWrite(
+              captured!,
+              status: GattResponseStatus.success,
+            ));
+            async.flushMicrotasks();
+
+            // 5. After response, the heartbeat clock restarts. 11s later,
+            //    no further activity, client times out normally.
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
+    });
+
     group('GattResponseStatus mapping', () {
       test('all GattResponseStatus values map to platform status', () async {
         final server = bluey.server()!;
