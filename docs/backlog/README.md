@@ -66,8 +66,6 @@ Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat 
 
 3. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
 
-4. **I087 + I091** — Disconnect-path error translation & auto-reconnect recovery on iOS. *Est. ≤1 day, investigative.* After I079 is fixed, re-run the failure-injection stress test. If I087 still reproduces, triage whether it's the example app's reconnect policy or a missing `ConnectionState.disconnected` emission on the unmapped-`CBATTError` disconnect path; fix I091's allowlist in the same pass. If I087 doesn't reproduce without the artificial starvation, close it with a verification note.
-
 Opportunistic one-offs — pick up when you're already in nearby code:
 
 - **I009** — `BlueyServer.respondToRead`/`respondToWrite` leak an internal platform-interface exception. Medium severity, one-file fix in the server error-translation path; natural to grab next time you're in `android_server.dart` / `ios_server.dart`.
@@ -161,7 +159,6 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I053](I053-capabilities-matrix-incomplete.md) | `Capabilities` matrix incomplete | medium |
 | [I084](I084-reconnect-loses-subscriptions.md) | Reconnected central loses subscriptions silently | medium |
 | [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout | medium |
-| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after disconnect with unmapped platform error | medium |
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
 
@@ -176,6 +173,8 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I077](I077-lifecycle-client-disconnect-storm.md) | Client appears to toggle connected/disconnected during heartbeat activity | `0b97cc6` |
 | [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | `136fa47` |
 | [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | LifecycleServer declares clients gone while holding their pending requests | `4206343` |
+| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after failure-injection-style disconnect with unmapped platform error | `c145209` |
+| [I096](I096-ios-nil-disconnect-error-to-unknown.md) | iOS `didDisconnectPeripheral` with `error: nil` produces `bluey-unknown` | `c145209` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |
