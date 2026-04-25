@@ -3,7 +3,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey/bluey.dart';
 
+import 'package:bluey_example/features/connection/domain/connection_settings.dart';
 import 'package:bluey_example/features/connection/presentation/connection_cubit.dart';
+import 'package:bluey_example/features/connection/presentation/connection_settings_cubit.dart';
 import 'package:bluey_example/features/connection/presentation/connection_state.dart';
 
 import '../../mocks/mock_use_cases.dart';
@@ -18,6 +20,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeDevice());
     registerFallbackValue(FakeConnection());
+    registerFallbackValue(const ConnectionSettings());
   });
 
   setUp(() {
@@ -32,12 +35,13 @@ void main() {
     );
   });
 
-  ConnectionCubit createCubit() {
+  ConnectionCubit createCubit({ConnectionSettingsCubit? settingsCubit}) {
     return ConnectionCubit(
       device: testDevice,
       connectToDevice: mockConnectToDevice,
       disconnectDevice: mockDisconnectDevice,
       getServices: mockGetServices,
+      settingsCubit: settingsCubit ?? ConnectionSettingsCubit(),
     );
   }
 
@@ -235,5 +239,97 @@ void main() {
         expect(cubit.state.error, contains('Connection state error'));
       },
     );
+
+    test('reconnects when settings change while connected', () async {
+      final settingsCubit = ConnectionSettingsCubit();
+
+      final firstConn = MockConnection();
+      when(() => firstConn.state).thenReturn(ConnectionState.connected);
+      when(() => firstConn.stateChanges)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => firstConn.disconnect()).thenAnswer((_) async {});
+
+      final secondConn = MockConnection();
+      when(() => secondConn.state).thenReturn(ConnectionState.connected);
+      when(() => secondConn.stateChanges)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => secondConn.disconnect()).thenAnswer((_) async {});
+
+      when(() => mockDisconnectDevice(any())).thenAnswer((_) async {});
+      when(() => mockGetServices(any())).thenAnswer((_) async => []);
+
+      final connections = [firstConn, secondConn];
+      when(
+        () => mockConnectToDevice(
+          any(),
+          timeout: any(named: 'timeout'),
+          settings: any(named: 'settings'),
+        ),
+      ).thenAnswer((_) async => connections.removeAt(0));
+
+      final cubit = createCubit(settingsCubit: settingsCubit);
+      await cubit.connect();
+      expect(cubit.state.connection, isNotNull);
+
+      // Change tolerance → cubit observes settings change → reconnects.
+      settingsCubit.setMaxFailedHeartbeats(3);
+      // Allow the async reconnect chain to drain (disconnect + connect + loadServices).
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      verify(() => mockDisconnectDevice(any())).called(1);
+      verify(
+        () => mockConnectToDevice(
+          any(),
+          timeout: any(named: 'timeout'),
+          settings: any(named: 'settings'),
+        ),
+      ).called(2);
+
+      await cubit.close();
+    });
+
+    test('no reconnect when settings unchanged', () async {
+      final settingsCubit = ConnectionSettingsCubit();
+
+      final mockConn = MockConnection();
+      when(() => mockConn.state).thenReturn(ConnectionState.connected);
+      when(() => mockConn.stateChanges)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockConn.disconnect()).thenAnswer((_) async {});
+
+      when(
+        () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+      ).thenAnswer((_) async => mockConn);
+      when(() => mockGetServices(any())).thenAnswer((_) async => []);
+
+      final cubit = createCubit(settingsCubit: settingsCubit);
+      await cubit.connect();
+
+      // Same value → no-op.
+      settingsCubit.setMaxFailedHeartbeats(1);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => mockDisconnectDevice(any()));
+      verify(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
+          .called(1);
+
+      await cubit.close();
+    });
+
+    test('settings change while disconnected does not trigger connect',
+        () async {
+      final settingsCubit = ConnectionSettingsCubit();
+      final cubit = createCubit(settingsCubit: settingsCubit);
+
+      // Don't call connect(). Change settings.
+      settingsCubit.setMaxFailedHeartbeats(3);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(
+        () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+      );
+
+      await cubit.close();
+    });
   });
 }

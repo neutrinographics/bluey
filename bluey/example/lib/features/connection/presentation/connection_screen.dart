@@ -51,7 +51,7 @@ class ConnectionScreen extends StatelessWidget {
             connectToDevice: getIt<ConnectToDevice>(),
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
-            settings: getIt<ConnectionSettingsCubit>().state,
+            settingsCubit: getIt<ConnectionSettingsCubit>(),
           )..connect(),
       child: const _ConnectionView(),
     );
