@@ -1128,6 +1128,73 @@ void main() {
           });
         },
       );
+
+      test(
+        'I079 — disconnect mid-pending request leaves no leaked state',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // Track + arrive a pending write-with-response.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            WriteRequest? captured;
+            server.writeRequests.listen((r) => captured = r);
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 99,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xAB]),
+              responseNeeded: true,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // Platform disconnect mid-request.
+            mockPlatform.emitCentralDisconnected('client-A');
+            async.flushMicrotasks();
+            expect(disconnections, ['client-A']);
+
+            // Late respond from the app — must be a no-op (no throw, no
+            // double-fire of disconnections).
+            unawaited(server.respondToWrite(
+              captured!,
+              status: GattResponseStatus.success,
+            ));
+            async.flushMicrotasks();
+
+            // Re-track the same client. Heartbeat-timer must run on its
+            // own fresh entry, with no phantom pending state.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 200,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A', 'client-A'],
+                reason: 'second timeout fires on the new entry');
+
+            server.dispose();
+          });
+        },
+      );
     });
 
     group('GattResponseStatus mapping', () {
