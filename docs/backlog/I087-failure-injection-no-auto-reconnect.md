@@ -4,9 +4,10 @@ title: Connection doesn't auto-reconnect after failure-injection-style disconnec
 category: bug
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-24
-related: [I079, I091, I090]
+status: fixed
+last_verified: 2026-04-25
+fixed_in: c145209
+related: [I079, I091, I090, I096]
 ---
 
 ## Symptom
@@ -41,8 +42,15 @@ Unconfirmed. Candidates:
 
 ## Notes
 
-Step 1 is to reproduce and instrument: add logging to the iOS disconnect callback and the connection-state stream to see which events actually fire in this sequence. Specifically: does `ConnectionState.disconnected` emit? If yes → example app bug. If no → iOS library bug (missing state emission on this error path).
+Fixed in `c145209` by [I096](I096-ios-nil-disconnect-error-to-unknown.md).
 
-Blocks: would benefit from having I079 fixed first, because I079's starvation is what triggers this disconnect sequence in the first place. Once I079 is fixed, reproducing I087 may require a different trigger (some other way to surface an unmapped CBATTError during teardown) — or I087 may simply not reproduce without the artificial starvation.
+The hypothesis in this entry's original Notes ("fixing I091 may fix this
+as a side effect") was directionally right — the bluey-unknown was
+indeed the cascade trigger — but pointed at the wrong code path.
+Diagnostic instrumentation revealed the bluey-unknown comes from
+`CentralManagerImpl.didDisconnectPeripheral` falling through on
+`error: nil`, **not** from `NSError.toPigeonError()`'s `CBATTError`
+allowlist gap.
 
-Medium severity: the failure mode is narrow (requires both a long-blocked op AND an unmapped CBATTError at disconnect time) but the outcome is severe (permanent connection loss requiring user intervention).
+I091 remains open for the original CBATTError allowlist concern (no
+production evidence it fires; low priority).
