@@ -6,7 +6,7 @@ severity: high
 platform: domain
 status: fixed
 last_verified: 2026-04-25
-fixed_in: 5f6d0b3
+fixed_in: 4206343
 related: [I012, I077]
 ---
 
@@ -38,7 +38,7 @@ Android shares the protocol (`LifecycleClient` lives in domain) and native GATT 
 
 ## Notes
 
-Fixed in `5f6d0b3` by introducing pending-request tolerance in
+Fixed in `4206343` by introducing pending-request tolerance in
 `LifecycleServer`. The previous prose recommending a client-side fix
 (routing successful user-op completions into `LivenessMonitor.recordActivity`)
 described work that was already in tree (`bluey/lib/src/connection/bluey_connection.dart:317`,
