@@ -63,14 +63,55 @@ Combined, the lifecycle layer authoritatively detects dead peer using *every* av
 2. **`finally`-wrapped accounting in `BlueyConnection`.** Markers fire in `try { mark; await op; on success: recordActivity } catch { recordUserOpFailure(error) } finally { unmark; }` so a thrown exception still decrements the counter. Leaks would be catastrophic — once leaked, probes never fire again.
 3. **Different predicate for user-op failures vs heartbeat failures.** Heartbeats use the existing `_isDeadPeerSignal` (timeout / disconnect / statusFailed) — wide net, justified by the Service-Changed force-kill case. User ops use a narrower predicate: **timeout only**. Disconnect is already handled by the platform-level disconnect callback (separate path that tears down the connection); statusFailed at the user-op level can mean ATT errors like WriteNotPermitted that don't imply dead peer.
 4. **Both mechanisms feed the same counter.** No separate "user-op failure counter" — `recordProbeFailure` is the single increment path. Whether the failure came from a heartbeat probe or a user op is invisible to the counter.
-5. **Defer-only, not skip-and-cancel-deadline.** When `_sendProbeOrDefer` defers, it reschedules per the existing cadence (one `activityWindow` later). Once the user op completes, the next scheduled probe attempt fires normally.
-6. **Threshold-trip path is unchanged.** When the counter trips, the existing logic runs as is: stop, fire `onServerUnreachable`, no further reschedule.
+5. **Counter increments are rate-limited to one per `activityWindow`.** Without rate limiting, a tight loop of rapidly-failing user ops could trip the threshold in well under one heartbeat interval — much faster than an idle peer would trip. With rate limiting, a busy connection fails at approximately the same rate as an idle connection (both bounded by `threshold × activityWindow` minimum trip time). Multiple failures within a single window collapse to one increment.
+6. **Defer-only, not skip-and-cancel-deadline.** When `_sendProbeOrDefer` defers, it reschedules per the existing cadence (one `activityWindow` later). Once the user op completes, the next scheduled probe attempt fires normally.
+7. **Threshold-trip path is unchanged.** When the counter trips, the existing logic runs as is: stop, fire `onServerUnreachable`, no further reschedule.
 
 ## Architecture
 
-Two files change. Neither edit touches the platform interface or native code.
+Three files change (LivenessMonitor, LifecycleClient, BlueyConnection). None touch the platform interface or native code.
+
+### `LivenessMonitor` — rate-limited counter increments
+
+Add a `_lastIncrementAt` field. Modify `recordProbeFailure` to gate at `activityWindow`. Clear the timestamp on success-paths.
+
+```dart
+DateTime? _lastIncrementAt;
+
+bool recordProbeFailure() {
+  _probeInFlight = false;
+  // I097: rate-limit increments to once per activityWindow so a busy
+  // connection fails at approximately the same rate as an idle one.
+  // Multiple failures within a single window collapse to one increment.
+  final last = _lastIncrementAt;
+  if (last != null && _now().difference(last) < _activityWindow) {
+    return _consecutiveFailures >= maxFailedProbes;
+  }
+  _lastIncrementAt = _now();
+  _consecutiveFailures++;
+  return _consecutiveFailures >= maxFailedProbes;
+}
+
+// In recordActivity and recordProbeSuccess, also clear the rate-limit
+// timestamp so the next failure starts a fresh window:
+void recordActivity() {
+  _consecutiveFailures = 0;
+  _lastActivityAt = _now();
+  _lastIncrementAt = null;
+}
+
+void recordProbeSuccess() {
+  _probeInFlight = false;
+  _consecutiveFailures = 0;
+  _lastActivityAt = _now();
+  _lastIncrementAt = null;
+}
+```
+
+The transient-error path (`cancelProbe`) does NOT clear `_lastIncrementAt` — transient errors are neither successes nor counted failures, and shouldn't reset the rate-limit window.
 
 ### `LifecycleClient` — counter, deferral, user-op outcome handling
+
 
 New private field, three new public methods:
 
@@ -164,6 +205,15 @@ The four current `recordActivity` sites (`bluey_connection.dart:317, :364, :376,
 ## TDD
 
 Tests live in `bluey/test/connection/`. Three layers.
+
+### `LivenessMonitor` (`bluey/test/connection/liveness_monitor_test.dart`)
+
+Three new tests for rate-limiting:
+
+A. **First failure increments.** Fresh monitor. Call `recordProbeFailure()` once. Verify counter is 1.
+B. **Failure within activityWindow does not increment.** Call `recordProbeFailure()` at t=0. Advance time by `activityWindow / 2`. Call `recordProbeFailure()` again. Verify counter is still 1.
+C. **Failure after activityWindow increments.** Call `recordProbeFailure()` at t=0. Advance time by `activityWindow + 1ms`. Call again. Verify counter is 2.
+D. **Success clears rate-limit window.** Call `recordProbeFailure()` at t=0. Advance by `activityWindow / 2`. Call `recordActivity()`. Advance another `1ms`. Call `recordProbeFailure()`. Verify counter is 1 (fresh window — not blocked).
 
 ### `LifecycleClient` (`bluey/test/connection/lifecycle_client_test.dart`)
 
