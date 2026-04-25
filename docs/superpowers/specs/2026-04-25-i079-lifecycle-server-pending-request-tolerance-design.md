@@ -136,7 +136,7 @@ Three call sites change:
 2. **Forwarded write requests** (`_platformWriteRequestsSub`, currently lines 113–118). Branch on `responseNeeded`:
    - `responseNeeded == true` → `_lifecycle.requestStarted(req.centralId, req.requestId)`.
    - `responseNeeded == false` → `_lifecycle.recordActivity(req.centralId)` (no response owed; just an activity event, as today).
-3. **Response paths** (`respondToRead` / `respondToWrite`). Both now call `_lifecycle.requestCompleted(client._platformId, request.internalRequestId)` after the platform call returns. `request.client` is already a `BlueyClient`; the cast is safe.
+3. **Response paths** (`respondToRead` / `respondToWrite`). Both now call `_lifecycle.requestCompleted(client._platformId, request.internalRequestId)` **before** the platform `respondTo*` call. The lifecycle obligation is discharged the moment the app commits to a response; whether the platform layer successfully delivers it is a separate concern. Calling `requestCompleted` first (rather than after) guarantees the pending set is drained even if the platform call throws (stale request id, platform in an error state, etc.). `request.client` is already a `BlueyClient`; the cast is safe.
 
 `_handleClientDisconnected` already calls `_lifecycle.cancelTimer(clientId)`. With the change above, that single call now clears both the timer and the pending set for the client.
 
@@ -176,6 +176,12 @@ With `responseNeeded: false` → `recordActivity` invoked, pending set unchanged
 
 **Test 9 — end-to-end stall scenario (`BlueyServer`).**
 Track a client. Drive a write-with-response arrival. Elapse 30 s. `onClientGone` not called. Drive `respondToWrite`. Elapse 11 s. `onClientGone` fires.
+
+**Test 10 — disconnect mid-request leaves no leaked pending state.**
+Track a client. `requestStarted(client, 1)`. Simulate a disconnect (`server._handleClientDisconnected('client')` via the `centralDisconnections` stream). Then call `respondToWrite` for request 1 — it must be a no-op (`requestCompleted` for unknown client). Re-track the same client via a fresh heartbeat. Elapse the interval. `onClientGone` fires once for the new entry — no double-fire, no phantom pending state.
+
+**Test 11 — `requestCompleted` fires even if the platform respond throws.**
+Configure `FakeBlueyPlatform` to throw on `respondToWriteRequest`. Drive a write-with-response arrival. Call `respondToWrite`; expect the throw to propagate. Verify `LifecycleServer`'s pending set is empty afterwards (the timer would re-arm and `onClientGone` fires after the interval). Drives the "drain pending before platform call" ordering.
 
 **Refactor pass.** Dartdoc on `LifecycleServer` explaining `recordActivity` vs `requestStarted` (when to use which). Logging at `dev.log` level on suppression and resume, matching the existing lifecycle-server log style.
 
