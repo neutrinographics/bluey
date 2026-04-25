@@ -497,5 +497,151 @@ void main() {
         server.dispose();
       });
     });
+
+    test('pending request suppresses heartbeat timeout', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        // Track the client via a heartbeat write.
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+
+        // App-level request begins. Server is now holding it.
+        server.requestStarted(_clientId, 42);
+
+        // Advance well past the 10s heartbeat-timeout window.
+        async.elapse(const Duration(seconds: 30));
+
+        // Server must NOT declare the client gone — we're holding its request.
+        expect(gone, isEmpty);
+
+        server.dispose();
+      });
+    });
+
+    test('requestCompleted restarts the heartbeat-timeout window', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+        server.requestStarted(_clientId, 42);
+
+        // Hold for 30s — still alive (suppressed).
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty);
+
+        // Response sent — pending drains.
+        server.requestCompleted(_clientId, 42);
+
+        // Within the fresh interval: still alive.
+        async.elapse(const Duration(seconds: 9));
+        expect(gone, isEmpty);
+
+        // Past the interval since completion: gone fires.
+        async.elapse(const Duration(seconds: 2));
+        expect(gone, [_clientId]);
+
+        server.dispose();
+      });
+    });
+
+    test('timer stays suppressed while ANY request is pending', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+
+        server.requestStarted(_clientId, 1);
+        server.requestStarted(_clientId, 2);
+
+        // Complete one — the other is still open.
+        server.requestCompleted(_clientId, 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty, reason: 'request 2 still pending');
+
+        // Complete the other — set is now empty, timer re-arms.
+        server.requestCompleted(_clientId, 2);
+
+        async.elapse(const Duration(seconds: 11));
+        expect(gone, [_clientId]);
+
+        server.dispose();
+      });
+    });
+
+    test('cancelTimer clears pending requests for the client', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        server.handleWriteRequest(
+          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        );
+        server.requestStarted(_clientId, 1);
+
+        // Simulate platform-level disconnect cleanup.
+        server.cancelTimer(_clientId);
+
+        // Late respond from the app — must be a no-op.
+        server.requestCompleted(_clientId, 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty,
+            reason: 'cancelTimer cleared the entry; '
+                'requestCompleted must not re-arm the timer');
+
+        server.dispose();
+      });
+    });
+
+    test('requestStarted is ignored for an untracked client', () {
+      fakeAsync((async) {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 10),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+        );
+
+        // No prior heartbeat — client is untracked. requestStarted must
+        // not implicitly track them.
+        server.requestStarted('stranger', 1);
+
+        async.elapse(const Duration(seconds: 30));
+        expect(gone, isEmpty);
+
+        server.dispose();
+      });
+    });
   });
 }

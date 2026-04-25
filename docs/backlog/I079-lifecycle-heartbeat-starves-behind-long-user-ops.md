@@ -1,11 +1,12 @@
 ---
 id: I079
-title: LifecycleClient heartbeat probe starves behind long user ops, causing spurious server-initiated disconnects
+title: LifecycleServer declares clients gone while holding their pending requests
 category: bug
 severity: high
-platform: both
-status: open
-last_verified: 2026-04-24
+platform: domain
+status: fixed
+last_verified: 2026-04-25
+fixed_in: 5f6d0b3
 related: [I012, I077]
 ---
 
@@ -37,18 +38,25 @@ Android shares the protocol (`LifecycleClient` lives in domain) and native GATT 
 
 ## Notes
 
-Fix sketches, rough order of preference:
+Fixed in `5f6d0b3` by introducing pending-request tolerance in
+`LifecycleServer`. The previous prose recommending a client-side fix
+(routing successful user-op completions into `LivenessMonitor.recordActivity`)
+described work that was already in tree (`bluey/lib/src/connection/bluey_connection.dart:317`,
+`:364`, `:376`, `:619`) and did not address this scenario — during the 12 s
+stall the user op has not yet *succeeded* on the client, so there is no
+completion event to feed.
 
-1. **Have successful user ops feed `recordActivity()`**. Route completion of any read/write/notify through the `LivenessMonitor` on the client side. A user op that just succeeded is *better* liveness evidence than a probe. This alone removes the need to fire a probe while user traffic is active, and the scheduler already handles deferral correctly (I077).
+The actual fix, per
+[the design doc](../superpowers/specs/2026-04-25-i079-lifecycle-server-pending-request-tolerance-design.md):
 
-   Open question: also signal "op started" so the heartbeat deadline isn't armed against a stale anchor while a long op is in flight. Simplest form — when dispatching a user op, call `recordActivity()` optimistically; if the op fails with a dead-peer signal, the existing disconnect path handles it.
-
-2. **Have the heartbeat bypass the OpSlot** (separate queue, or priority-insert in front of queued user ops). Risky — defeats the serialization invariant OpSlot was introduced to protect. Not recommended.
-
-3. **Raise the server-side lifecycle tolerance** to cover the longest plausible user-op duration. Brittle — depends on application-layer timeouts the library doesn't control.
-
-(1) is the right shape. The change is small: `BlueyConnection` already knows when ops succeed; it needs to notify the `LifecycleClient` attached to that connection (via the existing Peer wiring).
-
-Reproduction: iOS client + Android server, run the **timeout probe** stress test. Every invocation reproduces. Failure-injection reproduces the same underlying issue but with a messier post-disconnect error cascade (see I087).
-
-High severity because it's not hypothetical — it fires on ordinary long-running user ops. Any production app that does a slow read/write (file transfer, OTA, any operation where the peer takes a few seconds to respond) will see spurious disconnects.
+- `LifecycleServer` now tracks a per-client set of pending platform request
+  IDs. While the set is non-empty, the heartbeat-timeout timer is paused.
+  When the last pending request completes, the timer re-arms with a fresh
+  interval.
+- `BlueyServer` calls `requestStarted` on read / write-with-response arrival
+  and `requestCompleted` *before* the platform `respondTo*` call (so the
+  pending set drains even if the platform throws).
+- iOS-server detection regression accepted: a client that drops its link
+  while the iOS server is holding a pending request is detected only after
+  the app responds + one full interval. Narrow corner; routine false-positive
+  bug fixed.

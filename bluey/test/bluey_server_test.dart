@@ -28,6 +28,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   final List<RespondToWriteCall> respondToWriteCalls = [];
   final List<String> disconnectedClients = [];
 
+  // I079: when set, the next respondToWriteRequest call throws this error
+  // before recording the call. Used to verify that requestCompleted has
+  // already drained pending state before the platform call.
+  Object? throwOnRespondToWriteRequest;
+
   // Stream controllers for server events
   final _centralConnectionsController =
       StreamController<platform.PlatformCentral>.broadcast();
@@ -306,6 +311,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     int requestId,
     platform.PlatformGattStatus status,
   ) async {
+    final err = throwOnRespondToWriteRequest;
+    if (err != null) {
+      throwOnRespondToWriteRequest = null;
+      throw err;
+    }
     respondToWriteCalls.add(
       RespondToWriteCall(requestId: requestId, status: status),
     );
@@ -889,7 +899,7 @@ void main() {
 
     group('Lifecycle activity on non-control-service requests', () {
       test(
-        'incoming write to a non-control-service char resets client liveness timer',
+        'incoming write-without-response to a non-control-service char resets client liveness timer',
         () {
           fakeAsync((async) {
             final server = bluey.server(
@@ -934,8 +944,9 @@ void main() {
             async.elapse(const Duration(seconds: 9));
             expect(disconnections, isEmpty);
 
-            // Send a write to the user service — should reset the timer even
-            // though it's not a control-service write.
+            // Send a write-without-response to the user service — should reset
+            // the timer via recordActivity even though it's not a control-service
+            // write.
             mockPlatform.emitWriteRequest(
               platform.PlatformWriteRequest(
                 requestId: 2,
@@ -943,7 +954,7 @@ void main() {
                 characteristicUuid: userCharUuid,
                 value: Uint8List.fromList([0x99]),
                 offset: 0,
-                responseNeeded: true,
+                responseNeeded: false,
               ),
             );
             async.flushMicrotasks();
@@ -955,12 +966,301 @@ void main() {
               disconnections,
               isEmpty,
               reason:
-                  'non-control-service write should reset the liveness timer',
+                  'write-without-response to non-control-service char should reset the liveness timer',
             );
 
             // 2s more → past the 10s window from the user write → should fire.
             async.elapse(const Duration(seconds: 2));
             expect(disconnections, equals(['client-1']));
+
+            server.dispose();
+          });
+        },
+      );
+    });
+
+    group('I079 — pending-request tolerance', () {
+      test(
+        'I079 — does not declare client gone while holding a pending '
+        'write-with-response',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // 1. Track the client by simulating a heartbeat write arrival.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 2. Simulate an app-level write-with-response arriving.
+            WriteRequest? captured;
+            server.writeRequests.listen((r) => captured = r);
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 99,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xAB]),
+              responseNeeded: true,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // 3. App takes 30s to respond. Heartbeat-timeout would normally
+            //    fire at 10s — verify it does NOT.
+            async.elapse(const Duration(seconds: 30));
+            expect(disconnections, isEmpty,
+                reason: 'I079: server must tolerate its own pending response');
+
+            // 4. App finally responds.
+            unawaited(server.respondToWrite(
+              captured!,
+              status: GattResponseStatus.success,
+            ));
+            async.flushMicrotasks();
+
+            // 5. After response, the heartbeat clock restarts. 11s later,
+            //    no further activity, client times out normally.
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
+
+      test(
+        'I079 — read request enters pending set, drains on respondToRead',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            ReadRequest? captured;
+            server.readRequests.listen((r) => captured = r);
+            mockPlatform.emitReadRequest(platform.PlatformReadRequest(
+              requestId: 77,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // Server holds the read for 30s — must not declare gone.
+            async.elapse(const Duration(seconds: 30));
+            expect(disconnections, isEmpty);
+
+            unawaited(server.respondToRead(
+              captured!,
+              status: GattResponseStatus.success,
+              value: Uint8List.fromList([0xCD]),
+            ));
+            async.flushMicrotasks();
+
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
+
+      test(
+        'I079 — write-without-response uses recordActivity (no pend)',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 9s later, write-without-response arrives — extends timer.
+            async.elapse(const Duration(seconds: 9));
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 50,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xEE]),
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 9s after the write — total 18s since heartbeat, but only 9s
+            // since the write-without-response refreshed the timer.
+            async.elapse(const Duration(seconds: 9));
+            expect(disconnections, isEmpty,
+                reason: 'recordActivity should reset timer');
+
+            // 2s more — past the window from the last activity.
+            async.elapse(const Duration(seconds: 2));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
+
+      test(
+        'I079 — disconnect mid-pending request leaves no leaked state',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // Track + arrive a pending write-with-response.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            WriteRequest? captured;
+            server.writeRequests.listen((r) => captured = r);
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 99,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xAB]),
+              responseNeeded: true,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // Platform disconnect mid-request.
+            mockPlatform.emitCentralDisconnected('client-A');
+            async.flushMicrotasks();
+            expect(disconnections, ['client-A']);
+
+            // Late respond from the app — must be a no-op (no throw, no
+            // double-fire of disconnections).
+            unawaited(server.respondToWrite(
+              captured!,
+              status: GattResponseStatus.success,
+            ));
+            async.flushMicrotasks();
+
+            // Re-track the same client. Heartbeat-timer must run on its
+            // own fresh entry, with no phantom pending state.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 200,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A', 'client-A'],
+                reason: 'second timeout fires on the new entry');
+
+            server.dispose();
+          });
+        },
+      );
+
+      test(
+        'I079 — requestCompleted fires even if platform respond throws',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            // Track + arrive a pending write-with-response.
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            WriteRequest? captured;
+            server.writeRequests.listen((r) => captured = r);
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 99,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xAB]),
+              responseNeeded: true,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // Configure the platform to throw on respondToWriteRequest.
+            mockPlatform.throwOnRespondToWriteRequest =
+                StateError('platform respond failed');
+
+            // App responds — platform call throws, but pending must already
+            // be drained.
+            Object? thrown;
+            unawaited(server
+                .respondToWrite(captured!, status: GattResponseStatus.success)
+                .catchError((Object e) {
+              thrown = e;
+            }));
+            async.flushMicrotasks();
+            expect(thrown, isA<StateError>());
+
+            // If pending was drained correctly, the heartbeat clock has
+            // restarted. After the interval elapses, gone fires.
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A'],
+                reason:
+                    'pending must drain before platform call; otherwise '
+                    'the timer would stay paused forever');
 
             server.dispose();
           });

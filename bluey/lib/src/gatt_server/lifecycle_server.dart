@@ -19,7 +19,7 @@ class LifecycleServer {
   final void Function(String clientId)? onHeartbeatReceived;
 
   bool _controlServiceAdded = false;
-  final Map<String, Timer> _heartbeatTimers = {};
+  final Map<String, _ClientLiveness> _clients = {};
 
   LifecycleServer({
     required platform.BlueyPlatform platformApi,
@@ -105,10 +105,10 @@ class LifecycleServer {
     return true;
   }
 
-  /// Cancels the heartbeat timer for a specific client.
+  /// Cancels the heartbeat timer for a specific client and clears any
+  /// pending-request state. Removes the client entirely from tracking.
   void cancelTimer(String clientId) {
-    _heartbeatTimers[clientId]?.cancel();
-    _heartbeatTimers.remove(clientId);
+    _clients.remove(clientId)?.timer?.cancel();
   }
 
   /// Treats any incoming activity from [clientId] as liveness evidence,
@@ -124,26 +124,81 @@ class LifecycleServer {
   /// No-op if lifecycle is disabled (interval is null).
   void recordActivity(String clientId) {
     if (_interval == null) return;
-    if (!_heartbeatTimers.containsKey(clientId)) return;
+    if (!_clients.containsKey(clientId)) return;
     _resetTimer(clientId);
   }
 
-  /// Cancels all heartbeat timers and cleans up.
-  void dispose() {
-    for (final timer in _heartbeatTimers.values) {
-      timer.cancel();
+  /// Marks that the server has accepted a request from [clientId] and
+  /// owes a response. Adds [requestId] to the client's pending-request
+  /// set and pauses the client's heartbeat-timeout timer until all
+  /// pending requests for the client have completed.
+  ///
+  /// No-op for untracked clients (no prior heartbeat). Lifecycle policy
+  /// is opt-in: a generic BLE central reading a hosted service must not
+  /// be implicitly tracked as a Bluey peer.
+  ///
+  /// No-op if lifecycle is disabled (interval is null).
+  void requestStarted(String clientId, int requestId) {
+    if (_interval == null) return;
+    final state = _clients[clientId];
+    if (state == null) return;
+    state.pendingRequests.add(requestId);
+    _resetTimer(clientId);
+  }
+
+  /// Marks a previously-started request as complete. If the client has
+  /// no further pending requests, restarts the heartbeat-timeout timer
+  /// with a fresh interval (treated as activity).
+  ///
+  /// Idempotent: completing an unknown id is a no-op.
+  ///
+  /// No-op if lifecycle is disabled (interval is null).
+  void requestCompleted(String clientId, int requestId) {
+    if (_interval == null) return;
+    final state = _clients[clientId];
+    if (state == null) return;
+    if (!state.pendingRequests.remove(requestId)) return;
+    if (state.pendingRequests.isEmpty) {
+      _resetTimer(clientId);
     }
-    _heartbeatTimers.clear();
+  }
+
+  /// Cancels all heartbeat timers and clears all per-client state.
+  void dispose() {
+    for (final state in _clients.values) {
+      state.timer?.cancel();
+    }
+    _clients.clear();
   }
 
   void _resetTimer(String clientId) {
     final interval = _interval;
     if (interval == null) return;
 
-    _heartbeatTimers[clientId]?.cancel();
-    _heartbeatTimers[clientId] = Timer(interval, () {
-      _heartbeatTimers.remove(clientId);
+    final state = _clients.putIfAbsent(clientId, _ClientLiveness.new);
+    state.timer?.cancel();
+
+    if (state.pendingRequests.isNotEmpty) {
+      // Paused while pending — see _ClientLiveness doc.
+      state.timer = null;
+      return;
+    }
+
+    state.timer = Timer(interval, () {
+      _clients.remove(clientId);
       onClientGone(clientId);
     });
   }
+}
+
+/// Per-client liveness state: a (possibly paused) heartbeat-timeout timer
+/// and the set of platform request IDs currently pending a server response.
+///
+/// While [pendingRequests] is non-empty, [timer] is null (paused) — the
+/// client is demonstrably engaged with the server and must not be declared
+/// gone. Map-key membership in `_clients` is the unambiguous "tracked"
+/// signal.
+class _ClientLiveness {
+  Timer? timer;
+  final Set<int> pendingRequests = {};
 }
