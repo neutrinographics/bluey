@@ -1080,6 +1080,54 @@ void main() {
           });
         },
       );
+
+      test(
+        'I079 — write-without-response uses recordActivity (no pend)',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 9s later, write-without-response arrives — extends timer.
+            async.elapse(const Duration(seconds: 9));
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 50,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              value: Uint8List.fromList([0xEE]),
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            // 9s after the write — total 18s since heartbeat, but only 9s
+            // since the write-without-response refreshed the timer.
+            async.elapse(const Duration(seconds: 9));
+            expect(disconnections, isEmpty,
+                reason: 'recordActivity should reset timer');
+
+            // 2s more — past the window from the last activity.
+            async.elapse(const Duration(seconds: 2));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
     });
 
     group('GattResponseStatus mapping', () {
