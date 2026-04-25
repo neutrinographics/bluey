@@ -118,7 +118,7 @@ class _SheetHeader extends StatelessWidget {
               ),
             ),
             Text(
-              test._subtitle,
+              test.subtitle,
               style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
@@ -271,19 +271,3 @@ Color _iconColor(StressTest test) => switch (test) {
       StressTest.timeoutProbe || StressTest.failureInjection => _kRed,
     };
 
-// Access _subtitle from test_card.dart's private extension via a local mirror.
-// This avoids duplicating the strings by re-using the same source of truth
-// in test_card.dart — but since that extension is private, we read displayName
-// from domain and subtitle is available because _SheetHeader is in the same
-// file where _subtitle is defined below as a module-private extension.
-extension _StressTestSubtitle on StressTest {
-  String get _subtitle => switch (this) {
-        StressTest.burstWrite => 'Rapid throughput validation',
-        StressTest.mixedOps => 'Read/Write/Notify sequence',
-        StressTest.soak => 'Stability & memory leakage',
-        StressTest.timeoutProbe => 'Protocol resilience check',
-        StressTest.failureInjection => 'Error handling validation',
-        StressTest.mtuProbe => 'Maximum transfer unit check',
-        StressTest.notificationThroughput => 'Notification delivery rate',
-      };
-}

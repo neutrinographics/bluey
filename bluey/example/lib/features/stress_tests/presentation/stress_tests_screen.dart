@@ -13,9 +13,12 @@ import '../application/run_mtu_probe.dart';
 import '../application/run_notification_throughput.dart';
 import '../application/run_soak.dart';
 import '../application/run_timeout_probe.dart';
+import '../../connection/domain/connection_settings.dart';
+import '../../connection/presentation/connection_settings_cubit.dart';
 import 'stress_tests_cubit.dart';
 import 'stress_tests_state.dart';
 import 'widgets/test_card.dart';
+import 'widgets/tolerance_indicator.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -127,6 +130,16 @@ class _TopBar extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: _kTopBarTitle,
                   letterSpacing: -0.45,
+                ),
+              ),
+              const Spacer(),
+              BlocProvider<ConnectionSettingsCubit>.value(
+                value: getIt<ConnectionSettingsCubit>(),
+                child: BlocBuilder<ConnectionSettingsCubit,
+                    ConnectionSettings>(
+                  builder: (context, settings) => ToleranceIndicator(
+                    maxFailedHeartbeats: settings.maxFailedHeartbeats,
+                  ),
                 ),
               ),
             ],

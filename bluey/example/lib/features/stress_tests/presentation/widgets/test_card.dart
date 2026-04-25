@@ -52,15 +52,6 @@ extension _StressTestMeta on StressTest {
         StressTest.notificationThroughput => _kAccent,
       };
 
-  String get _subtitle => switch (this) {
-        StressTest.burstWrite => 'Rapid throughput validation',
-        StressTest.mixedOps => 'Read/Write/Notify sequence',
-        StressTest.soak => 'Stability & memory leakage',
-        StressTest.timeoutProbe => 'Protocol resilience check',
-        StressTest.failureInjection => 'Error handling validation',
-        StressTest.mtuProbe => 'Maximum transfer unit check',
-        StressTest.notificationThroughput => 'Notification delivery rate',
-      };
 }
 
 // ─── TestCard ─────────────────────────────────────────────────────────────────
@@ -166,7 +157,7 @@ class _CardHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                test._subtitle,
+                test.subtitle,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,

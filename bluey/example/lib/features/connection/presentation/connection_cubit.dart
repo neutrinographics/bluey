@@ -7,6 +7,7 @@ import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
 import '../domain/connection_settings.dart';
+import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
 
 /// Cubit for managing connection state.
@@ -14,21 +15,49 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final ConnectToDevice _connectToDevice;
   final DisconnectDevice _disconnectDevice;
   final GetServices _getServices;
-  final ConnectionSettings _settings;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
+  StreamSubscription<ConnectionSettings>? _settingsSubscription;
+  ConnectionSettings _settings;
+
+  /// Set during a user-initiated reconnect (tolerance change). The
+  /// `_stateSubscription` listener checks this flag and skips the
+  /// "Device disconnected" error emission so the dialog isn't shown
+  /// during a transparent re-establishment.
+  bool _suppressDisconnectDialog = false;
 
   ConnectionCubit({
     required Device device,
     required ConnectToDevice connectToDevice,
     required DisconnectDevice disconnectDevice,
     required GetServices getServices,
-    ConnectionSettings settings = const ConnectionSettings(),
-  }) : _connectToDevice = connectToDevice,
-       _disconnectDevice = disconnectDevice,
-       _getServices = getServices,
-       _settings = settings,
-       super(ConnectionScreenState(device: device));
+    required ConnectionSettingsCubit settingsCubit,
+  })  : _connectToDevice = connectToDevice,
+        _disconnectDevice = disconnectDevice,
+        _getServices = getServices,
+        _settings = settingsCubit.state,
+        super(ConnectionScreenState(device: device)) {
+    _settingsSubscription =
+        settingsCubit.stream.listen(_handleSettingsChange);
+  }
+
+  Future<void> _handleSettingsChange(ConnectionSettings newSettings) async {
+    if (newSettings == _settings) return;
+    _settings = newSettings;
+    if (state.connection != null) {
+      _suppressDisconnectDialog = true;
+      await _stateSubscription?.cancel();
+      _stateSubscription = null;
+      try {
+        await _disconnectDevice(state.connection!);
+      } catch (_) {
+        // best-effort; even if disconnect throws we still want to reconnect
+      }
+      emit(state.withoutConnection());
+      _suppressDisconnectDialog = false;
+      await connect();
+    }
+  }
 
   /// Connects to the device.
   Future<void> connect() async {
@@ -55,10 +84,15 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
           emit(state.copyWith(connectionState: connectionState));
 
           if (connectionState == ConnectionState.disconnected) {
-            // Connection lost - emit event for UI to handle
-            emit(
-              state.withoutConnection().copyWith(error: 'Device disconnected'),
-            );
+            if (_suppressDisconnectDialog) {
+              // User-initiated tolerance change — quiet teardown.
+              emit(state.withoutConnection());
+            } else {
+              // Connection lost - emit event for UI to handle
+              emit(
+                state.withoutConnection().copyWith(error: 'Device disconnected'),
+              );
+            }
           }
         },
         onError: (error) {
@@ -142,6 +176,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
 
   @override
   Future<void> close() {
+    _settingsSubscription?.cancel();
     _stateSubscription?.cancel();
     state.connection?.disconnect();
     return super.close();
