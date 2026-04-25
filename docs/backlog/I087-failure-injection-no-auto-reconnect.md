@@ -1,12 +1,11 @@
 ---
 id: I087
-title: Connection doesn't auto-reconnect after failure-injection-style disconnect with unmapped platform error
+title: Connection doesn't auto-reconnect after failure-injection-style disconnect
 category: bug
 severity: medium
 platform: ios
-status: fixed
+status: open
 last_verified: 2026-04-25
-fixed_in: c145209
 related: [I079, I091, I090, I096]
 ---
 
@@ -42,15 +41,12 @@ Unconfirmed. Candidates:
 
 ## Notes
 
-Fixed in `c145209` by [I096](I096-ios-nil-disconnect-error-to-unknown.md).
+**Update 2026-04-25:** [I096](I096-ios-nil-disconnect-error-to-unknown.md) was a *necessary* sub-fix — it eliminated the `bluey-unknown` exception from the disconnect cascade, which was hypothesised in this entry's original Notes as the likely root cause. After landing I096, on-device verification shows the cascade is now well-typed (`1 GattTimeoutException + 9 GattOperationDisconnectedException`, no `bluey-unknown`) — but **the connection still does not reconnect.**
 
-The hypothesis in this entry's original Notes ("fixing I091 may fix this
-as a side effect") was directionally right — the bluey-unknown was
-indeed the cascade trigger — but pointed at the wrong code path.
-Diagnostic instrumentation revealed the bluey-unknown comes from
-`CentralManagerImpl.didDisconnectPeripheral` falling through on
-`error: nil`, **not** from `NSError.toPigeonError()`'s `CBATTError`
-allowlist gap.
+That confirms hypothesis #2 from this entry's original "Root cause" section: the **example-app reconnect cubit** is the actual blocker. The cubit isn't reacting to `GattOperationDisconnectedException` either. I087 stays open until the cubit fix lands.
 
-I091 remains open for the original CBATTError allowlist concern (no
-production evidence it fires; low priority).
+Refined location: `bluey/example/lib/features/connection/presentation/connection_cubit.dart` — needs investigation of how the cubit observes disconnects, what triggers reconnect, and what (if anything) gates reconnect from firing in this scenario.
+
+Symptom updated post-I096: the cascade is now `1 GattTimeoutException + N-1 GattOperationDisconnectedException` (no `bluey-unknown`). The "no reconnect" outcome remains. Tagged `platform: ios` because the failure-injection scenario only reproduces on iOS-client → Android-server today (the OpSlot serialization on iOS is what shapes this exact sequence) — but the cubit code at fault is shared Dart, not iOS-specific.
+
+I091 remains open for the original CBATTError allowlist concern (no production evidence it fires; low priority).

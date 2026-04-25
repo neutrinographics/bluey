@@ -146,6 +146,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
 | [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | Disconnect of already-disconnected peripheral waits for timeout | low |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
+| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after failure-injection-style disconnect | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
 
@@ -173,7 +174,6 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I077](I077-lifecycle-client-disconnect-storm.md) | Client appears to toggle connected/disconnected during heartbeat activity | `0b97cc6` |
 | [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | `136fa47` |
 | [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | LifecycleServer declares clients gone while holding their pending requests | `4206343` |
-| [I087](I087-failure-injection-no-auto-reconnect.md) | Connection doesn't auto-reconnect after failure-injection-style disconnect with unmapped platform error | `c145209` |
 | [I096](I096-ios-nil-disconnect-error-to-unknown.md) | iOS `didDisconnectPeripheral` with `error: nil` produces `bluey-unknown` | `c145209` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
