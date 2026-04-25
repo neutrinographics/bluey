@@ -1,12 +1,12 @@
 ---
 id: I087
-title: Connection doesn't auto-reconnect after failure-injection-style disconnect with unmapped platform error
+title: Connection doesn't auto-reconnect after failure-injection-style disconnect
 category: bug
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-24
-related: [I079, I091, I090]
+status: wontfix
+last_verified: 2026-04-25
+related: [I079, I091, I090, I096]
 ---
 
 ## Symptom
@@ -41,8 +41,21 @@ Unconfirmed. Candidates:
 
 ## Notes
 
-Step 1 is to reproduce and instrument: add logging to the iOS disconnect callback and the connection-state stream to see which events actually fire in this sequence. Specifically: does `ConnectionState.disconnected` emit? If yes → example app bug. If no → iOS library bug (missing state emission on this error path).
+**Resolution 2026-04-25 (wontfix).** This entry's premise — "the connection should auto-reconnect after failure-injection-style disconnect" — was inherited from a comparison to the **timeout-probe** test that no longer applies post-I079. Pre-I079, both tests caused a disconnect (because of I079's starvation false-positive), and the timeout-probe's "auto-reconnect after disconnect" was the visible recovery path. Post-I079, the timeout-probe **no longer disconnects at all** — there's no longer a "compare to timeout-probe reconnecting" example. The expectation that failure-injection should also auto-reconnect was carried forward incorrectly.
 
-Blocks: would benefit from having I079 fixed first, because I079's starvation is what triggers this disconnect sequence in the first place. Once I079 is fixed, reproducing I087 may require a different trigger (some other way to surface an unmapped CBATTError during teardown) — or I087 may simply not reproduce without the artificial starvation.
+Re-examining the failure-injection chain post-I079 / post-I096:
 
-Medium severity: the failure mode is narrow (requires both a long-blocked op AND an unmapped CBATTError at disconnect time) but the outcome is severe (permanent connection loss requiring user intervention).
+1. Server drops a response (deliberate).
+2. Client times out cleanly → `GattTimeoutException`.
+3. `LifecycleClient` correctly counts the failed heartbeat and (with default `maxFailedHeartbeats=1`) declares the peer unreachable.
+4. Client tears down via `cancelPeripheralConnection` — correct policy given the information available.
+5. Queued ops drain as typed `GattOperationDisconnectedException` (post-I096 — no more `bluey-unknown`).
+6. Connection ends in `disconnected` state; example-app dialog offers a manual "Reconnect" button.
+
+**Every step is correct, deliberate library behaviour.** The disconnect *is* the expected outcome of injecting a failure that crosses the dead-peer threshold. The cubit's lack of auto-reconnect is a deliberate UX choice (manual control via the existing dialog), not a bug.
+
+What's actually open here is a **descriptive** issue: the failure-injection test's help text claims "writeCount − 1 successes" as the healthy outcome, which never matches the post-I079 reality. That is being addressed separately as a stress-test description audit, plus exposing `maxFailedHeartbeats` as a tunable in the example app so users can demonstrate both the disconnect-cascade scenario (low tolerance) and the recovery scenario (higher tolerance).
+
+I096 remains correctly closed — it was a real bug (semantically wrong error mapping) and its fix stands on its own merits regardless of this entry's resolution.
+
+I091 remains open for the original `CBATTError` allowlist concern (no production evidence it fires; low priority).

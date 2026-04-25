@@ -491,8 +491,20 @@ class CentralManagerImpl: NSObject {
         }
 
         // Drain all remaining pending completions with the disconnect error.
-        let pigeonError: Error = (error as NSError?)?.toPigeonError()
-            ?? BlueyError.unknown.toClientPigeonError()
+        // iOS reports nil error for graceful disconnects: peer-initiated
+        // clean shutdown, or our own cancelPeripheralConnection (e.g.
+        // LifecycleClient declared the peer unreachable). The link is gone
+        // either way; map to gatt-disconnected so callers (LifecycleClient,
+        // example-app reconnect cubit) recognise the dead-peer signal.
+        // Falling through to BlueyError.unknown was wrong — see I096.
+        let pigeonError: Error
+        if let nsError = error as? NSError {
+            pigeonError = nsError.toPigeonError()
+        } else {
+            pigeonError = PigeonError(code: "gatt-disconnected",
+                                      message: "Peripheral disconnected",
+                                      details: nil)
+        }
         clearPendingCompletions(for: deviceId, error: pigeonError)
 
         // Notify connection state change
