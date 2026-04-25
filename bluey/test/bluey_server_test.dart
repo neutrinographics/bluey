@@ -1029,6 +1029,57 @@ void main() {
           });
         },
       );
+
+      test(
+        'I079 — read request enters pending set, drains on respondToRead',
+        () {
+          fakeAsync((async) {
+            final server = bluey.server(
+              lifecycleInterval: const Duration(seconds: 10),
+            )!;
+
+            final disconnections = <String>[];
+            server.disconnections.listen(disconnections.add);
+
+            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+              requestId: 1,
+              centralId: 'client-A',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              responseNeeded: false,
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+
+            ReadRequest? captured;
+            server.readRequests.listen((r) => captured = r);
+            mockPlatform.emitReadRequest(platform.PlatformReadRequest(
+              requestId: 77,
+              centralId: 'client-A',
+              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+              offset: 0,
+            ));
+            async.flushMicrotasks();
+            expect(captured, isNotNull);
+
+            // Server holds the read for 30s — must not declare gone.
+            async.elapse(const Duration(seconds: 30));
+            expect(disconnections, isEmpty);
+
+            unawaited(server.respondToRead(
+              captured!,
+              status: GattResponseStatus.success,
+              value: Uint8List.fromList([0xCD]),
+            ));
+            async.flushMicrotasks();
+
+            async.elapse(const Duration(seconds: 11));
+            expect(disconnections, ['client-A']);
+
+            server.dispose();
+          });
+        },
+      );
     });
 
     group('GattResponseStatus mapping', () {
