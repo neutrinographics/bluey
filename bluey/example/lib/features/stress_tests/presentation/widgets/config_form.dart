@@ -286,7 +286,13 @@ class _ConfigFormState extends State<ConfigForm> {
               fontWeight: FontWeight.w600,
               color: _kDark,
             ),
-            onSubmitted: (s) {
+            // Use onChanged (commits per-keystroke) rather than onSubmitted:
+            // iOS's number keyboard has no Done / action button, so
+            // onSubmitted never fires there and typed values would never
+            // save. The screen-level keyboard-dismiss handler (see
+            // stress_tests_screen.dart) closes the keyboard via tap-outside
+            // or the Done bar.
+            onChanged: (s) {
               final parsed = int.tryParse(s);
               if (parsed != null && parsed > 0) onChanged(parsed);
             },

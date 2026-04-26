@@ -47,53 +47,62 @@ class StressTestsScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: _kBg,
-        body: Stack(
-          children: [
-            BlocBuilder<StressTestsCubit, StressTestsState>(
-              builder: (context, state) {
-                final top = MediaQuery.of(context).padding.top + 64 + 16;
-                final entries = state.cards.entries.toList();
-                return CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: top)),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final entry = entries[index];
-                            final isLast = index == entries.length - 1;
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: isLast ? 128 : 24,
-                              ),
-                              child: TestCard(
-                                test: entry.key,
-                                config: entry.value.config,
-                                result: entry.value.result,
-                                isRunning: entry.value.isRunning,
-                                anyRunning: state.anyRunning,
-                                onRun: () => context
-                                    .read<StressTestsCubit>()
-                                    .run(entry.key),
-                                onStop: () =>
-                                    context.read<StressTestsCubit>().stop(),
-                                onConfigChanged: (cfg) => context
-                                    .read<StressTestsCubit>()
-                                    .updateConfig(entry.key, cfg),
-                              ),
-                            );
-                          },
-                          childCount: entries.length,
+        // Tap anywhere outside an interactive widget to dismiss the
+        // soft keyboard. Translucent so child gestures (run, stop,
+        // help buttons, scroll) still claim their taps; this only
+        // fires for taps that land on otherwise-inert background
+        // area. Required on iOS where the number pad has no Done key.
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: Stack(
+            children: [
+              BlocBuilder<StressTestsCubit, StressTestsState>(
+                builder: (context, state) {
+                  final top = MediaQuery.of(context).padding.top + 64 + 16;
+                  final entries = state.cards.entries.toList();
+                  return CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: SizedBox(height: top)),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final entry = entries[index];
+                              final isLast = index == entries.length - 1;
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: isLast ? 128 : 24,
+                                ),
+                                child: TestCard(
+                                  test: entry.key,
+                                  config: entry.value.config,
+                                  result: entry.value.result,
+                                  isRunning: entry.value.isRunning,
+                                  anyRunning: state.anyRunning,
+                                  onRun: () => context
+                                      .read<StressTestsCubit>()
+                                      .run(entry.key),
+                                  onStop: () =>
+                                      context.read<StressTestsCubit>().stop(),
+                                  onConfigChanged: (cfg) => context
+                                      .read<StressTestsCubit>()
+                                      .updateConfig(entry.key, cfg),
+                                ),
+                              );
+                            },
+                            childCount: entries.length,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const _TopBar(),
-          ],
+                    ],
+                  );
+                },
+              ),
+              const _TopBar(),
+            ],
+          ),
         ),
       ),
     );
@@ -149,3 +158,4 @@ class _TopBar extends StatelessWidget {
     );
   }
 }
+
