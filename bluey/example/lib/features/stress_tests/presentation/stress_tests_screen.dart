@@ -47,53 +47,63 @@ class StressTestsScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: _kBg,
-        body: Stack(
-          children: [
-            BlocBuilder<StressTestsCubit, StressTestsState>(
-              builder: (context, state) {
-                final top = MediaQuery.of(context).padding.top + 64 + 16;
-                final entries = state.cards.entries.toList();
-                return CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: top)),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final entry = entries[index];
-                            final isLast = index == entries.length - 1;
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: isLast ? 128 : 24,
-                              ),
-                              child: TestCard(
-                                test: entry.key,
-                                config: entry.value.config,
-                                result: entry.value.result,
-                                isRunning: entry.value.isRunning,
-                                anyRunning: state.anyRunning,
-                                onRun: () => context
-                                    .read<StressTestsCubit>()
-                                    .run(entry.key),
-                                onStop: () =>
-                                    context.read<StressTestsCubit>().stop(),
-                                onConfigChanged: (cfg) => context
-                                    .read<StressTestsCubit>()
-                                    .updateConfig(entry.key, cfg),
-                              ),
-                            );
-                          },
-                          childCount: entries.length,
+        // Tap anywhere outside an interactive widget to dismiss the
+        // keyboard. Translucent so child gestures (run, stop, help
+        // buttons, scroll) still claim their taps; this only fires for
+        // taps that land on otherwise-inert background area. Required
+        // on iOS where the number pad has no Done key.
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: Stack(
+            children: [
+              BlocBuilder<StressTestsCubit, StressTestsState>(
+                builder: (context, state) {
+                  final top = MediaQuery.of(context).padding.top + 64 + 16;
+                  final entries = state.cards.entries.toList();
+                  return CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: SizedBox(height: top)),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final entry = entries[index];
+                              final isLast = index == entries.length - 1;
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: isLast ? 128 : 24,
+                                ),
+                                child: TestCard(
+                                  test: entry.key,
+                                  config: entry.value.config,
+                                  result: entry.value.result,
+                                  isRunning: entry.value.isRunning,
+                                  anyRunning: state.anyRunning,
+                                  onRun: () => context
+                                      .read<StressTestsCubit>()
+                                      .run(entry.key),
+                                  onStop: () =>
+                                      context.read<StressTestsCubit>().stop(),
+                                  onConfigChanged: (cfg) => context
+                                      .read<StressTestsCubit>()
+                                      .updateConfig(entry.key, cfg),
+                                ),
+                              );
+                            },
+                            childCount: entries.length,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const _TopBar(),
-          ],
+                    ],
+                  );
+                },
+              ),
+              const _TopBar(),
+              const _KeyboardDoneBar(),
+            ],
+          ),
         ),
       ),
     );
@@ -143,6 +153,56 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Keyboard Done bar ───────────────────────────────────────────────────────
+
+/// A floating "Done" button that appears just above the soft keyboard
+/// when any text field on this screen is focused. Required because
+/// iOS's number-pad keyboard has no built-in Done / action button, so
+/// without an explicit dismissal control the user has no obvious way
+/// to confirm their input and close the keyboard. Tapping outside any
+/// widget also dismisses (see the Scaffold body's GestureDetector),
+/// but this gives a visible affordance.
+class _KeyboardDoneBar extends StatelessWidget {
+  const _KeyboardDoneBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    if (keyboardHeight == 0) return const SizedBox.shrink();
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8FAFC),
+          border: Border(
+            top: BorderSide(color: Color(0xFFE2E8F0), width: 0.5),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF3F6187),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: Text(
+              'Done',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ),
