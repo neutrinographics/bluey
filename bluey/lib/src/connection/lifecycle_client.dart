@@ -314,6 +314,9 @@ class LifecycleClient {
         name: 'bluey.lifecycle',
         level: 900, // WARNING
       );
+      // Release the in-flight flag: the probe write is done (with a dead-peer
+      // error), so the next probe can be dispatched normally.
+      _monitor.cancelProbe();
       // Feed the peer-silence detector. If the death watch trips, the
       // monitor's onSilent callback (set in the constructor) will call
       // our stop() + onServerUnreachable. No reschedule needed in that

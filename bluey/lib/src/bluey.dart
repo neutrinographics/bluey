@@ -296,8 +296,9 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
-  /// [maxFailedHeartbeats] - Consecutive heartbeat write failures that
-  ///   trigger a local disconnect when the device is a Bluey server.
+  /// [peerSilenceTimeout] - How long after the first heartbeat failure the
+  ///   peer is declared unreachable and a local disconnect is triggered.
+  ///   Only applies when the device is a Bluey server.
   ///
   /// After connecting, this method automatically discovers services. If the
   /// device hosts the Bluey control service, the lifecycle heartbeat is
@@ -309,7 +310,7 @@ class Bluey {
   Future<Connection> connect(
     Device device, {
     Duration? timeout,
-    int maxFailedHeartbeats = 1,
+    Duration peerSilenceTimeout = const Duration(seconds: 20),
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -333,14 +334,14 @@ class Bluey {
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
-        maxFailedHeartbeats: maxFailedHeartbeats,
+        peerSilenceTimeout: peerSilenceTimeout,
       );
 
       // Auto-upgrade: if the server hosts the Bluey control service,
       // start the lifecycle heartbeat and upgrade the connection in place.
       final connection = await _upgradeIfBlueyServer(
         rawConnection,
-        maxFailedHeartbeats: maxFailedHeartbeats,
+        peerSilenceTimeout: peerSilenceTimeout,
       );
 
       dev.log(
@@ -372,7 +373,7 @@ class Bluey {
   /// unchanged.
   Future<Connection> _upgradeIfBlueyServer(
     BlueyConnection rawConnection, {
-    int maxFailedHeartbeats = 1,
+    Duration peerSilenceTimeout = const Duration(seconds: 20),
   }) async {
     try {
       dev.log('upgrade attempt: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
@@ -417,7 +418,7 @@ class Bluey {
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
         connectionId: rawConnection.connectionId,
-        maxFailedHeartbeats: maxFailedHeartbeats,
+        peerSilenceTimeout: peerSilenceTimeout,
         onServerUnreachable: () {
           rawConnection.disconnect().catchError((_) {});
         },
@@ -513,17 +514,17 @@ class Bluey {
   ///
   /// No BLE activity happens until [BlueyPeer.connect] is called.
   ///
-  /// [maxFailedHeartbeats] controls how many consecutive heartbeat
-  /// write failures trigger a local disconnect on the peer connection.
-  /// Defaults to 1 (fail-fast).
+  /// [peerSilenceTimeout] controls how long after the first heartbeat failure
+  /// before the peer is declared unreachable and a local disconnect is
+  /// triggered on the peer connection. Defaults to 20 seconds.
   BlueyPeer peer(
     ServerId serverId, {
-    int maxFailedHeartbeats = 1,
+    Duration peerSilenceTimeout = const Duration(seconds: 20),
   }) {
     return createBlueyPeer(
       platformApi: _platform,
       serverId: serverId,
-      maxFailedHeartbeats: maxFailedHeartbeats,
+      peerSilenceTimeout: peerSilenceTimeout,
     );
   }
 

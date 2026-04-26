@@ -118,7 +118,7 @@ Future<T> _loggedGattOp<T>({
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
-  final int _maxFailedHeartbeats;
+  final Duration _peerSilenceTimeout;
 
   /// The platform-level connection identifier.
   ///
@@ -174,10 +174,10 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
-    int maxFailedHeartbeats = 1,
+    Duration peerSilenceTimeout = const Duration(seconds: 20),
   }) : _platform = platformInstance,
        _connectionId = connectionId,
-       _maxFailedHeartbeats = maxFailedHeartbeats {
+       _peerSilenceTimeout = peerSilenceTimeout {
     // Subscribe to platform connection state changes
     _platformStateSubscription = _platform
         .connectionStateStream(_connectionId)
@@ -515,7 +515,7 @@ class BlueyConnection implements Connection {
     final lifecycleClient = LifecycleClient(
       platformApi: _platform,
       connectionId: _connectionId,
-      maxFailedHeartbeats: _maxFailedHeartbeats,
+      peerSilenceTimeout: _peerSilenceTimeout,
       onServerUnreachable: () {
         disconnect().catchError((_) {});
       },

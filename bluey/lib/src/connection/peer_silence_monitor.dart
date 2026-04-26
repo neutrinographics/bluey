@@ -80,10 +80,11 @@ class PeerSilenceMonitor {
     _running = true;
   }
 
-  /// Deactivates the monitor and cancels any pending timer.
-  /// Idempotent.
+  /// Deactivates the monitor, cancels any pending timer, and releases the
+  /// in-flight probe flag. Idempotent.
   void stop() {
     _running = false;
+    _probeInFlight = false;
     _deathTimer?.cancel();
     _deathTimer = null;
   }
@@ -92,10 +93,12 @@ class PeerSilenceMonitor {
 
   /// Records evidence that the peer is alive: a successful user op,
   /// an incoming notification, or a probe ack. Cancels the death
-  /// watch if one is active.
+  /// watch if one is active, and releases any in-flight probe flag so
+  /// a future probe is not permanently gated.
   void recordActivity() {
     _lastActivityAt = clock.now();
     _firstFailureAt = null;
+    _probeInFlight = false;
     _deathTimer?.cancel();
     _deathTimer = null;
   }

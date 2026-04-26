@@ -16,18 +16,18 @@ import 'server_id.dart';
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
   required ServerId serverId,
-  int maxFailedHeartbeats = 1,
+  Duration peerSilenceTimeout = const Duration(seconds: 20),
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
     serverId: serverId,
-    maxFailedHeartbeats: maxFailedHeartbeats,
+    peerSilenceTimeout: peerSilenceTimeout,
   );
 }
 
 class _BlueyPeer implements BlueyPeer {
   final platform.BlueyPlatform _platform;
-  final int _maxFailedHeartbeats;
+  final Duration _peerSilenceTimeout;
 
   @override
   final ServerId serverId;
@@ -37,9 +37,9 @@ class _BlueyPeer implements BlueyPeer {
   _BlueyPeer({
     required platform.BlueyPlatform platformApi,
     required this.serverId,
-    required int maxFailedHeartbeats,
+    required Duration peerSilenceTimeout,
   })  : _platform = platformApi,
-        _maxFailedHeartbeats = maxFailedHeartbeats;
+        _peerSilenceTimeout = peerSilenceTimeout;
 
   @override
   Future<Connection> connect({
@@ -81,7 +81,7 @@ class _BlueyPeer implements BlueyPeer {
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
         connectionId: blueyConnection.connectionId,
-        maxFailedHeartbeats: _maxFailedHeartbeats,
+        peerSilenceTimeout: _peerSilenceTimeout,
         onServerUnreachable: () {
           blueyConnection.disconnect().catchError((_) {});
         },
