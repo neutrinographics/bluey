@@ -123,23 +123,33 @@ extension StressTestHelpX on StressTest {
                 'Issues a drop-next command to the server, then fires '
                 'writeCount writes against the echo characteristic. The '
                 'first write is silently dropped by the server; '
-                'subsequent writes are answered normally. Verifies how '
-                'the client handles a single dropped response and '
-                'whether the connection recovers afterwards.',
+                'subsequent writes would normally be answered, but on '
+                'iOS the platform stack stalls behind the missing ack. '
+                'Verifies that Bluey reports the cascade clearly and '
+                'tears the connection down on schedule rather than '
+                'declaring the peer dead from local serialization '
+                'alone (the I097 bug).',
             readingResults:
                 'Outcome depends on the "Heartbeat tolerance" setting '
-                'on the connection screen.\n\n'
-                'Strict (10 s): the dropped write times out, and the '
-                'silence detector trips 10 s later because no '
-                'subsequent successful exchange occurs in that window. '
-                'Expect 1 GattTimeoutException + N−1 '
-                'GattOperationDisconnectedException as queued ops '
-                'drain. This is the disconnect-cascade scenario.\n\n'
-                'Tolerant (30 s) or Very tolerant (60 s): the dropped '
-                'write times out, but the next successful echo arrives '
-                'before the silence timeout expires, resetting the '
-                'death watch. Expect 1 GattTimeoutException + N−1 '
-                'successes. This is the recovery scenario.',
+                'on the connection screen and on the platform.\n\n'
+                'iOS — the platform stack stalls until CoreBluetooth '
+                'drops the link itself at roughly 30 s after the stuck '
+                'write. So:\n'
+                '  • Strict (10 s): Bluey\'s silence detector fires '
+                '10 s after the first timeout. Expect 1 '
+                'GattTimeoutException + cascade.\n'
+                '  • Tolerant (30 s) / Very tolerant (60 s): two visible '
+                'GattTimeoutExceptions (the dropped write at T=10 s and '
+                'the next-stuck write at T=20 s), then the platform '
+                'drops the link at ~30 s before our silence timer can '
+                'expire. The recovery path isn\'t reachable on iOS '
+                'because CB never releases the stuck write.\n\n'
+                'Android — the queue surfaces a single timeout for the '
+                'dropped write; subsequent echoes succeed. With '
+                'Tolerant or higher, the recovery scenario is reachable: '
+                '1 GattTimeoutException + N−1 successes. With Strict, '
+                'the silence detector tears the connection down before '
+                'a subsequent success can clear it.',
             relevantStats: [
               HelpStat.attempted,
               HelpStat.succeeded,
