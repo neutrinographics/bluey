@@ -4,8 +4,9 @@ title: `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-inter
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-24
+status: fixed
+last_verified: 2026-04-26
+fixed_in: a6bd217
 related: [I020, I021]
 ---
 
@@ -27,11 +28,10 @@ Oversight when the server-side respond methods were first wired up. The client-s
 
 ## Notes
 
-Fix sketch: add a `runGuarded`-style wrapper in `BlueyServer` mirroring the one in `BlueyConnection`. Needs a design decision about which user-facing `BlueyException` subtype is right:
+Fixed in `a6bd217` by adding a new `ServerRespondFailedException` to the `BlueyException` sealed hierarchy (server bounded context) and wrapping `respondToRead` / `respondToWrite` in `BlueyServer` with a typed catch on `GattOperationStatusFailedException` that rethrows the new exception.
 
-- Reuse `GattOperationFailedException` (same class as client-side), OR
-- Add a new `ServerRespondFailedException` — probably cleaner, since the semantics ("your pending request is gone") are different from the client-side ("the peer returned a non-success ATT status").
+Decision: chose option B (new exception, not reuse of `GattOperationFailedException`). The client-side and server-side variants signal genuinely different domain events even though they carry the same platform status byte: the client-side means "peer rejected my write with a non-success ATT status," whereas the server-side means "the platform refused my reply, usually because the central is gone." Bounded contexts get their own vocabulary.
 
-Out of scope for the I020+I021 PR because the fix for that PR can't leak what the old no-op paths didn't leak either. Track here for the next domain-layer pass.
+Payload (rich for debugging): `operation` (`'respondToRead'` or `'respondToWrite'`), `status` (native ATT byte, e.g. `0x0A` NoPendingRequest), `clientId` (the central's `Client.id`), `characteristicId` (the original request's target characteristic).
 
 Related: I020, I021 (surfaced this; the new `NoPendingRequest → gatt-status-failed(0x0A)` path is a primary trigger).
