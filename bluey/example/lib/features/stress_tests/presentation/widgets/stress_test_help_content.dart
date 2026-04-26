@@ -108,9 +108,10 @@ extension StressTestHelpX on StressTest {
                 'operation.\n\n'
                 'If the connection drops, the lifecycle policy is being '
                 'tripped by the slow op — see the "Heartbeat tolerance" '
-                'setting on the connection screen. With Strict (1), even '
-                'one slow op can trip the dead-peer threshold; with '
-                'Tolerant (3) or higher, slow ops are absorbed.',
+                'setting on the connection screen. With Strict (10 s), '
+                'a slow op approaching that window can trip the silence '
+                'detector; with Tolerant (30 s) or higher, slow ops are '
+                'absorbed.',
             relevantStats: [
               HelpStat.attempted,
               HelpStat.succeeded,

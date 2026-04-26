@@ -15,12 +15,12 @@ import 'connection.dart';
 import 'lifecycle_client.dart';
 
 /// Runs a GATT op through the error-translation pipeline and routes
-/// lifecycle signals into [lifecycle]. Used by every public GATT op on
-/// [BlueyConnection] / [BlueyRemoteCharacteristic] /
+/// lifecycle signals into [lifecycleClient]. Used by every public GATT
+/// op on [BlueyConnection] / [BlueyRemoteCharacteristic] /
 /// [BlueyRemoteDescriptor] so user-op accounting and activity signals
 /// flow uniformly through one place.
 ///
-/// Lifecycle hooks (all no-ops if [lifecycle] is null):
+/// Lifecycle hooks (all no-ops if [lifecycleClient] is null):
 ///   * [LifecycleClient.markUserOpStarted] before [body] is awaited.
 ///   * [LifecycleClient.recordActivity] on success.
 ///   * [LifecycleClient.recordUserOpFailure] on any caught platform
@@ -44,34 +44,34 @@ Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
   Future<T> Function() body, {
-  LifecycleClient? lifecycle,
+  LifecycleClient? lifecycleClient,
 }) async {
-  lifecycle?.markUserOpStarted();
+  lifecycleClient?.markUserOpStarted();
   try {
     final result = await body();
-    lifecycle?.recordActivity();
+    lifecycleClient?.recordActivity();
     return result;
   } on platform.GattOperationTimeoutException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     throw GattTimeoutException(operation);
   } on platform.GattOperationDisconnectedException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
   } on platform.GattOperationStatusFailedException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     throw GattOperationFailedException(operation, e.status);
   } on platform.GattOperationUnknownPlatformException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     throw BlueyPlatformException(
       e.message ?? 'unknown platform error (${e.code})',
       code: e.code,
       cause: e,
     );
   } on platform.PlatformPermissionDeniedException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     throw PermissionDeniedException([e.permission]);
   } on PlatformException catch (e) {
-    lifecycle?.recordUserOpFailure(e);
+    lifecycleClient?.recordUserOpFailure(e);
     // Defensive backstop: any PlatformException that wasn't translated by
     // the platform adapter (e.g. a new native error code we haven't yet
     // mapped) gets wrapped so user code only ever catches BlueyException.
@@ -81,7 +81,7 @@ Future<T> _runGattOp<T>(
       cause: e,
     );
   } finally {
-    lifecycle?.markUserOpEnded();
+    lifecycleClient?.markUserOpEnded();
   }
 }
 
@@ -100,15 +100,19 @@ Future<T> _loggedGattOp<T>({
   required Future<T> Function() body,
   String startDetail = '',
   String Function(T result)? completeDetail,
-  LifecycleClient? lifecycle,
+  LifecycleClient? lifecycleClient,
 }) async {
   final startSuffix = startDetail.isEmpty ? '' : ', $startDetail';
   dev.log('$op start: deviceId=$deviceId$startSuffix',
       name: 'bluey.gatt', level: 500);
   final sw = Stopwatch()..start();
   try {
-    final result =
-        await _runGattOp(deviceId, op, body, lifecycle: lifecycle);
+    final result = await _runGattOp(
+      deviceId,
+      op,
+      body,
+      lifecycleClient: lifecycleClient,
+    );
     final detail = completeDetail?.call(result);
     final completeSuffix = (detail == null || detail.isEmpty) ? '' : ', $detail';
     dev.log(
@@ -331,7 +335,7 @@ class BlueyConnection implements Connection {
       deviceId,
       'discoverServices',
       () => _platform.discoverServices(_connectionId),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
     final allServices = platformServices.map((ps) => _mapService(ps)).toList();
 
@@ -378,7 +382,7 @@ class BlueyConnection implements Connection {
       startDetail: 'requested=$mtu',
       body: () => _platform.requestMtu(_connectionId, mtu),
       completeDetail: (negotiated) => 'requested=$mtu, negotiated=$negotiated',
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
     return _mtu;
   }
@@ -390,7 +394,7 @@ class BlueyConnection implements Connection {
       op: 'readRssi',
       body: () => _platform.readRssi(_connectionId),
       completeDetail: (rssi) => 'rssi=${rssi}dBm',
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 
@@ -646,7 +650,7 @@ class BlueyConnection implements Connection {
         canIndicate: pc.properties.canIndicate,
       ),
       descriptors: pc.descriptors.map(_mapDescriptor).toList(),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 
@@ -656,7 +660,7 @@ class BlueyConnection implements Connection {
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 }
@@ -721,11 +725,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     required this.descriptors,
-    LifecycleClient? lifecycle,
+    LifecycleClient? lifecycleClient,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycle;
+       _lifecycle = lifecycleClient;
 
   @override
   Future<Uint8List> read() {
@@ -738,7 +742,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       startDetail: 'char=$uuid',
       body: () => _platform.readCharacteristic(_connectionId, uuid.toString()),
       completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 
@@ -761,7 +765,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         withResponse,
       ),
       completeDetail: (_) => 'char=$uuid',
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 
@@ -792,7 +796,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     ).catchError((Object error) {
       _notificationController?.addError(error);
     });
@@ -828,7 +832,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     ).catchError((Object _) {});
 
     // Cancel subscription
@@ -862,11 +866,11 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
-    LifecycleClient? lifecycle,
+    LifecycleClient? lifecycleClient,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycle;
+       _lifecycle = lifecycleClient;
 
   @override
   Future<Uint8List> read() async {
@@ -874,7 +878,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'readDescriptor',
       () => _platform.readDescriptor(_connectionId, uuid.toString()),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 
@@ -884,7 +888,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'writeDescriptor',
       () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
-      lifecycle: _lifecycle,
+      lifecycleClient: _lifecycle,
     );
   }
 }

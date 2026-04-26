@@ -93,12 +93,20 @@ class PeerSilenceMonitor {
 
   /// Records evidence that the peer is alive: a successful user op,
   /// an incoming notification, or a probe ack. Cancels the death
-  /// watch if one is active, and releases any in-flight probe flag so
-  /// a future probe is not permanently gated.
+  /// watch if one is active.
+  ///
+  /// Deliberately does NOT clear `_probeInFlight`: a probe write that
+  /// is genuinely still on the wire must complete via
+  /// [recordProbeSuccess] / [cancelProbe] / [recordPeerFailure]. If
+  /// recordActivity cleared the flag, a user op completing during a
+  /// probe write could let the next scheduled tick dispatch a second
+  /// probe before the first one resolves — the exact CoreBluetooth
+  /// queue-contention pattern this monitor was introduced to avoid.
+  /// Lingering `_probeInFlight` after [stop] is handled in [stop]
+  /// itself.
   void recordActivity() {
     _lastActivityAt = clock.now();
     _firstFailureAt = null;
-    _probeInFlight = false;
     _deathTimer?.cancel();
     _deathTimer = null;
   }

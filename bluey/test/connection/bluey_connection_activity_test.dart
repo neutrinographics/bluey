@@ -115,7 +115,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycle: lc,
+        lifecycleClient: lc,
       );
 
       await char.write(Uint8List.fromList([0x42]));
@@ -157,7 +157,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycle: lc,
+        lifecycleClient: lc,
       );
 
       await char.read();
@@ -196,7 +196,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycle: lc,
+        lifecycleClient: lc,
       );
 
       await expectLater(
@@ -225,7 +225,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycle: lc,
+        lifecycleClient: lc,
       );
     }
 
