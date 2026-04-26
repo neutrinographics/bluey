@@ -414,8 +414,18 @@ class BlueyConnection implements Connection {
     _stateController.add(_state);
 
     // Send lifecycle disconnect command if upgraded to Bluey protocol.
+    // The disconnect command is a courtesy hint to the server, not a
+    // requirement — bound it with a short timeout so an unresponsive
+    // peer (the typical disconnect scenario) doesn't block the platform
+    // disconnect for the full per-op timeout. See I074.
     if (_lifecycle != null) {
-      await _lifecycle!.sendDisconnectCommand();
+      try {
+        await _lifecycle!
+            .sendDisconnectCommand()
+            .timeout(const Duration(seconds: 1));
+      } catch (_) {
+        // Best-effort courtesy; proceed to platform disconnect regardless.
+      }
       _lifecycle!.stop();
     }
 
