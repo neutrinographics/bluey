@@ -6,8 +6,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../shared/device_id_coercion.dart';
 import '../shared/exceptions.dart';
-import '../shared/uuid.dart';
 import 'server_id.dart';
 
 /// Stateless helper that orchestrates scan + connect + serverId read
@@ -64,7 +64,7 @@ class PeerDiscovery {
           return BlueyConnection(
             platformInstance: _platform,
             connectionId: address,
-            deviceId: _addressToUuid(address),
+            deviceId: deviceIdToUuid(address),
           );
         }
         // Not a match — disconnect.
@@ -126,13 +126,4 @@ class PeerDiscovery {
     return lifecycle.decodeServerId(bytes);
   }
 
-  /// Converts a device address (e.g. MAC) to a [UUID].
-  UUID _addressToUuid(String address) {
-    if (address.length == 36 && address.contains('-')) {
-      return UUID(address);
-    }
-    final clean = address.replaceAll(':', '').toLowerCase();
-    final padded = clean.padLeft(32, '0');
-    return UUID(padded);
-  }
 }

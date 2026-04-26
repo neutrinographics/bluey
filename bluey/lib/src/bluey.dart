@@ -20,6 +20,7 @@ import 'peer/peer.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
+import 'shared/device_id_coercion.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
 import 'shared/uuid.dart';
@@ -470,7 +471,7 @@ class Bluey {
   /// Maps a platform device to a domain Device (identity only).
   Device _mapDevice(platform.PlatformDevice platformDevice) {
     return Device(
-      id: _deviceIdToUuid(platformDevice.id),
+      id: deviceIdToUuid(platformDevice.id),
       address: platformDevice.id,
       name: platformDevice.name,
     );
@@ -585,24 +586,6 @@ class Bluey {
       case platform.BluetoothState.on:
         return BluetoothState.on;
     }
-  }
-
-
-  /// Converts a platform device ID to a UUID.
-  ///
-  /// On Android, the ID is a MAC address (e.g., "AA:BB:CC:DD:EE:FF").
-  /// On iOS, the ID is already a UUID.
-  UUID _deviceIdToUuid(String id) {
-    // Check if it's already a UUID format
-    if (id.length == 36 && id.contains('-')) {
-      return UUID(id);
-    }
-
-    // Convert MAC address to UUID format
-    // Remove colons and pad to 32 hex chars
-    final clean = id.replaceAll(':', '').toLowerCase();
-    final padded = clean.padLeft(32, '0');
-    return UUID(padded);
   }
 
   /// Emits an event to the event bus.
