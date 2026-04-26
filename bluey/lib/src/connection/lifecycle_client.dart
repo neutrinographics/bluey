@@ -99,6 +99,18 @@ class LifecycleClient {
     _monitor.start();
   }
 
+  /// Exposed for tests: count of in-flight user GATT ops as tracked by
+  /// [markUserOpStarted] / [markUserOpEnded]. Should be zero between
+  /// ops; non-zero values indicate the wrapping is leaking.
+  @visibleForTesting
+  int get pendingUserOpsForTest => _pendingUserOps;
+
+  /// Exposed for tests: the death-watch's first-failure timestamp.
+  /// Non-null implies the silence detector has been armed by a peer
+  /// failure that hasn't yet been cleared by a successful exchange.
+  @visibleForTesting
+  DateTime? get firstFailureAtForTest => _monitor.firstFailureAt;
+
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
   /// shifts the probe deadline forward by [_monitor.activityWindow].

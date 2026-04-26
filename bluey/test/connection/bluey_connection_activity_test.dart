@@ -209,4 +209,118 @@ void main() {
       lc.stop();
     });
   }); // end group('BlueyRemoteCharacteristic activity hook')
+
+  group('BlueyConnection user-op wrapping (I097)', () {
+    BlueyRemoteCharacteristic buildWritableChar(LifecycleClient lc) {
+      return BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: false,
+          canWrite: true,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+        lifecycle: lc,
+      );
+    }
+
+    Future<void> setupWritablePeripheral() async {
+      fakePlatform.simulatePeripheral(
+        id: TestDeviceIds.device1,
+        name: 'Test',
+        services: [
+          TestServiceBuilder(TestUuids.customService)
+              .withWritable(TestUuids.customChar1)
+              .build(),
+        ],
+      );
+      await fakePlatform.connect(
+        TestDeviceIds.device1,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+    }
+
+    LifecycleClient newStartedLifecycle() {
+      return LifecycleClient(
+        platformApi: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        peerSilenceTimeout: const Duration(seconds: 20),
+        onServerUnreachable: () {},
+      )..debugStartForTest();
+    }
+
+    test('user op success wraps with start/end and records activity',
+        () async {
+      await setupWritablePeripheral();
+      final lc = newStartedLifecycle();
+      final char = buildWritableChar(lc);
+
+      final write = char.write(Uint8List.fromList([0x42]));
+      // While the await is in flight, the counter is incremented.
+      expect(lc.pendingUserOpsForTest, 1,
+          reason: 'markUserOpStarted ran before the body awaited');
+      await write;
+
+      expect(lc.pendingUserOpsForTest, 0,
+          reason: 'markUserOpEnded ran after the body returned');
+      expect(lc.lastActivityAtForTest, isNotNull);
+      expect(lc.firstFailureAtForTest, isNull,
+          reason: 'success path must not arm the silence detector');
+
+      lc.stop();
+    });
+
+    test('user op timeout wraps with start/end and arms the silence detector',
+        () async {
+      await setupWritablePeripheral();
+      fakePlatform.simulateWriteTimeout = true;
+
+      final lc = newStartedLifecycle();
+      final char = buildWritableChar(lc);
+
+      await expectLater(
+        () => char.write(Uint8List.fromList([0x42])),
+        throwsA(isA<GattTimeoutException>()),
+        reason: 'translated domain exception still propagates to caller',
+      );
+
+      expect(lc.pendingUserOpsForTest, 0,
+          reason: 'markUserOpEnded ran in finally even on failure');
+      expect(lc.lastActivityAtForTest, isNull);
+      expect(lc.firstFailureAtForTest, isNotNull,
+          reason: 'timeout user op must arm the silence detector');
+
+      fakePlatform.simulateWriteTimeout = false;
+      lc.stop();
+    });
+
+    test(
+        'user op status-failed wraps with start/end but does not arm the '
+        'silence detector', () async {
+      await setupWritablePeripheral();
+      fakePlatform.simulateWriteStatusFailed = 0x03;
+
+      final lc = newStartedLifecycle();
+      final char = buildWritableChar(lc);
+
+      await expectLater(
+        () => char.write(Uint8List.fromList([0x42])),
+        throwsA(isA<GattOperationFailedException>()),
+      );
+
+      expect(lc.pendingUserOpsForTest, 0);
+      expect(lc.lastActivityAtForTest, isNull);
+      expect(lc.firstFailureAtForTest, isNull,
+          reason:
+              'non-timeout user-op failure is filtered out of recordUserOpFailure');
+
+      fakePlatform.simulateWriteStatusFailed = null;
+      lc.stop();
+    });
+  }); // end group('BlueyConnection user-op wrapping (I097)')
 }
