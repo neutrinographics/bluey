@@ -57,8 +57,18 @@ void main() {
         final id = ServerId.generate();
         fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
 
-        // Use a short peerSilenceTimeout so the test doesn't need to advance
-        // a full 20 seconds after the first failure.
+        // Note: this test actually exercises BlueyConnection's own
+        // `_peerSilenceTimeout` (the lifecycle installed by `_tryUpgrade`
+        // during `services()`), NOT the `createBlueyPeer` parameter.
+        // `BlueyPeer.connect` reinstalls a second LifecycleClient via
+        // `blueyConnection.upgrade(...)` but never starts it (the
+        // post-upgrade `services()` already filtered out the control
+        // service, so `LifecycleClient.start` finds no heartbeat char).
+        // The OLD lifecycle leaks per I071 and is the one that fires.
+        //
+        // Until I071 is fixed, the timeout that actually matters here is
+        // the BlueyConnection default — currently
+        // `lifecycle.defaultPeerSilenceTimeout` (30 s).
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
           serverId: id,
@@ -82,10 +92,10 @@ void main() {
         fakePlatform.simulateWriteTimeout = true;
 
         // Heartbeat interval is half the 10s lifecycle interval = 5s.
-        // First failure at ~T=5s arms the death watch for T=5+8=13s.
-        // Advance 20s to ensure the death watch fires, plus give time for
-        // the cascading async disconnect operations to complete.
-        async.elapse(const Duration(seconds: 20));
+        // First probe failure at ~T=5s arms the OLD lifecycle's death
+        // watch for T=5+30=35s. Advance to T~=40s plus drain so the
+        // cascading async disconnect operations complete.
+        async.elapse(const Duration(seconds: 40));
         async.flushMicrotasks();
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();

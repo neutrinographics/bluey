@@ -47,6 +47,17 @@ final disconnectValue = Uint8List.fromList([0x00]);
 /// Default lifecycle interval.
 const defaultLifecycleInterval = Duration(seconds: 10);
 
+/// Default peer-silence timeout for the death watch in `LifecycleClient`.
+///
+/// Chosen to be strictly longer than the typical OS link-supervision
+/// timeout (~20 seconds on Android per AOSP defaults, comparable on
+/// iOS) so that on genuine link loss the platform's own disconnect
+/// path fires first and the application-level silence detector
+/// converges via the queue-drain rather than racing the OS. See I017
+/// in the backlog and Bluetooth Core Spec 5.4 Vol 6 Part B §4.5.2
+/// (Link Supervision Timeout) for the upstream constraint.
+const defaultPeerSilenceTimeout = Duration(seconds: 30);
+
 /// Checks whether a characteristic UUID belongs to the control service.
 bool isControlServiceCharacteristic(String characteristicUuid) {
   final normalized = characteristicUuid.toLowerCase();

@@ -16,7 +16,7 @@ import 'server_id.dart';
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
   required ServerId serverId,
-  Duration peerSilenceTimeout = const Duration(seconds: 20),
+  Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
