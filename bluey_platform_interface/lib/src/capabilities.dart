@@ -46,11 +46,16 @@ class Capabilities {
   });
 
   /// Android capabilities.
+  ///
+  /// `canBond` is currently `false` because the Dart-side bonding methods
+  /// on `AndroidConnectionManager` are unimplemented (I035 Stage A).
+  /// Flip back to `true` once the Pigeon schema declares the bond
+  /// operations and the Kotlin side wires up `BluetoothDevice.createBond()`.
   static const android = Capabilities(
     canAdvertise: true,
     canRequestMtu: true,
     maxMtu: 517,
-    canBond: true,
+    canBond: false,
     canRequestEnable: true,
   );
 

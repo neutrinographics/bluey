@@ -45,7 +45,9 @@ void main() {
       expect(Capabilities.android.canAdvertise, isTrue);
       expect(Capabilities.android.canRequestMtu, isTrue);
       expect(Capabilities.android.maxMtu, equals(517));
-      expect(Capabilities.android.canBond, isTrue);
+      // I035 Stage A: canBond temporarily false until the Dart-side
+      // bonding methods are wired through Pigeon (Stage B).
+      expect(Capabilities.android.canBond, isFalse);
       expect(Capabilities.android.canRequestEnable, isTrue);
     });
 

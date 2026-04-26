@@ -286,73 +286,10 @@ void main() {
       });
     });
 
-    group('bonding stubs', () {
-      test('getBondState returns none', () async {
-        final state = await connectionManager.getBondState('device-1');
-        expect(state, equals(PlatformBondState.none));
-      });
-
-      test('bondStateStream returns empty stream', () {
-        final stream = connectionManager.bondStateStream('device-1');
-        expect(stream, emitsDone);
-      });
-
-      test('bond is a no-op', () async {
-        await connectionManager.bond('device-1');
-        // No exception means success
-      });
-
-      test('removeBond is a no-op', () async {
-        await connectionManager.removeBond('device-1');
-        // No exception means success
-      });
-
-      test('getBondedDevices returns empty list', () async {
-        final devices = await connectionManager.getBondedDevices();
-        expect(devices, isEmpty);
-      });
-    });
-
-    group('PHY stubs', () {
-      test('getPhy returns le1m for both tx and rx', () async {
-        final phy = await connectionManager.getPhy('device-1');
-        expect(phy.tx, equals(PlatformPhy.le1m));
-        expect(phy.rx, equals(PlatformPhy.le1m));
-      });
-
-      test('phyStream returns empty stream', () {
-        final stream = connectionManager.phyStream('device-1');
-        expect(stream, emitsDone);
-      });
-
-      test('requestPhy is a no-op', () async {
-        await connectionManager.requestPhy(
-            'device-1', PlatformPhy.le2m, PlatformPhy.le2m);
-        // No exception means success
-      });
-    });
-
-    group('connection parameters stubs', () {
-      test('getConnectionParameters returns defaults', () async {
-        final params =
-            await connectionManager.getConnectionParameters('device-1');
-        expect(params.intervalMs, equals(30));
-        expect(params.latency, equals(0));
-        expect(params.timeoutMs, equals(5000));
-      });
-
-      test('requestConnectionParameters is a no-op', () async {
-        await connectionManager.requestConnectionParameters(
-          'device-1',
-          const PlatformConnectionParameters(
-            intervalMs: 15,
-            latency: 0,
-            timeoutMs: 2000,
-          ),
-        );
-        // No exception means success
-      });
-    });
+    // Bonding / PHY / connection-parameter stubs are exercised by the
+    // 'unimplemented stubs (I035 Stage A)' group at the bottom of this
+    // file — they all throw UnimplementedError until Stage B wires the
+    // Pigeon plumbing through.
 
     group('onMtuChanged', () {
       test('does not throw for known device', () async {
@@ -795,6 +732,95 @@ void main() {
           );
         },
       );
+    });
+
+    group('unimplemented stubs (I035 Stage A)', () {
+      // Bond/PHY/connection-parameter methods are not yet wired through
+      // Pigeon. Until they are, the stubs must be honest — throw
+      // UnimplementedError rather than silently returning hardcoded
+      // success values, so callers cannot mistake a no-op for a working
+      // implementation.
+
+      test('getBondState throws UnimplementedError', () {
+        expect(
+          () => connectionManager.getBondState('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('bondStateStream throws UnimplementedError synchronously', () {
+        expect(
+          () => connectionManager.bondStateStream('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('bond throws UnimplementedError', () {
+        expect(
+          () => connectionManager.bond('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('removeBond throws UnimplementedError', () {
+        expect(
+          () => connectionManager.removeBond('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('getBondedDevices throws UnimplementedError', () {
+        expect(
+          () => connectionManager.getBondedDevices(),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('getPhy throws UnimplementedError', () {
+        expect(
+          () => connectionManager.getPhy('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('phyStream throws UnimplementedError synchronously', () {
+        expect(
+          () => connectionManager.phyStream('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('requestPhy throws UnimplementedError', () {
+        expect(
+          () => connectionManager.requestPhy(
+            'device-1',
+            PlatformPhy.le1m,
+            PlatformPhy.le1m,
+          ),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('getConnectionParameters throws UnimplementedError', () {
+        expect(
+          () => connectionManager.getConnectionParameters('device-1'),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
+
+      test('requestConnectionParameters throws UnimplementedError', () {
+        expect(
+          () => connectionManager.requestConnectionParameters(
+            'device-1',
+            const PlatformConnectionParameters(
+              intervalMs: 30,
+              latency: 0,
+              timeoutMs: 5000,
+            ),
+          ),
+          throwsA(isA<UnimplementedError>()),
+        );
+      });
     });
   });
 }
