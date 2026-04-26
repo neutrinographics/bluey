@@ -296,9 +296,13 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
-  /// [peerSilenceTimeout] - How long after the first heartbeat failure the
-  ///   peer is declared unreachable and a local disconnect is triggered.
-  ///   Only applies when the device is a Bluey server.
+  /// [peerSilenceTimeout] - How long after a peer-failure signal (heartbeat
+  ///   probe timeout or user-op timeout) without an intervening successful
+  ///   exchange before the peer is declared unreachable and a local
+  ///   disconnect is triggered. Only applies when the device is a Bluey
+  ///   server. Defaults to [lifecycle.defaultPeerSilenceTimeout] (30 s),
+  ///   chosen to exceed the typical OS link-supervision timeout (~20 s) so
+  ///   the OS path fires first on genuine link loss.
   ///
   /// After connecting, this method automatically discovers services. If the
   /// device hosts the Bluey control service, the lifecycle heartbeat is
@@ -310,7 +314,7 @@ class Bluey {
   Future<Connection> connect(
     Device device, {
     Duration? timeout,
-    Duration peerSilenceTimeout = const Duration(seconds: 20),
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -373,7 +377,7 @@ class Bluey {
   /// unchanged.
   Future<Connection> _upgradeIfBlueyServer(
     BlueyConnection rawConnection, {
-    Duration peerSilenceTimeout = const Duration(seconds: 20),
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
     try {
       dev.log('upgrade attempt: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
@@ -514,12 +518,15 @@ class Bluey {
   ///
   /// No BLE activity happens until [BlueyPeer.connect] is called.
   ///
-  /// [peerSilenceTimeout] controls how long after the first heartbeat failure
-  /// before the peer is declared unreachable and a local disconnect is
-  /// triggered on the peer connection. Defaults to 20 seconds.
+  /// [peerSilenceTimeout] controls how long after a peer-failure signal
+  /// (heartbeat probe timeout or user-op timeout) without an intervening
+  /// successful exchange before the peer is declared unreachable and a
+  /// local disconnect is triggered. Defaults to
+  /// [lifecycle.defaultPeerSilenceTimeout] (30 s); see that constant for
+  /// the rationale (must exceed the OS link-supervision timeout).
   BlueyPeer peer(
     ServerId serverId, {
-    Duration peerSilenceTimeout = const Duration(seconds: 20),
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) {
     return createBlueyPeer(
       platformApi: _platform,

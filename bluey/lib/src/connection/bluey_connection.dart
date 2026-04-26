@@ -195,7 +195,7 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
-    Duration peerSilenceTimeout = const Duration(seconds: 20),
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) : _platform = platformInstance,
        _connectionId = connectionId,
        _peerSilenceTimeout = peerSilenceTimeout {
