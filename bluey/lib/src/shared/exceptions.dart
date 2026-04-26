@@ -197,6 +197,51 @@ class OperationNotSupportedException extends BlueyException {
 
 // === Server Exceptions ===
 
+/// Server-side respond to a [ReadRequest] or [WriteRequest] failed at the
+/// platform layer.
+///
+/// Most common cause: the central disconnected after sending the request
+/// but before the server-side handler called `respondToRead` /
+/// `respondToWrite`, so the platform has no pending request matching the
+/// supplied id. Android surfaces this as ATT status `0x0A` (NoPendingRequest).
+///
+/// Distinct from [GattOperationFailedException], which is a *client-side*
+/// failure (peer rejected our write with a non-success ATT status).
+/// `ServerRespondFailedException` is *server-side*: we tried to reply and
+/// the platform refused. Typical caller response is "log it and move on" —
+/// there's no recipient left to retry against.
+class ServerRespondFailedException extends BlueyException {
+  /// Which respond method failed: `'respondToRead'` or `'respondToWrite'`.
+  final String operation;
+
+  /// Native ATT status code returned by the platform. Android uses ATT
+  /// codes directly (e.g. `0x0A` NoPendingRequest after a central drops
+  /// mid-transaction). iOS adapts CoreBluetooth errors to ATT-like codes
+  /// in the same range.
+  final int status;
+
+  /// Identifier of the central (`Client.id`) whose request could not be
+  /// responded to. The client may already be disconnected; consumers
+  /// should not assume it is still live.
+  final UUID clientId;
+
+  /// UUID of the characteristic the original request targeted. Useful
+  /// for correlating with consumer-side request tracking.
+  final UUID characteristicId;
+
+  ServerRespondFailedException({
+    required this.operation,
+    required this.status,
+    required this.clientId,
+    required this.characteristicId,
+  }) : super(
+          'Server "$operation" failed for client $clientId on '
+          'characteristic $characteristicId (ATT status $status)',
+          action: 'The central likely disconnected before the response '
+              'could be delivered; safe to log and move on.',
+        );
+}
+
 /// Reasons why advertising might fail.
 enum AdvertisingFailureReason {
   alreadyAdvertising,
