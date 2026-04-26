@@ -205,48 +205,55 @@ class AndroidConnectionManager {
     );
   }
 
-  // === Bonding Stubs ===
+  // === Bonding (unimplemented; see I035) ===
+  //
+  // The Pigeon schema does not yet declare bond/PHY/connection-parameter
+  // operations, so the Dart-side adapter has nothing to delegate to.
+  // Until the Pigeon plumbing lands (Stage B), the stubs throw
+  // UnimplementedError rather than silently returning hardcoded values
+  // so the API does not lie to callers. Companion change in
+  // `Capabilities.android` flips `canBond` to false so the capability
+  // matrix reflects reality.
 
   /// Returns the bond state for a device.
   Future<PlatformBondState> getBondState(String deviceId) async {
-    // TODO: Implement when Android Pigeon API supports bonding
-    return PlatformBondState.none;
+    throw UnimplementedError('Android: getBondState not yet implemented (I035)');
   }
 
   /// Returns a stream of bond state changes for a device.
   Stream<PlatformBondState> bondStateStream(String deviceId) {
-    // TODO: Implement when Android Pigeon API supports bonding
-    return const Stream.empty();
+    throw UnimplementedError(
+      'Android: bondStateStream not yet implemented (I035)',
+    );
   }
 
   /// Initiates bonding with a device.
   Future<void> bond(String deviceId) async {
-    // TODO: Implement when Android Pigeon API supports bonding
+    throw UnimplementedError('Android: bond not yet implemented (I035)');
   }
 
   /// Removes the bond with a device.
   Future<void> removeBond(String deviceId) async {
-    // TODO: Implement when Android Pigeon API supports bonding
+    throw UnimplementedError('Android: removeBond not yet implemented (I035)');
   }
 
   /// Returns all bonded devices.
   Future<List<PlatformDevice>> getBondedDevices() async {
-    // TODO: Implement when Android Pigeon API supports bonding
-    return [];
+    throw UnimplementedError(
+      'Android: getBondedDevices not yet implemented (I035)',
+    );
   }
 
-  // === PHY Stubs ===
+  // === PHY (unimplemented; see I035) ===
 
   /// Returns the current PHY for a device.
   Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
-    // TODO: Implement when Android Pigeon API supports PHY
-    return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
+    throw UnimplementedError('Android: getPhy not yet implemented (I035)');
   }
 
   /// Returns a stream of PHY changes for a device.
   Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
-    // TODO: Implement when Android Pigeon API supports PHY
-    return const Stream.empty();
+    throw UnimplementedError('Android: phyStream not yet implemented (I035)');
   }
 
   /// Requests a PHY change for a device.
@@ -255,20 +262,17 @@ class AndroidConnectionManager {
     PlatformPhy? txPhy,
     PlatformPhy? rxPhy,
   ) async {
-    // TODO: Implement when Android Pigeon API supports PHY
+    throw UnimplementedError('Android: requestPhy not yet implemented (I035)');
   }
 
-  // === Connection Parameters Stubs ===
+  // === Connection Parameters (unimplemented; see I035) ===
 
   /// Returns the connection parameters for a device.
   Future<PlatformConnectionParameters> getConnectionParameters(
     String deviceId,
   ) async {
-    // TODO: Implement when Android Pigeon API supports connection parameters
-    return const PlatformConnectionParameters(
-      intervalMs: 30,
-      latency: 0,
-      timeoutMs: 5000,
+    throw UnimplementedError(
+      'Android: getConnectionParameters not yet implemented (I035)',
     );
   }
 
@@ -277,7 +281,9 @@ class AndroidConnectionManager {
     String deviceId,
     PlatformConnectionParameters params,
   ) async {
-    // TODO: Implement when Android Pigeon API supports connection parameters
+    throw UnimplementedError(
+      'Android: requestConnectionParameters not yet implemented (I035)',
+    );
   }
 
   // === Callback Handlers ===
