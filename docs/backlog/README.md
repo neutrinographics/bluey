@@ -60,13 +60,17 @@ Prose sections (in this order, any may be omitted if empty):
 
 Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-followup imports. The backlog now bundles many previously-separate fixes into a few coherent rewrite specs (I088, I098, I099, I089/I300/I301), which changes the right unit of work. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
 
-### Tier 1 — Quick wins (sub-day each)
+### Tier 1 — Quick wins (sub-day each) — DONE
 
-Lifecycle context still warm post-I097/I074/I017/I035-Stage-A/I009/I057. One quick item left in this tier; after that, move to Tier 2.
+Tier 1 cleared. Done in this cycle:
+~~I074~~ ([f13f2ef](#)),
+~~I017~~ ([a352c17](#)),
+~~I035 Stage A~~ ([cb1b24f](#)),
+~~I009~~ ([a6bd217](#)),
+~~I057~~ ([510278e](#)),
+~~I067~~ ([8b02ccf](#)).
 
-1. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
-
-Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)), ~~I035 Stage A~~ ([cb1b24f](#)), ~~I009~~ ([a6bd217](#)), ~~I057~~ ([510278e](#)). I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098.
+I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098. **Move on to Tier 2.**
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
@@ -122,7 +126,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I059](I059-server-remove-service-fire-and-forget.md) | `BlueyServer.removeService` doesn't await the platform call | low |
 | [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
 | [I066](I066-connection-platform-specific-methods.md) | Cross-platform `Connection` interface declares platform-specific methods | high |
-| [I067](I067-connection-state-linked-vs-ready.md) | `ConnectionState` collapses link-up and services-discovered into one state | medium |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
 | [I069](I069-fake-platform-capabilities-hardcoded.md) | `FakeBlueyPlatform.capabilities` hardcoded; no test coverage of capability gating | medium |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
@@ -237,6 +240,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I017](I017-peer-silence-timeout-defaults.md) | Default `peerSilenceTimeout` internally inconsistent (lib 20 s vs example 30 s); reconciled to 30 s | `a352c17` |
 | [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondTo{Read,Write}` leaked platform-interface exception; translated to `ServerRespondFailedException` | `a6bd217` |
 | [I057](I057-mac-to-uuid-coercion-duplicated.md) | MAC-to-UUID coercion duplicated; extracted `deviceIdToUuid` helper | `510278e` |
+| [I067](I067-connection-state-linked-vs-ready.md) | `ConnectionState.connected` split into `linked` + `ready` (breaking) | `8b02ccf` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |
