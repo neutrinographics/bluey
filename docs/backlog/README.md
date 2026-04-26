@@ -62,14 +62,14 @@ Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-fol
 
 ### Tier 1 — Quick wins (sub-day each)
 
-Lifecycle context is still warm post-I097. These are the fastest "visible-progress" items and good warm-up before bigger projects.
+Lifecycle context still warm post-I097/I074/I017. These are the fastest "visible-progress" items and good warm-up before bigger projects.
 
-1. **I074** — `sendDisconnectCommand()` can hang the whole disconnect path. *~1–2 hours.* High severity, domain-only, adjacent to recently-touched lifecycle code.
-2. **I017** — `peerSilenceTimeout` defaults inconsistent (lib 20s vs example 30s). *~30 min.* Trivial follow-up to I097.
-3. **I035 Stage A** — replace Android silent-success bond/PHY/conn-param stubs with thrown `UnsupportedOperationException`. *~1 hour.* Makes the lying APIs honest immediately; full Pigeon plumbing (Stage B) waits for I098 / its own project.
-4. **I009** — `BlueyServer.respondToRead/Write` leaks internal platform-interface exception. *~1–2 hours.* Medium severity, one-file fix.
-5. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
-6. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
+1. **I035 Stage A** — replace Android silent-success bond/PHY/conn-param stubs with thrown `UnsupportedOperationException`. *~1 hour.* Makes the lying APIs honest immediately; full Pigeon plumbing (Stage B) waits for I098 / its own project.
+2. **I009** — `BlueyServer.respondToRead/Write` leaks internal platform-interface exception. *~1–2 hours.* Medium severity, one-file fix.
+3. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
+4. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
+
+Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)).
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
@@ -119,7 +119,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
 | [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-interface exception | medium |
-| [I017](I017-peer-silence-timeout-defaults.md) | Default `peerSilenceTimeout` is internally inconsistent and races OS supervision timeout | low |
 | [I054](I054-events-dart-dead-types.md) | Several `BlueyEvent` subtypes are defined but never emitted | low |
 | [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery scans without service filter; probes every nearby device | medium |
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses platform default timeout | medium |
@@ -240,6 +239,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | LifecycleServer declares clients gone while holding their pending requests | `4206343` |
 | [I096](I096-ios-nil-disconnect-error-to-unknown.md) | iOS `didDisconnectPeripheral` with `error: nil` produces `bluey-unknown` | `c145209` |
 | [I097](I097-client-opslot-starves-heartbeat.md) | Client-side OpSlot starvation causes false-positive heartbeat failures | `8f8a5a9` |
+| [I017](I017-peer-silence-timeout-defaults.md) | Default `peerSilenceTimeout` internally inconsistent (lib 20 s vs example 30 s); reconciled to 30 s | `a352c17` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |

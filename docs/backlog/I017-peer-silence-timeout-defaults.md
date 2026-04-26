@@ -4,9 +4,10 @@ title: Default `peerSilenceTimeout` is internally inconsistent and races OS supe
 category: bug
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-04-26
-related: [I097]
+fixed_in: a352c17
+related: [I097, I071]
 ---
 
 ## Symptom
@@ -31,14 +32,11 @@ Independent default-value choices that drifted apart during the I097 (peer-silen
 
 ## Notes
 
-Suggested fix:
+Fixed in `a352c17` by introducing a single `lifecycle.defaultPeerSilenceTimeout = Duration(seconds: 30)` constant and pointing all five default-value sites at it (`Bluey.connect`, `Bluey._upgradeIfBlueyServer`, `Bluey.peer`, `BlueyConnection` constructor, `createBlueyPeer`). Doc-comments on `Bluey.connect` and `Bluey.peer` updated to describe the parameter as covering both heartbeat-probe timeouts and user-op timeouts (post-I097 reality) and to cite the OS-supervision constraint. Bluetooth Core Spec 5.4 Vol 6 Part B §4.5.2 (Link Supervision Timeout) is referenced in the constant's doc-comment.
 
-1. **Reconcile defaults.** Pick one value and use it consistently across library and example. Recommendation: **30 seconds**:
-   - Conservative against false positives during transient link congestion on stressed Android devices.
-   - Strictly longer than the Android default supervision timeout (~20s), so the OS path has room to fire first on genuine link loss.
-   - Aligned with iOS's longer effective supervision timeout.
-2. **Document the rationale.** The doc-comment on `Bluey.connect`'s `peerSilenceTimeout` parameter should explicitly note that the value should exceed the platform supervision timeout, with a one-sentence pointer to the BLE Core Spec section on supervision timeout.
-3. **Optional: clamp to a minimum.** Constructor-time assertion or warning if `peerSilenceTimeout < Duration(seconds: 10)` — values below the supervision timeout actively undermine the design.
+The recommendation to add a constructor-time minimum-clamp assertion was not implemented — minimum-value validation of timeout-knob parameters is more naturally bundled with the value-object refactor in I301 (primitive obsession), where `PeerSilenceTimeout` would become a typed value object with construction-time validation.
+
+Side discovery: verification surfaced a concrete consequence of [I071](I071-upgrade-called-twice-leaks-lifecycle.md) (upgrade-leaks-previous-lifecycle). A test in `bluey_peer_test.dart` was relying on the leaked OLD lifecycle's timeout rather than the timeout it passed to `createBlueyPeer`. Workaround applied (longer elapse window + comment); the I071 entry now records the test as a candidate for rewrite once I071 lands.
 
 External references:
 - Bluetooth Core Specification 5.4, Vol 6 (Low Energy Controller), Part B, §4.5.2 — Link Supervision Timeout. AOSP default `BTM_BLE_CONN_TIMEOUT_DEF` ≈ 2000 (× 10ms = 20s).
