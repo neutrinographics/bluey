@@ -58,19 +58,49 @@ Prose sections (in this order, any may be omitted if empty):
 
 ## Suggested order of attack
 
-Ordered by impact per hour, based on the 2026-04-23 deep-review campaign. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, etc.).
+Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-followup imports. The backlog now bundles many previously-separate fixes into a few coherent rewrite specs (I088, I098, I099, I089/I300/I301), which changes the right unit of work. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
 
-1. **I010 + I011** — Characteristic and descriptor UUID lookup ignores service/characteristic context. *Est. 2 days.* Fixes the descriptor-collision bug that misroutes CCCD writes on any multi-service peripheral (very common — CCCD is on every notifiable characteristic). Coherent single PR because both changes share a Pigeon-schema extension (adding `serviceUuid` / `characteristicUuid` context).
+### Tier 1 — Quick wins (sub-day each)
 
-2. **I062 + I082 + I086** — "Phase 2c: thread-safety audit." *Est. 3–5 days.* One sustained pass through the Android native layer, wrapping all state mutations in `handler.post` and either locking or defensively copying subscription sets. These are the flaky-bug generators — they don't show up in dev/test but bite at scale.
+Lifecycle context is still warm post-I097. These are the fastest "visible-progress" items and good warm-up before bigger projects.
 
-3. **I060 + I061 + I074** — Disconnect / cleanup correctness. *Est. 1–2 days.* Android `disconnect()` fire-and-forget, `cleanup()` orphans pending callbacks, courtesy `sendDisconnectCommand` can hang the whole disconnect. Small, targeted, each mostly independent.
+1. **I074** — `sendDisconnectCommand()` can hang the whole disconnect path. *~1–2 hours.* High severity, domain-only, adjacent to recently-touched lifecycle code.
+2. **I017** — `peerSilenceTimeout` defaults inconsistent (lib 20s vs example 30s). *~30 min.* Trivial follow-up to I097.
+3. **I035 Stage A** — replace Android silent-success bond/PHY/conn-param stubs with thrown `UnsupportedOperationException`. *~1 hour.* Makes the lying APIs honest immediately; full Pigeon plumbing (Stage B) waits for I098 / its own project.
+4. **I009** — `BlueyServer.respondToRead/Write` leaks internal platform-interface exception. *~1–2 hours.* Medium severity, one-file fix.
+5. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
+6. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
 
-Opportunistic one-offs — pick up when you're already in nearby code:
+### Tier 2 — Medium projects (multi-day, no breaking changes)
 
-- **I009** — `BlueyServer.respondToRead`/`respondToWrite` leak an internal platform-interface exception. Medium severity, one-file fix in the server error-translation path; natural to grab next time you're in `android_server.dart` / `ios_server.dart`.
+Each is a single coherent PR. Pick one per multi-day session.
 
-Everything else (the other 40-odd open entries) can also proceed opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
+7. **I098** — Android `ConnectionManager` rewrite. *~2–3 days.* Bundles I060 + I061 + I062 + I064 into one coherent threading + disconnect-lifecycle pass. High severity. Replaces the previous "Phase 2c thread-safety audit" recommendation.
+8. **I003** — notification controllers never closed (memory leak). *~1 day.* High severity, domain.
+9. **I002** — GATT ops not gated by connection state. *~1–2 days.* High severity, domain.
+10. **Android server hardening** (I012 + I080 + I082 + I086). *~2–3 days.* Bundles notification-completion tracking, `addService`/`startAdvertising` race, `notifyCharacteristic` unsynchronized iteration, and `removeService`/notify race. All Android-side server-role bugs that compound under stress.
+
+### Tier 3 — Major architectural rewrites (breaking; major-version bumps)
+
+These rewrite portions of the public surface; plan as release events with a migration guide.
+
+11. **I088** — Pigeon GATT schema rewrite (handle-based identity). *Critical severity. ~5–7 days.* Drives I010 + I011 + I016 fixes. Highest-impact correctness fix in the backlog (data-routing on multi-service peripherals).
+12. **I099** — Typed error translation rewrite. *~2–3 days.* Drives I090 + I092. Replaces string-matching `_wrapError` with a typed catch ladder; preserves the I097 lifecycle-accounting hooks.
+13. **I089 + I300 + I301** — Connection bounded-context refinement. *~5–7 days.* Coherent DDD restructure: removes `Connection.isBlueyServer` / `serverId` (composition over upgrade-in-place), splits cross-platform vs platform-specific methods (`AndroidConnectionExtensions`), introduces value objects for connection parameters and MTU. Major-version bump. **Strongly consider bundling with I088** to consolidate breaking changes into one release.
+
+### Tier 4 — Opportunistic (pick up when in nearby code)
+
+Bundles flagged where natural; everything else can land as one-offs.
+
+- **iOS one-offs** — I044 (disconnect-of-disconnected waits timeout), I045 (lying `disconnectCentral`), I046 (max-write-length plumbing), I047 (batched ATT write response), I048 (state restoration). Each independent.
+- **Server-API polish** (I058 + I059) — advertising mode dropped + `removeService` fire-and-forget. *Bundle, ~1–2 hours.*
+- **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. *Bundle, ~1–2 hours.*
+- **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. *Bundle.*
+- **Capabilities matrix** (I053 + I065 + I069) — expand the matrix, make it load-bearing in production code, parameterize the test fake. *Bundle.*
+- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md, document the Domain ↔ Platform-Interface vocabulary translation. *~1 hour.* Best done alongside I300.
+- **iOS 091/093** — unmapped `CBATTError` codes / `notFound` mapping. Small NSError mapping cleanups.
+
+Everything else (the remaining 30+ open entries, mostly low-severity stubs and limitations) proceeds opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
 
 ---
 
