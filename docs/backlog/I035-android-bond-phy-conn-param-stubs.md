@@ -6,6 +6,7 @@ severity: high
 platform: android
 status: open
 last_verified: 2026-04-26
+stage_a_fixed_in: cb1b24f
 related: [I030, I031, I032, I033, I034, I065, I066]
 ---
 
@@ -34,16 +35,9 @@ The Pigeon schema (`bluey_android/pigeons/messages.dart`) doesn't declare these 
 
 Two-stage fix:
 
-**Stage A (immediate, ~1 hour, removes the silent-lie mode):** change every stub to throw `UnsupportedOperationException(operation, 'android (not yet implemented)')` until the real implementation lands. The cross-platform `Capabilities` matrix already has `canBond: true` for Android — that's the production lie. If the user calls `bond()` and it throws, they can at least catch and react.
+**Stage A — DONE (`cb1b24f`).** Landed 2026-04-26. Each stub now throws `UnimplementedError` with a message naming the operation and pointing at I035. `Capabilities.android.canBond` flipped from `true` to `false` so the matrix reflects reality. Implementation note: the entry's original sketch suggested the domain-layer `UnsupportedOperationException`, but `bluey_android` can't reach the domain layer (it depends on `bluey_platform_interface`, not `bluey`). Used Dart's built-in `UnimplementedError` instead — honest and immediately legible. Future-returning stubs throw asynchronously via the async body; stream-returning stubs throw synchronously.
 
-```dart
-// Stage A pattern:
-Future<void> bond(String deviceId) async {
-  throw UnsupportedOperationException('bond', 'android (not yet implemented)');
-}
-```
-
-Concomitantly, set `Capabilities.android` to `canBond: false` etc. until real implementations land — `capabilities` should be the truth, not the aspiration.
+The full typed-translation path (platform → typed exception → domain `UnsupportedOperationException`) is rolled into [I099](I099-typed-error-translation-rewrite.md). The "consult capabilities before delegating" discipline (so `connection.bond()` checks `capabilities.canBond` before throwing through to the platform) is rolled into [I065](I065-capabilities-matrix-decorative.md).
 
 **Stage B (proper fix, weeks):** add Pigeon methods for bond/PHY/connection-priority, implement the Kotlin side using `BluetoothDevice.createBond()`, `BluetoothGatt.setPreferredPhy(...)`, and `BluetoothGatt.requestConnectionPriority(...)`. Wire up callbacks for bond state changes (BroadcastReceiver on `ACTION_BOND_STATE_CHANGED`) and PHY changes (`onPhyUpdate` / `onPhyRead` in the gatt callback).
 

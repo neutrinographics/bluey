@@ -62,14 +62,13 @@ Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-fol
 
 ### Tier 1 — Quick wins (sub-day each)
 
-Lifecycle context still warm post-I097/I074/I017. These are the fastest "visible-progress" items and good warm-up before bigger projects.
+Lifecycle context still warm post-I097/I074/I017/I035-Stage-A. These are the fastest "visible-progress" items and good warm-up before bigger projects.
 
-1. **I035 Stage A** — replace Android silent-success bond/PHY/conn-param stubs with thrown `UnsupportedOperationException`. *~1 hour.* Makes the lying APIs honest immediately; full Pigeon plumbing (Stage B) waits for I098 / its own project.
-2. **I009** — `BlueyServer.respondToRead/Write` leaks internal platform-interface exception. *~1–2 hours.* Medium severity, one-file fix.
-3. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
-4. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
+1. **I009** — `BlueyServer.respondToRead/Write` leaks internal platform-interface exception. *~1–2 hours.* Medium severity, one-file fix.
+2. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
+3. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
 
-Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)).
+Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)), ~~I035 Stage A~~ ([cb1b24f](#)). I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098.
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
