@@ -5,7 +5,8 @@ category: bug
 severity: high
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-04-26
+related: [I060, I061, I064, I098]
 ---
 
 ## Symptom
@@ -54,3 +55,5 @@ Symptom profile when this bites: intermittent "connection succeeded but GATT ops
 Worth a targeted test: use `ThreadPoolExecutor`-based multi-connect stress in the example app with `StrictMode` enabled to catch cross-thread violations.
 
 Related: may manifest most easily with the stress test's soak scenario, which hammers GATT ops across connect/disconnect cycles.
+
+**2026-04-26 deep-review confirmation:** External review confirms the diagnosis is exact and the fix sketch is the correct approach. Bundle with I060/I061/I064 per I098 (rewrite spec) for coherent single-PR fix.

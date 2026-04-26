@@ -5,8 +5,9 @@ category: bug
 severity: critical
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-04-26
 historical_ref: BUGS-ANALYSIS-ANDROID-A1
+related: [I011, I016, I088]
 ---
 
 ## Symptom
@@ -15,7 +16,8 @@ If a device exposes two services that each contain a characteristic with the sam
 
 ## Location
 
-`bluey_android/android/src/main/kotlin/com/neutrinographics/bluey/ConnectionManager.kt:749-759` — `findCharacteristic(gatt, uuid)` iterates services in order and returns the first match.
+- `bluey_android/android/src/main/kotlin/com/neutrinographics/bluey/ConnectionManager.kt:749-759` — `findCharacteristic(gatt, uuid)` iterates services in order and returns the first match.
+- iOS server-side mirror: `bluey_ios/ios/Classes/PeripheralManagerImpl.swift:18, 53` — `characteristics: [String: CBMutableCharacteristic]` keyed by charUuid alone. Same dimensional error in the hosted-service bookkeeping. (See also I016.)
 
 ## Root cause
 
@@ -27,4 +29,4 @@ Fix shape: add a `serviceUuid: String` parameter to every characteristic-targeti
 
 Alternative: use Android's `BluetoothGattCharacteristic.instanceId` (hash code) as the stable key, the way `bluetooth_low_energy_android` does. Higher-fidelity but requires lifetime tracking of the native instance.
 
-Related: I011 (same pattern for descriptors, which is where the bug actually bites in practice via CCCD).
+Related: I011 (same pattern for descriptors, which is where the bug actually bites in practice via CCCD); I016 (iOS server-side mirror); I088 (architectural rewrite of Pigeon GATT schema, which is the principled coherent fix).

@@ -2018,7 +2018,11 @@ as backlog items.
 > Format: `### IXXX — verified | invalidated | partially verified` plus
 > a paragraph of what was found._
 
-(empty)
+### 2026-04-26 — full sweep verified, all 22 entries filed
+
+All 22 new entries (I016, I017, I035, I045–I048, I054–I059, I065–I069, I088, I089, I098, I099) verified against HEAD and filed under `docs/backlog/IXXX-*.md`. Updates to existing entries (I010, I040, I062, I090) applied. README index updated; new "Open — platform-interface" section added for I088. No invalidations.
+
+Minor line-drift observations recorded in the entries themselves (cited line numbers were stale by a few lines for I046, I069, and the I090 update due to the I097 squash-merge inflating affected files — entries use the actual current line numbers).
 
 ---
 

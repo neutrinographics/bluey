@@ -89,13 +89,27 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
 | [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondToRead`/`respondToWrite` leak internal platform-interface exception | medium |
+| [I017](I017-peer-silence-timeout-defaults.md) | Default `peerSilenceTimeout` is internally inconsistent and races OS supervision timeout | low |
+| [I054](I054-events-dart-dead-types.md) | Several `BlueyEvent` subtypes are defined but never emitted | low |
+| [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery scans without service filter; probes every nearby device | medium |
+| [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses platform default timeout | medium |
+| [I057](I057-mac-to-uuid-coercion-duplicated.md) | MAC-to-UUID coercion duplicated in two places | low |
+| [I058](I058-server-advertising-mode-dropped.md) | `BlueyServer.startAdvertising` drops user-supplied advertising mode | medium |
+| [I059](I059-server-remove-service-fire-and-forget.md) | `BlueyServer.removeService` doesn't await the platform call | low |
+| [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
+| [I066](I066-connection-platform-specific-methods.md) | Cross-platform `Connection` interface declares platform-specific methods | high |
+| [I067](I067-connection-state-linked-vs-ready.md) | `ConnectionState` collapses link-up and services-discovered into one state | medium |
+| [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
+| [I069](I069-fake-platform-capabilities-hardcoded.md) | `FakeBlueyPlatform.capabilities` hardcoded; no test coverage of capability gating | medium |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I089](I089-connection-platform-tagged-extensions.md) | Rewrite `Connection` to platform-tagged extensions (architectural; bundles I066) | high |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
+| [I099](I099-typed-error-translation-rewrite.md) | Replace string-matching error wrapping with typed catch ladder (architectural) | high |
 
 ### Open — Android native
 
@@ -116,6 +130,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I081](I081-advertiser-concurrent-start.md) | Advertiser allows concurrent `startAdvertising` | medium |
 | [I082](I082-notify-characteristic-unsynchronized-iteration.md) | `notifyCharacteristic` iterates subscriptions without sync | high |
 | [I085](I085-cccd-malformed-bytes-silently-ignored.md) | CCCD write with malformed bytes silently ignored | medium |
+| [I098](I098-android-connection-manager-rewrite.md) | Rewrite `ConnectionManager`: threading + disconnect lifecycle (architectural; bundles I060/I061/I062/I064) | high |
 
 ### Open — Android GATT server stubs / no-ops
 
@@ -135,16 +150,22 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I032](I032-android-connection-parameters-stub.md) | Connection parameters API stubbed (hardcoded returns) | high |
 | [I033](I033-android-connection-priority-not-exposed.md) | Connection priority request not exposed | medium |
 | [I034](I034-android-maximum-write-length-not-exposed.md) | Maximum write length query not exposed | medium |
+| [I035](I035-android-bond-phy-conn-param-stubs.md) | Dart-side bonding/PHY/connection-parameter methods return silent success (umbrella for I030–I034) | high |
 
 ### Open — iOS stubs / no-ops / bugs
 
 | ID | Title | Severity |
 |---|---|---|
+| [I016](I016-ios-server-characteristics-uuid-only.md) | iOS server `characteristics` dict keyed by UUID alone (mirror of I010) | high |
 | [I040](I040-ios-notification-retry-on-ready.md) | `isReadyToUpdateSubscribers` does not retry failed notifications | medium |
 | [I041](I041-ios-read-notification-race.md) | `didUpdateCharacteristicValue` conflates read response with notification | medium |
 | [I042](I042-ios-services-cache-dead.md) | `services` cache dict is dead storage | low |
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
 | [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | Disconnect of already-disconnected peripheral waits for timeout | low |
+| [I045](I045-ios-disconnect-central-noop.md) | `disconnectCentral` returns success without disconnecting the central | medium |
+| [I046](I046-ios-max-write-length-not-exposed.md) | `getMaximumWriteLength` implemented but not exposed via Pigeon | medium |
+| [I047](I047-ios-pending-write-requests-batch.md) | `respondToWriteRequest` only responds to first of batched ATT requests | medium |
+| [I048](I048-ios-no-state-restoration.md) | iOS managers initialized without restore identifier; state restoration disabled | medium |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
@@ -161,6 +182,12 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout | medium |
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
+
+### Open — platform-interface
+
+| ID | Title | Severity |
+|---|---|---|
+| [I088](I088-pigeon-gatt-schema-rewrite.md) | Rewrite Pigeon GATT schema to thread service/characteristic context (architectural; bundles I010/I011/I016) | critical |
 
 ### Fixed — verified in HEAD
 
@@ -208,3 +235,5 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 - `I200–I299` — wontfix
 
 Gaps in the numbering are intentional — they reserve space for follow-up entries in the same cluster.
+
+**Cluster deviations.** A handful of entries from the 2026-04-26 deep review (I016 iOS server, I017 domain) landed in the I010–I019 range because the cross-platform cluster (I050–I099) was nearly full. The convention is "by content, not by ID" when reading the index — refer to the section the entry appears under, not its numeric range. When new IDs are assigned going forward, prefer fresh numbers in the I100s+ if all relevant cluster ranges are saturated, rather than overflowing into a sibling cluster.
