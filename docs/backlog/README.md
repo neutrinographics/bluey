@@ -189,6 +189,14 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 |---|---|---|
 | [I088](I088-pigeon-gatt-schema-rewrite.md) | Rewrite Pigeon GATT schema to thread service/characteristic context (architectural; bundles I010/I011/I016) | critical |
 
+### Open — DDD / architectural refinement
+
+| ID | Title | Severity |
+|---|---|---|
+| [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carries Peer-context state; bounded-context boundary inverted | high |
+| [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` use primitives where domain value objects would carry validation | low |
+| [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
+
 ### Fixed — verified in HEAD
 
 | ID | Title | Fixed in |
@@ -233,6 +241,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 - `I050–I099` — cross-platform features
 - `I100–I199` — fixed
 - `I200–I299` — wontfix
+- `I300–I399` — DDD / architectural refinement (bounded-context boundaries, value objects, ubiquitous language)
 
 Gaps in the numbering are intentional — they reserve space for follow-up entries in the same cluster.
 
