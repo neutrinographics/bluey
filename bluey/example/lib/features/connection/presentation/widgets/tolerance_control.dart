@@ -6,17 +6,17 @@ import '../../domain/connection_settings.dart';
 import '../connection_settings_cubit.dart';
 
 /// Segmented control on the connection screen that lets the user pick a
-/// `maxFailedHeartbeats` tolerance for the active connection. Tapping a
-/// different segment dispatches `setMaxFailedHeartbeats` on the
+/// `peerSilenceTimeout` tolerance for the active connection. Tapping a
+/// different segment dispatches `setPeerSilenceTimeout` on the
 /// [ConnectionSettingsCubit]; the connection cubit observes that change
 /// and triggers a transparent reconnect with the new value.
 class ToleranceControl extends StatelessWidget {
   const ToleranceControl({super.key});
 
   static const _options = [
-    (label: 'Strict', value: 1),
-    (label: 'Tolerant', value: 3),
-    (label: 'Very tolerant', value: 5),
+    (label: 'Strict', value: Duration(seconds: 10)),
+    (label: 'Tolerant', value: Duration(seconds: 30)),
+    (label: 'Very tolerant', value: Duration(seconds: 60)),
   ];
 
   @override
@@ -38,14 +38,14 @@ class ToleranceControl extends StatelessWidget {
             Row(
               children: _options.map((option) {
                 final isSelected =
-                    settings.maxFailedHeartbeats == option.value;
+                    settings.peerSilenceTimeout == option.value;
                 return Expanded(
                   child: GestureDetector(
                     onTap: isSelected
                         ? null
                         : () => context
                             .read<ConnectionSettingsCubit>()
-                            .setMaxFailedHeartbeats(option.value),
+                            .setPeerSilenceTimeout(option.value),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       padding: const EdgeInsets.symmetric(vertical: 8),

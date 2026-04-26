@@ -7,23 +7,23 @@ import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
-import 'liveness_monitor.dart';
+import 'peer_silence_monitor.dart';
 
 /// Client-side lifecycle management.
 ///
 /// Owns the GATT write mechanism (deadline-scheduled Timer + heartbeat
 /// char write).
-/// Delegates all liveness policy decisions to an internal [LivenessMonitor]:
+/// Delegates all liveness policy decisions to an internal [PeerSilenceMonitor]:
 /// when to send a probe, when failures count, when to tear down.
 ///
 /// Internal to the Connection bounded context.
 class LifecycleClient {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
-  final int _maxFailedHeartbeats;
+  final Duration _peerSilenceTimeout;
   final void Function() onServerUnreachable;
 
-  late LivenessMonitor _monitor;
+  late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
 
   /// UUID of the server's heartbeat characteristic, once we've found
@@ -37,23 +37,35 @@ class LifecycleClient {
   /// indicates only "we know which char to write heartbeats to".
   bool _isRunning = false;
 
+  /// Count of user-initiated GATT ops currently in flight on this
+  /// connection. While > 0, scheduled probes defer rather than fire —
+  /// the in-flight op is itself an outstanding peer probe (see I097).
+  /// Maintained by [BlueyConnection] via [markUserOpStarted] /
+  /// [markUserOpEnded].
+  int _pendingUserOps = 0;
+
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
-    int maxFailedHeartbeats = 1,
+    required Duration peerSilenceTimeout,
     required this.onServerUnreachable,
   })  : _platform = platformApi,
         _connectionId = connectionId,
-        _maxFailedHeartbeats = maxFailedHeartbeats {
-    _monitor = LivenessMonitor(
-      maxFailedProbes: maxFailedHeartbeats,
+        _peerSilenceTimeout = peerSilenceTimeout {
+    _monitor = PeerSilenceMonitor(
+      peerSilenceTimeout: peerSilenceTimeout,
       activityWindow: _defaultHeartbeatInterval,
+      onSilent: () {
+        // Single-fire from monitor; we still need to clean up our
+        // own state and signal upward.
+        stop();
+        onServerUnreachable();
+      },
     );
   }
 
-  /// Also exposed for [BlueyConnection] tests to inspect: public for
-  /// consistency with the rest of the Connection bounded context.
-  int get maxFailedHeartbeats => _maxFailedHeartbeats;
+  /// Exposed for [BlueyConnection] tests to inspect.
+  Duration get peerSilenceTimeout => _peerSilenceTimeout;
 
   /// Whether the heartbeat client has committed to running and has
   /// not yet been stopped.
@@ -73,7 +85,33 @@ class LifecycleClient {
   /// (updated by successful GATT ops, incoming notifications, and
   /// successful probe acks). Not intended for production use.
   @visibleForTesting
+  // ignore: invalid_use_of_visible_for_testing_member
   DateTime? get lastActivityAtForTest => _monitor.lastActivityAt;
+
+  /// Test-only entry point that flips the running flag and starts the
+  /// monitor without requiring the full `start(allServices: ...)` path.
+  /// Useful for unit-testing call sites that record activity / failures
+  /// against the lifecycle client in isolation, without constructing a
+  /// peripheral with the control service.
+  @visibleForTesting
+  void debugStartForTest() {
+    if (_isRunning) return;
+    _isRunning = true;
+    _monitor.start();
+  }
+
+  /// Exposed for tests: count of in-flight user GATT ops as tracked by
+  /// [markUserOpStarted] / [markUserOpEnded]. Should be zero between
+  /// ops; non-zero values indicate the wrapping is leaking.
+  @visibleForTesting
+  int get pendingUserOpsForTest => _pendingUserOps;
+
+  /// Exposed for tests: the death-watch's first-failure timestamp.
+  /// Non-null implies the silence detector has been armed by a peer
+  /// failure that hasn't yet been cleared by a successful exchange.
+  @visibleForTesting
+  // ignore: invalid_use_of_visible_for_testing_member
+  DateTime? get firstFailureAtForTest => _monitor.firstFailureAt;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
@@ -86,6 +124,37 @@ class LifecycleClient {
     _monitor.recordActivity();
     // Deadline shifted — supersede the pending timer.
     _scheduleProbe();
+  }
+
+  /// Called by [BlueyConnection] when a user GATT op is dispatched.
+  /// While [_pendingUserOps] is > 0, scheduled probes defer rather
+  /// than fire — the in-flight op is itself an outstanding peer probe
+  /// and its outcome will tell us about the peer's liveness. See I097.
+  void markUserOpStarted() {
+    _pendingUserOps++;
+  }
+
+  /// Called by [BlueyConnection] when a user GATT op completes (success
+  /// or failure). Symmetric with [markUserOpStarted]. Decrement only;
+  /// does not itself fire a probe — the next scheduled tick will fire
+  /// normally if the count reaches zero before then.
+  void markUserOpEnded() {
+    if (_pendingUserOps > 0) _pendingUserOps--;
+  }
+
+  /// Called by [BlueyConnection] when a user GATT op fails. Filters by
+  /// predicate: timeouts feed the peer-silence detector; other errors
+  /// are no-ops at this layer.
+  ///
+  /// User-op disconnects are deliberately not counted here: the
+  /// platform-level disconnect callback already triggers tear-down
+  /// through a separate path. User-op statusFailed errors are
+  /// deliberately not counted: at the user level they can mean ATT
+  /// errors (WriteNotPermitted, etc.) that don't imply dead peer.
+  void recordUserOpFailure(Object error) {
+    if (!_isRunning) return;
+    if (error is! platform.GattOperationTimeoutException) return;
+    _monitor.recordPeerFailure();
   }
 
   /// Starts the heartbeat if the server hosts the control service.
@@ -112,6 +181,7 @@ class LifecycleClient {
     // Commit point — from here on, any synchronous failure must
     // fully unwind so the class never exposes a partial-start state.
     _isRunning = true;
+    _monitor.start();
     _heartbeatCharUuid = heartbeatChar.uuid.toString();
     dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
 
@@ -169,20 +239,17 @@ class LifecycleClient {
     }
   }
 
-  /// Stops the heartbeat timer and clears the char reference. Releases
-  /// any in-flight probe flag via [LivenessMonitor.cancelProbe] so the
-  /// monitor does not strand [probeInFlight] if a write was pending at
-  /// teardown. The failure counter and activity timestamp are retained
-  /// (they are irrelevant because this instance is not reused after
-  /// stop()). After stop(): `recordActivity` bails on the `isRunning`
-  /// guard; `_scheduleProbe` and `_sendProbeOrDefer` bail on the
-  /// `_heartbeatCharUuid == null` guard.
+  /// Stops the heartbeat timer and clears the char reference. Cancels
+  /// the death watch via [PeerSilenceMonitor.stop] so the monitor does
+  /// not fire after teardown. After stop(): `recordActivity` bails on
+  /// the `isRunning` guard; `_scheduleProbe` and `_sendProbeOrDefer`
+  /// bail on the `_heartbeatCharUuid == null` guard.
   void stop() {
     _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
     _heartbeatCharUuid = null;
-    _monitor.cancelProbe();
+    _monitor.stop();
   }
 
   Duration get _defaultHeartbeatInterval => Duration(
@@ -226,6 +293,12 @@ class LifecycleClient {
   void _sendProbeOrDefer() {
     if (_heartbeatCharUuid == null) return;
     if (_monitor.probeInFlight) return;
+    if (_pendingUserOps > 0) {
+      // I097: defer while a user op is in flight — that op is itself
+      // an outstanding peer probe.
+      _scheduleProbe(after: _monitor.activityWindow);
+      return;
+    }
     if (_monitor.timeUntilNextProbe() > Duration.zero) {
       _scheduleProbe();
       return;
@@ -262,26 +335,23 @@ class LifecycleClient {
         _scheduleProbe(after: _monitor.activityWindow);
         return;
       }
-      final tripped = _monitor.recordProbeFailure();
       dev.log(
         'heartbeat failed (counted): ${error.runtimeType}',
         name: 'bluey.lifecycle',
         level: 900, // WARNING
       );
-      if (tripped) {
-        dev.log(
-          'heartbeat threshold reached — invoking onServerUnreachable',
-          name: 'bluey.lifecycle',
-          level: 1000, // SEVERE
-        );
-        stop();
-        onServerUnreachable();
-        // No reschedule — connection is tearing down.
-        return;
+      // Release the in-flight flag: the probe write is done (with a dead-peer
+      // error), so the next probe can be dispatched normally.
+      _monitor.cancelProbe();
+      // Feed the peer-silence detector. If the death watch trips, the
+      // monitor's onSilent callback (set in the constructor) will call
+      // our stop() + onServerUnreachable. No reschedule needed in that
+      // case — the lifecycle is shutting down. Otherwise, keep retrying
+      // on the original cadence.
+      _monitor.recordPeerFailure();
+      if (_isRunning) {
+        _scheduleProbe(after: _monitor.activityWindow);
       }
-      // Under-threshold dead-peer signal: retry one activityWindow later
-      // (same rate-limit as the transient path).
-      _scheduleProbe(after: _monitor.activityWindow);
     });
   }
 

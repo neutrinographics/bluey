@@ -2,19 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Read-only chip in the stress-tests screen top bar showing the active
-/// `maxFailedHeartbeats` tolerance. Tapping pops back to the connection
+/// `peerSilenceTimeout` tolerance. Tapping pops back to the connection
 /// screen, where the user can change the value via [ToleranceControl].
 class ToleranceIndicator extends StatelessWidget {
-  final int maxFailedHeartbeats;
+  final Duration peerSilenceTimeout;
 
-  const ToleranceIndicator({super.key, required this.maxFailedHeartbeats});
+  const ToleranceIndicator({super.key, required this.peerSilenceTimeout});
 
-  String get _label => switch (maxFailedHeartbeats) {
-        1 => 'Strict',
-        3 => 'Tolerant',
-        5 => 'Very tolerant',
-        final n => '$n',
-      };
+  String get _label {
+    switch (peerSilenceTimeout.inSeconds) {
+      case 10:
+        return 'Strict';
+      case 30:
+        return 'Tolerant';
+      case 60:
+        return 'Very tolerant';
+      default:
+        return '${peerSilenceTimeout.inSeconds}s';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

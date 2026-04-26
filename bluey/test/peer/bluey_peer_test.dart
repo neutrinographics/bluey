@@ -57,9 +57,12 @@ void main() {
         final id = ServerId.generate();
         fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
 
+        // Use a short peerSilenceTimeout so the test doesn't need to advance
+        // a full 20 seconds after the first failure.
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
           serverId: id,
+          peerSilenceTimeout: const Duration(seconds: 8),
         );
 
         late Connection conn;
@@ -79,7 +82,12 @@ void main() {
         fakePlatform.simulateWriteTimeout = true;
 
         // Heartbeat interval is half the 10s lifecycle interval = 5s.
-        async.elapse(const Duration(seconds: 6));
+        // First failure at ~T=5s arms the death watch for T=5+8=13s.
+        // Advance 20s to ensure the death watch fires, plus give time for
+        // the cascading async disconnect operations to complete.
+        async.elapse(const Duration(seconds: 20));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
         expect(states, contains(ConnectionState.disconnected));

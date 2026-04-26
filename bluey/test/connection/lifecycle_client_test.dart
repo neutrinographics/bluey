@@ -19,7 +19,7 @@ Future<({
   List<RemoteService> services,
   FakeBlueyPlatform fakePlatform,
 })> _setUpConnectedClient({
-  int maxFailedHeartbeats = 1,
+  Duration peerSilenceTimeout = const Duration(seconds: 20),
   Duration intervalValue = const Duration(seconds: 10),
   required void Function() onServerUnreachable,
 }) async {
@@ -46,7 +46,7 @@ Future<({
   final client = LifecycleClient(
     platformApi: fakePlatform,
     connectionId: _deviceAddress,
-    maxFailedHeartbeats: maxFailedHeartbeats,
+    peerSilenceTimeout: peerSilenceTimeout,
     onServerUnreachable: onServerUnreachable,
   );
 
@@ -91,6 +91,7 @@ void main() {
       final client = LifecycleClient(
         platformApi: fakePlatform,
         connectionId: _deviceAddress,
+        peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
       );
 
@@ -147,6 +148,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
         );
 
@@ -323,6 +325,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
         );
 
@@ -403,6 +406,7 @@ void main() {
           final client = LifecycleClient(
             platformApi: fakePlatform,
             connectionId: _deviceAddress,
+            peerSilenceTimeout: const Duration(seconds: 20),
             onServerUnreachable: () {},
           );
 
@@ -528,16 +532,21 @@ void main() {
       });
     });
 
-    // 12. heartbeat success resets failure count
-    test('heartbeat success resets failure count', () {
+    // 12. heartbeat success resets the death watch
+    test('heartbeat success resets the death watch', () {
       fakeAsync((async) {
         var unreachableFired = false;
         late LifecycleClient client;
         late List<RemoteService> services;
         late FakeBlueyPlatform fakePlatform;
 
+        // peerSilenceTimeout = 30s; heartbeat interval = 5s (10s server / 2).
+        // The first failure arms the death watch at T+30s. After a success,
+        // the death watch is cancelled and must be re-armed from scratch on the
+        // next failure. We verify that the callback does NOT fire within 20s
+        // of the success (less than one full peerSilenceTimeout from the reset).
         _setUpConnectedClient(
-          maxFailedHeartbeats: 3,
+          peerSilenceTimeout: const Duration(seconds: 30),
           onServerUnreachable: () => unreachableFired = true,
         ).then((setup) {
           client = setup.client;
@@ -549,36 +558,36 @@ void main() {
         client.start(allServices: services);
         async.flushMicrotasks();
 
-        // Fail 2 heartbeats (below threshold of 3).
+        // Arm the death watch: first failure at ~T=5s.
         fakePlatform.simulateWriteTimeout = true;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 5));
-        async.flushMicrotasks();
+        expect(unreachableFired, isFalse,
+            reason: 'Death watch is armed but not yet expired');
 
-        // Succeed one heartbeat -- resets failure count.
+        // One success clears _firstFailureAt and cancels the death timer.
         fakePlatform.simulateWriteTimeout = false;
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
-        // Fail 2 more -- still below threshold because count was reset.
+        // Now fail again — the death watch resets from now. We should NOT
+        // trip within the next 20s because 20s < peerSilenceTimeout (30s).
         fakePlatform.simulateWriteTimeout = true;
-        async.elapse(const Duration(seconds: 5));
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 5));
+        async.elapse(const Duration(seconds: 20));
         async.flushMicrotasks();
 
         expect(unreachableFired, isFalse,
-            reason: 'Success should have reset the failure counter');
+            reason: 'Success must have reset the death watch; '
+                'new 30s window is not yet expired at 20s');
 
         fakePlatform.simulateWriteTimeout = false;
         client.stop();
       });
     });
 
-    // 13. heartbeat failure fires onServerUnreachable after maxFailedHeartbeats
+    // 13. heartbeat failure fires onServerUnreachable after peerSilenceTimeout
     test(
-      'heartbeat failure fires onServerUnreachable after maxFailedHeartbeats',
+      'heartbeat failure fires onServerUnreachable after peerSilenceTimeout',
       () {
         fakeAsync((async) {
           var unreachableFired = false;
@@ -586,8 +595,12 @@ void main() {
           late List<RemoteService> services;
           late FakeBlueyPlatform fakePlatform;
 
+          // peerSilenceTimeout = 30s; heartbeat interval = 5s (10s server / 2).
+          // Equivalent spirit to the old 3-failure test: ~3 probes at 5s each
+          // corresponds to 15s of silence, but we use 30s to be explicit about
+          // the time-based contract.
           _setUpConnectedClient(
-            maxFailedHeartbeats: 3,
+            peerSilenceTimeout: const Duration(seconds: 30),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -602,20 +615,19 @@ void main() {
           // Initial immediate heartbeat succeeds. Now enable failures.
           fakePlatform.simulateWriteTimeout = true;
 
-          // Failure 1
-          async.elapse(const Duration(seconds: 5));
+          // First failure at ~T=5s arms the death watch for T=5+30=35s.
+          // Advance 33s — the first probe fires at T=5 so we're safely before
+          // the 35s deadline.
+          async.elapse(const Duration(seconds: 33));
           async.flushMicrotasks();
-          expect(unreachableFired, isFalse);
+          expect(unreachableFired, isFalse,
+              reason: 'peerSilenceTimeout not yet elapsed');
 
-          // Failure 2
-          async.elapse(const Duration(seconds: 5));
+          // Advance 4 more seconds — now past the 35s deadline.
+          async.elapse(const Duration(seconds: 4));
           async.flushMicrotasks();
-          expect(unreachableFired, isFalse);
-
-          // Failure 3 -- should trigger callback
-          async.elapse(const Duration(seconds: 5));
-          async.flushMicrotasks();
-          expect(unreachableFired, isTrue);
+          expect(unreachableFired, isTrue,
+              reason: 'peerSilenceTimeout elapsed — onServerUnreachable must fire');
           expect(client.isRunning, isFalse,
               reason: 'stop() should have been called internally');
 
@@ -624,9 +636,9 @@ void main() {
       },
     );
 
-    // 14. heartbeat failure with default maxFailedHeartbeats=1 fires immediately
+    // 14. heartbeat failure fires onServerUnreachable after a short peerSilenceTimeout
     test(
-      'heartbeat failure with default maxFailedHeartbeats=1 fires immediately',
+      'heartbeat failure fires onServerUnreachable after a short peerSilenceTimeout',
       () {
         fakeAsync((async) {
           var unreachableFired = false;
@@ -634,8 +646,10 @@ void main() {
           late List<RemoteService> services;
           late FakeBlueyPlatform fakePlatform;
 
+          // Use a short 8s timeout: the first failure at ~5s arms the watch,
+          // which fires 8s later at ~13s total.
           _setUpConnectedClient(
-            maxFailedHeartbeats: 1,
+            peerSilenceTimeout: const Duration(seconds: 8),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -650,10 +664,15 @@ void main() {
           // Initial heartbeat succeeds. Now enable failures.
           fakePlatform.simulateWriteTimeout = true;
 
-          // First periodic heartbeat fails -- should trigger immediately.
+          // First failure at T=5s arms the death watch; timeout at T=5+8=13s.
           async.elapse(const Duration(seconds: 5));
           async.flushMicrotasks();
+          expect(unreachableFired, isFalse,
+              reason: 'death watch armed but not yet expired');
 
+          // Advance past the 8s timeout.
+          async.elapse(const Duration(seconds: 9));
+          async.flushMicrotasks();
           expect(unreachableFired, isTrue);
           expect(client.isRunning, isFalse);
 
@@ -662,9 +681,9 @@ void main() {
       },
     );
 
-    // 15. non-timeout heartbeat error does NOT increment failure count
+    // 15. non-timeout heartbeat error does NOT arm the death watch
     test(
-      'non-timeout heartbeat error does NOT increment failure counter',
+      'non-timeout heartbeat error does NOT arm the death watch',
       () {
         fakeAsync((async) {
           var unreachableFired = false;
@@ -672,8 +691,10 @@ void main() {
           late List<RemoteService> services;
           late FakeBlueyPlatform fakePlatform;
 
+          // Short peerSilenceTimeout: if non-timeout errors incorrectly armed
+          // the death watch, onServerUnreachable would fire within 10s.
           _setUpConnectedClient(
-            maxFailedHeartbeats: 1,
+            peerSilenceTimeout: const Duration(seconds: 10),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -689,15 +710,15 @@ void main() {
           // (e.g. another GATT op in flight on Android).
           fakePlatform.simulateWriteFailure = true;
 
-          // Even with maxFailedHeartbeats=1, ten consecutive non-timeout
-          // errors should NOT trigger onServerUnreachable.
+          // Ten consecutive non-timeout errors across 50s of simulated time
+          // must NOT trigger onServerUnreachable regardless of peerSilenceTimeout.
           for (var i = 0; i < 10; i++) {
             async.elapse(const Duration(seconds: 5));
             async.flushMicrotasks();
           }
 
           expect(unreachableFired, isFalse,
-              reason: 'Non-timeout errors are transient and must be ignored');
+              reason: 'Non-timeout errors are transient and must not arm the death watch');
           expect(client.isRunning, isTrue,
               reason: 'Heartbeat must keep running through non-timeout errors');
 
@@ -707,9 +728,9 @@ void main() {
       },
     );
 
-    // 16. timeout heartbeat error DOES increment failure count
+    // 16. timeout heartbeat error DOES arm the death watch and fires after peerSilenceTimeout
     test(
-      'timeout heartbeat error fires onServerUnreachable after threshold',
+      'timeout heartbeat error fires onServerUnreachable after peerSilenceTimeout',
       () {
         fakeAsync((async) {
           var unreachableFired = false;
@@ -717,8 +738,10 @@ void main() {
           late List<RemoteService> services;
           late FakeBlueyPlatform fakePlatform;
 
+          // peerSilenceTimeout = 12s; heartbeat interval = 5s.
+          // First timeout at ~5s arms the watch; fires at ~5+12=17s.
           _setUpConnectedClient(
-            maxFailedHeartbeats: 2,
+            peerSilenceTimeout: const Duration(seconds: 12),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -732,13 +755,14 @@ void main() {
 
           fakePlatform.simulateWriteTimeout = true;
 
-          // Timeout 1 — below threshold
+          // First timeout — arms the death watch; not yet expired.
           async.elapse(const Duration(seconds: 5));
           async.flushMicrotasks();
-          expect(unreachableFired, isFalse);
+          expect(unreachableFired, isFalse,
+              reason: 'death watch armed but not yet expired');
 
-          // Timeout 2 — at threshold, should fire
-          async.elapse(const Duration(seconds: 5));
+          // Advance past peerSilenceTimeout — death watch fires.
+          async.elapse(const Duration(seconds: 13));
           async.flushMicrotasks();
           expect(unreachableFired, isTrue);
           expect(client.isRunning, isFalse);
@@ -748,9 +772,9 @@ void main() {
       },
     );
 
-    // 17. mixed timeouts and non-timeouts: only timeouts count
+    // 17. mixed timeouts and non-timeouts: only timeouts arm the death watch
     test(
-      'mixed timeouts and non-timeouts: only timeouts count toward threshold',
+      'mixed timeouts and non-timeouts: only timeouts arm the death watch',
       () {
         fakeAsync((async) {
           var unreachableFired = false;
@@ -758,8 +782,11 @@ void main() {
           late List<RemoteService> services;
           late FakeBlueyPlatform fakePlatform;
 
+          // peerSilenceTimeout = 20s. A timeout at ~5s arms the watch;
+          // non-timeout errors in between must not reset _firstFailureAt
+          // or re-arm the timer. Death watch fires at ~5+20=25s.
           _setUpConnectedClient(
-            maxFailedHeartbeats: 3,
+            peerSilenceTimeout: const Duration(seconds: 20),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -771,33 +798,37 @@ void main() {
           client.start(allServices: services);
           async.flushMicrotasks();
 
-          // Timeout 1
+          // First timeout at ~5s arms the death watch.
           fakePlatform.simulateWriteTimeout = true;
           async.elapse(const Duration(seconds: 5));
           async.flushMicrotasks();
-          expect(unreachableFired, isFalse);
+          expect(unreachableFired, isFalse,
+              reason: 'death watch armed, not yet expired');
 
-          // 5 non-timeout failures interleaved — must NOT advance the counter
+          // Switch to non-timeout errors — these must NOT reset _firstFailureAt
+          // or cancel the death watch. Advance 10s through non-timeout noise.
           fakePlatform.simulateWriteTimeout = false;
           fakePlatform.simulateWriteFailure = true;
-          for (var i = 0; i < 5; i++) {
-            async.elapse(const Duration(seconds: 5));
-            async.flushMicrotasks();
-          }
+          async.elapse(const Duration(seconds: 10));
+          async.flushMicrotasks();
           expect(unreachableFired, isFalse,
-              reason: 'Non-timeout errors must not advance the counter');
+              reason: 'Non-timeout errors must not cancel or reset the death watch');
           fakePlatform.simulateWriteFailure = false;
 
-          // Timeout 2
+          // Another timeout while death watch is already armed — the watch
+          // deadline stays at _firstFailureAt + 20s, unchanged.
           fakePlatform.simulateWriteTimeout = true;
           async.elapse(const Duration(seconds: 5));
           async.flushMicrotasks();
-          expect(unreachableFired, isFalse);
+          expect(unreachableFired, isFalse,
+              reason: 'Death watch deadline should not have moved');
 
-          // Timeout 3 — threshold
-          async.elapse(const Duration(seconds: 5));
+          // Advance past the original deadline (started at ~5s, timeout=20s →
+          // fires at 25s total; we're now at ~20s; need 6 more seconds).
+          async.elapse(const Duration(seconds: 6));
           async.flushMicrotasks();
-          expect(unreachableFired, isTrue);
+          expect(unreachableFired, isTrue,
+              reason: 'Original death watch (from first timeout) must have fired');
 
           fakePlatform.simulateWriteTimeout = false;
         });
@@ -819,7 +850,7 @@ void main() {
           late FakeBlueyPlatform fakePlatform;
 
           _setUpConnectedClient(
-            maxFailedHeartbeats: 1,
+            peerSilenceTimeout: const Duration(seconds: 8),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -833,7 +864,8 @@ void main() {
 
           fakePlatform.simulateWriteStatusFailed = 0x01;
 
-          async.elapse(const Duration(seconds: 5));
+          // First failure at ~5s arms the death watch; fires at ~5+8=13s.
+          async.elapse(const Duration(seconds: 14));
           async.flushMicrotasks();
           expect(unreachableFired, isTrue);
           expect(client.isRunning, isFalse);
@@ -859,7 +891,7 @@ void main() {
           late FakeBlueyPlatform fakePlatform;
 
           _setUpConnectedClient(
-            maxFailedHeartbeats: 1,
+            peerSilenceTimeout: const Duration(seconds: 8),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -873,7 +905,8 @@ void main() {
 
           fakePlatform.simulateWriteDisconnected = true;
 
-          async.elapse(const Duration(seconds: 5));
+          // First failure at ~5s arms the death watch; fires at ~5+8=13s.
+          async.elapse(const Duration(seconds: 14));
           async.flushMicrotasks();
           expect(unreachableFired, isTrue);
           expect(client.isRunning, isFalse);
@@ -898,7 +931,7 @@ void main() {
           late FakeBlueyPlatform fakePlatform;
 
           _setUpConnectedClient(
-            maxFailedHeartbeats: 1,
+            peerSilenceTimeout: const Duration(seconds: 10),
             onServerUnreachable: () => unreachableFired = true,
           ).then((setup) {
             client = setup.client;
@@ -912,6 +945,7 @@ void main() {
 
           fakePlatform.simulateWritePlatformErrorCode = 'something-unrelated';
 
+          // 5 unrecognized errors across 25s — death watch must not be armed.
           for (var i = 0; i < 5; i++) {
             async.elapse(const Duration(seconds: 5));
             async.flushMicrotasks();
@@ -925,15 +959,16 @@ void main() {
       },
     );
 
-    test('recordActivity resets the failure counter', () {
+    test('recordActivity cancels the death watch', () {
       fakeAsync((async) {
         var unreachableFired = false;
         late LifecycleClient client;
         late List<RemoteService> services;
         late FakeBlueyPlatform fakePlatform;
 
+        // peerSilenceTimeout = 15s; heartbeat interval = 5s.
         _setUpConnectedClient(
-          maxFailedHeartbeats: 2,
+          peerSilenceTimeout: const Duration(seconds: 15),
           onServerUnreachable: () => unreachableFired = true,
         ).then((setup) {
           client = setup.client;
@@ -949,22 +984,30 @@ void main() {
         // timeouts and have activity rescue the connection.
         fakePlatform.simulateWriteTimeout = true;
 
-        // Failure 1 — below threshold.
+        // First timeout at ~5s arms the death watch (fires at ~5+15=20s).
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
-        expect(unreachableFired, isFalse);
+        expect(unreachableFired, isFalse,
+            reason: 'death watch armed but not yet expired');
 
-        // User op success → recordActivity resets the counter.
+        // User op success → recordActivity cancels the death watch and
+        // resets _firstFailureAt. A fresh 15s window starts from here.
         client.recordActivity();
 
-        // Two post-reset failures trip the threshold.
-        async.elapse(const Duration(seconds: 5));
+        // Advance 14s — new death watch (if re-armed by subsequent failure)
+        // should not have expired yet, and the old one was cancelled.
+        async.elapse(const Duration(seconds: 14));
         async.flushMicrotasks();
-        expect(unreachableFired, isFalse, reason: 'failure 1 of 2 post-reset');
+        expect(unreachableFired, isFalse,
+            reason: 'recordActivity cancelled the watch; new window not expired');
 
-        async.elapse(const Duration(seconds: 5));
+        // The first post-reset probe fails at T=10 (T=5+5s window), arming a
+        // fresh death watch for T=10+15=25s. We are at T=5+14=19s. Advance 7s
+        // more to reach T=26s > 25s, past the fresh deadline.
+        async.elapse(const Duration(seconds: 7));
         async.flushMicrotasks();
-        expect(unreachableFired, isTrue, reason: 'failure 2 of 2 post-reset trips threshold');
+        expect(unreachableFired, isTrue,
+            reason: 'Fresh death watch from post-reset failure must eventually fire');
 
         fakePlatform.simulateWriteTimeout = false;
       });
@@ -1290,9 +1333,8 @@ void main() {
         client.stop();
         async.flushMicrotasks();
 
-        // Dead-peer signal. With maxFailedHeartbeats defaulting to 1,
-        // without the guard the late .catchError invokes
-        // recordProbeFailure (→ threshold tripped) → onServerUnreachable.
+        // Dead-peer signal. Without the guard the late .catchError invokes
+        // recordPeerFailure (→ death watch armed) → onServerUnreachable.
         fakePlatform.failHeldWrite(
           const platform.GattOperationTimeoutException('writeCharacteristic'),
         );
@@ -1378,6 +1420,7 @@ void main() {
       final client = LifecycleClient(
         platformApi: fakePlatform,
         connectionId: _deviceAddress,
+        peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
       );
 
@@ -1490,6 +1533,222 @@ void main() {
         async.flushMicrotasks();
         expect(fakePlatform.writeCharacteristicCalls.length, writesAfterStart + 1,
             reason: 'probe fires at T=8s (activity at T=3s + window 5s)');
+
+        client.stop();
+      });
+    });
+
+    // I097 user-op tracking tests.
+
+    // I097-1: probe is deferred while a user op is pending
+    test('probe deferred while user op pending', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        // Let the interval-read settle and capture baseline.
+        final heartbeatCharUuid = lifecycle.heartbeatCharUuid;
+
+        // Clear writes from start (initial probe).
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        // Signal that a user op has started — probes must be deferred.
+        client.markUserOpStarted();
+
+        // Advance 30s — well past the 5s heartbeat interval.
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls
+            .where((c) =>
+                c.characteristicUuid.toLowerCase() == heartbeatCharUuid)
+            .length;
+        expect(heartbeatWrites, equals(0),
+            reason: 'probes must be deferred while a user op is pending');
+
+        client.markUserOpEnded();
+        client.stop();
+      });
+    });
+
+    // I097-2: probe fires after user op ends
+    test('probe fires after user op ends', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        client.markUserOpStarted();
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+
+        client.markUserOpEnded();
+        // After the op ends, the next scheduled tick should dispatch a probe.
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+          (c) => c.characteristicUuid.toLowerCase() == lifecycle.heartbeatCharUuid,
+        );
+        expect(heartbeatWrites, isNotEmpty,
+            reason: 'probe should fire after user op ends');
+
+        client.stop();
+      });
+    });
+
+    // I097-3: multiple concurrent user ops are correctly counted
+    test('multiple concurrent user ops correctly counted', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        fakePlatform.writeCharacteristicCalls.clear();
+
+        // Two concurrent ops: count = 2.
+        client.markUserOpStarted();
+        client.markUserOpStarted();
+        // End one: count drops to 1 — still deferred.
+        client.markUserOpEnded();
+
+        final writesBeforeWait = fakePlatform.writeCharacteristicCalls
+            .where((c) =>
+                c.characteristicUuid.toLowerCase() == lifecycle.heartbeatCharUuid)
+            .length;
+
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+
+        final writesAfterWait = fakePlatform.writeCharacteristicCalls
+            .where((c) =>
+                c.characteristicUuid.toLowerCase() == lifecycle.heartbeatCharUuid)
+            .length;
+        expect(writesAfterWait, equals(writesBeforeWait),
+            reason: 'one op still pending — probes should be deferred');
+
+        // End the second op: count = 0 — probes resume.
+        client.markUserOpEnded();
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+
+        expect(
+          fakePlatform.writeCharacteristicCalls.where((c) =>
+              c.characteristicUuid.toLowerCase() == lifecycle.heartbeatCharUuid),
+          isNotEmpty,
+          reason: 'probes must resume once all user ops have ended',
+        );
+
+        client.stop();
+      });
+    });
+
+    // I097-4: recordUserOpFailure with a timeout feeds the silence detector
+    test('recordUserOpFailure with timeout feeds the silence detector', () {
+      fakeAsync((async) {
+        var unreachable = false;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        _setUpConnectedClient(
+          peerSilenceTimeout: const Duration(seconds: 10),
+          onServerUnreachable: () => unreachable = true,
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Make subsequent heartbeat probes also time out so that successful
+        // probes do not reset the death watch that we're about to arm.
+        fakePlatform.simulateWriteTimeout = true;
+
+        // A user op times out — this should arm the death watch.
+        client.recordUserOpFailure(
+          const platform.GattOperationTimeoutException('writeCharacteristic'),
+        );
+
+        // Before peerSilenceTimeout: not yet fired.
+        async.elapse(const Duration(seconds: 9));
+        async.flushMicrotasks();
+        expect(unreachable, isFalse,
+            reason: 'peerSilenceTimeout not yet elapsed');
+
+        // Past peerSilenceTimeout: death watch fires.
+        async.elapse(const Duration(seconds: 2));
+        async.flushMicrotasks();
+        expect(unreachable, isTrue,
+            reason: 'timeout failure must arm the death watch');
+      });
+    });
+
+    // I097-5: recordUserOpFailure with a non-timeout is a no-op for the silence detector
+    test('recordUserOpFailure with non-timeout is a no-op', () {
+      fakeAsync((async) {
+        var unreachable = false;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+
+        _setUpConnectedClient(
+          peerSilenceTimeout: const Duration(seconds: 10),
+          onServerUnreachable: () => unreachable = true,
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // A user op fails with a status error — NOT a timeout; must not arm
+        // the death watch at this layer.
+        client.recordUserOpFailure(
+          const platform.GattOperationStatusFailedException(
+              'writeCharacteristic', 0x03),
+        );
+
+        // Advance well past peerSilenceTimeout — no callback.
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+        expect(unreachable, isFalse,
+            reason: 'non-timeout failures must not arm the death watch via '
+                'recordUserOpFailure');
 
         client.stop();
       });

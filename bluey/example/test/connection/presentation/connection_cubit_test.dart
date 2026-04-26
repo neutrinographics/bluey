@@ -272,7 +272,7 @@ void main() {
       expect(cubit.state.connection, isNotNull);
 
       // Change tolerance → cubit observes settings change → reconnects.
-      settingsCubit.setMaxFailedHeartbeats(3);
+      settingsCubit.setPeerSilenceTimeout(const Duration(seconds: 60));
       // Allow the async reconnect chain to drain (disconnect + connect + loadServices).
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -306,7 +306,7 @@ void main() {
       await cubit.connect();
 
       // Same value → no-op.
-      settingsCubit.setMaxFailedHeartbeats(1);
+      settingsCubit.setPeerSilenceTimeout(const Duration(seconds: 30));
       await Future<void>.delayed(Duration.zero);
 
       verifyNever(() => mockDisconnectDevice(any()));
@@ -322,7 +322,7 @@ void main() {
       final cubit = createCubit(settingsCubit: settingsCubit);
 
       // Don't call connect(). Change settings.
-      settingsCubit.setMaxFailedHeartbeats(3);
+      settingsCubit.setPeerSilenceTimeout(const Duration(seconds: 60));
       await Future<void>.delayed(Duration.zero);
 
       verifyNever(
