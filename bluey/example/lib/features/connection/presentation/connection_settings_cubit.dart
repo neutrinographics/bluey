@@ -7,7 +7,7 @@ import '../domain/connection_settings.dart';
 class ConnectionSettingsCubit extends Cubit<ConnectionSettings> {
   ConnectionSettingsCubit() : super(const ConnectionSettings());
 
-  void setMaxFailedHeartbeats(int value) {
-    emit(state.copyWith(maxFailedHeartbeats: value));
+  void setPeerSilenceTimeout(Duration value) {
+    emit(state.copyWith(peerSilenceTimeout: value));
   }
 }

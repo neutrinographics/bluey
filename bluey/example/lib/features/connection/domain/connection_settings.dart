@@ -3,15 +3,18 @@ import 'package:flutter/foundation.dart';
 /// User-tunable options applied to the next [Connection].
 @immutable
 class ConnectionSettings {
-  /// How many consecutive heartbeat write failures trigger a local
-  /// disconnect. See [Bluey.connect].
-  final int maxFailedHeartbeats;
+  /// How long after a peer-failure signal (heartbeat probe timeout or
+  /// user-op timeout) without intervening successful activity before
+  /// the connection is declared dead. See [Bluey.connect].
+  final Duration peerSilenceTimeout;
 
-  const ConnectionSettings({this.maxFailedHeartbeats = 1});
+  const ConnectionSettings({
+    this.peerSilenceTimeout = const Duration(seconds: 30),
+  });
 
-  ConnectionSettings copyWith({int? maxFailedHeartbeats}) {
+  ConnectionSettings copyWith({Duration? peerSilenceTimeout}) {
     return ConnectionSettings(
-      maxFailedHeartbeats: maxFailedHeartbeats ?? this.maxFailedHeartbeats,
+      peerSilenceTimeout: peerSilenceTimeout ?? this.peerSilenceTimeout,
     );
   }
 
@@ -20,8 +23,8 @@ class ConnectionSettings {
       identical(this, other) ||
       other is ConnectionSettings &&
           runtimeType == other.runtimeType &&
-          maxFailedHeartbeats == other.maxFailedHeartbeats;
+          peerSilenceTimeout == other.peerSilenceTimeout;
 
   @override
-  int get hashCode => maxFailedHeartbeats.hashCode;
+  int get hashCode => peerSilenceTimeout.hashCode;
 }

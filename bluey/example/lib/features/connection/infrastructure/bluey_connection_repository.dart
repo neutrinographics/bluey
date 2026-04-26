@@ -18,7 +18,7 @@ class BlueyConnectionRepository implements ConnectionRepository {
     return await _bluey.connect(
       device,
       timeout: timeout,
-      maxFailedHeartbeats: settings.maxFailedHeartbeats,
+      peerSilenceTimeout: settings.peerSilenceTimeout,
     );
   }
 
