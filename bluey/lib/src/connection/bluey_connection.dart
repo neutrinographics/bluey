@@ -637,6 +637,11 @@ class BlueyConnection implements Connection {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
+    // The lifecycle is provided via a getter rather than the current
+    // value, because characteristics are typically constructed during
+    // service discovery — before [upgrade] runs — and we want them to
+    // pick up the lifecycle once it's installed without rebuilding the
+    // service tree. See I097.
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
@@ -650,7 +655,7 @@ class BlueyConnection implements Connection {
         canIndicate: pc.properties.canIndicate,
       ),
       descriptors: pc.descriptors.map(_mapDescriptor).toList(),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: () => _lifecycle,
     );
   }
 
@@ -660,7 +665,7 @@ class BlueyConnection implements Connection {
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: () => _lifecycle,
     );
   }
 }
@@ -704,7 +709,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
-  final LifecycleClient? _lifecycle;
+  final LifecycleClient? Function() _lifecycle;
 
   @override
   final UUID uuid;
@@ -718,6 +723,12 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   StreamSubscription? _notificationSubscription;
   StreamController<Uint8List>? _notificationController;
 
+  /// [lifecycleClient] is a getter rather than a value because the
+  /// characteristic may be constructed before the connection upgrades
+  /// to the Bluey lifecycle protocol. Reading the field at call time
+  /// ensures user ops on characteristics built during initial service
+  /// discovery still feed activity / failure signals into the
+  /// lifecycle once it starts.
   BlueyRemoteCharacteristic({
     required platform.BlueyPlatform platform,
     required String connectionId,
@@ -725,11 +736,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     required this.descriptors,
-    LifecycleClient? lifecycleClient,
+    LifecycleClient? Function()? lifecycleClient,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycleClient;
+       _lifecycle = lifecycleClient ?? (() => null);
 
   @override
   Future<Uint8List> read() {
@@ -742,7 +753,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       startDetail: 'char=$uuid',
       body: () => _platform.readCharacteristic(_connectionId, uuid.toString()),
       completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     );
   }
 
@@ -765,7 +776,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         withResponse,
       ),
       completeDetail: (_) => 'char=$uuid',
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     );
   }
 
@@ -796,7 +807,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), true),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     ).catchError((Object error) {
       _notificationController?.addError(error);
     });
@@ -814,7 +825,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
             // Inbound notifications are demonstrable peer activity but
             // not user ops, so we record activity without the
             // start/end/failure wrapping used for outbound ops.
-            _lifecycle?.recordActivity();
+            _lifecycle()?.recordActivity();
             _notificationController?.add(notification.value);
           },
           onError: (error) {
@@ -832,7 +843,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       _deviceId,
       'setNotification',
       () => _platform.setNotification(_connectionId, uuid.toString(), false),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     ).catchError((Object _) {});
 
     // Cancel subscription
@@ -856,21 +867,25 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
   final UUID _deviceId;
-  final LifecycleClient? _lifecycle;
+  final LifecycleClient? Function() _lifecycle;
 
   @override
   final UUID uuid;
 
+  /// [lifecycleClient] is a getter rather than a value: descriptors are
+  /// constructed during service discovery, before the connection
+  /// upgrades to the Bluey lifecycle protocol. See
+  /// [BlueyRemoteCharacteristic] for the same pattern and reasoning.
   BlueyRemoteDescriptor({
     required platform.BlueyPlatform platform,
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
-    LifecycleClient? lifecycleClient,
+    LifecycleClient? Function()? lifecycleClient,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycleClient;
+       _lifecycle = lifecycleClient ?? (() => null);
 
   @override
   Future<Uint8List> read() async {
@@ -878,7 +893,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'readDescriptor',
       () => _platform.readDescriptor(_connectionId, uuid.toString()),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     );
   }
 
@@ -888,7 +903,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       _deviceId,
       'writeDescriptor',
       () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
-      lifecycleClient: _lifecycle,
+      lifecycleClient: _lifecycle(),
     );
   }
 }

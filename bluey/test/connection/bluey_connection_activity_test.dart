@@ -115,7 +115,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycleClient: lc,
+        lifecycleClient: () => lc,
       );
 
       await char.write(Uint8List.fromList([0x42]));
@@ -157,7 +157,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycleClient: lc,
+        lifecycleClient: () => lc,
       );
 
       await char.read();
@@ -196,7 +196,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycleClient: lc,
+        lifecycleClient: () => lc,
       );
 
       await expectLater(
@@ -225,7 +225,7 @@ void main() {
           canIndicate: false,
         ),
         descriptors: const [],
-        lifecycleClient: lc,
+        lifecycleClient: () => lc,
       );
     }
 
@@ -321,6 +321,52 @@ void main() {
 
       fakePlatform.simulateWriteStatusFailed = null;
       lc.stop();
+    });
+
+    test(
+        'characteristic constructed before upgrade picks up lifecycle once '
+        'installed', () async {
+      // Regression for I097: BlueyConnection._mapCharacteristic builds
+      // characteristics during the initial services() discovery, BEFORE
+      // _tryUpgrade installs the LifecycleClient. If the characteristic
+      // captured the (null) lifecycle by value at construction time, user
+      // ops on those cached characteristics would never feed the
+      // silence detector — the exact behaviour I097 was meant to fix.
+      // The lifecycleClient parameter is a getter for this reason.
+      await setupWritablePeripheral();
+
+      LifecycleClient? installedLifecycle;
+      final char = BlueyRemoteCharacteristic(
+        platform: fakePlatform,
+        connectionId: TestDeviceIds.device1,
+        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        uuid: UUID(TestUuids.customChar1),
+        properties: const CharacteristicProperties(
+          canRead: false,
+          canWrite: true,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: const [],
+        lifecycleClient: () => installedLifecycle,
+      );
+
+      // Before "upgrade" — getter returns null, write succeeds without
+      // recording anything anywhere.
+      await char.write(Uint8List.fromList([0x01]));
+
+      // Simulate upgrade by installing a started lifecycle.
+      installedLifecycle = newStartedLifecycle();
+
+      // Now a write should feed activity into the lifecycle.
+      await char.write(Uint8List.fromList([0x02]));
+      expect(installedLifecycle!.lastActivityAtForTest, isNotNull,
+          reason:
+              'characteristic must read lifecycleClient at call time so it '
+              'picks up the lifecycle installed after construction');
+
+      installedLifecycle!.stop();
     });
   }); // end group('BlueyConnection user-op wrapping (I097)')
 }
