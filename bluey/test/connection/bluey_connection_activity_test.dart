@@ -361,12 +361,12 @@ void main() {
 
       // Now a write should feed activity into the lifecycle.
       await char.write(Uint8List.fromList([0x02]));
-      expect(installedLifecycle!.lastActivityAtForTest, isNotNull,
+      expect(installedLifecycle.lastActivityAtForTest, isNotNull,
           reason:
               'characteristic must read lifecycleClient at call time so it '
               'picks up the lifecycle installed after construction');
 
-      installedLifecycle!.stop();
+      installedLifecycle.stop();
     });
   }); // end group('BlueyConnection user-op wrapping (I097)')
 }
