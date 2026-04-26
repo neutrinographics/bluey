@@ -47,20 +47,11 @@ class StressTestsScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: _kBg,
-        // Done bar above the soft keyboard. Lives in the
-        // bottomNavigationBar slot rather than inside the body Stack
-        // because Scaffold lays the bottomNavigationBar out *above*
-        // the keyboard automatically — and the body's MediaQuery has
-        // viewInsets.bottom zeroed out (Scaffold consumes the inset
-        // to resize the body), which would otherwise make a Stack-
-        // positioned bar invisible. The widget self-hides when no
-        // field is focused.
-        bottomNavigationBar: const _KeyboardDoneBar(),
         // Tap anywhere outside an interactive widget to dismiss the
-        // keyboard. Translucent so child gestures (run, stop, help
-        // buttons, scroll) still claim their taps; this only fires for
-        // taps that land on otherwise-inert background area. Required
-        // on iOS where the number pad has no Done key.
+        // soft keyboard. Translucent so child gestures (run, stop,
+        // help buttons, scroll) still claim their taps; this only
+        // fires for taps that land on otherwise-inert background
+        // area. Required on iOS where the number pad has no Done key.
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -168,93 +159,3 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ─── Keyboard Done bar ───────────────────────────────────────────────────────
-
-/// A "Done" button that appears just above the soft keyboard when any
-/// text field on this screen is focused. Required because iOS's
-/// number-pad keyboard has no built-in Done / action button, so without
-/// an explicit dismissal control the user has no obvious way to confirm
-/// their input and close the keyboard. Tapping outside any widget also
-/// dismisses (see the Scaffold body's GestureDetector), but this gives a
-/// visible affordance.
-///
-/// Mounted as `Scaffold.bottomNavigationBar` so the Scaffold lays it out
-/// above the keyboard automatically. Visibility is driven by
-/// [FocusManager] rather than [MediaQuery]'s `viewInsets.bottom`: the
-/// Scaffold consumes the bottom inset to resize the body, so any
-/// `MediaQuery` lookup from inside the body sees `viewInsets.bottom == 0`
-/// and would never detect the keyboard. Listening to focus changes on
-/// the [FocusManager] singleton sidesteps that.
-class _KeyboardDoneBar extends StatefulWidget {
-  const _KeyboardDoneBar();
-
-  @override
-  State<_KeyboardDoneBar> createState() => _KeyboardDoneBarState();
-}
-
-class _KeyboardDoneBarState extends State<_KeyboardDoneBar> {
-  bool _editingText = false;
-
-  @override
-  void initState() {
-    super.initState();
-    FocusManager.instance.addListener(_onFocusChanged);
-  }
-
-  @override
-  void dispose() {
-    FocusManager.instance.removeListener(_onFocusChanged);
-    super.dispose();
-  }
-
-  void _onFocusChanged() {
-    // On Flutter mobile, only text fields take *persistent* focus —
-    // buttons may briefly attach focus during a tap but it's released
-    // immediately, so checking for `hasPrimaryFocus` is a reliable
-    // proxy for "the soft keyboard is up." Trying to inspect the
-    // focused widget's runtime type doesn't work reliably because
-    // FocusNode.context points to the surrounding `Focus` widget, not
-    // the `EditableText` that ultimately bound it.
-    final hasFocus =
-        FocusManager.instance.primaryFocus?.hasPrimaryFocus ?? false;
-    if (hasFocus != _editingText) {
-      setState(() => _editingText = hasFocus);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_editingText) return const SizedBox.shrink();
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8FAFC),
-          border: Border(
-            top: BorderSide(color: Color(0xFFE2E8F0), width: 0.5),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () =>
-                FocusManager.instance.primaryFocus?.unfocus(),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF3F6187),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-            child: Text(
-              'Done',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
