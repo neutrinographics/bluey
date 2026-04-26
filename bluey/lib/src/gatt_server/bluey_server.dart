@@ -9,6 +9,7 @@ import '../event_bus.dart';
 import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../peer/server_id.dart';
+import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'lifecycle_server.dart';
@@ -315,11 +316,20 @@ class BlueyServer implements Server {
     // discharged even if respondToReadRequest throws (stale request id,
     // platform error, etc.).
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
-    await _platform.respondToReadRequest(
-      request.internalRequestId,
-      _mapGattResponseStatusToPlatform(status),
-      value,
-    );
+    try {
+      await _platform.respondToReadRequest(
+        request.internalRequestId,
+        _mapGattResponseStatusToPlatform(status),
+        value,
+      );
+    } on platform.GattOperationStatusFailedException catch (e) {
+      throw ServerRespondFailedException(
+        operation: 'respondToRead',
+        status: e.status,
+        clientId: request.client.id,
+        characteristicId: request.characteristicId,
+      );
+    }
   }
 
   @override
@@ -330,10 +340,19 @@ class BlueyServer implements Server {
     final clientId = (request.client as BlueyClient)._platformId;
     // Drain pending state BEFORE the platform call — see respondToRead.
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
-    await _platform.respondToWriteRequest(
-      request.internalRequestId,
-      _mapGattResponseStatusToPlatform(status),
-    );
+    try {
+      await _platform.respondToWriteRequest(
+        request.internalRequestId,
+        _mapGattResponseStatusToPlatform(status),
+      );
+    } on platform.GattOperationStatusFailedException catch (e) {
+      throw ServerRespondFailedException(
+        operation: 'respondToWrite',
+        status: e.status,
+        clientId: request.client.id,
+        characteristicId: request.characteristicId,
+      );
+    }
   }
 
   @override

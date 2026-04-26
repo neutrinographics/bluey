@@ -33,6 +33,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   // already drained pending state before the platform call.
   Object? throwOnRespondToWriteRequest;
 
+  // I009: symmetric hook for respondToReadRequest. Set to a throwable to
+  // make the next respondToReadRequest fail before recording the call.
+  Object? throwOnRespondToReadRequest;
+
   // Stream controllers for server events
   final _centralConnectionsController =
       StreamController<platform.PlatformCentral>.broadcast();
@@ -301,6 +305,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     platform.PlatformGattStatus status,
     Uint8List? value,
   ) async {
+    final err = throwOnRespondToReadRequest;
+    if (err != null) {
+      throwOnRespondToReadRequest = null;
+      throw err;
+    }
     respondToReadCalls.add(
       RespondToReadCall(requestId: requestId, status: status, value: value),
     );
@@ -1307,6 +1316,141 @@ void main() {
             reason: 'Status $status should be mapped',
           );
         }
+      });
+    });
+
+    group('respond error translation (I009)', () {
+      // Verify that platform-interface GattOperationStatusFailedException
+      // (e.g. ATT status 0x0A NoPendingRequest after a central drops mid-
+      // transaction) is translated into the user-facing
+      // ServerRespondFailedException at the BlueyServer boundary, mirroring
+      // the client-side translation in BlueyConnection.
+
+      Future<ReadRequest> setUpReadRequest({required int requestId}) async {
+        final server = bluey.server()!;
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        late ReadRequest captured;
+        server.readRequests.listen((r) => captured = r);
+        mockPlatform.emitReadRequest(
+          platform.PlatformReadRequest(
+            requestId: requestId,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            offset: 0,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+        return captured;
+      }
+
+      Future<WriteRequest> setUpWriteRequest({required int requestId}) async {
+        final server = bluey.server()!;
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+
+        late WriteRequest captured;
+        server.writeRequests.listen((r) => captured = r);
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: requestId,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            value: Uint8List.fromList([1, 2, 3]),
+            offset: 0,
+            responseNeeded: true,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+        return captured;
+      }
+
+      test(
+          'respondToRead translates GattOperationStatusFailedException to '
+          'ServerRespondFailedException', () async {
+        final server = bluey.server()!;
+        final request = await setUpReadRequest(requestId: 42);
+
+        mockPlatform.throwOnRespondToReadRequest =
+            const platform.GattOperationStatusFailedException(
+          'respondToReadRequest',
+          0x0A,
+        );
+
+        await expectLater(
+          () => server.respondToRead(
+            request,
+            status: GattResponseStatus.success,
+            value: Uint8List.fromList([1]),
+          ),
+          throwsA(
+            isA<ServerRespondFailedException>()
+                .having((e) => e.operation, 'operation', 'respondToRead')
+                .having((e) => e.status, 'status', 0x0A)
+                .having(
+                  (e) => e.clientId,
+                  'clientId',
+                  request.client.id,
+                )
+                .having(
+                  (e) => e.characteristicId,
+                  'characteristicId',
+                  request.characteristicId,
+                ),
+          ),
+        );
+      });
+
+      test(
+          'respondToWrite translates GattOperationStatusFailedException to '
+          'ServerRespondFailedException', () async {
+        final server = bluey.server()!;
+        final request = await setUpWriteRequest(requestId: 7);
+
+        mockPlatform.throwOnRespondToWriteRequest =
+            const platform.GattOperationStatusFailedException(
+          'respondToWriteRequest',
+          0x0A,
+        );
+
+        await expectLater(
+          () => server.respondToWrite(
+            request,
+            status: GattResponseStatus.success,
+          ),
+          throwsA(
+            isA<ServerRespondFailedException>()
+                .having((e) => e.operation, 'operation', 'respondToWrite')
+                .having((e) => e.status, 'status', 0x0A)
+                .having(
+                  (e) => e.clientId,
+                  'clientId',
+                  request.client.id,
+                )
+                .having(
+                  (e) => e.characteristicId,
+                  'characteristicId',
+                  request.characteristicId,
+                ),
+          ),
+        );
+      });
+
+      test('ServerRespondFailedException is a BlueyException subtype', () {
+        final e = ServerRespondFailedException(
+          operation: 'respondToRead',
+          status: 0x0A,
+          clientId: UUID('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+          characteristicId: UUID('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+        );
+        expect(e, isA<BlueyException>());
       });
     });
   });
