@@ -7,32 +7,36 @@ void main() {
       MaterialApp(home: Scaffold(body: Center(child: child)));
 
   group('ToleranceIndicator', () {
-    testWidgets('renders Strict label for value 1', (tester) async {
+    testWidgets('renders Strict label for 10 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(maxFailedHeartbeats: 1)),
+        wrap(const ToleranceIndicator(
+            peerSilenceTimeout: Duration(seconds: 10))),
       );
       expect(find.text('Tolerance: Strict'), findsOneWidget);
     });
 
-    testWidgets('renders Tolerant label for value 3', (tester) async {
+    testWidgets('renders Tolerant label for 30 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(maxFailedHeartbeats: 3)),
+        wrap(const ToleranceIndicator(
+            peerSilenceTimeout: Duration(seconds: 30))),
       );
       expect(find.text('Tolerance: Tolerant'), findsOneWidget);
     });
 
-    testWidgets('renders Very tolerant label for value 5', (tester) async {
+    testWidgets('renders Very tolerant label for 60 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(maxFailedHeartbeats: 5)),
+        wrap(const ToleranceIndicator(
+            peerSilenceTimeout: Duration(seconds: 60))),
       );
       expect(find.text('Tolerance: Very tolerant'), findsOneWidget);
     });
 
-    testWidgets('renders raw number for non-named value', (tester) async {
+    testWidgets('renders raw seconds for non-named value', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(maxFailedHeartbeats: 7)),
+        wrap(const ToleranceIndicator(
+            peerSilenceTimeout: Duration(seconds: 7))),
       );
-      expect(find.text('Tolerance: 7'), findsOneWidget);
+      expect(find.text('Tolerance: 7s'), findsOneWidget);
     });
   });
 }

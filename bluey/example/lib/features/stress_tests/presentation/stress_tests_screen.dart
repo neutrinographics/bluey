@@ -138,7 +138,7 @@ class _TopBar extends StatelessWidget {
                 child: BlocBuilder<ConnectionSettingsCubit,
                     ConnectionSettings>(
                   builder: (context, settings) => ToleranceIndicator(
-                    maxFailedHeartbeats: settings.maxFailedHeartbeats,
+                    peerSilenceTimeout: settings.peerSilenceTimeout,
                   ),
                 ),
               ),
