@@ -62,12 +62,11 @@ Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-fol
 
 ### Tier 1 — Quick wins (sub-day each)
 
-Lifecycle context still warm post-I097/I074/I017/I035-Stage-A/I009. These are the fastest "visible-progress" items and good warm-up before bigger projects.
+Lifecycle context still warm post-I097/I074/I017/I035-Stage-A/I009/I057. One quick item left in this tier; after that, move to Tier 2.
 
-1. **I057** — extract MAC-to-UUID coercion helper (currently duplicated in `bluey.dart` and `peer_discovery.dart`). *~30 min.*
-2. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
+1. **I067** — add `linked` / `ready` states to `ConnectionState`. *Trivial enum extension.* Forward-looking architectural cleanup; no current bug.
 
-Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)), ~~I035 Stage A~~ ([cb1b24f](#)), ~~I009~~ ([a6bd217](#)). I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098.
+Done in this Tier 1 cycle: ~~I074~~ ([f13f2ef](#)), ~~I017~~ ([a352c17](#)), ~~I035 Stage A~~ ([cb1b24f](#)), ~~I009~~ ([a6bd217](#)), ~~I057~~ ([510278e](#)). I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098.
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
@@ -119,7 +118,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I054](I054-events-dart-dead-types.md) | Several `BlueyEvent` subtypes are defined but never emitted | low |
 | [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery scans without service filter; probes every nearby device | medium |
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses platform default timeout | medium |
-| [I057](I057-mac-to-uuid-coercion-duplicated.md) | MAC-to-UUID coercion duplicated in two places | low |
 | [I058](I058-server-advertising-mode-dropped.md) | `BlueyServer.startAdvertising` drops user-supplied advertising mode | medium |
 | [I059](I059-server-remove-service-fire-and-forget.md) | `BlueyServer.removeService` doesn't await the platform call | low |
 | [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
@@ -238,6 +236,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I097](I097-client-opslot-starves-heartbeat.md) | Client-side OpSlot starvation causes false-positive heartbeat failures | `8f8a5a9` |
 | [I017](I017-peer-silence-timeout-defaults.md) | Default `peerSilenceTimeout` internally inconsistent (lib 20 s vs example 30 s); reconciled to 30 s | `a352c17` |
 | [I009](I009-server-respond-leaks-internal-exception.md) | `BlueyServer.respondTo{Read,Write}` leaked platform-interface exception; translated to `ServerRespondFailedException` | `a6bd217` |
+| [I057](I057-mac-to-uuid-coercion-duplicated.md) | MAC-to-UUID coercion duplicated; extracted `deviceIdToUuid` helper | `510278e` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |

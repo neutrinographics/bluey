@@ -4,8 +4,9 @@ title: MAC-to-UUID coercion duplicated in two places
 category: bug
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-04-26
+fixed_in: 510278e
 related: [I006]
 ---
 
@@ -26,6 +27,8 @@ Copy-paste during the peer module addition. The underlying issue is that `Device
 
 ## Notes
 
-Fixing this properly is bound up with I006's resolution (introduce a typed `DeviceIdentifier` value object that distinguishes `MacAddress`, `IosUuid`, and `BlueyServerId` variants). In the interim, extract the coercion into a single utility function in `bluey/lib/src/shared/` and have both call sites delegate.
+Fixed in `510278e` by extracting the coercion to a top-level `deviceIdToUuid(String)` in a new `bluey/lib/src/shared/device_id_coercion.dart`. Both call sites now delegate; both private definitions deleted. The `peer_discovery.dart` `uuid.dart` import was no longer needed and was dropped.
 
-Since I006 captures the underlying issue, this entry exists to flag the duplication to whoever fixes I006. Consider closing I057 with `status: subsumed-by` once the proper fix lands.
+Behaviour is byte-identical to the previous duplicated implementation. The synthesis itself remains a workaround flagged by [I006](I006-mac-to-uuid-truncation.md) (typed `DeviceIdentifier` value object). I057's contribution is that the eventual I006 fix now has a single site to rewrite rather than two.
+
+A new `bluey/test/device_id_coercion_test.dart` covers the helper directly (iOS pass-through, MAC strip-and-pad, case normalization, colonless MAC, length+hyphen detection).
