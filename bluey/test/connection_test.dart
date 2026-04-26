@@ -39,7 +39,7 @@ class MockConnection implements Connection {
 
   MockConnection({
     required this.deviceId,
-    this.state = ConnectionState.connected,
+    this.state = ConnectionState.ready,
     this.mtu = 23,
     this.bondState = BondState.none,
     this.txPhy = Phy.le1m,
@@ -187,7 +187,7 @@ void main() {
       });
 
       test('has state', () {
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
       });
 
       test('has mtu', () {

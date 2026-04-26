@@ -13,7 +13,7 @@ class FakeConnection implements Connection {
   final UUID stressServiceUuid;
   final _stateController = StreamController<ConnectionState>.broadcast();
 
-  ConnectionState _state = ConnectionState.connected;
+  ConnectionState _state = ConnectionState.ready;
   int _mtu = 23;
   int? _mtuRequest;
 

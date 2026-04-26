@@ -28,7 +28,7 @@ void main() {
       );
       final conn = await peer.connect();
 
-      expect(conn.state, ConnectionState.connected);
+      expect(conn.state, ConnectionState.ready);
       final services = await conn.services();
       expect(
         services.any((s) => s.uuid.toString() == controlServiceUuid),

@@ -159,9 +159,11 @@ class BlueyConnection implements Connection {
   @override
   ServerId? get serverId => _serverId;
 
-  ConnectionState _state =
-      ConnectionState
-          .connected; // Start as connected since we're created after successful connection
+  // Start as `linked` since we're constructed after a successful platform
+  // connect — the link is up but services have not yet been discovered.
+  // The first `services()` call (or `upgrade()` for a Bluey peer) will
+  // promote us to `ready`. See I067.
+  ConnectionState _state = ConnectionState.linked;
   int _mtu = 23; // Default BLE MTU
   BondState _bondState = BondState.none;
   Phy _txPhy = Phy.le1m;
@@ -199,17 +201,20 @@ class BlueyConnection implements Connection {
   }) : _platform = platformInstance,
        _connectionId = connectionId,
        _peerSilenceTimeout = peerSilenceTimeout {
-    // Subscribe to platform connection state changes
+    // Subscribe to platform connection state changes.
+    //
+    // The platform reports four states (connecting / connected /
+    // disconnecting / disconnected); we map them onto our five-state
+    // domain enum, with the platform's `connected` becoming `linked`
+    // (the link is up; services not yet discovered). Promotion to
+    // `ready` is driven from `services()` / `upgrade()` once GATT
+    // discovery completes — see [_setState] for the idempotent /
+    // non-regressing transition logic.
     _platformStateSubscription = _platform
         .connectionStateStream(_connectionId)
         .listen(
           (platformState) {
-            _state = _mapConnectionState(platformState);
-            dev.log(
-              'state transition: → $_state',
-              name: 'bluey.connection',
-            );
-            _stateController.add(_state);
+            _setState(_mapConnectionState(platformState));
           },
           onError: (error) {
             _stateController.addError(error);
@@ -285,11 +290,38 @@ class BlueyConnection implements Connection {
     _lifecycle = lifecycleClient;
     _serverId = serverId;
     _cachedServices = null; // invalidate so next services() call filters
+    // Force-emit `ready` even if we're already at ready. Duplicate
+    // emits from this path are a meaningful signal (the lifecycle
+    // protocol is now active or has been re-attached); consumers like
+    // the example app's connection cubit listen for the re-emit to
+    // know when to refresh derived state. The platform-state listener
+    // route still goes through [_setState] for idempotency.
+    _state = ConnectionState.ready;
     dev.log(
-      'state transition: → ${ConnectionState.connected}',
+      'state transition: → $_state (upgrade)',
       name: 'bluey.connection',
     );
-    _stateController.add(ConnectionState.connected);
+    _stateController.add(_state);
+  }
+
+  /// Idempotent, non-regressing state transition. Skips the emit if the
+  /// new state matches the current one. Also refuses to walk backwards
+  /// from `ready` to `linked` if the platform happens to re-emit a
+  /// CONNECTED event after services have already been discovered (the
+  /// platform doesn't model the linked → ready distinction, so its
+  /// repeats would otherwise downgrade us).
+  void _setState(ConnectionState newState) {
+    if (_state == newState) return;
+    if (_state == ConnectionState.ready &&
+        newState == ConnectionState.linked) {
+      return;
+    }
+    _state = newState;
+    dev.log(
+      'state transition: → $_state',
+      name: 'bluey.connection',
+    );
+    _stateController.add(_state);
   }
 
   @override
@@ -362,6 +394,12 @@ class BlueyConnection implements Connection {
       level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
 
+    // Services discovered → promote linked → ready. Idempotent: if we
+    // were already ready (e.g. via a prior `upgrade()` call from
+    // `_tryUpgrade` in this same services() invocation), this is a
+    // no-op.
+    _setState(ConnectionState.ready);
+
     return _cachedServices!;
   }
 
@@ -406,12 +444,7 @@ class BlueyConnection implements Connection {
       return;
     }
 
-    _state = ConnectionState.disconnecting;
-    dev.log(
-      'state transition: → $_state',
-      name: 'bluey.connection',
-    );
-    _stateController.add(_state);
+    _setState(ConnectionState.disconnecting);
 
     // Send lifecycle disconnect command if upgraded to Bluey protocol.
     // The disconnect command is a courtesy hint to the server, not a
@@ -431,12 +464,7 @@ class BlueyConnection implements Connection {
 
     await _platform.disconnect(_connectionId);
 
-    _state = ConnectionState.disconnected;
-    dev.log(
-      'state transition: → $_state',
-      name: 'bluey.connection',
-    );
-    _stateController.add(_state);
+    _setState(ConnectionState.disconnected);
 
     await _cleanup();
   }
@@ -582,7 +610,10 @@ class BlueyConnection implements Connection {
       case platform.PlatformConnectionState.connecting:
         return ConnectionState.connecting;
       case platform.PlatformConnectionState.connected:
-        return ConnectionState.connected;
+        // Platform doesn't model the linked → ready distinction; the
+        // promotion to ready is driven domain-side from
+        // `services()` / `upgrade()`. See I067.
+        return ConnectionState.linked;
       case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
     }

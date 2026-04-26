@@ -436,7 +436,10 @@ void main() {
         await subscription.cancel();
 
         expect(states, contains(ConnectionState.connecting));
-        expect(states, contains(ConnectionState.connected));
+        // Platform-CONNECTED maps to `linked` (link up, services not yet
+        // discovered). After Bluey.connect() completes its post-connect
+        // services() call, the connection is in `ready`.
+        expect(states, contains(ConnectionState.linked));
       });
     });
 
@@ -520,9 +523,10 @@ void main() {
   });
 
   group('ConnectionState', () {
-    test('isActive returns true when connecting or connected', () {
+    test('isActive returns true when connecting, linked, or ready', () {
       expect(ConnectionState.connecting.isActive, isTrue);
-      expect(ConnectionState.connected.isActive, isTrue);
+      expect(ConnectionState.linked.isActive, isTrue);
+      expect(ConnectionState.ready.isActive, isTrue);
       expect(ConnectionState.disconnecting.isActive, isFalse);
       expect(ConnectionState.disconnected.isActive, isFalse);
     });

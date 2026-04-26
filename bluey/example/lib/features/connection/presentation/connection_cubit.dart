@@ -73,8 +73,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
 
       _stateSubscription = connection.stateChanges.listen(
         (connectionState) {
-          if (connectionState == ConnectionState.connected &&
-              state.connectionState == ConnectionState.connected) {
+          if (connectionState == ConnectionState.ready &&
+              state.connectionState == ConnectionState.ready) {
             // Re-emitted connected means the connection upgraded (e.g.,
             // server restarted and Bluey protocol became available).
             // Reload services so the UI refreshes.
