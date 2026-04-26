@@ -87,6 +87,18 @@ class LifecycleClient {
   @visibleForTesting
   DateTime? get lastActivityAtForTest => _monitor.lastActivityAt;
 
+  /// Test-only entry point that flips the running flag and starts the
+  /// monitor without requiring the full `start(allServices: ...)` path.
+  /// Useful for unit-testing call sites that record activity / failures
+  /// against the lifecycle client in isolation, without constructing a
+  /// peripheral with the control service.
+  @visibleForTesting
+  void debugStartForTest() {
+    if (_isRunning) return;
+    _isRunning = true;
+    _monitor.start();
+  }
+
   /// Forwarded from [BlueyConnection] on any successful GATT op or
   /// incoming notification. Treats the peer as demonstrably alive and
   /// shifts the probe deadline forward by [_monitor.activityWindow].
