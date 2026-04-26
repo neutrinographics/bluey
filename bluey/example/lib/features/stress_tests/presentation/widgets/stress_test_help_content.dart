@@ -123,31 +123,22 @@ extension StressTestHelpX on StressTest {
                 'writeCount writes against the echo characteristic. The '
                 'first write is silently dropped by the server; '
                 'subsequent writes are answered normally. Verifies how '
-                'the client handles a single dropped response: '
-                'classifies the dropped write as a timeout and tears '
-                'the connection down once the heartbeat-failure '
-                'threshold is crossed.',
+                'the client handles a single dropped response and '
+                'whether the connection recovers afterwards.',
             readingResults:
-                'Expect the first write to surface as '
-                'GattTimeoutException, then a cascade of '
-                'GattOperationDisconnectedException as the remaining '
-                'queued writes drain. The connection ends in '
-                'disconnected — tap Reconnect on the disconnected '
-                'dialog to start over.\n\n'
-                'The "Heartbeat tolerance" setting on the connection '
-                'screen affects HOW MANY visible timeouts you see '
-                'before the disconnect: at Strict (1) the threshold is '
-                'crossed during the first stalled write, so you see 1 '
-                'timeout + N−1 disconnects. At Tolerant (3) or Very '
-                'tolerant (5) the threshold takes longer to cross, so '
-                'you see 2 or more timeouts before the cascade.\n\n'
-                'NOTE: tolerance does NOT prevent the disconnect in '
-                'this scenario — see I097 (client-side OpSlot '
-                'starvation) for why heartbeats keep accumulating '
-                'failures while a user op stalls. The "tolerant '
-                'recovery" outcome will only become reachable once '
-                'I097 is fixed; until then this test reliably '
-                'demonstrates the disconnect cascade.',
+                'Outcome depends on the "Heartbeat tolerance" setting '
+                'on the connection screen.\n\n'
+                'Strict (10 s): the dropped write times out, and the '
+                'silence detector trips 10 s later because no '
+                'subsequent successful exchange occurs in that window. '
+                'Expect 1 GattTimeoutException + N−1 '
+                'GattOperationDisconnectedException as queued ops '
+                'drain. This is the disconnect-cascade scenario.\n\n'
+                'Tolerant (30 s) or Very tolerant (60 s): the dropped '
+                'write times out, but the next successful echo arrives '
+                'before the silence timeout expires, resetting the '
+                'death watch. Expect 1 GattTimeoutException + N−1 '
+                'successes. This is the recovery scenario.',
             relevantStats: [
               HelpStat.attempted,
               HelpStat.succeeded,
