@@ -148,7 +148,6 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
-| [I097](I097-client-opslot-starves-heartbeat.md) | Client-side OpSlot starvation causes false-positive heartbeat failures | medium |
 
 ### Open — cross-platform unimplemented features
 
@@ -175,6 +174,7 @@ Everything else (the other 40-odd open entries) can also proceed opportunistical
 | [I078](I078-lifecycle-client-activity-drop-during-start.md) | `LifecycleClient.recordActivity()` silently drops signals during `start()` → interval-read window | `136fa47` |
 | [I079](I079-lifecycle-heartbeat-starves-behind-long-user-ops.md) | LifecycleServer declares clients gone while holding their pending requests | `4206343` |
 | [I096](I096-ios-nil-disconnect-error-to-unknown.md) | iOS `didDisconnectPeripheral` with `error: nil` produces `bluey-unknown` | `c145209` |
+| [I097](I097-client-opslot-starves-heartbeat.md) | Client-side OpSlot starvation causes false-positive heartbeat failures | `8f8a5a9` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |

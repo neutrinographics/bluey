@@ -4,8 +4,9 @@ title: Client-side OpSlot starvation causes false-positive heartbeat failures
 category: bug
 severity: medium
 platform: ios
-status: open
+status: fixed
 last_verified: 2026-04-26
+fixed_in: 8f8a5a9
 related: [I079, I087, I077]
 ---
 
@@ -38,18 +39,12 @@ The example app's tolerance setting (introduced 2026-04-26) was originally inten
 
 ## Notes
 
-Fix sketches, in rough order of preference:
+Fixed in `8f8a5a9` by switching from count-based (`maxFailedHeartbeats: int`) to time-based (`peerSilenceTimeout: Duration`) detection, with three coordinated changes:
 
-1. **Distinguish wire-timeouts from local-queue-timeouts in `_sendProbe`.** A heartbeat probe that times out *while still in the OpSlot queue* (never reached the wire) is not a dead-peer signal — the local serialization is the cause, not the peer. Only count timeouts that occurred after the op went on the wire. Requires OpSlot to surface "did this op actually transmit?" in its error metadata, which it currently doesn't.
+1. **`PeerSilenceMonitor`** (renamed from `LivenessMonitor`) — wall-clock death watch keyed off the *first* unrecovered failure. Subsequent failures while the watch is armed do not push the deadline out; only a successful exchange cancels it. So OpSlot-starved heartbeats can no longer drive a runaway counter — the deadline is fixed once tripped.
 
-2. **Heartbeat probes bypass OpSlot.** Symmetric to the I079 fix sketch #2 (which was rejected). Same reasoning here: defeats the serialization invariant OpSlot was introduced to protect (concurrent-GATT-op hangs, see I012-era discussion). Risky.
+2. **Defer probes during user-op pendency.** `LifecycleClient` tracks in-flight user ops via `markUserOpStarted` / `markUserOpEnded`. While `_pendingUserOps > 0`, scheduled probes defer rather than queue behind the user op in the OpSlot. The in-flight user op is itself an outstanding peer probe — its outcome will tell us about the peer's liveness.
 
-3. **Record local-op success as activity.** Even when a user op times out, if it completed its OpSlot lifecycle (entered, was dispatched, got a response or hit per-op timeout *on the wire*), that's still activity from the local side's perspective. Currently `BlueyConnection` only records activity on success, but in OpSlot-starvation scenarios the user op itself failing doesn't contradict "the link is alive on the wire" — only the local queueing implies it. Underdetermined; needs more thought.
+3. **User-op timeouts feed the silence detector.** `BlueyConnection`'s GATT call sites wrap each user op with start/end accounting and route platform timeout exceptions into `LifecycleClient.recordUserOpFailure`, which arms the same death watch a heartbeat-probe timeout would. So the failure signal is now "any op we expected an answer to didn't get one within the silence window" rather than "N heartbeats in a row failed locally".
 
-(1) is the right shape — it isolates the actual misclassification. The other ideas address symptoms.
-
-Reproduction: iOS client + Android server, run the **failure-injection** stress test at any tolerance setting. Server-side log shows the dropped echo write but no heartbeat writes during the test window; client-side disconnect fires after N visible `GattTimeoutException`s where N grows roughly linearly with tolerance.
-
-Verified by direct instrumentation (commit `a8ee29d`, since reverted): server only drops one write per `DropNextCommand`; the second timeout is purely client-side.
-
-Medium severity: the scenario requires a very long-stalling user op (10s+) to accumulate starved heartbeats. Not impossible in production (file transfer, OTA, slow peer), but uncommon. The disconnect itself is the *correct* response to "peer hasn't been heard from" — the bug is that "peer hasn't been heard from" is being inferred from local serialization, not from wire-level silence.
+Subsequent on-device verification (this conversation, 2026-04-26) confirmed the fix delivers what was promised — heartbeats no longer starve behind user ops — but also surfaced a separate *platform* limit unrelated to I097: the Bluetooth Core Spec (Vol 3 Part F §3.3.3) caps an unacknowledged ATT transaction at 30 seconds, after which the bearer is dead and a new one must be established. CoreBluetooth implements this strictly; Android's stack is more permissive. So the **failure-injection** "tolerant recovery" path is reachable on Android-client but not iOS-client — the platform pulls the bearer at ~30 s before any reasonable `peerSilenceTimeout` would let recovery happen. This is now reflected in the failure-injection help text and is **not** a residual I097 bug; it's a candidate for a future cross-platform consistency project (transparent ATT-bearer reset at the Peer layer).
