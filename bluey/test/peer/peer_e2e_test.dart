@@ -54,7 +54,7 @@ void main() {
       final bluey = Bluey();
       final peer = bluey.peer(id);
       final conn = await peer.connect();
-      expect(conn.state, ConnectionState.connected);
+      expect(conn.state, ConnectionState.ready);
       await conn.disconnect();
       await bluey.dispose();
     });

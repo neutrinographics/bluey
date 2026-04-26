@@ -351,7 +351,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         // Listen for state changes
         final states = <ConnectionState>[];
@@ -551,7 +551,7 @@ void main() {
         // Connect to first device
         final device1 = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device1);
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         // Add another device before second scan
         fakePlatform.simulatePeripheral(
@@ -571,7 +571,7 @@ void main() {
         expect(results, hasLength(2));
 
         // Original connection should still be active
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         await connection.disconnect();
         await bluey.dispose();
@@ -605,8 +605,8 @@ void main() {
         // Connect to second while first is connected
         final connection2 = await bluey.connect(scanResults[1].device);
 
-        expect(connection1.state, equals(ConnectionState.connected));
-        expect(connection2.state, equals(ConnectionState.connected));
+        expect(connection1.state, equals(ConnectionState.ready));
+        expect(connection2.state, equals(ConnectionState.ready));
 
         await connection1.disconnect();
         await connection2.disconnect();
@@ -775,7 +775,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         // Listen for state changes before simulating disconnect
         final stateCompleter = Completer<ConnectionState>();
@@ -806,7 +806,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Initially connected
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         // Track all state changes
         final states = <ConnectionState>[];

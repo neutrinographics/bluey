@@ -179,7 +179,7 @@ void main() {
         name: 'Bluey Server',
       ));
 
-      expect(conn.state, ConnectionState.connected);
+      expect(conn.state, ConnectionState.ready);
       expect(conn.isBlueyServer, isTrue);
 
       await conn.disconnect();
@@ -354,7 +354,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // No extra connected event from a redundant upgrade
-      expect(states.where((s) => s == ConnectionState.connected), isEmpty);
+      expect(states.where((s) => s == ConnectionState.ready), isEmpty);
 
       await conn.disconnect();
       await bluey.dispose();

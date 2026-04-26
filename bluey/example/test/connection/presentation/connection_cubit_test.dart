@@ -57,7 +57,7 @@ void main() {
       'connect succeeds and auto-discovers services',
       setUp: () {
         final mockConnection = MockConnection();
-        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
@@ -85,7 +85,7 @@ void main() {
                 .having(
                   (s) => s.connectionState,
                   'connectionState',
-                  ConnectionState.connected,
+                  ConnectionState.ready,
                 )
                 .having((s) => s.connection, 'connection', isNotNull),
             isA<ConnectionScreenState>().having(
@@ -130,7 +130,7 @@ void main() {
       setUp: () {
         final mockConnection = MockConnection();
         when(() => mockDisconnectDevice(any())).thenAnswer((_) async {});
-        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
@@ -142,11 +142,11 @@ void main() {
       },
       seed: () {
         final mockConnection = MockConnection();
-        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         return ConnectionScreenState(
           device: testDevice,
           connection: mockConnection,
-          connectionState: ConnectionState.connected,
+          connectionState: ConnectionState.ready,
         );
       },
       act: (cubit) => cubit.disconnect(),
@@ -192,12 +192,12 @@ void main() {
       build: createCubit,
       seed: () {
         final mockConnection = MockConnection();
-        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
         return ConnectionScreenState(
           device: testDevice,
           connection: mockConnection,
-          connectionState: ConnectionState.connected,
+          connectionState: ConnectionState.ready,
         );
       },
       act: (cubit) => cubit.disconnect(),
@@ -215,7 +215,7 @@ void main() {
       'connect emits error when connection state stream errors',
       setUp: () {
         final mockConnection = MockConnection();
-        when(() => mockConnection.state).thenReturn(ConnectionState.connected);
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         // Use async* to emit error after a microtask delay
         when(() => mockConnection.stateChanges).thenAnswer((_) async* {
           await Future.delayed(Duration.zero);
@@ -244,13 +244,13 @@ void main() {
       final settingsCubit = ConnectionSettingsCubit();
 
       final firstConn = MockConnection();
-      when(() => firstConn.state).thenReturn(ConnectionState.connected);
+      when(() => firstConn.state).thenReturn(ConnectionState.ready);
       when(() => firstConn.stateChanges)
           .thenAnswer((_) => const Stream.empty());
       when(() => firstConn.disconnect()).thenAnswer((_) async {});
 
       final secondConn = MockConnection();
-      when(() => secondConn.state).thenReturn(ConnectionState.connected);
+      when(() => secondConn.state).thenReturn(ConnectionState.ready);
       when(() => secondConn.stateChanges)
           .thenAnswer((_) => const Stream.empty());
       when(() => secondConn.disconnect()).thenAnswer((_) async {});
@@ -292,7 +292,7 @@ void main() {
       final settingsCubit = ConnectionSettingsCubit();
 
       final mockConn = MockConnection();
-      when(() => mockConn.state).thenReturn(ConnectionState.connected);
+      when(() => mockConn.state).thenReturn(ConnectionState.ready);
       when(() => mockConn.stateChanges)
           .thenAnswer((_) => const Stream.empty());
       when(() => mockConn.disconnect()).thenAnswer((_) async {});

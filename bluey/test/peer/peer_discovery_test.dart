@@ -61,7 +61,10 @@ void main() {
         scanTimeout: const Duration(milliseconds: 500),
       );
       expect(connection, isNotNull);
-      expect(connection.state, ConnectionState.connected);
+      // PeerDiscovery returns the BlueyConnection bare — services have
+      // not been discovered yet, so it sits at `linked`. The caller
+      // (BlueyPeer) then runs services() and upgrade() to promote.
+      expect(connection.state, ConnectionState.linked);
       await connection.disconnect();
     });
 
@@ -90,7 +93,10 @@ void main() {
         target,
         scanTimeout: const Duration(milliseconds: 500),
       );
-      expect(connection.state, ConnectionState.connected);
+      // PeerDiscovery returns the BlueyConnection bare — services have
+      // not been discovered yet, so it sits at `linked`. The caller
+      // (BlueyPeer) then runs services() and upgrade() to promote.
+      expect(connection.state, ConnectionState.linked);
       await connection.disconnect();
     });
   });

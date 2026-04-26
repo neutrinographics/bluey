@@ -55,7 +55,8 @@ class ConnectionStateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (state) {
-      bluey.ConnectionState.connected => (Colors.green, 'Connected'),
+      bluey.ConnectionState.ready => (Colors.green, 'Connected'),
+      bluey.ConnectionState.linked => (Colors.lightGreen, 'Linked'),
       bluey.ConnectionState.connecting => (Colors.orange, 'Connecting'),
       bluey.ConnectionState.disconnecting => (Colors.orange, 'Disconnecting'),
       bluey.ConnectionState.disconnected => (Colors.grey, 'Disconnected'),

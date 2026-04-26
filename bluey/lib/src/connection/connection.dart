@@ -109,8 +109,12 @@ enum Phy {
 /// Use [service] or [services] to access the device's GATT services.
 ///
 /// The connection has the following invariants:
-/// - GATT access is only valid when [state] is [ConnectionState.connected]
-/// - Services are discovered lazily on first access
+/// - GATT access is only valid when [state] is [ConnectionState.ready]
+///   (or use the [ConnectionState.isReady] helper). Use
+///   [ConnectionState.isConnected] (true for both `linked` and `ready`)
+///   if you only need to know the link is up.
+/// - Services are discovered lazily on first access; the `linked` →
+///   `ready` transition fires once that discovery completes.
 ///
 /// Example:
 /// ```dart

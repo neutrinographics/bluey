@@ -100,7 +100,7 @@ void main() {
         final states = <ConnectionState>[];
         final subscription = connection.stateChanges.listen(states.add);
 
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         await connection.disconnect();
 
@@ -186,7 +186,7 @@ void main() {
         );
 
         // State should still be connected
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
 
         await connection.disconnect();
         await bluey.dispose();
@@ -428,7 +428,7 @@ void main() {
         final services = await connection.services();
 
         // Connection should still be valid
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
         expect(services, hasLength(1));
 
         await connection.disconnect();
@@ -449,7 +449,7 @@ void main() {
         final newMtu = await connection.requestMtu(512);
 
         // Connection should still be valid
-        expect(connection.state, equals(ConnectionState.connected));
+        expect(connection.state, equals(ConnectionState.ready));
         expect(newMtu, equals(512));
 
         await connection.disconnect();
@@ -528,7 +528,7 @@ void main() {
 
         // Connect
         final connection1 = await bluey.connect(device);
-        expect(connection1.state, equals(ConnectionState.connected));
+        expect(connection1.state, equals(ConnectionState.ready));
 
         // Unexpected disconnection
         fakePlatform.simulateDisconnection('AA:BB:CC:DD:EE:01');
@@ -537,7 +537,7 @@ void main() {
 
         // Reconnect
         final connection2 = await bluey.connect(device);
-        expect(connection2.state, equals(ConnectionState.connected));
+        expect(connection2.state, equals(ConnectionState.ready));
 
         await connection2.disconnect();
         await bluey.dispose();

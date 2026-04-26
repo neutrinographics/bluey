@@ -675,14 +675,14 @@ void main() {
 
         // All should be connected
         for (final connection in connections) {
-          expect(connection.state, equals(ConnectionState.connected));
+          expect(connection.state, equals(ConnectionState.ready));
         }
 
         // Disconnect one, others should remain connected
         await connections[1].disconnect();
-        expect(connections[0].state, equals(ConnectionState.connected));
+        expect(connections[0].state, equals(ConnectionState.ready));
         expect(connections[1].state, equals(ConnectionState.disconnected));
-        expect(connections[2].state, equals(ConnectionState.connected));
+        expect(connections[2].state, equals(ConnectionState.ready));
 
         // Disconnect remaining
         await connections[0].disconnect();
