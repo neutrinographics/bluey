@@ -85,6 +85,7 @@ class LifecycleClient {
   /// (updated by successful GATT ops, incoming notifications, and
   /// successful probe acks). Not intended for production use.
   @visibleForTesting
+  // ignore: invalid_use_of_visible_for_testing_member
   DateTime? get lastActivityAtForTest => _monitor.lastActivityAt;
 
   /// Test-only entry point that flips the running flag and starts the
@@ -109,6 +110,7 @@ class LifecycleClient {
   /// Non-null implies the silence detector has been armed by a peer
   /// failure that hasn't yet been cleared by a successful exchange.
   @visibleForTesting
+  // ignore: invalid_use_of_visible_for_testing_member
   DateTime? get firstFailureAtForTest => _monitor.firstFailureAt;
 
   /// Forwarded from [BlueyConnection] on any successful GATT op or
