@@ -47,6 +47,17 @@ class ConnectionManagerLifecycleTest {
     private val testCharUuid = JavaUUID.fromString("12345678-1234-1234-1234-123456789abd")
     private val testServiceUuid = JavaUUID.fromString("12345678-1234-1234-1234-123456789abc")
 
+    /**
+     * Captured `(runnable, delayMs)` pairs from every `Handler.postDelayed`
+     * call across the test. Tests that exercise scheduled timeouts (the
+     * disconnect fallback in I060, the connect timeout) drive the
+     * captured runnable manually to simulate the timer firing.
+     */
+    private val capturedPostDelayed = mutableListOf<Pair<Runnable, Long>>()
+
+    /** Runnables passed to `Handler.removeCallbacks` (used for cancellation assertions). */
+    private val removedCallbacks = mutableListOf<Runnable>()
+
     @Before
     fun setUp() {
         // Pin SDK_INT to TIRAMISU so production code takes the modern gatt API
@@ -78,8 +89,15 @@ class ConnectionManagerLifecycleTest {
             firstArg<Runnable>().run()
             true
         }
-        every { anyConstructed<Handler>().postDelayed(any(), any()) } returns true
-        every { anyConstructed<Handler>().removeCallbacks(any()) } just Runs
+        // postDelayed: capture the runnable so tests can fire it manually
+        // to simulate a timer expiring.
+        every { anyConstructed<Handler>().postDelayed(any(), any()) } answers {
+            capturedPostDelayed.add(firstArg<Runnable>() to secondArg<Long>())
+            true
+        }
+        every { anyConstructed<Handler>().removeCallbacks(any()) } answers {
+            removedCallbacks.add(firstArg<Runnable>())
+        }
 
         mockContext = mockk(relaxed = true)
         mockAdapter = mockk(relaxed = true)
@@ -333,6 +351,145 @@ class ConnectionManagerLifecycleTest {
         verify(exactly = 1) {
             mockDevice.connectGatt(any(), any(), any<BluetoothGattCallback>(), any())
         }
+    }
+
+    // ============================================================
+    // I060 — disconnect lifecycle (await STATE_DISCONNECTED + 5s fallback)
+    // ============================================================
+
+    private val disconnectFallbackMs = 5_000L
+
+    @Test
+    fun `I060 disconnect does not invoke callback synchronously`() {
+        establishConnection()
+
+        var disconnectResult: Result<Unit>? = null
+        connectionManager.disconnect(deviceAddress) { result ->
+            disconnectResult = result
+        }
+
+        assertNull(
+            "disconnect callback must NOT fire until STATE_DISCONNECTED arrives (I060)",
+            disconnectResult,
+        )
+
+        // Fire STATE_DISCONNECTED.
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_DISCONNECTED,
+        )
+
+        assertNotNull(disconnectResult)
+        assertTrue(
+            "disconnect must succeed when STATE_DISCONNECTED arrives within window",
+            disconnectResult!!.isSuccess,
+        )
+    }
+
+    @Test
+    fun `I060 disconnect with no connection invokes callback synchronously with success`() {
+        // No establishConnection() — there is no entry in connections.
+        var disconnectResult: Result<Unit>? = null
+        connectionManager.disconnect(deviceAddress) { result ->
+            disconnectResult = result
+        }
+
+        assertNotNull(
+            "disconnect with no entry must complete synchronously with success (idempotent)",
+            disconnectResult,
+        )
+        assertTrue(disconnectResult!!.isSuccess)
+        // No gatt.disconnect() should have been issued.
+        verify(exactly = 0) { mockGatt.disconnect() }
+    }
+
+    @Test
+    fun `I060 disconnect fallback fires gatt-disconnected after 5s if STATE_DISCONNECTED never arrives`() {
+        establishConnection()
+        // Clear postDelayed history from setUp (e.g. connect timeouts) so
+        // we can find the disconnect fallback unambiguously.
+        capturedPostDelayed.clear()
+
+        var disconnectResult: Result<Unit>? = null
+        connectionManager.disconnect(deviceAddress) { result ->
+            disconnectResult = result
+        }
+
+        // The 5 s fallback must have been scheduled.
+        val fallback = capturedPostDelayed.firstOrNull { it.second == disconnectFallbackMs }
+        assertNotNull(
+            "disconnect must schedule a 5000ms fallback runnable (I060)",
+            fallback,
+        )
+
+        assertNull(
+            "callback must not fire before fallback runs or STATE_DISCONNECTED arrives",
+            disconnectResult,
+        )
+
+        // Simulate timer expiry — STATE_DISCONNECTED never arrives.
+        fallback!!.first.run()
+
+        assertNotNull(disconnectResult)
+        assertTrue(disconnectResult!!.isFailure)
+        val err = disconnectResult!!.exceptionOrNull()
+        assertTrue(
+            "fallback must surface gatt-disconnected, got ${err?.javaClass?.simpleName}: $err",
+            err is FlutterError && err.code == "gatt-disconnected",
+        )
+
+        // Force-close was called on the gatt.
+        verify(atLeast = 1) { mockGatt.close() }
+    }
+
+    @Test
+    fun `I060 late STATE_DISCONNECTED after fallback is a no-op`() {
+        establishConnection()
+        capturedPostDelayed.clear()
+
+        var disconnectResult: Result<Unit>? = null
+        var callbackInvocations = 0
+        connectionManager.disconnect(deviceAddress) { result ->
+            disconnectResult = result
+            callbackInvocations++
+        }
+
+        val fallback = capturedPostDelayed.firstOrNull { it.second == disconnectFallbackMs }
+        assertNotNull(fallback)
+
+        // Fallback fires first.
+        fallback!!.first.run()
+        assertEquals(1, callbackInvocations)
+
+        // STATE_DISCONNECTED arrives late.
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_DISCONNECTED,
+        )
+
+        assertEquals(
+            "callback must fire exactly once even when STATE_DISCONNECTED arrives after fallback",
+            1, callbackInvocations,
+        )
+    }
+
+    @Test
+    fun `I060 STATE_DISCONNECTED cancels the disconnect fallback timer`() {
+        establishConnection()
+        capturedPostDelayed.clear()
+        removedCallbacks.clear()
+
+        connectionManager.disconnect(deviceAddress) { /* ignored */ }
+
+        val fallback = capturedPostDelayed.firstOrNull { it.second == disconnectFallbackMs }
+        assertNotNull(fallback)
+
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_DISCONNECTED,
+        )
+
+        assertTrue(
+            "STATE_DISCONNECTED must cancel the disconnect fallback runnable via removeCallbacks (I060)",
+            removedCallbacks.any { it === fallback!!.first },
+        )
     }
 
     @Test
