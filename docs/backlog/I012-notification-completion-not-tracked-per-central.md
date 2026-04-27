@@ -4,10 +4,16 @@ title: Server notification completion not tracked per central
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: aa588f1
 historical_ref: BUGS-ANALYSIS-ANDROID-A5
 ---
+
+> **Fixed 2026-04-27.** `GattServer` now tracks pending notifications per-central via `pendingNotifications: Map<String, ArrayDeque<PendingNotification>>`. `notifyCharacteristic` / `notifyCharacteristicTo` enqueue an entry per recipient and only fire the outer callback once every per-central completion has resolved. `onNotificationSent(device, status)` pops the FIFO head for that central — Android's API doesn't carry the characteristic UUID, so FIFO ordering is the only reliable disambiguation. Per-send 5 s timeout (`NOTIFY_SEND_TIMEOUT_MS`) surfaces `FlutterError(gatt-timeout)`; `STATE_DISCONNECTED` and `cleanup()` drain pending entries with `gatt-disconnected`. Aggregation is all-or-nothing: success when every recipient acks, failure on first non-success / timeout / disconnect.
+>
+> **Pigeon contract unchanged.** `Future<void>` still — per-central observability is not exposed at this layer (deferred; the documented bug is the missing wait, not the missing per-central API). 8 new JVM tests in `GattServerNotifyCompletionTest.kt`. The pre-existing I082 regression test was updated to reflect the new completion-tracking semantics (its original "notify must succeed" assertion was a pre-I012 artifact).
+
 
 ## Symptom
 

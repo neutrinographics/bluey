@@ -84,11 +84,9 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 
 ~~**I080** — `addService` / `startAdvertising` ordering~~ ([612d534](#) + [da80f52](#)). Platform-side: `pendingServiceCallback` is now a Map keyed by service UUID. Domain-side: `BlueyServer.startAdvertising` awaits in-flight `addService` futures. 1 new JVM test + 2 new Dart tests.
 
-Each remaining item is a single coherent PR. Pick one per multi-day session.
+~~**I012** — server notification completion not tracked per central~~ ([aa588f1](#)). `pendingNotifications` per-central FIFO queue; `onNotificationSent` pops the head; 5 s timeout per send; `STATE_DISCONNECTED` and `cleanup()` drain. Pigeon contract stayed `Future<void>` (per-central observability not exposed). 8 new JVM tests.
 
-**Android server hardening (remaining):**
-
-- **I012** — server notification completion not tracked per central. *~half-day to a day.* High severity. Pigeon contract change (caller gets per-central outcomes).
+**Tier 2 cleared.** Move on to Tier 3 — see below.
 
 ### Tier 3 — Major architectural rewrites (breaking; major-version bumps)
 
@@ -151,7 +149,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 |---|---|---|
 | [I010](I010-characteristic-uuid-lookup-no-service-context.md) | Characteristic UUID lookup ignores service context | critical |
 | [I011](I011-descriptor-uuid-lookup-no-char-context.md) | Descriptor UUID lookup ignores characteristic context | critical |
-| [I012](I012-notification-completion-not-tracked-per-central.md) | Server notification completion not tracked per central | high |
 | [I013](I013-scan-failure-error-code-not-propagated.md) | Scan failure error code discarded | medium |
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
@@ -254,6 +251,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I002](I002-gatt-ops-not-gated-by-connection-state.md) | GATT ops not gated by connection state; `_ensureConnected()` now throws `DisconnectedException` from every public op | `7da8795` |
 | [I082](I082-notify-characteristic-unsynchronized-iteration.md) | Android `notifyCharacteristic` iterated subscriptions unsynchronized; defensive snapshot + `handler.post` for binder-thread mutations | `80ef2ed` |
 | [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising`; platform-side Map keyed by UUID + Dart-side `_pendingServiceAdds` awaited by `startAdvertising` | `da80f52` |
+| [I012](I012-notification-completion-not-tracked-per-central.md) | Server notification completion not tracked per central; `pendingNotifications` FIFO queue + `onNotificationSent` wiring + 5 s timeout + `STATE_DISCONNECTED` drain | `aa588f1` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
