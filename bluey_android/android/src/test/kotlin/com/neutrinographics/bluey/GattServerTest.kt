@@ -207,6 +207,63 @@ class GattServerTest {
     }
 
     @Test
+    fun `I080 parallel addService calls do not clobber each other's callbacks`() {
+        // Two addService calls in flight before either onServiceAdded
+        // fires. Pre-fix the single-slot `pendingServiceCallback` was
+        // overwritten by the second call, so the first caller's Future
+        // never resolved. Post-fix the callbacks are keyed by service
+        // UUID and resolve independently.
+        val uuid1 = "12345678-1234-1234-1234-123456789abc"
+        val uuid2 = "87654321-4321-4321-4321-cba987654321"
+
+        val service1 = LocalServiceDto(
+            uuid = uuid1,
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList(),
+        )
+        val service2 = LocalServiceDto(
+            uuid = uuid2,
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList(),
+        )
+
+        var result1: Result<Unit>? = null
+        var result2: Result<Unit>? = null
+        gattServer.addService(service1) { result1 = it }
+        gattServer.addService(service2) { result2 = it }
+
+        // Pre-onServiceAdded: neither callback should have fired yet.
+        assertNull("addService callbacks must wait for onServiceAdded", result1)
+        assertNull("addService callbacks must wait for onServiceAdded", result2)
+
+        // Mock BluetoothGattService instances with their UUIDs so the
+        // production code can match each onServiceAdded to its caller.
+        val mockService1 = mockk<android.bluetooth.BluetoothGattService>(relaxed = true)
+        every { mockService1.uuid } returns java.util.UUID.fromString(uuid1)
+        val mockService2 = mockk<android.bluetooth.BluetoothGattService>(relaxed = true)
+        every { mockService2.uuid } returns java.util.UUID.fromString(uuid2)
+
+        // Fire onServiceAdded for both. Each callback must resolve to
+        // its own caller, not be lost or routed to the wrong one.
+        capturedCallback!!.onServiceAdded(0, mockService1)
+        capturedCallback!!.onServiceAdded(0, mockService2)
+
+        assertNotNull(
+            "first addService callback must fire (I080: pendingServiceCallback " +
+            "must be a Map keyed by service UUID, not a single slot)",
+            result1,
+        )
+        assertNotNull(
+            "second addService callback must fire",
+            result2,
+        )
+        assertTrue(result1!!.isSuccess)
+        assertTrue(result2!!.isSuccess)
+    }
+
+    @Test
     fun `onCharacteristicReadRequest notifies Flutter`() {
         // Use a service without characteristics to avoid BluetoothGattService.addCharacteristic
         // being called (which isn't mocked). The callback itself doesn't depend on service setup.

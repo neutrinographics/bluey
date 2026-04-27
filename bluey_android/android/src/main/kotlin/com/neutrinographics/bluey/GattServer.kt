@@ -55,8 +55,13 @@ class GattServer(
     private val pendingReadRequests = PendingRequestRegistry<PendingRead>()
     private val pendingWriteRequests = PendingRequestRegistry<PendingWrite>()
 
-    // Pending callbacks for async service addition
-    private var pendingServiceCallback: ((Result<Unit>) -> Unit)? = null
+    // Pending callbacks for async service additions, keyed by the
+    // service UUID's string form (see the `key` extracted in addService
+    // and matched against `service.uuid.toString()` in onServiceAdded).
+    // Pre-I080 this was a single slot — parallel addService calls
+    // overwrote each other and the first caller's Future never
+    // resolved. Now each pending registration has its own slot.
+    private val pendingServiceCallbacks = mutableMapOf<String, (Result<Unit>) -> Unit>()
 
     // CCCD UUID for notifications/indications
     companion object {
@@ -85,20 +90,24 @@ class GattServer(
         }
 
         val gattService = createGattService(service)
-        pendingServiceCallback = callback
+        // Key by the service's *normalized* UUID (lowercase canonical form)
+        // so onServiceAdded — which receives a BluetoothGattService whose
+        // .uuid.toString() is also lowercase canonical — can match.
+        val key = normalizeUuid(service.uuid).lowercase()
+        pendingServiceCallbacks[key] = callback
 
         try {
             Log.d("GattServer", "addService: calling server.addService")
             if (!server.addService(gattService)) {
                 Log.d("GattServer", "addService: server.addService returned false")
-                pendingServiceCallback = null
+                pendingServiceCallbacks.remove(key)
                 callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid)))
             }
             Log.d("GattServer", "addService: server.addService returned true, waiting for onServiceAdded")
             // Callback will be invoked in onServiceAdded
         } catch (e: SecurityException) {
             Log.e("GattServer", "addService: SecurityException", e)
-            pendingServiceCallback = null
+            pendingServiceCallbacks.remove(key)
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
     }
@@ -321,7 +330,7 @@ class GattServer(
         subscriptions.clear()
         pendingReadRequests.clear()
         pendingWriteRequests.clear()
-        pendingServiceCallback = null
+        pendingServiceCallbacks.clear()
     }
 
     /**
@@ -460,8 +469,10 @@ class GattServer(
 
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
             Log.d("GattServer", "onServiceAdded: status=$status service=${service.uuid}")
-            val callback = pendingServiceCallback
-            pendingServiceCallback = null
+            // Look up the caller by service UUID. Match the same lowercase
+            // canonical form used as the key in addService.
+            val key = service.uuid.toString().lowercase()
+            val callback = pendingServiceCallbacks.remove(key)
 
             if (callback != null) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
