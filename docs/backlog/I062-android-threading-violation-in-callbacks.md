@@ -4,8 +4,9 @@ title: "Threading violation: `onConnectionStateChange` mutates main-thread state
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-27
+fixed_in: f9d83d4
 related: [I060, I061, I064, I098]
 ---
 

@@ -4,10 +4,14 @@ title: Coherent rewrite of Android ConnectionManager — threading invariants + 
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-27
+fixed_in: 051f415
 related: [I060, I061, I062, I064]
 ---
+
+> **Fixed 2026-04-27.** Landed across 11 commits: `3962e43` (I064 dead-code purge), `d9e1e51` + `f9d83d4` (I062 threading), `424834c` + `5fac284` (concurrent-connect mutex with `ConnectInProgress`), `1ed0fb5` + `c70d6d0` (I060 disconnect lifecycle + 5 s fallback), `3563f52` + `33c48fb` (I061 cleanup contract), `051f415` (docs). 15 new JVM unit tests in `ConnectionManagerLifecycleTest.kt`. Manual on-device verification still pending. Spec: `docs/superpowers/specs/2026-04-27-android-connection-manager-rewrite-design.md`.
+
 
 ## Symptom
 

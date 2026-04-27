@@ -4,8 +4,10 @@ title: Android `disconnect()` is fire-and-forget, doesn't wait for confirmation
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: c70d6d0
+related: [I098]
 ---
 
 ## Symptom

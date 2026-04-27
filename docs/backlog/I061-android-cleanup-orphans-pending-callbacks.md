@@ -4,8 +4,10 @@ title: "`ConnectionManager.cleanup()` orphans pending callbacks"
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: 33c48fb
+related: [I098]
 ---
 
 ## Symptom

@@ -70,13 +70,14 @@ Tier 1 cleared. Done in this cycle:
 ~~I057~~ ([510278e](#)),
 ~~I067~~ ([8b02ccf](#)).
 
-I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry; possibly absorbed into I098. **Move on to Tier 2.**
+I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a multi-day project — see I035 entry. The Stage A follow-up (domain-side capability gating in `BlueyConnection`) landed `ae76523` and unblocked Android-as-client manual testing.
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
-Each is a single coherent PR. Pick one per multi-day session.
+~~**I098** — Android `ConnectionManager` rewrite~~ ([051f415](#); 11 commits). Bundled I060 + I061 + I062 + I064 + concurrent-connect mutex into one coherent threading + disconnect-lifecycle pass. 15 new JVM unit tests (`ConnectionManagerLifecycleTest.kt`). Manual on-device verification still pending.
 
-7. **I098** — Android `ConnectionManager` rewrite. *~2–3 days.* Bundles I060 + I061 + I062 + I064 into one coherent threading + disconnect-lifecycle pass. High severity. Replaces the previous "Phase 2c thread-safety audit" recommendation.
+Each remaining item is a single coherent PR. Pick one per multi-day session.
+
 8. **I003** — notification controllers never closed (memory leak). *~1 day.* High severity, domain.
 9. **I002** — GATT ops not gated by connection state. *~1–2 days.* High severity, domain.
 10. **Android server hardening** (I012 + I080 + I082 + I086). *~2–3 days.* Bundles notification-completion tracking, `addService`/`startAdvertising` race, `notifyCharacteristic` unsynchronized iteration, and `removeService`/notify race. All Android-side server-role bugs that compound under stress.
@@ -148,16 +149,11 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I013](I013-scan-failure-error-code-not-propagated.md) | Scan failure error code discarded | medium |
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
-| [I060](I060-android-disconnect-fire-and-forget.md) | `disconnect()` fire-and-forget, doesn't wait for confirmation | high |
-| [I061](I061-android-cleanup-orphans-pending-callbacks.md) | `cleanup()` orphans pending callbacks (connects hang forever) | high |
-| [I062](I062-android-threading-violation-in-callbacks.md) | Threading violation: binder-thread mutation of main-thread maps | high |
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
-| [I064](I064-android-phase-2b-dead-legacy-maps.md) | Legacy pending-op maps are dead code (Phase 2b cleanup) | low |
 | [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising` | high |
 | [I081](I081-advertiser-concurrent-start.md) | Advertiser allows concurrent `startAdvertising` | medium |
 | [I082](I082-notify-characteristic-unsynchronized-iteration.md) | `notifyCharacteristic` iterates subscriptions without sync | high |
 | [I085](I085-cccd-malformed-bytes-silently-ignored.md) | CCCD write with malformed bytes silently ignored | medium |
-| [I098](I098-android-connection-manager-rewrite.md) | Rewrite `ConnectionManager`: threading + disconnect lifecycle (architectural; bundles I060/I061/I062/I064) | high |
 
 ### Open — Android GATT server stubs / no-ops
 
@@ -245,6 +241,11 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |
 | [I103](I103-scan-timeout-double-emit.md) | Scan timeout fires after manual stop | Scanner refactor |
+| [I064](I064-android-phase-2b-dead-legacy-maps.md) | Legacy pending-op maps in `ConnectionManager` are dead code | `3962e43` |
+| [I062](I062-android-threading-violation-in-callbacks.md) | Threading violation: binder-thread mutation of main-thread maps in `onConnectionStateChange` | `f9d83d4` |
+| [I060](I060-android-disconnect-fire-and-forget.md) | `disconnect()` fire-and-forget; now awaits STATE_DISCONNECTED with 5 s fallback | `c70d6d0` |
+| [I061](I061-android-cleanup-orphans-pending-callbacks.md) | `cleanup()` orphans pending callbacks; now drains queues + fails-or-succeeds pending callbacks | `33c48fb` |
+| [I098](I098-android-connection-manager-rewrite.md) | Coherent rewrite of Android `ConnectionManager` (threading + disconnect lifecycle); bundles I060/I061/I062/I064 + concurrent-connect mutex | `051f415` (11 commits) |
 
 ### Wontfix — documented platform limitations & superseded premises
 

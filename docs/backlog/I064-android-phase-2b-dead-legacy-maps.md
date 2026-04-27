@@ -4,8 +4,10 @@ title: "Legacy pending-op maps in `ConnectionManager` are dead code"
 category: bug
 severity: low
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: 3962e43
+related: [I098]
 ---
 
 ## Symptom
