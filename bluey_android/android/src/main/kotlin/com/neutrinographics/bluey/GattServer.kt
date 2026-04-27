@@ -63,10 +63,40 @@ class GattServer(
     // resolved. Now each pending registration has its own slot.
     private val pendingServiceCallbacks = mutableMapOf<String, (Result<Unit>) -> Unit>()
 
+    // Pending per-central notification completions (I012). Android's
+    // `onNotificationSent(device, status)` doesn't carry the
+    // characteristic UUID, so completions are FIFO per central:
+    // each notifyCharacteristic / notifyCharacteristicTo enqueues a
+    // PendingNotification per recipient; the next onNotificationSent
+    // for that central pops the head.
+    private val pendingNotifications =
+        mutableMapOf<String, ArrayDeque<PendingNotification>>()
+
+    /**
+     * Per-central in-flight notification entry. [onComplete] receives
+     * the per-send result; [timeoutRunnable] is the scheduled timer
+     * that will fire if `onNotificationSent` doesn't arrive within
+     * [NOTIFY_SEND_TIMEOUT_MS].
+     */
+    private class PendingNotification(
+        val onComplete: (Result<Unit>) -> Unit,
+    ) {
+        var timeoutRunnable: Runnable? = null
+    }
+
     // CCCD UUID for notifications/indications
     companion object {
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val DEFAULT_MTU = 23
+
+        /**
+         * Maximum time to wait for `onNotificationSent` per recipient
+         * before failing the per-send completion with `gatt-timeout`.
+         * 5 s matches the I098 disconnect-fallback budget; on a
+         * healthy link `onNotificationSent` typically fires in <100 ms.
+         * (I012)
+         */
+        private const val NOTIFY_SEND_TIMEOUT_MS = 5_000L
     }
 
     fun setActivity(activity: Activity?) {
@@ -163,19 +193,63 @@ class GattServer(
         // we don't even reach this point — and any mid-fanout removal
         // affects only the subscription map, not the captured snapshot.
         val subscribedCentralIds = subscriptions[normalizedUuid]?.toList() ?: emptyList()
-        if (subscribedCentralIds.isEmpty()) {
+        val recipients = subscribedCentralIds.mapNotNull { id ->
+            connectedCentrals[id]?.let { id to it }
+        }
+        if (recipients.isEmpty()) {
             callback(Result.success(Unit))
             return
         }
 
+        // I012: aggregate per-central completions and only invoke the
+        // outer callback after every recipient's `onNotificationSent`
+        // has fired (or timed out / disconnected). All-or-nothing
+        // semantics: success when every central acks with GATT_SUCCESS;
+        // first non-success status, timeout, or disconnect surfaces as
+        // the aggregate failure.
+        val expected = recipients.size
+        var completed = 0
+        var firstFailure: Throwable? = null
+        var fired = false
+        val onPerCentralComplete: (Result<Unit>) -> Unit = { result ->
+            if (!fired) {
+                completed++
+                if (firstFailure == null && result.isFailure) {
+                    firstFailure = result.exceptionOrNull()
+                }
+                if (completed == expected) {
+                    fired = true
+                    val f = firstFailure
+                    if (f != null) {
+                        callback(Result.failure(f))
+                    } else {
+                        callback(Result.success(Unit))
+                    }
+                }
+            }
+        }
+
+        // Enqueue all per-central pending entries BEFORE issuing any
+        // sendNotification. If sendNotification(central1) triggers a
+        // binder-thread reaction that races back to mutate state — for
+        // example, a STATE_DISCONNECTED for central2 that drains
+        // pendingNotifications[central2] — we want central2's entry to
+        // already be enqueued so the drain finds it. (Otherwise the
+        // entry is enqueued after the disconnect handler ran and sits
+        // in the queue forever waiting for an onNotificationSent that
+        // will never arrive.)
+        for ((id, _) in recipients) {
+            enqueuePendingNotification(id, onPerCentralComplete)
+        }
         try {
-            for (centralId in subscribedCentralIds) {
-                val device = connectedCentrals[centralId] ?: continue
+            for ((_, device) in recipients) {
                 sendNotification(server, device, characteristic, value)
             }
-            callback(Result.success(Unit))
         } catch (e: SecurityException) {
-            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+            if (!fired) {
+                fired = true
+                callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+            }
         }
     }
 
@@ -204,12 +278,46 @@ class GattServer(
             return
         }
 
+        // I012: single-central path uses the same per-central FIFO
+        // queue; the aggregate degenerates to "complete on first
+        // onNotificationSent for this central".
         try {
+            enqueuePendingNotification(centralId, callback)
             sendNotification(server, device, characteristic, value)
-            callback(Result.success(Unit))
         } catch (e: SecurityException) {
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
+    }
+
+    /**
+     * Enqueues a per-central pending notification with the
+     * [NOTIFY_SEND_TIMEOUT_MS] timer. Returns immediately; the entry
+     * resolves either via [BluetoothGattServerCallback.onNotificationSent]
+     * (which pops the head and cancels the timer) or via the timer
+     * firing (which removes the entry by reference and fails it with
+     * `gatt-timeout`). On `STATE_DISCONNECTED` the queue is drained
+     * with `gatt-disconnected`. (I012)
+     */
+    private fun enqueuePendingNotification(
+        centralId: String,
+        onComplete: (Result<Unit>) -> Unit,
+    ) {
+        val pending = PendingNotification(onComplete)
+        val timeoutRunnable = Runnable {
+            val q = pendingNotifications[centralId] ?: return@Runnable
+            if (q.remove(pending)) {
+                pending.onComplete(Result.failure(
+                    FlutterError(
+                        "gatt-timeout",
+                        "notify timed out for $centralId",
+                        null,
+                    ),
+                ))
+            }
+        }
+        pending.timeoutRunnable = timeoutRunnable
+        pendingNotifications.getOrPut(centralId) { ArrayDeque() }.addLast(pending)
+        handler.postDelayed(timeoutRunnable, NOTIFY_SEND_TIMEOUT_MS)
     }
 
     fun respondToReadRequest(
@@ -331,6 +439,24 @@ class GattServer(
         pendingReadRequests.clear()
         pendingWriteRequests.clear()
         pendingServiceCallbacks.clear()
+
+        // I012: drain in-flight notifications so callers' Futures don't
+        // hang past server teardown. Mirrors the I061 cleanup contract
+        // for ConnectionManager.
+        if (pendingNotifications.isNotEmpty()) {
+            val err = FlutterError(
+                "gatt-disconnected",
+                "GATT server torn down with pending notification",
+                null,
+            )
+            for ((_, queue) in pendingNotifications) {
+                for (entry in queue) {
+                    entry.timeoutRunnable?.let { handler.removeCallbacks(it) }
+                    entry.onComplete(Result.failure(err))
+                }
+            }
+            pendingNotifications.clear()
+        }
     }
 
     /**
@@ -442,8 +568,25 @@ class GattServer(
                     // is the immediate guard; this post is the architectural
                     // invariant — same single-threaded discipline as I062's
                     // ConnectionManager fix.
+                    //
+                    // I012: drain any in-flight notifications for this
+                    // central with `gatt-disconnected` so the awaiting
+                    // notify futures don't hang on an `onNotificationSent`
+                    // that will never arrive.
                     handler.post {
                         subscriptions.values.forEach { it.remove(deviceId) }
+                        val pending = pendingNotifications.remove(deviceId)
+                        if (pending != null) {
+                            val err = FlutterError(
+                                "gatt-disconnected",
+                                "central disconnected with pending notification",
+                                null,
+                            )
+                            for (entry in pending) {
+                                entry.timeoutRunnable?.let { handler.removeCallbacks(it) }
+                                entry.onComplete(Result.failure(err))
+                            }
+                        }
                     }
 
                     // Drain pending ATT requests for this central — no point
@@ -645,7 +788,29 @@ class GattServer(
 
         override fun onNotificationSent(device: BluetoothDevice, status: Int) {
             Log.d("GattServer", "onNotificationSent: device=${device.address} status=$status")
-            // Notification was sent - could track for reliability
+            // I012: pop the FIFO head for this central and complete its
+            // notify. Fires on a binder thread; marshal to main so the
+            // pendingNotifications map is only mutated on the main looper
+            // (matches the I062 / I082 single-threaded discipline).
+            val deviceId = device.address
+            handler.post {
+                val queue = pendingNotifications[deviceId] ?: return@post
+                val pending = queue.removeFirstOrNull() ?: return@post
+                if (queue.isEmpty()) pendingNotifications.remove(deviceId)
+                pending.timeoutRunnable?.let { handler.removeCallbacks(it) }
+                val result = if (status == BluetoothGatt.GATT_SUCCESS) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(
+                        FlutterError(
+                            "gatt-status-failed",
+                            "Notify failed with status: $status",
+                            status,
+                        ),
+                    )
+                }
+                pending.onComplete(result)
+            }
         }
 
         override fun onPhyUpdate(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {

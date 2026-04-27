@@ -83,6 +83,11 @@ class GattServerNotifyConcurrencyTest {
             firstArg<Runnable>().run()
             true
         }
+        // I012 added per-send timeouts via postDelayed; capture them so
+        // tests that exercise notifyCharacteristic don't crash on the
+        // unmocked method, and the GattServer's queue stays consistent.
+        every { anyConstructed<Handler>().postDelayed(any(), any()) } returns true
+        every { anyConstructed<Handler>().removeCallbacks(any()) } just Runs
 
         mockContext = mockk(relaxed = true)
         mockBluetoothManager = mockk(relaxed = true)
@@ -219,20 +224,27 @@ class GattServerNotifyConcurrencyTest {
             byteArrayOf(0x01),
         ) { notifyResult = it }
 
-        assertNotNull("notifyCharacteristic must complete its callback", notifyResult)
-        assertTrue(
-            "notify must succeed (not throw ConcurrentModificationException) " +
-            "even when a subscriber disconnects mid-fanout (I082)",
-            notifyResult!!.isSuccess,
+        // Under I012, notify waits for onNotificationSent per central.
+        // central2's pending entry was drained with gatt-disconnected by
+        // the disconnect handler; central1's still in flight.
+        assertNull(
+            "notify must still be waiting for central1's onNotificationSent",
+            notifyResult,
         )
-        // central1 was notified before the disconnect fired; central2 was
-        // skipped because its connectedCentrals entry was already removed
-        // by the binder-thread STATE_DISCONNECTED handler. The key assertion
-        // is the iteration completed cleanly — no CME — which is the
-        // observable consequence of the snapshot.
+
+        // Fire central1's onNotificationSent → aggregate completes.
+        capturedCallback!!.onNotificationSent(device1, 0)
+
+        assertNotNull(notifyResult)
+        // No ConcurrentModificationException was thrown — the iteration
+        // walked the snapshot safely. The aggregate surfaces a failure
+        // because central2 was disconnected mid-fanout (I012 semantics).
         assertTrue(
-            "central1 must have received its notification before the disconnect " +
-            "of central2 fired",
+            "aggregate result reflects central2's disconnect failure",
+            notifyResult!!.isFailure,
+        )
+        assertTrue(
+            "central1 was notified before the disconnect of central2 fired",
             notifiedDevices.contains(central1),
         )
     }
