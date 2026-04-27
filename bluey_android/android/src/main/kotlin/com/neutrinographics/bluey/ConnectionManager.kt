@@ -35,28 +35,16 @@ class ConnectionManager(
     private val queues = mutableMapOf<String, GattOpQueue>()
     private val handler = Handler(Looper.getMainLooper())
 
-    // Pending operation callbacks - GATT operations are async
+    // Pending connect callback. GATT ops route through GattOpQueue; only
+    // connect-phase still uses a top-level callback because the queue is
+    // created on STATE_CONNECTED and doesn't exist yet when connect() is
+    // invoked.
     private val pendingConnections = mutableMapOf<String, (Result<String>) -> Unit>()
-    private val pendingServiceDiscovery = mutableMapOf<String, (Result<List<ServiceDto>>) -> Unit>()
-    private val pendingReads = mutableMapOf<String, (Result<ByteArray>) -> Unit>()
-    private val pendingWrites = mutableMapOf<String, (Result<Unit>) -> Unit>()
-    private val pendingDescriptorReads = mutableMapOf<String, (Result<ByteArray>) -> Unit>()
-    private val pendingDescriptorWrites = mutableMapOf<String, (Result<Unit>) -> Unit>()
-    private val pendingMtuRequests = mutableMapOf<String, (Result<Long>) -> Unit>()
-    private val pendingRssiReads = mutableMapOf<String, (Result<Long>) -> Unit>()
 
-    // Pending timeout Runnables — kept alongside each callback map so that a
-    // completed operation's timer can be cancelled. Without this, a stale
-    // timer from a finished operation will fire and cancel a newer
-    // operation that reuses the same key (e.g. same characteristic).
+    // Pending connect timeout Runnable, keyed by deviceId. Cancelled on
+    // STATE_CONNECTED so a successful connect's timer doesn't later fire
+    // and tear down a still-live connection.
     private val pendingConnectionTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingServiceDiscoveryTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingReadTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingWriteTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingDescriptorReadTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingDescriptorWriteTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingMtuTimeouts = mutableMapOf<String, Runnable>()
-    private val pendingRssiTimeouts = mutableMapOf<String, Runnable>()
 
     // CCCD UUID for enabling notifications/indications
     companion object {
@@ -416,62 +404,12 @@ class ConnectionManager(
         connections.clear()
         queues.clear()
 
-        // Cancel all pending timeouts so they cannot fire after cleanup
+        // Cancel any pending connect timeouts so they cannot fire after cleanup
         pendingConnectionTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingServiceDiscoveryTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingReadTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingWriteTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingDescriptorReadTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingDescriptorWriteTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingMtuTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingRssiTimeouts.values.forEach { handler.removeCallbacks(it) }
         pendingConnectionTimeouts.clear()
-        pendingServiceDiscoveryTimeouts.clear()
-        pendingReadTimeouts.clear()
-        pendingWriteTimeouts.clear()
-        pendingDescriptorReadTimeouts.clear()
-        pendingDescriptorWriteTimeouts.clear()
-        pendingMtuTimeouts.clear()
-        pendingRssiTimeouts.clear()
 
-        // Clear all pending callbacks
+        // Clear pending connect callbacks
         pendingConnections.clear()
-        pendingServiceDiscovery.clear()
-        pendingReads.clear()
-        pendingWrites.clear()
-        pendingDescriptorReads.clear()
-        pendingDescriptorWrites.clear()
-        pendingMtuRequests.clear()
-        pendingRssiReads.clear()
-    }
-
-    /**
-     * Cancels all pending timeout Runnables scheduled for the given device.
-     *
-     * Called on disconnect so that stale timers from in-flight operations
-     * don't fire and corrupt a future operation that happens to reuse the
-     * same completion key (same characteristic/descriptor/device).
-     */
-    private fun cancelAllTimeouts(deviceId: String) {
-        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-        pendingServiceDiscoveryTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-        pendingMtuTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-        pendingRssiTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-
-        // Keyed maps: "$deviceId:$uuid" — remove any entries belonging to
-        // this device, cancelling each timer before removal.
-        val prefix = "$deviceId:"
-        cancelTimersWithPrefix(pendingReadTimeouts, prefix)
-        cancelTimersWithPrefix(pendingWriteTimeouts, prefix)
-        cancelTimersWithPrefix(pendingDescriptorReadTimeouts, prefix)
-        cancelTimersWithPrefix(pendingDescriptorWriteTimeouts, prefix)
-    }
-
-    private fun cancelTimersWithPrefix(map: MutableMap<String, Runnable>, prefix: String) {
-        val keys = map.keys.filter { it.startsWith(prefix) }
-        for (key in keys) {
-            map.remove(key)?.let { handler.removeCallbacks(it) }
-        }
     }
 
     /** Resolves the [GattOpQueue] for [deviceId], or null if no connection exists. */
@@ -532,9 +470,10 @@ class ConnectionManager(
                                 )
                             }
                         }
-                        // Legacy map cleanup (unused after this task but declarations remain
-                        // for Phase 2b to remove)
-                        cancelAllTimeouts(deviceId)
+                        // Cancel any pending connect timeout for this device. Stale
+                        // disconnect-fallback timer cancellation (I060) is added in a
+                        // later commit.
+                        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                         // Connection failed or disconnected - invoke pending callback with error if present
                         val pendingCallback = pendingConnections.remove(deviceId)
                         if (pendingCallback != null) {
