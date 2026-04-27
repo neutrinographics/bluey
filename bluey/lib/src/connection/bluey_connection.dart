@@ -314,6 +314,26 @@ class BlueyConnection implements Connection {
     _stateController.add(_state);
   }
 
+  /// Throws [DisconnectedException] if the connection is not in a
+  /// state that can carry GATT operations. The "live" states are
+  /// [ConnectionState.linked] (link up, services not yet discovered)
+  /// and [ConnectionState.ready] (link up, services discovered or
+  /// upgraded). Every other state — `connecting`, `disconnecting`,
+  /// `disconnected` — fails the gate.
+  ///
+  /// Called at the top of every public GATT-op method on the connection
+  /// itself, and from `BlueyRemoteCharacteristic` /
+  /// `BlueyRemoteDescriptor` via the closure threaded through their
+  /// constructors. Without this gate, calling read/write/etc. on a
+  /// dead connection lets a raw [PlatformException] escape from the
+  /// platform layer (I002).
+  void _ensureConnected() {
+    if (_state == ConnectionState.linked || _state == ConnectionState.ready) {
+      return;
+    }
+    throw DisconnectedException(deviceId, DisconnectReason.unknown);
+  }
+
   /// Idempotent, non-regressing state transition. Skips the emit if the
   /// new state matches the current one. Also refuses to walk backwards
   /// from `ready` to `linked` if the platform happens to re-emit a
@@ -363,6 +383,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
+    _ensureConnected();
     if (cache && _cachedServices != null) {
       return _cachedServices!;
     }
@@ -424,6 +445,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> requestMtu(int mtu) async {
+    _ensureConnected();
     _mtu = await _loggedGattOp(
       deviceId: deviceId,
       op: 'requestMtu',
@@ -436,7 +458,8 @@ class BlueyConnection implements Connection {
   }
 
   @override
-  Future<int> readRssi() {
+  Future<int> readRssi() async {
+    _ensureConnected();
     return _loggedGattOp(
       deviceId: deviceId,
       op: 'readRssi',
@@ -489,11 +512,13 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> bond() async {
+    _ensureConnected();
     await _platform.bond(_connectionId);
   }
 
   @override
   Future<void> removeBond() async {
+    _ensureConnected();
     await _platform.removeBond(_connectionId);
   }
 
@@ -510,6 +535,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
+    _ensureConnected();
     await _platform.requestPhy(
       _connectionId,
       txPhy != null ? _mapPhyToPlatform(txPhy) : null,
@@ -524,6 +550,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> requestConnectionParameters(ConnectionParameters params) async {
+    _ensureConnected();
     await _platform.requestConnectionParameters(
       _connectionId,
       platform.PlatformConnectionParameters(
@@ -719,6 +746,7 @@ class BlueyConnection implements Connection {
       ),
       descriptors: pc.descriptors.map(_mapDescriptor).toList(),
       lifecycleClient: () => _lifecycle,
+      ensureConnected: _ensureConnected,
     );
   }
 
@@ -729,6 +757,7 @@ class BlueyConnection implements Connection {
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
       lifecycleClient: () => _lifecycle,
+      ensureConnected: _ensureConnected,
     );
   }
 }
@@ -791,6 +820,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final String _connectionId;
   final UUID _deviceId;
   final LifecycleClient? Function() _lifecycle;
+  final void Function() _ensureConnected;
 
   @override
   final UUID uuid;
@@ -810,6 +840,12 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   /// ensures user ops on characteristics built during initial service
   /// discovery still feed activity / failure signals into the
   /// lifecycle once it starts.
+  ///
+  /// [ensureConnected] is the connection's pre-flight gate (I002).
+  /// Invoked at the top of every public op; throws
+  /// [DisconnectedException] if the owning connection is no longer
+  /// in `linked` or `ready`. Defaults to a no-op for tests that
+  /// build a characteristic without a parent connection.
   BlueyRemoteCharacteristic({
     required platform.BlueyPlatform platform,
     required String connectionId,
@@ -818,13 +854,16 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.properties,
     required this.descriptors,
     LifecycleClient? Function()? lifecycleClient,
+    void Function()? ensureConnected,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycleClient ?? (() => null);
+       _lifecycle = lifecycleClient ?? (() => null),
+       _ensureConnected = ensureConnected ?? (() {});
 
   @override
-  Future<Uint8List> read() {
+  Future<Uint8List> read() async {
+    _ensureConnected();
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
@@ -839,7 +878,8 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   }
 
   @override
-  Future<void> write(Uint8List value, {bool withResponse = true}) {
+  Future<void> write(Uint8List value, {bool withResponse = true}) async {
+    _ensureConnected();
     if (withResponse && !properties.canWrite) {
       throw const OperationNotSupportedException('write');
     }
@@ -863,6 +903,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   @override
   Stream<Uint8List> get notifications {
+    _ensureConnected();
     if (!properties.canSubscribe) {
       throw const OperationNotSupportedException('notify');
     }
@@ -965,6 +1006,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final String _connectionId;
   final UUID _deviceId;
   final LifecycleClient? Function() _lifecycle;
+  final void Function() _ensureConnected;
 
   @override
   final UUID uuid;
@@ -973,19 +1015,26 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   /// constructed during service discovery, before the connection
   /// upgrades to the Bluey lifecycle protocol. See
   /// [BlueyRemoteCharacteristic] for the same pattern and reasoning.
+  ///
+  /// [ensureConnected] is the connection's pre-flight gate (I002).
+  /// Defaults to a no-op for tests that build a descriptor without a
+  /// parent connection.
   BlueyRemoteDescriptor({
     required platform.BlueyPlatform platform,
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
     LifecycleClient? Function()? lifecycleClient,
+    void Function()? ensureConnected,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
-       _lifecycle = lifecycleClient ?? (() => null);
+       _lifecycle = lifecycleClient ?? (() => null),
+       _ensureConnected = ensureConnected ?? (() {});
 
   @override
   Future<Uint8List> read() async {
+    _ensureConnected();
     return _runGattOp(
       _deviceId,
       'readDescriptor',
@@ -996,6 +1045,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 
   @override
   Future<void> write(Uint8List value) async {
+    _ensureConnected();
     return _runGattOp(
       _deviceId,
       'writeDescriptor',
