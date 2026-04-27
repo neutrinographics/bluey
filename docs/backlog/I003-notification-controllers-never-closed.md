@@ -4,10 +4,14 @@ title: "Memory leak: notification controllers never closed"
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: f69dafa
 historical_ref: BUGS-ANALYSIS-#5
 ---
+
+> **Fixed 2026-04-27.** `BlueyRemoteCharacteristic` and `BlueyRemoteService` now expose `dispose()`; `BlueyConnection._cleanup()` walks `_cachedServices` and disposes each before nulling the cache. 3 new tests in `bluey/test/connection/bluey_connection_disposal_test.dart`. Out of scope (deferred): the autonomous link-loss path (platform reports `DISCONNECTED` without the user calling `disconnect()`) does not flow through `_cleanup()` and still leaks. Per the original fix-sketch's recommendation, reconnect-creates-fresh-BlueyConnection makes this acceptable for now.
+
 
 ## Symptom
 

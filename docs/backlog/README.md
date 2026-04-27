@@ -74,11 +74,12 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 
 ### Tier 2 — Medium projects (multi-day, no breaking changes)
 
-~~**I098** — Android `ConnectionManager` rewrite~~ ([051f415](#); 11 commits). Bundled I060 + I061 + I062 + I064 + concurrent-connect mutex into one coherent threading + disconnect-lifecycle pass. 15 new JVM unit tests (`ConnectionManagerLifecycleTest.kt`). Manual on-device verification still pending.
+~~**I098** — Android `ConnectionManager` rewrite~~ ([051f415](#); 11 commits). Bundled I060 + I061 + I062 + I064 + concurrent-connect mutex into one coherent threading + disconnect-lifecycle pass. 15 new JVM unit tests (`ConnectionManagerLifecycleTest.kt`). Verified on real Android via stress tests.
+
+~~**I003** — notification controllers never closed~~ ([f69dafa](#)). `BlueyConnection._cleanup()` now walks `_cachedServices` and disposes each. 3 new domain tests.
 
 Each remaining item is a single coherent PR. Pick one per multi-day session.
 
-8. **I003** — notification controllers never closed (memory leak). *~1 day.* High severity, domain.
 9. **I002** — GATT ops not gated by connection state. *~1–2 days.* High severity, domain.
 10. **Android server hardening** (I012 + I080 + I082 + I086). *~2–3 days.* Bundles notification-completion tracking, `addService`/`startAdvertising` race, `notifyCharacteristic` unsynchronized iteration, and `removeService`/notify race. All Android-side server-role bugs that compound under stress.
 
@@ -114,7 +115,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 |---|---|---|
 | [I001](I001-disconnect-state-double-emission.md) | Disconnect state double-emission | medium |
 | [I002](I002-gatt-ops-not-gated-by-connection-state.md) | GATT ops not gated by connection state | high |
-| [I003](I003-notification-controllers-never-closed.md) | Memory leak: notification controllers never closed | high |
 | [I004](I004-mtu-not-synced-with-platform-callbacks.md) | MTU not synced with platform-initiated changes | medium |
 | [I005](I005-async-init-without-error-handling.md) | Async initialization without error handling | medium |
 | [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC → UUID truncation | medium |
@@ -246,6 +246,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I060](I060-android-disconnect-fire-and-forget.md) | `disconnect()` fire-and-forget; now awaits STATE_DISCONNECTED with 5 s fallback | `c70d6d0` |
 | [I061](I061-android-cleanup-orphans-pending-callbacks.md) | `cleanup()` orphans pending callbacks; now drains queues + fails-or-succeeds pending callbacks | `33c48fb` |
 | [I098](I098-android-connection-manager-rewrite.md) | Coherent rewrite of Android `ConnectionManager` (threading + disconnect lifecycle); bundles I060/I061/I062/I064 + concurrent-connect mutex | `051f415` (11 commits) |
+| [I003](I003-notification-controllers-never-closed.md) | Memory leak: per-characteristic notification controllers never closed; `_cleanup()` now walks `_cachedServices` and disposes each | `f69dafa` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
