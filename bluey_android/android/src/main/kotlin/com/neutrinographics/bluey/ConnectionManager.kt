@@ -85,7 +85,18 @@ class ConnectionManager(
             return
         }
 
-        // Check if already connected
+        // Reject concurrent connects to the same device (I098 item 5).
+        // Order matters: check the in-flight set BEFORE the established
+        // set. Otherwise the established check would fire idempotent
+        // success during the connecting → connected window where
+        // connections[deviceId] is populated but the link isn't up yet
+        // (the original false-positive bug).
+        if (pendingConnections.containsKey(deviceId)) {
+            callback(Result.failure(BlueyAndroidError.ConnectInProgress(deviceId)))
+            return
+        }
+
+        // Check if already connected (idempotent success).
         if (connections.containsKey(deviceId)) {
             callback(Result.success(deviceId))
             return
