@@ -4,9 +4,14 @@ title: "Android `notifyCharacteristic` iterates subscriptions without synchroniz
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: 80ef2ed
+related: [I062, I086]
 ---
+
+> **Fixed 2026-04-27.** Two-part fix: (1) defensive snapshot at iteration entry — `subscriptions[uuid]?.toList() ?: emptyList()` — prevents `ConcurrentModificationException` if mutation lands mid-fanout; (2) every binder-thread mutation of `subscriptions` (CCCD subscribe/unsubscribe in `onDescriptorWriteRequest`, central removal in `STATE_DISCONNECTED`) is now wrapped in `handler.post { … }`, applying the same single-threaded discipline established by the I098 `ConnectionManager` rewrite. 3 new JVM tests in `bluey_android/android/src/test/kotlin/com/neutrinographics/bluey/GattServerNotifyConcurrencyTest.kt`.
+
 
 ## Symptom
 

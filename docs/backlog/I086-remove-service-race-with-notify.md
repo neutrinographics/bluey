@@ -3,10 +3,15 @@ id: I086
 title: "`removeService` races with in-flight notify fanout"
 category: bug
 severity: medium
-platform: both
+platform: ios
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-04-27
+android_fixed_in: 80ef2ed
+related: [I082]
 ---
+
+> **Android side fixed 2026-04-27** (`80ef2ed`). Falls out of the I082 defensive-snapshot fix: a removed service's characteristic returns null from `findCharacteristic`, surfacing `CharacteristicNotFound` before any iteration. The snapshot also protects fanout if removal lands mid-iteration. **iOS side remains open** — `peripheralManager(_:didRemoveService:)` clears `subscribedCentrals` without coordination with notify fanout; same fix shape (defensive snapshot at iteration entry) applies. Best bundled with other iOS one-offs (Tier 4) when natural.
+
 
 ## Symptom
 

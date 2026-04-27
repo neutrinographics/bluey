@@ -80,9 +80,14 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 
 ~~**I002** — GATT ops not gated by connection state~~ ([7da8795](#)). `_ensureConnected()` throws `DisconnectedException` from every public op on `BlueyConnection` / `BlueyRemoteCharacteristic` / `BlueyRemoteDescriptor`. 10 new domain tests.
 
+~~**I082 + I086 (Android side)** — `notifyCharacteristic` concurrent-mutation safety~~ ([80ef2ed](#)). Defensive snapshot at iteration entry; binder-thread subscription mutations now go through `handler.post`. 3 new JVM tests. **iOS-side I086 remains open** (Tier 4, bundle with other iOS one-offs).
+
 Each remaining item is a single coherent PR. Pick one per multi-day session.
 
-10. **Android server hardening** (I012 + I080 + I082 + I086). *~2–3 days.* Bundles notification-completion tracking, `addService`/`startAdvertising` race, `notifyCharacteristic` unsynchronized iteration, and `removeService`/notify race. All Android-side server-role bugs that compound under stress.
+**Android server hardening (remaining)** — I012 + I080 still open from the original bundle:
+
+- **I012** — server notification completion not tracked per central. *~half-day to a day.* High severity. Pigeon contract change (caller gets per-central outcomes).
+- **I080** — `addService` races with `startAdvertising`. *~half-day.* High severity. Coordination between two state machines.
 
 ### Tier 3 — Major architectural rewrites (breaking; major-version bumps)
 
@@ -152,7 +157,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
 | [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising` | high |
 | [I081](I081-advertiser-concurrent-start.md) | Advertiser allows concurrent `startAdvertising` | medium |
-| [I082](I082-notify-characteristic-unsynchronized-iteration.md) | `notifyCharacteristic` iterates subscriptions without sync | high |
 | [I085](I085-cccd-malformed-bytes-silently-ignored.md) | CCCD write with malformed bytes silently ignored | medium |
 
 ### Open — Android GATT server stubs / no-ops
@@ -202,7 +206,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I052](I052-scan-options-not-exposed.md) | Scan options not exposed (mode, RSSI filter, duplicates) | medium |
 | [I053](I053-capabilities-matrix-incomplete.md) | `Capabilities` matrix incomplete | medium |
 | [I084](I084-reconnect-loses-subscriptions.md) | Reconnected central loses subscriptions silently | medium |
-| [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout | medium |
+| [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout (iOS only; Android done in `80ef2ed`) | medium |
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
 
@@ -248,6 +252,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I098](I098-android-connection-manager-rewrite.md) | Coherent rewrite of Android `ConnectionManager` (threading + disconnect lifecycle); bundles I060/I061/I062/I064 + concurrent-connect mutex | `051f415` (11 commits) |
 | [I003](I003-notification-controllers-never-closed.md) | Memory leak: per-characteristic notification controllers never closed; `_cleanup()` now walks `_cachedServices` and disposes each | `f69dafa` |
 | [I002](I002-gatt-ops-not-gated-by-connection-state.md) | GATT ops not gated by connection state; `_ensureConnected()` now throws `DisconnectedException` from every public op | `7da8795` |
+| [I082](I082-notify-characteristic-unsynchronized-iteration.md) | Android `notifyCharacteristic` iterated subscriptions unsynchronized; defensive snapshot + `handler.post` for binder-thread mutations | `80ef2ed` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
