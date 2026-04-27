@@ -608,7 +608,19 @@ class BlueyConnection implements Connection {
     await _stateController.close();
     await _bondStateController.close();
     await _phyController.close();
+
+    // I003 — dispose every cached service before nulling the cache, so
+    // each BlueyRemoteCharacteristic's lazily-built notification
+    // controller is closed and its platform subscription cancelled.
+    // Without this walk, controllers persisted across connect/disconnect
+    // cycles and memory grew monotonically.
+    final cached = _cachedServices;
     _cachedServices = null;
+    if (cached != null) {
+      for (final service in cached) {
+        await service.dispose();
+      }
+    }
   }
 
   ConnectionState _mapConnectionState(
@@ -752,6 +764,24 @@ class BlueyRemoteService implements RemoteService {
       }
     }
     throw CharacteristicNotFoundException(uuid);
+  }
+
+  /// Releases per-characteristic resources (notification subscriptions
+  /// and broadcast controllers) for every characteristic in this
+  /// service. Called by [BlueyConnection._cleanup] on disconnect to
+  /// prevent the leak documented in I003. Included services are
+  /// disposed recursively. Idempotent.
+  Future<void> dispose() async {
+    for (final char in characteristics) {
+      if (char is BlueyRemoteCharacteristic) {
+        await char.dispose();
+      }
+    }
+    for (final included in includedServices) {
+      if (included is BlueyRemoteService) {
+        await included.dispose();
+      }
+    }
   }
 }
 
@@ -900,6 +930,22 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // Cancel subscription
     _notificationSubscription?.cancel();
     _notificationSubscription = null;
+  }
+
+  /// Releases this characteristic's notification resources. Called by
+  /// the owning [BlueyRemoteService.dispose] when the connection is
+  /// torn down (I003). Cancels the platform notification subscription
+  /// and closes the lazily-built broadcast controller. Idempotent and
+  /// safe when no consumer ever subscribed (controller was never
+  /// created).
+  Future<void> dispose() async {
+    final sub = _notificationSubscription;
+    _notificationSubscription = null;
+    await sub?.cancel();
+
+    final controller = _notificationController;
+    _notificationController = null;
+    await controller?.close();
   }
 
   @override
