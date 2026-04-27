@@ -435,6 +435,16 @@ class ConnectionManager(
 
     private fun createGattCallback(deviceId: String): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
+            // Threading invariant (I062): every state-mutating branch body
+            // is wrapped in `handler.post { ... }` so all map mutations,
+            // pending-callback invocations, and gatt.close() calls happen
+            // on the main looper thread. `onConnectionStateChange` fires
+            // on a Binder IPC thread; without the marshal, ConnectionManager's
+            // maps would be mutated concurrently with main-thread reads in
+            // the public op methods.
+            //
+            // `notifyConnectionState` already internally posts to main, so
+            // it can stay outside the wrapper.
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTING -> {
@@ -443,15 +453,15 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_CONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.CONNECTED)
-                        // Cancel the pending connect timeout
-                        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
                         handler.post {
-                            // Creating the queue on the main thread preserves GattOpQueue's
-                            // single-threaded invariant (all state mutation on the main-looper
-                            // thread). onConnectionStateChange fires on a binder thread.
+                            // Cancel the pending connect timeout.
+                            pendingConnectionTimeouts.remove(deviceId)?.let {
+                                handler.removeCallbacks(it)
+                            }
+                            // Create the queue on the main thread to preserve
+                            // GattOpQueue's single-threaded invariant.
                             queues[deviceId] = GattOpQueue(gatt, handler)
-                            val pendingCallback = pendingConnections.remove(deviceId)
-                            pendingCallback?.invoke(Result.success(deviceId))
+                            pendingConnections.remove(deviceId)?.invoke(Result.success(deviceId))
                         }
                     }
 
@@ -461,37 +471,38 @@ class ConnectionManager(
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
-                        // Drain any pending queue operations with gatt-disconnected
-                        queues.remove(deviceId)?.let { queue ->
-                            handler.post {
-                                queue.drainAll(
-                                    FlutterError("gatt-disconnected",
-                                        "connection lost with pending GATT op", null)
-                                )
+                        handler.post {
+                            // Cancel any pending connect timeout. Stale
+                            // disconnect-fallback timer cancellation (I060)
+                            // is added in a later commit.
+                            pendingConnectionTimeouts.remove(deviceId)?.let {
+                                handler.removeCallbacks(it)
                             }
-                        }
-                        // Cancel any pending connect timeout for this device. Stale
-                        // disconnect-fallback timer cancellation (I060) is added in a
-                        // later commit.
-                        pendingConnectionTimeouts.remove(deviceId)?.let { handler.removeCallbacks(it) }
-                        // Connection failed or disconnected - invoke pending callback with error if present
-                        val pendingCallback = pendingConnections.remove(deviceId)
-                        if (pendingCallback != null) {
-                            val error = if (status != BluetoothGatt.GATT_SUCCESS) {
-                                statusFailedError("Connection", status)
-                            } else {
-                                BlueyAndroidError.GattConnectionCreationFailed
-                            }
-                            handler.post {
+                            // Drain any in-flight + pending queue ops with
+                            // gatt-disconnected. drainAll itself is safe to
+                            // call here because we're already on main.
+                            queues.remove(deviceId)?.drainAll(
+                                FlutterError("gatt-disconnected",
+                                    "connection lost with pending GATT op", null)
+                            )
+                            // Connection failed or disconnected — fail any
+                            // pending connect callback with the appropriate
+                            // typed error.
+                            val pendingCallback = pendingConnections.remove(deviceId)
+                            if (pendingCallback != null) {
+                                val error = if (status != BluetoothGatt.GATT_SUCCESS) {
+                                    statusFailedError("Connection", status)
+                                } else {
+                                    BlueyAndroidError.GattConnectionCreationFailed
+                                }
                                 pendingCallback.invoke(Result.failure(error))
                             }
-                        }
-                        // Clean up
-                        connections.remove(deviceId)
-                        try {
-                            gatt.close()
-                        } catch (e: Exception) {
-                            // Ignore
+                            connections.remove(deviceId)
+                            try {
+                                gatt.close()
+                            } catch (e: Exception) {
+                                // Ignore
+                            }
                         }
                     }
                 }
