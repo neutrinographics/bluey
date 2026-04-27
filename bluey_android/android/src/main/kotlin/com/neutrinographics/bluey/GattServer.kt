@@ -142,8 +142,18 @@ class GattServer(
             return
         }
 
-        // Get subscribed centrals for this characteristic
-        val subscribedCentralIds = subscriptions[normalizedUuid] ?: emptySet()
+        // Defensive snapshot of the subscribed-centrals set. The
+        // underlying MutableSet is mutated from binder-thread callbacks
+        // (CCCD subscribe/unsubscribe in onDescriptorWriteRequest, and
+        // STATE_DISCONNECTED in onConnectionStateChange). Iterating the
+        // live set would throw ConcurrentModificationException if a
+        // central disconnects or unsubscribes mid-fanout (I082).
+        //
+        // Snapshot semantics also make I086 a no-op: a removed service's
+        // characteristic returns null from findCharacteristic above, so
+        // we don't even reach this point — and any mid-fanout removal
+        // affects only the subscription map, not the captured snapshot.
+        val subscribedCentralIds = subscriptions[normalizedUuid]?.toList() ?: emptyList()
         if (subscribedCentralIds.isEmpty()) {
             callback(Result.success(Unit))
             return
@@ -417,8 +427,15 @@ class GattServer(
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
-                    // Remove from all subscriptions.
-                    subscriptions.values.forEach { it.remove(deviceId) }
+                    // Marshal the subscriptions cleanup to the main thread so
+                    // it doesn't race with `notifyCharacteristic`'s iteration
+                    // (I082). The defensive snapshot at the iteration entry
+                    // is the immediate guard; this post is the architectural
+                    // invariant — same single-threaded discipline as I062's
+                    // ConnectionManager fix.
+                    handler.post {
+                        subscriptions.values.forEach { it.remove(deviceId) }
+                    }
 
                     // Drain pending ATT requests for this central — no point
                     // keeping them; sendResponse would fail once the device is gone.
@@ -576,16 +593,20 @@ class GattServer(
                         value.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
                 val isUnsubscribing = value.contentEquals(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
 
+                // CCCD subscribe / unsubscribe mutates `subscriptions`,
+                // which is read on the main thread by `notifyCharacteristic`.
+                // Marshal the mutation onto the main thread alongside the
+                // existing flutterApi notification so the threading invariant
+                // holds (I082).
                 if (isSubscribing) {
-                    subscriptions.getOrPut(characteristicUuid) { mutableSetOf() }.add(centralId)
-                    // Must dispatch to main thread for Flutter platform channel
                     handler.post {
+                        subscriptions.getOrPut(characteristicUuid) { mutableSetOf() }
+                            .add(centralId)
                         flutterApi.onCharacteristicSubscribed(centralId, characteristicUuid) {}
                     }
                 } else if (isUnsubscribing) {
-                    subscriptions[characteristicUuid]?.remove(centralId)
-                    // Must dispatch to main thread for Flutter platform channel
                     handler.post {
+                        subscriptions[characteristicUuid]?.remove(centralId)
                         flutterApi.onCharacteristicUnsubscribed(centralId, characteristicUuid) {}
                     }
                 }
