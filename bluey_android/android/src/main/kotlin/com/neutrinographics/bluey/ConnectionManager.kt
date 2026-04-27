@@ -490,25 +490,71 @@ class ConnectionManager(
         queue.enqueue(ReadRssiOp(callback, readRssiTimeoutMs))
     }
 
+    /**
+     * Tears down all in-flight connection state. Called on engine detach
+     * / activity destroy. Order matters (I061):
+     *
+     *   1. Drain queues with gatt-disconnected so in-flight queue ops fire
+     *      their callbacks.
+     *   2. Fail pending connect callbacks with a typed cleanup error.
+     *   3. Succeed pending disconnect callbacks (the user asked for the
+     *      link to come down; cleanup made that happen — spec Decision 2).
+     *   4. Cancel scheduled timeout Runnables.
+     *   5. Disconnect and close every BluetoothGatt handle.
+     *   6. Clear all maps.
+     *
+     * The completions happen BEFORE gatt.disconnect() so that if the OS
+     * later schedules a STATE_DISCONNECTED for a torn-down connection,
+     * the binder-thread handler.post finds empty maps and is a no-op
+     * (rather than racing with cleanup() and double-firing user
+     * callbacks).
+     */
     fun cleanup() {
-        // Disconnect all connections
-        val deviceIds = connections.keys.toList()
-        for (deviceId in deviceIds) {
+        // 1. Drain in-flight queue ops.
+        val drainError = FlutterError(
+            "gatt-disconnected", "cleanup in progress", null,
+        )
+        for ((_, queue) in queues) {
+            queue.drainAll(drainError)
+        }
+        queues.clear()
+
+        // 2. Fail pending connect callbacks.
+        val connectCallbacks = pendingConnections.values.toList()
+        pendingConnections.clear()
+        for (cb in connectCallbacks) {
+            cb(Result.failure(BlueyAndroidError.GattConnectionCreationFailed))
+        }
+
+        // 3. Succeed pending disconnect callbacks. The link is going away
+        //    — that is what disconnect() callers asked for.
+        val disconnectCallbackLists = pendingDisconnects.values.toList()
+        pendingDisconnects.clear()
+        for (callbacks in disconnectCallbackLists) {
+            for (cb in callbacks) cb(Result.success(Unit))
+        }
+
+        // 4. Cancel scheduled timeouts.
+        pendingConnectionTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingConnectionTimeouts.clear()
+        pendingDisconnectTimeouts.values.forEach { handler.removeCallbacks(it) }
+        pendingDisconnectTimeouts.clear()
+
+        // 5. Disconnect and close every gatt handle. Errors are ignored —
+        //    we're already in the failure path.
+        for ((_, gatt) in connections) {
             try {
-                connections[deviceId]?.disconnect()
+                gatt.disconnect()
             } catch (e: Exception) {
-                // Ignore errors during cleanup
+                // Ignore
+            }
+            try {
+                gatt.close()
+            } catch (e: Exception) {
+                // Ignore
             }
         }
         connections.clear()
-        queues.clear()
-
-        // Cancel any pending connect timeouts so they cannot fire after cleanup
-        pendingConnectionTimeouts.values.forEach { handler.removeCallbacks(it) }
-        pendingConnectionTimeouts.clear()
-
-        // Clear pending connect callbacks
-        pendingConnections.clear()
     }
 
     /** Resolves the [GattOpQueue] for [deviceId], or null if no connection exists. */
