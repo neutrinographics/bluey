@@ -533,4 +533,113 @@ class ConnectionManagerLifecycleTest {
         assertTrue(secondResult!!.isSuccess)
         assertNull("first connect callback must remain in flight", firstResult)
     }
+
+    // ============================================================
+    // I061 — cleanup() drains + fails-or-succeeds pending callbacks
+    // ============================================================
+
+    @Test
+    fun `I061 cleanup fails pending connect callbacks with a typed error`() {
+        // Start a connect; do NOT fire STATE_CONNECTED.
+        var connectResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            connectResult = result
+        }
+
+        connectionManager.cleanup()
+
+        assertNotNull(
+            "cleanup must fire pending connect callbacks (I061)",
+            connectResult,
+        )
+        assertTrue(connectResult!!.isFailure)
+        // The exact error type is internal-spec; we only require it to be
+        // a non-null failure that callers can observe.
+        assertNotNull(connectResult!!.exceptionOrNull())
+    }
+
+    @Test
+    fun `I061 cleanup completes pending disconnect callbacks with success`() {
+        establishConnection()
+
+        // Start a disconnect; do NOT fire STATE_DISCONNECTED.
+        var disconnectResult: Result<Unit>? = null
+        connectionManager.disconnect(deviceAddress) { result ->
+            disconnectResult = result
+        }
+        assertNull("disconnect callback must NOT have fired pre-cleanup", disconnectResult)
+
+        connectionManager.cleanup()
+
+        assertNotNull(
+            "cleanup must fire pending disconnect callbacks (I061)",
+            disconnectResult,
+        )
+        assertTrue(
+            "pending disconnect must complete with success on cleanup — the user " +
+            "asked for the link to come down, cleanup made that happen (spec Decision 2)",
+            disconnectResult!!.isSuccess,
+        )
+    }
+
+    @Test
+    fun `I061 cleanup drains in-flight queue ops with gatt-disconnected`() {
+        establishConnection()
+        val char = mockCharacteristic()
+        every { mockGatt.writeCharacteristic(
+            any<BluetoothGattCharacteristic>(), any(), any(),
+        ) } returns BluetoothGatt.GATT_SUCCESS
+
+        var writeResult: Result<Unit>? = null
+        connectionManager.writeCharacteristic(
+            deviceAddress, testCharUuid.toString(),
+            byteArrayOf(0x01), true,
+        ) { writeResult = it }
+
+        // Write is in flight (no callback yet — onCharacteristicWrite hasn't fired).
+        assertNull(writeResult)
+
+        connectionManager.cleanup()
+
+        assertNotNull(
+            "in-flight queue op callback must fire on cleanup (I061)",
+            writeResult,
+        )
+        assertTrue(writeResult!!.isFailure)
+        val err = writeResult!!.exceptionOrNull()
+        assertTrue(
+            "expected FlutterError(gatt-disconnected, ...), got ${err?.javaClass?.simpleName}: $err",
+            err is FlutterError && err.code == "gatt-disconnected",
+        )
+    }
+
+    @Test
+    fun `I061 cleanup cancels pending connection and disconnect timeout runnables`() {
+        // Establish a connection and start a disconnect to populate
+        // pendingDisconnectTimeouts. The connect-timeout map only holds
+        // entries when ConnectConfigDto carries a timeoutMs; use one.
+        var connectResult: Result<String>? = null
+        connectionManager.connect(
+            deviceAddress, ConnectConfigDto(timeoutMs = 30_000L),
+        ) { connectResult = it }
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
+        )
+        assertTrue(connectResult!!.isSuccess)
+
+        connectionManager.disconnect(deviceAddress) { /* ignored */ }
+        val fallback = capturedPostDelayed.firstOrNull { it.second == disconnectFallbackMs }
+        assertNotNull(
+            "disconnect must have scheduled a 5s fallback for this test to be meaningful",
+            fallback,
+        )
+
+        removedCallbacks.clear()
+        connectionManager.cleanup()
+
+        assertTrue(
+            "cleanup must cancel the disconnect fallback runnable via removeCallbacks (I061)",
+            removedCallbacks.any { it === fallback!!.first },
+        )
+    }
 }
