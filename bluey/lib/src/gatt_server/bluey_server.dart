@@ -26,6 +26,12 @@ class BlueyServer implements Server {
   bool _isAdvertising = false;
   final Map<String, BlueyClient> _connectedClients = {};
 
+  /// User-initiated `addService` futures still in flight. Tracked here
+  /// so [startAdvertising] can await them — without this, advertising
+  /// could begin while services were still registering and a central
+  /// connecting in that window would see an incomplete GATT tree (I080).
+  final List<Future<void>> _pendingServiceAdds = [];
+
   final StreamController<Client> _connectionsController =
       StreamController<Client>.broadcast();
   final StreamController<String> _disconnectionsController =
@@ -148,11 +154,21 @@ class BlueyServer implements Server {
     // adding app services — Android requires sequential addService calls.
     await _controlServiceReady;
     final platformService = _mapHostedServiceToPlatform(service);
-    await _platform.addService(platformService);
-    dev.log('service added: ${service.uuid}', name: 'bluey.server');
-    _emitEvent(
-      ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
-    );
+
+    // Track this addService so startAdvertising can wait for it even if
+    // the user fires addService and startAdvertising without awaiting
+    // in between (I080).
+    final platformFuture = _platform.addService(platformService);
+    _pendingServiceAdds.add(platformFuture);
+    try {
+      await platformFuture;
+      dev.log('service added: ${service.uuid}', name: 'bluey.server');
+      _emitEvent(
+        ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
+      );
+    } finally {
+      _pendingServiceAdds.remove(platformFuture);
+    }
   }
 
   @override
@@ -170,6 +186,21 @@ class BlueyServer implements Server {
     // Ensure the eagerly-registered control service has completed before
     // advertising. The Future is cached and completes only once.
     await _controlServiceReady;
+
+    // Wait for any user-initiated addService calls still in flight so a
+    // central connecting after advertising starts sees the full GATT
+    // tree (I080). Failures are reported via the original addService
+    // Future; here we just need to let the in-flight call settle before
+    // advertising. Snapshot the list because addService removes from
+    // _pendingServiceAdds in its finally block.
+    final pending = List<Future<void>>.from(_pendingServiceAdds);
+    for (final f in pending) {
+      try {
+        await f;
+      } on Object {
+        // Surfaced via the original addService Future.
+      }
+    }
 
     final config = platform.PlatformAdvertiseConfig(
       name: name,
