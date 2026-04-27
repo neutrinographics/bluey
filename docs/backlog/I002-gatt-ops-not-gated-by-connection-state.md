@@ -4,10 +4,14 @@ title: GATT operations not gated by connection state
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: 7da8795
 historical_ref: BUGS-ANALYSIS-#4
 ---
+
+> **Fixed 2026-04-27.** Added `BlueyConnection._ensureConnected()` (passes when state is `linked` or `ready`, throws `DisconnectedException(deviceId, DisconnectReason.unknown)` otherwise). Called at the top of every public GATT-op method on `BlueyConnection`, `BlueyRemoteCharacteristic`, and `BlueyRemoteDescriptor` via a closure threaded through the constructors. 10 new tests in `bluey/test/connection/bluey_connection_state_gating_test.dart`. Out of scope (deferred): the post-hoc "rewrap raw platform error to `DisconnectReason.linkLoss` if state flipped mid-op" — covered for the typed-error path by existing `_runGattOp`'s `GattOperationDisconnectedException` translation; un-typed cases roll into [I099](I099-typed-error-translation-rewrite.md).
+
 
 ## Symptom
 
