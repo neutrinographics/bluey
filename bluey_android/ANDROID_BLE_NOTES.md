@@ -195,3 +195,50 @@ The heartbeat write still fires as a fallback when the connection is genuinely i
 Motivation: burst workloads (e.g. the example app's stress-test suite) were starving the heartbeat into a queue-wait timeout, tripping `onServerUnreachable` mid-burst even though every preceding write had succeeded. Treating user-op success as activity prevents this false positive.
 
 Implementation reference: `bluey/lib/src/connection/liveness_monitor.dart` owns the state machine; `LifecycleClient` delegates all policy decisions to it.
+
+## ConnectionManager Threading + Lifecycle Contract (2026-04-27, I098)
+
+A coherent rewrite of `ConnectionManager.kt` that bundles four previously-separate fixes into one pass: I060 (fire-and-forget disconnect), I061 (cleanup orphans pending callbacks), I062 (binder-thread map mutation), I064 (legacy dead pending-op maps). The rewrite is documented in `docs/superpowers/specs/2026-04-27-android-connection-manager-rewrite-design.md`.
+
+### Threading invariant
+
+> All mutation of `ConnectionManager`'s state fields happens on the main looper thread.
+
+`BluetoothGattCallback` methods fire on Binder IPC threads. Before this fix, `onConnectionStateChange` mutated `connections`, `queues`, `pendingConnections`, and `pendingConnectionTimeouts` directly on the binder thread, while those same maps were read and written from main-thread code paths in the public op methods. Classic JVM data race; symptoms included intermittent `DeviceNotConnected` errors after a successful connect, lost connect callbacks, and inexplicable hangs.
+
+Fix: every state-mutating branch body in `onConnectionStateChange` is wrapped in `handler.post { … }` so all mutations marshal to main. `notifyConnectionState` already internally posts; it stays outside the wrapper. The other `BluetoothGattCallback` overrides (`onCharacteristicWrite`, `onMtuChanged`, etc.) already correctly route through `handler.post { queueFor(deviceId)?.onComplete(...) }` — unchanged.
+
+### Disconnect lifecycle
+
+`disconnect(deviceId, callback)` no longer fires `success` synchronously. It registers the callback in `pendingDisconnects[deviceId]`, calls `gatt.disconnect()`, and schedules a 5 s fallback Runnable. The callback fires from one of three paths:
+
+1. **`STATE_DISCONNECTED` arrives within 5 s** — expected. Cancels the fallback timer, drains the queue with `gatt-disconnected`, removes from `connections`, calls `gatt.close()`, invokes every registered callback with `Result.success(Unit)`.
+2. **5 s fallback fires** — the OS callback genuinely didn't arrive. Force-closes the gatt, drains the queue, synthesizes `notifyConnectionState(DISCONNECTED)`, invokes every registered callback with `FlutterError("gatt-disconnected", "disconnect timed out…")`.
+3. **`STATE_DISCONNECTED` arrives after the fallback fired** — no-op (the binder-thread post finds empty maps).
+
+Multiple concurrent `disconnect()` calls to the same `deviceId` share-the-future: every registered callback fires when the link comes down. `disconnect(deviceId)` for an address with no entry in `connections` fires `success` synchronously (idempotent / matches iOS I044).
+
+### Concurrent connect rejection
+
+`connect(deviceId, …)` checks `pendingConnections.containsKey(deviceId)` BEFORE the established-connection idempotency check. A second `connect()` to the same address while the first is still in flight fires `failure(BlueyAndroidError.ConnectInProgress(deviceId))` — surfacing Dart-side as `BlueyPlatformException` (`bluey-unknown` Pigeon code).
+
+Pre-fix, the existing `connections.containsKey(deviceId)` check fired success() as soon as `device.connectGatt()` returned and populated `connections[deviceId]`, before `STATE_CONNECTED` arrived — a false-positive success during the connecting → connected window.
+
+### Cleanup contract
+
+`cleanup()` (engine detach / activity destroy) now does, in order:
+
+1. Drain `queues` with `FlutterError("gatt-disconnected", "cleanup in progress")`.
+2. Fail `pendingConnections` callbacks with `BlueyAndroidError.GattConnectionCreationFailed`.
+3. Succeed `pendingDisconnects` callbacks (the user asked for the link to come down; cleanup made that happen).
+4. `handler.removeCallbacks` for every entry in `pendingConnectionTimeouts` and `pendingDisconnectTimeouts`.
+5. `gatt.disconnect()` then `gatt.close()` for every entry in `connections`.
+6. Clear all maps.
+
+The completion-then-disconnect order matters: completing the user-facing callbacks BEFORE issuing `gatt.disconnect()` means a binder-thread `STATE_DISCONNECTED` that arrives later finds empty maps and is a no-op, rather than racing with `cleanup()` and double-firing user callbacks.
+
+### What can and can't be unit-tested
+
+JVM unit tests (`ConnectionManagerLifecycleTest.kt`, 15 cases) validate the lifecycle contract end-to-end with mockk. They cover: handler.post deferral of map mutations (I062), connect-mutex semantics (I098), disconnect-await + fallback paths (I060), cleanup ordering (I061).
+
+What unit tests **cannot** prove: `mockkConstructor(Handler).post { runImmediately() }` flattens threading, so race conditions across binder ↔ main are observably absent in tests but may still be present at runtime. Manual stress-test verification on real Android (the example app's `runSoak` and `runFailureInjection` scenarios) remains the load-bearing gate for the threading invariant.
