@@ -31,6 +31,18 @@ internal sealed class BlueyAndroidError(message: String) : Exception(message) {
 
     object GattConnectionCreationFailed : BlueyAndroidError("GATT connection creation failed")
 
+    /**
+     * A concurrent `connect(deviceId)` call was made while a previous connect
+     * to the same address was still in flight. Surfaces as `bluey-unknown`
+     * via the catch-all path in [Throwable.toClientFlutterError]. Calling
+     * `connect()` twice on the same device is a programming error
+     * (`BlueyConnection` should not do this); rejecting it loudly beats the
+     * pre-fix behaviour where the second call returned a false-positive
+     * success because `connections[deviceId]` was already populated.
+     */
+    data class ConnectInProgress(val deviceId: String) :
+        BlueyAndroidError("Connect already in progress for $deviceId")
+
     // --- Sync setNotification reject → gatt-status-failed(0x01) ---
 
     data class SetNotificationFailed(val uuid: String) :

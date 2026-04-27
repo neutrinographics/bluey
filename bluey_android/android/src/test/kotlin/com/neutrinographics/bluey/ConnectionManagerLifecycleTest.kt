@@ -247,4 +247,133 @@ class ConnectionManagerLifecycleTest {
         assertNotNull(probeResult)
         assertTrue(probeResult!!.isFailure)
     }
+
+    // ============================================================
+    // I098 item 5 — concurrent connect mutex
+    // ============================================================
+
+    @Test
+    fun `I098 connect succeeds normally on first call`() {
+        var connectResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            connectResult = result
+        }
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
+        )
+        assertNotNull(connectResult)
+        assertTrue(connectResult!!.isSuccess)
+        assertEquals(deviceAddress, connectResult!!.getOrNull())
+    }
+
+    @Test
+    fun `I098 second connect to same deviceId while first in-flight returns ConnectInProgress`() {
+        // First connect — do NOT fire STATE_CONNECTED, so the connect
+        // remains in flight (registered in pendingConnections).
+        var firstResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            firstResult = result
+        }
+
+        // Second connect to the same address.
+        var secondResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            secondResult = result
+        }
+
+        // The second call must fire its callback synchronously with a
+        // typed BlueyAndroidError.ConnectInProgress(deviceAddress) failure.
+        assertNotNull(
+            "second connect must invoke its callback synchronously when one " +
+            "is already in flight (I098 item 5)",
+            secondResult,
+        )
+        assertTrue(secondResult!!.isFailure)
+        val error = secondResult!!.exceptionOrNull()
+        assertTrue(
+            "expected BlueyAndroidError.ConnectInProgress, got ${error?.javaClass?.simpleName}: $error",
+            error is BlueyAndroidError.ConnectInProgress,
+        )
+        assertEquals(deviceAddress, (error as BlueyAndroidError.ConnectInProgress).deviceId)
+
+        // The first connect's callback must NOT have been disturbed.
+        assertNull("first connect callback must not yet have fired", firstResult)
+
+        // Only one BluetoothDevice.connectGatt call must have been issued.
+        verify(exactly = 1) {
+            mockDevice.connectGatt(any(), any(), any<BluetoothGattCallback>(), any())
+        }
+    }
+
+    @Test
+    fun `I098 second connect after first established returns idempotent success`() {
+        // First connect, then complete it.
+        var firstResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            firstResult = result
+        }
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
+        )
+        assertTrue(firstResult!!.isSuccess)
+
+        // Second connect to the same address — already connected, no
+        // in-flight connect. Idempotent success: callback fires
+        // synchronously, no second connectGatt issued.
+        var secondResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            secondResult = result
+        }
+
+        assertNotNull(secondResult)
+        assertTrue(secondResult!!.isSuccess)
+        assertEquals(deviceAddress, secondResult!!.getOrNull())
+
+        // Still only one connectGatt — the established connection is reused.
+        verify(exactly = 1) {
+            mockDevice.connectGatt(any(), any(), any<BluetoothGattCallback>(), any())
+        }
+    }
+
+    @Test
+    fun `I098 connect to a different deviceId while first in-flight succeeds independently`() {
+        val secondAddress = "AA:BB:CC:DD:EE:02"
+        val secondMockDevice = mockk<BluetoothDevice>(relaxed = true)
+        val secondMockGatt = mockk<BluetoothGatt>(relaxed = true)
+        var secondCapturedCallback: BluetoothGattCallback? = null
+
+        every { secondMockDevice.address } returns secondAddress
+        every { mockAdapter.getRemoteDevice(secondAddress) } returns secondMockDevice
+        every {
+            secondMockDevice.connectGatt(any(), any(), any<BluetoothGattCallback>(), any())
+        } answers {
+            secondCapturedCallback = thirdArg()
+            secondMockGatt
+        }
+
+        // First connect to deviceAddress — leave in flight.
+        var firstResult: Result<String>? = null
+        connectionManager.connect(deviceAddress, ConnectConfigDto()) { result ->
+            firstResult = result
+        }
+
+        // Connect to a different address — must NOT be blocked by the
+        // first connect's mutex (mutex is per-deviceId).
+        var secondResult: Result<String>? = null
+        connectionManager.connect(secondAddress, ConnectConfigDto()) { result ->
+            secondResult = result
+        }
+        assertNull(
+            "second connect to a different address must NOT fail synchronously",
+            secondResult,
+        )
+
+        secondCapturedCallback!!.onConnectionStateChange(
+            secondMockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
+        )
+
+        assertNotNull(secondResult)
+        assertTrue(secondResult!!.isSuccess)
+        assertNull("first connect callback must remain in flight", firstResult)
+    }
 }
