@@ -29,15 +29,27 @@ import 'package:flutter/services.dart' show PlatformException;
 /// final devices = await platform.scan(config).toList();
 /// ```
 final class FakeBlueyPlatform extends BlueyPlatform {
-  FakeBlueyPlatform() : super.impl();
+  /// Creates a fake platform.
+  ///
+  /// [capabilities] lets tests override the simulated capability matrix,
+  /// e.g. to verify that the domain layer respects `canBond=false` /
+  /// `canRequestPhy=false` / `canRequestConnectionParameters=false` and
+  /// skips the corresponding platform calls (I035 / I065).
+  FakeBlueyPlatform({
+    Capabilities capabilities = const Capabilities(
+      canScan: true,
+      canConnect: true,
+      canAdvertise: true,
+      canBond: true,
+      canRequestPhy: true,
+      canRequestConnectionParameters: true,
+    ),
+  })  : _capabilities = capabilities,
+        super.impl();
 
   // === Configuration ===
   BluetoothState _state = BluetoothState.on;
-  final Capabilities _capabilities = const Capabilities(
-    canScan: true,
-    canConnect: true,
-    canAdvertise: true,
-  );
+  final Capabilities _capabilities;
 
   // === Simulated Peripherals (devices we can discover/connect to) ===
   final Map<String, _SimulatedPeripheral> _peripherals = {};
@@ -783,29 +795,59 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   // === Bonding Operations ===
+  //
+  // When [Capabilities.canBond] is false the fake mirrors Android's
+  // post-I035-Stage-A behaviour: every bond method throws
+  // [UnimplementedError]. This is what the domain-side capability gating
+  // exists to avoid — calling these on a `canBond=false` platform must
+  // be guarded. Tests that pass `canBond: false` rely on this throwing
+  // behaviour to assert the gate is in place.
 
   @override
   Future<PlatformBondState> getBondState(String deviceId) async {
+    if (!_capabilities.canBond) {
+      throw UnimplementedError(
+        'Fake: getBondState called on a canBond=false platform',
+      );
+    }
     return PlatformBondState.none;
   }
 
   @override
   Stream<PlatformBondState> bondStateStream(String deviceId) {
+    if (!_capabilities.canBond) {
+      throw UnimplementedError(
+        'Fake: bondStateStream called on a canBond=false platform',
+      );
+    }
     return Stream.empty();
   }
 
   @override
   Future<void> bond(String deviceId) async {
-    // Simulate bonding success
+    if (!_capabilities.canBond) {
+      throw UnimplementedError(
+        'Fake: bond called on a canBond=false platform',
+      );
+    }
   }
 
   @override
   Future<void> removeBond(String deviceId) async {
-    // Simulate bond removal
+    if (!_capabilities.canBond) {
+      throw UnimplementedError(
+        'Fake: removeBond called on a canBond=false platform',
+      );
+    }
   }
 
   @override
   Future<List<PlatformDevice>> getBondedDevices() async {
+    if (!_capabilities.canBond) {
+      throw UnimplementedError(
+        'Fake: getBondedDevices called on a canBond=false platform',
+      );
+    }
     return [];
   }
 
@@ -813,11 +855,21 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) async {
+    if (!_capabilities.canRequestPhy) {
+      throw UnimplementedError(
+        'Fake: getPhy called on a canRequestPhy=false platform',
+      );
+    }
     return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
   }
 
   @override
   Stream<({PlatformPhy tx, PlatformPhy rx})> phyStream(String deviceId) {
+    if (!_capabilities.canRequestPhy) {
+      throw UnimplementedError(
+        'Fake: phyStream called on a canRequestPhy=false platform',
+      );
+    }
     return Stream.empty();
   }
 
@@ -827,7 +879,11 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     PlatformPhy? txPhy,
     PlatformPhy? rxPhy,
   ) async {
-    // Simulate PHY request success
+    if (!_capabilities.canRequestPhy) {
+      throw UnimplementedError(
+        'Fake: requestPhy called on a canRequestPhy=false platform',
+      );
+    }
   }
 
   // === Connection Parameters ===
@@ -836,6 +892,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   Future<PlatformConnectionParameters> getConnectionParameters(
     String deviceId,
   ) async {
+    if (!_capabilities.canRequestConnectionParameters) {
+      throw UnimplementedError(
+        'Fake: getConnectionParameters called on a '
+        'canRequestConnectionParameters=false platform',
+      );
+    }
     return const PlatformConnectionParameters(
       intervalMs: 30.0,
       latency: 0,
@@ -848,7 +910,12 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     PlatformConnectionParameters params,
   ) async {
-    // Simulate connection parameters request success
+    if (!_capabilities.canRequestConnectionParameters) {
+      throw UnimplementedError(
+        'Fake: requestConnectionParameters called on a '
+        'canRequestConnectionParameters=false platform',
+      );
+    }
   }
 
   // === Server Operations ===

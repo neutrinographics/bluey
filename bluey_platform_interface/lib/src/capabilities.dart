@@ -30,6 +30,21 @@ class Capabilities {
   /// Whether pairing/bonding is supported.
   final bool canBond;
 
+  /// Whether reading and requesting the link-layer PHY is supported.
+  ///
+  /// When false, [BlueyPlatform.getPhy], [BlueyPlatform.phyStream], and
+  /// [BlueyPlatform.requestPhy] are not implemented and the domain layer
+  /// will not subscribe to or fetch PHY state on a connection.
+  final bool canRequestPhy;
+
+  /// Whether reading and requesting BLE connection parameters
+  /// (interval, latency, supervision timeout) is supported.
+  ///
+  /// When false, [BlueyPlatform.getConnectionParameters] and
+  /// [BlueyPlatform.requestConnectionParameters] are not implemented and
+  /// the domain layer will not fetch connection parameters on a connection.
+  final bool canRequestConnectionParameters;
+
   /// Whether Bluetooth can be enabled programmatically.
   final bool canRequestEnable;
 
@@ -42,29 +57,41 @@ class Capabilities {
     this.canScanInBackground = false,
     this.canAdvertiseInBackground = false,
     this.canBond = false,
+    this.canRequestPhy = false,
+    this.canRequestConnectionParameters = false,
     this.canRequestEnable = false,
   });
 
   /// Android capabilities.
   ///
-  /// `canBond` is currently `false` because the Dart-side bonding methods
-  /// on `AndroidConnectionManager` are unimplemented (I035 Stage A).
-  /// Flip back to `true` once the Pigeon schema declares the bond
-  /// operations and the Kotlin side wires up `BluetoothDevice.createBond()`.
+  /// `canBond`, `canRequestPhy`, and `canRequestConnectionParameters` are
+  /// currently `false` because the Dart-side bond/PHY/connection-parameter
+  /// methods on `AndroidConnectionManager` are unimplemented (I035 Stage A
+  /// throws `UnimplementedError`; Stage B will add the Pigeon plumbing).
+  /// Flip them back on as each operation lands native + Pigeon support.
   static const android = Capabilities(
     canAdvertise: true,
     canRequestMtu: true,
     maxMtu: 517,
     canBond: false,
+    canRequestPhy: false,
+    canRequestConnectionParameters: false,
     canRequestEnable: true,
   );
 
   /// iOS capabilities.
+  ///
+  /// `canBond`, `canRequestPhy`, and `canRequestConnectionParameters` are
+  /// `false`: iOS does not expose bond state, PHY information, or
+  /// connection parameters via CoreBluetooth (see I200 wontfix).
   static const iOS = Capabilities(
     canAdvertise: true,
     maxMtu: 185,
     canScanInBackground: true,
     canAdvertiseInBackground: true,
+    canBond: false,
+    canRequestPhy: false,
+    canRequestConnectionParameters: false,
   );
 
   /// macOS capabilities.
@@ -98,6 +125,8 @@ class Capabilities {
         other.canScanInBackground == canScanInBackground &&
         other.canAdvertiseInBackground == canAdvertiseInBackground &&
         other.canBond == canBond &&
+        other.canRequestPhy == canRequestPhy &&
+        other.canRequestConnectionParameters == canRequestConnectionParameters &&
         other.canRequestEnable == canRequestEnable;
   }
 
@@ -111,6 +140,8 @@ class Capabilities {
         canScanInBackground,
         canAdvertiseInBackground,
         canBond,
+        canRequestPhy,
+        canRequestConnectionParameters,
         canRequestEnable,
       );
 
@@ -125,6 +156,8 @@ class Capabilities {
         'canScanInBackground: $canScanInBackground, '
         'canAdvertiseInBackground: $canAdvertiseInBackground, '
         'canBond: $canBond, '
+        'canRequestPhy: $canRequestPhy, '
+        'canRequestConnectionParameters: $canRequestConnectionParameters, '
         'canRequestEnable: $canRequestEnable)';
   }
 }

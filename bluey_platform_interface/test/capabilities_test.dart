@@ -13,6 +13,8 @@ void main() {
         canScanInBackground: false,
         canAdvertiseInBackground: false,
         canBond: true,
+        canRequestPhy: true,
+        canRequestConnectionParameters: true,
         canRequestEnable: true,
       );
 
@@ -24,6 +26,8 @@ void main() {
       expect(capabilities.canScanInBackground, isFalse);
       expect(capabilities.canAdvertiseInBackground, isFalse);
       expect(capabilities.canBond, isTrue);
+      expect(capabilities.canRequestPhy, isTrue);
+      expect(capabilities.canRequestConnectionParameters, isTrue);
       expect(capabilities.canRequestEnable, isTrue);
     });
 
@@ -38,6 +42,8 @@ void main() {
       expect(capabilities.canScanInBackground, isFalse);
       expect(capabilities.canAdvertiseInBackground, isFalse);
       expect(capabilities.canBond, isFalse);
+      expect(capabilities.canRequestPhy, isFalse);
+      expect(capabilities.canRequestConnectionParameters, isFalse);
       expect(capabilities.canRequestEnable, isFalse);
     });
 
@@ -45,9 +51,14 @@ void main() {
       expect(Capabilities.android.canAdvertise, isTrue);
       expect(Capabilities.android.canRequestMtu, isTrue);
       expect(Capabilities.android.maxMtu, equals(517));
-      // I035 Stage A: canBond temporarily false until the Dart-side
-      // bonding methods are wired through Pigeon (Stage B).
+      // I035 Stage A: canBond, canRequestPhy, and
+      // canRequestConnectionParameters are all false until the Dart-side
+      // bond/PHY/conn-param methods are wired through Pigeon (Stage B).
+      // The domain layer (BlueyConnection) consults these flags before
+      // subscribing to or fetching the corresponding state.
       expect(Capabilities.android.canBond, isFalse);
+      expect(Capabilities.android.canRequestPhy, isFalse);
+      expect(Capabilities.android.canRequestConnectionParameters, isFalse);
       expect(Capabilities.android.canRequestEnable, isTrue);
     });
 
@@ -56,6 +67,11 @@ void main() {
       expect(Capabilities.iOS.maxMtu, equals(185));
       expect(Capabilities.iOS.canScanInBackground, isTrue);
       expect(Capabilities.iOS.canAdvertiseInBackground, isTrue);
+      // CoreBluetooth does not expose bond / PHY / connection parameters;
+      // see I200 wontfix.
+      expect(Capabilities.iOS.canBond, isFalse);
+      expect(Capabilities.iOS.canRequestPhy, isFalse);
+      expect(Capabilities.iOS.canRequestConnectionParameters, isFalse);
       expect(Capabilities.iOS.canRequestEnable, isFalse);
     });
 

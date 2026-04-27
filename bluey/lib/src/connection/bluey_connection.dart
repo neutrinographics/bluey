@@ -221,48 +221,58 @@ class BlueyConnection implements Connection {
           },
         );
 
-    // Subscribe to platform bond state changes
-    _platformBondStateSubscription = _platform
-        .bondStateStream(_connectionId)
-        .listen(
-          (platformBondState) {
-            _bondState = _mapBondState(platformBondState);
-            _bondStateController.add(_bondState);
-          },
-          onError: (error) {
-            _bondStateController.addError(error);
-          },
-        );
+    // Bond / PHY / connection-parameter subscriptions and initial fetches
+    // are guarded by [Capabilities]. Platforms that don't support an
+    // operation throw `UnimplementedError` from the corresponding stub
+    // (e.g. Android post-I035 Stage A); calling them unconditionally
+    // would crash every connect on those platforms. The default field
+    // values seeded above (BondState.none, le1m PHY, 30 ms / 0 / 4 s
+    // connection parameters) stand in when the capability is absent.
+    final caps = _platform.capabilities;
 
-    // Initialize bond state
-    _platform.getBondState(_connectionId).then((platformBondState) {
-      _bondState = _mapBondState(platformBondState);
-    });
+    if (caps.canBond) {
+      _platformBondStateSubscription = _platform
+          .bondStateStream(_connectionId)
+          .listen(
+            (platformBondState) {
+              _bondState = _mapBondState(platformBondState);
+              _bondStateController.add(_bondState);
+            },
+            onError: (error) {
+              _bondStateController.addError(error);
+            },
+          );
 
-    // Subscribe to platform PHY changes
-    _platformPhySubscription = _platform
-        .phyStream(_connectionId)
-        .listen(
-          (platformPhy) {
-            _txPhy = _mapPhy(platformPhy.tx);
-            _rxPhy = _mapPhy(platformPhy.rx);
-            _phyController.add((tx: _txPhy, rx: _rxPhy));
-          },
-          onError: (error) {
-            _phyController.addError(error);
-          },
-        );
+      _platform.getBondState(_connectionId).then((platformBondState) {
+        _bondState = _mapBondState(platformBondState);
+      });
+    }
 
-    // Initialize PHY
-    _platform.getPhy(_connectionId).then((platformPhy) {
-      _txPhy = _mapPhy(platformPhy.tx);
-      _rxPhy = _mapPhy(platformPhy.rx);
-    });
+    if (caps.canRequestPhy) {
+      _platformPhySubscription = _platform
+          .phyStream(_connectionId)
+          .listen(
+            (platformPhy) {
+              _txPhy = _mapPhy(platformPhy.tx);
+              _rxPhy = _mapPhy(platformPhy.rx);
+              _phyController.add((tx: _txPhy, rx: _rxPhy));
+            },
+            onError: (error) {
+              _phyController.addError(error);
+            },
+          );
 
-    // Initialize connection parameters
-    _platform.getConnectionParameters(_connectionId).then((params) {
-      _connectionParameters = _mapConnectionParameters(params);
-    });
+      _platform.getPhy(_connectionId).then((platformPhy) {
+        _txPhy = _mapPhy(platformPhy.tx);
+        _rxPhy = _mapPhy(platformPhy.rx);
+      });
+    }
+
+    if (caps.canRequestConnectionParameters) {
+      _platform.getConnectionParameters(_connectionId).then((params) {
+        _connectionParameters = _mapConnectionParameters(params);
+      });
+    }
 
     // Subscribe to service changes for late upgrade
     _serviceChangeSubscription = _platform.serviceChanges
