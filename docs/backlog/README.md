@@ -82,12 +82,13 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 
 ~~**I082 + I086 (Android side)** — `notifyCharacteristic` concurrent-mutation safety~~ ([80ef2ed](#)). Defensive snapshot at iteration entry; binder-thread subscription mutations now go through `handler.post`. 3 new JVM tests. **iOS-side I086 remains open** (Tier 4, bundle with other iOS one-offs).
 
+~~**I080** — `addService` / `startAdvertising` ordering~~ ([612d534](#) + [da80f52](#)). Platform-side: `pendingServiceCallback` is now a Map keyed by service UUID. Domain-side: `BlueyServer.startAdvertising` awaits in-flight `addService` futures. 1 new JVM test + 2 new Dart tests.
+
 Each remaining item is a single coherent PR. Pick one per multi-day session.
 
-**Android server hardening (remaining)** — I012 + I080 still open from the original bundle:
+**Android server hardening (remaining):**
 
 - **I012** — server notification completion not tracked per central. *~half-day to a day.* High severity. Pigeon contract change (caller gets per-central outcomes).
-- **I080** — `addService` races with `startAdvertising`. *~half-day.* High severity. Coordination between two state machines.
 
 ### Tier 3 — Major architectural rewrites (breaking; major-version bumps)
 
@@ -155,7 +156,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
-| [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising` | high |
 | [I081](I081-advertiser-concurrent-start.md) | Advertiser allows concurrent `startAdvertising` | medium |
 | [I085](I085-cccd-malformed-bytes-silently-ignored.md) | CCCD write with malformed bytes silently ignored | medium |
 
@@ -253,6 +253,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I003](I003-notification-controllers-never-closed.md) | Memory leak: per-characteristic notification controllers never closed; `_cleanup()` now walks `_cachedServices` and disposes each | `f69dafa` |
 | [I002](I002-gatt-ops-not-gated-by-connection-state.md) | GATT ops not gated by connection state; `_ensureConnected()` now throws `DisconnectedException` from every public op | `7da8795` |
 | [I082](I082-notify-characteristic-unsynchronized-iteration.md) | Android `notifyCharacteristic` iterated subscriptions unsynchronized; defensive snapshot + `handler.post` for binder-thread mutations | `80ef2ed` |
+| [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising`; platform-side Map keyed by UUID + Dart-side `_pendingServiceAdds` awaited by `startAdvertising` | `da80f52` |
 
 ### Wontfix — documented platform limitations & superseded premises
 

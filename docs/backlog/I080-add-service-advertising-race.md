@@ -4,9 +4,18 @@ title: "Android `addService` races with `startAdvertising`"
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-27
+fixed_in: da80f52
 ---
+
+> **Fixed 2026-04-27** across two layers:
+>
+> * **Platform side (`612d534`).** `GattServer.pendingServiceCallback` (single slot) replaced with `pendingServiceCallbacks` (Map keyed by service UUID). Pre-fix, parallel `addService` calls clobbered each other and the first caller's Future never resolved.
+> * **Domain side (`da80f52`).** `BlueyServer.startAdvertising` now snapshots `_pendingServiceAdds` and awaits each in-flight platform `addService` Future before advertising. Pre-fix, a user calling `server.addService(s1)` then `server.startAdvertising()` without awaiting between could race — advertising would begin before s1 was registered.
+>
+> 1 new JVM test (`GattServerTest.parallel addService calls do not clobber each other's callbacks`); 2 new Dart tests (`bluey/test/gatt_server/bluey_server_advertising_order_test.dart`).
+
 
 ## Symptom
 
