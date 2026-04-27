@@ -923,7 +923,11 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// When non-null, the next call to [addService] consumes this completer
   /// instead of resolving immediately. Lets ordering tests verify that
   /// `startAdvertising` waits for an in-flight `addService` (I080).
+  /// Once consumed, the completer is parked in [_heldAddServiceInFlight]
+  /// so [resolveHeldAddService] can still find it (mirrors the
+  /// `_heldWriteInFlight` pattern above).
   Completer<void>? _heldAddService;
+  Completer<void>? _heldAddServiceInFlight;
 
   /// Arranges for the next [addService] call to be held indefinitely.
   /// Call [resolveHeldAddService] to release it.
@@ -931,13 +935,15 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     _heldAddService = Completer<void>();
   }
 
-  /// Resolves the currently-held addService future.
+  /// Resolves the currently-held addService future. Works whether or
+  /// not the held call has already been consumed.
   void resolveHeldAddService() {
-    final held = _heldAddService;
+    final held = _heldAddServiceInFlight ?? _heldAddService;
     if (held == null) {
       throw StateError('No held addService to resolve');
     }
     _heldAddService = null;
+    _heldAddServiceInFlight = null;
     held.complete();
   }
 
@@ -946,6 +952,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     final held = _heldAddService;
     if (held != null) {
       _heldAddService = null;
+      _heldAddServiceInFlight = held;
       await held.future;
     }
     _localServices.add(service);
