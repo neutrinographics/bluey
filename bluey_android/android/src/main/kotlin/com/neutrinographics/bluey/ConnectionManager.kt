@@ -46,9 +46,34 @@ class ConnectionManager(
     // and tear down a still-live connection.
     private val pendingConnectionTimeouts = mutableMapOf<String, Runnable>()
 
+    // Pending disconnect callbacks, keyed by deviceId. A disconnect()
+    // call registers its callback here and returns; the callback fires
+    // either from the STATE_DISCONNECTED handler (success) or from the
+    // 5 s fallback runnable (failure with gatt-disconnected). Multiple
+    // concurrent disconnect() calls to the same deviceId share-the-future:
+    // every callback fires when the link comes down. (I060 + spec
+    // Decision 3.)
+    private val pendingDisconnects = mutableMapOf<String, MutableList<(Result<Unit>) -> Unit>>()
+
+    // Pending disconnect fallback Runnable, keyed by deviceId. Force-closes
+    // the gatt and synthesizes a gatt-disconnected failure if
+    // STATE_DISCONNECTED never arrives within DISCONNECT_FALLBACK_MS.
+    private val pendingDisconnectTimeouts = mutableMapOf<String, Runnable>()
+
     // CCCD UUID for enabling notifications/indications
     companion object {
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        /**
+         * Maximum time to wait for `STATE_DISCONNECTED` after a `disconnect()`
+         * call before force-closing the gatt and synthesizing a
+         * `gatt-disconnected` failure. Android's `BluetoothGatt.disconnect()`
+         * is fire-and-forget at the OS level; occasionally the callback
+         * genuinely doesn't arrive (driver bug, peer unreachable, controller
+         * stuck). 5 s is comfortably above the typical <1 s OS-level disconnect
+         * latency and below most app-level timeouts. (I060 + spec Decision 1.)
+         */
+        private const val DISCONNECT_FALLBACK_MS = 5_000L
     }
 
     // Configurable timeout values — set via configure(), defaults match previous hardcoded values
@@ -172,22 +197,85 @@ class ConnectionManager(
         }
     }
 
+    /**
+     * Disconnects from [deviceId]. The callback fires only after the OS
+     * reports `STATE_DISCONNECTED` (success) or after a 5 s fallback timer
+     * force-closes the gatt and synthesizes a `gatt-disconnected` failure.
+     *
+     * Calling `disconnect()` on a deviceId with no entry in [connections]
+     * fires the callback synchronously with success (idempotent / no-op,
+     * matches the iOS I044 fix).
+     *
+     * Multiple concurrent `disconnect()` calls to the same deviceId
+     * share-the-future: every registered callback fires when the link
+     * comes down. (I060 + spec Decision 3.)
+     */
     fun disconnect(deviceId: String, callback: (Result<Unit>) -> Unit) {
         val gatt = connections[deviceId]
         if (gatt == null) {
+            // Nothing to disconnect — already gone (idempotent).
             callback(Result.success(Unit))
             return
         }
 
+        // Share-the-future: append to the list if a disconnect is already
+        // in flight for this device. Only the first disconnect issues the
+        // gatt.disconnect() call and schedules the fallback; subsequent
+        // ones piggy-back on the same completion.
+        val existing = pendingDisconnects[deviceId]
+        if (existing != null) {
+            existing.add(callback)
+            return
+        }
+        pendingDisconnects[deviceId] = mutableListOf(callback)
+
         try {
             notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTING)
             gatt.disconnect()
-            callback(Result.success(Unit))
         } catch (e: SecurityException) {
+            // Permission revoked between connect() and disconnect(). Drop
+            // the registered callbacks and surface synchronously.
+            pendingDisconnects.remove(deviceId)
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
+            return
         } catch (e: Exception) {
+            pendingDisconnects.remove(deviceId)
             callback(Result.failure(e))
+            return
         }
+
+        // Schedule the 5 s fallback. If STATE_DISCONNECTED fires within
+        // the window, the fallback Runnable is cancelled in the
+        // STATE_DISCONNECTED handler. If not, it force-closes the gatt
+        // and surfaces gatt-disconnected to every registered callback.
+        val fallback = Runnable {
+            // If pendingDisconnects[deviceId] is still populated, the OS
+            // callback never arrived; complete the callbacks with
+            // gatt-disconnected and tear down state ourselves.
+            val callbacks = pendingDisconnects.remove(deviceId) ?: return@Runnable
+            pendingDisconnectTimeouts.remove(deviceId)
+            queues.remove(deviceId)?.drainAll(
+                FlutterError("gatt-disconnected",
+                    "connection lost with pending GATT op", null)
+            )
+            connections.remove(deviceId)
+            try {
+                gatt.close()
+            } catch (e: Exception) {
+                // Ignore — we're already in the failure path.
+            }
+            // Synthesize the missing platform DISCONNECTED so domain-side
+            // ConnectionState reaches its terminal value.
+            notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
+            val error = FlutterError(
+                "gatt-disconnected",
+                "disconnect timed out after ${DISCONNECT_FALLBACK_MS}ms; force-closed gatt",
+                null,
+            )
+            for (cb in callbacks) cb(Result.failure(error))
+        }
+        pendingDisconnectTimeouts[deviceId] = fallback
+        handler.postDelayed(fallback, DISCONNECT_FALLBACK_MS)
     }
 
     fun discoverServices(deviceId: String, callback: (Result<List<ServiceDto>>) -> Unit) {
@@ -483,10 +571,13 @@ class ConnectionManager(
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         notifyConnectionState(deviceId, ConnectionStateDto.DISCONNECTED)
                         handler.post {
-                            // Cancel any pending connect timeout. Stale
-                            // disconnect-fallback timer cancellation (I060)
-                            // is added in a later commit.
+                            // Cancel any pending connect timeout and any
+                            // pending disconnect fallback timer — neither
+                            // should fire once STATE_DISCONNECTED has arrived.
                             pendingConnectionTimeouts.remove(deviceId)?.let {
+                                handler.removeCallbacks(it)
+                            }
+                            pendingDisconnectTimeouts.remove(deviceId)?.let {
                                 handler.removeCallbacks(it)
                             }
                             // Drain any in-flight + pending queue ops with
@@ -507,6 +598,12 @@ class ConnectionManager(
                                     BlueyAndroidError.GattConnectionCreationFailed
                                 }
                                 pendingCallback.invoke(Result.failure(error))
+                            }
+                            // Pending disconnects succeed — this is the
+                            // expected completion path for disconnect().
+                            // Every registered share-the-future callback fires.
+                            pendingDisconnects.remove(deviceId)?.forEach { cb ->
+                                cb(Result.success(Unit))
                             }
                             connections.remove(deviceId)
                             try {
