@@ -116,8 +116,10 @@ abstract class Connection {
   ///
   /// Services are discovered lazily on first access.
   ///
-  /// Throws [ServiceNotFoundException] if the service is not found.
-  /// Throws [DisconnectedException] if not connected.
+  /// Throws [ServiceNotFoundException] if no service with [uuid] exists.
+  /// Throws [AmbiguousAttributeException] if more than one discovered
+  /// service shares [uuid] — use [services] and pick by handle to
+  /// disambiguate. Throws [DisconnectedException] if not connected.
   RemoteService service(UUID uuid);
 
   /// Get all services on the device.

@@ -39,7 +39,7 @@ void main() {
         canNotify: true,
       ),
     );
-    when(() => mockCharacteristic.descriptors).thenReturn([]);
+    when(() => mockCharacteristic.descriptors()).thenReturn([]);
   });
 
   CharacteristicCubit createCubit() {
@@ -267,7 +267,7 @@ void main() {
         when(
           () => descriptor.uuid,
         ).thenReturn(Descriptors.characteristicUserDescription);
-        when(() => mockCharacteristic.descriptors).thenReturn([descriptor]);
+        when(() => mockCharacteristic.descriptors()).thenReturn([descriptor]);
         when(
           () => mockReadDescriptor(descriptor),
         ).thenAnswer((_) async => Uint8List.fromList('Sensor Temp'.codeUnits));
@@ -288,7 +288,7 @@ void main() {
         when(
           () => descriptor.uuid,
         ).thenReturn(Descriptors.characteristicUserDescription);
-        when(() => mockCharacteristic.descriptors).thenReturn([descriptor]);
+        when(() => mockCharacteristic.descriptors()).thenReturn([descriptor]);
         when(
           () => mockReadDescriptor(descriptor),
         ).thenThrow(Exception('Read failed'));
@@ -305,7 +305,7 @@ void main() {
     test(
       'does not set userDescription when no User Description descriptor present',
       () async {
-        when(() => mockCharacteristic.descriptors).thenReturn([]);
+        when(() => mockCharacteristic.descriptors()).thenReturn([]);
 
         final cubit = createCubit();
         await Future.delayed(const Duration(milliseconds: 10));

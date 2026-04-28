@@ -87,20 +87,34 @@ class FakeConnection implements Connection {
 class _FakeService implements RemoteService {
   @override
   final UUID uuid;
-  @override
-  final List<RemoteCharacteristic> characteristics;
+  final List<RemoteCharacteristic> _characteristics;
 
-  _FakeService(this.uuid, this.characteristics);
+  _FakeService(this.uuid, this._characteristics);
 
   @override
   bool get isPrimary => true;
 
   @override
-  RemoteCharacteristic characteristic(UUID uuid) =>
-      characteristics.firstWhere(
-        (c) => c.uuid == uuid,
-        orElse: () => throw CharacteristicNotFoundException(uuid),
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) {
+    if (uuid == null) return List.unmodifiable(_characteristics);
+    return List.unmodifiable(_characteristics.where((c) => c.uuid == uuid));
+  }
+
+  @override
+  RemoteCharacteristic characteristic(UUID uuid) {
+    final matches = _characteristics.where((c) => c.uuid == uuid).toList();
+    if (matches.isEmpty) {
+      throw CharacteristicNotFoundException(uuid);
+    }
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'characteristic',
       );
+    }
+    return matches.single;
+  }
 
   @override
   List<RemoteService> get includedServices => const [];

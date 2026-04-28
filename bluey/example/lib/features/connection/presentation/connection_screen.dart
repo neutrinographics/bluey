@@ -792,7 +792,7 @@ class _ServiceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${service.characteristics.length} characteristics',
+                    '${service.characteristics().length} characteristics',
                     style: GoogleFonts.inter(fontSize: 11, color: _kMid),
                   ),
                 ],

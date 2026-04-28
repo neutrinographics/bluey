@@ -170,12 +170,10 @@ class LifecycleClient {
         .firstOrNull;
     if (controlService == null) return;
 
-    final heartbeatChar = controlService.characteristics
-        .where(
+    final heartbeatChar = controlService.characteristics().where(
           (c) =>
               c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
-        )
-        .firstOrNull;
+        ).firstOrNull;
     if (heartbeatChar == null) return;
 
     // Commit point — from here on, any synchronous failure must
@@ -192,12 +190,10 @@ class LifecycleClient {
       _sendProbe();
 
       // Find the interval characteristic and read the server's interval.
-      final intervalChar = controlService.characteristics
-          .where(
+      final intervalChar = controlService.characteristics().where(
             (c) =>
                 c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
-          )
-          .firstOrNull;
+          ).firstOrNull;
 
       if (intervalChar != null) {
         _platform

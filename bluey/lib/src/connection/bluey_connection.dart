@@ -328,13 +328,21 @@ class BlueyConnection implements Connection {
       throw ServiceNotFoundException(uuid);
     }
 
-    for (final svc in _cachedServices!) {
-      if (svc.uuid == uuid) {
-        return svc;
-      }
+    final matches = <RemoteService>[
+      for (final svc in _cachedServices!)
+        if (svc.uuid == uuid) svc,
+    ];
+    if (matches.isEmpty) {
+      throw ServiceNotFoundException(uuid);
     }
-
-    throw ServiceNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'service',
+      );
+    }
+    return matches.single;
   }
 
   @override
@@ -652,8 +660,10 @@ class BlueyRemoteService implements RemoteService {
   @override
   final bool isPrimary;
 
-  @override
-  final List<RemoteCharacteristic> characteristics;
+  /// All characteristics in this service. Stored as the full discovered
+  /// list; the public surface is [characteristics] (filterable) and
+  /// [characteristic] (singular, throws on ambiguity).
+  final List<RemoteCharacteristic> _characteristics;
 
   @override
   final List<RemoteService> includedServices;
@@ -663,18 +673,32 @@ class BlueyRemoteService implements RemoteService {
     required String connectionId,
     required this.uuid,
     required this.isPrimary,
-    required this.characteristics,
+    required List<RemoteCharacteristic> characteristics,
     required this.includedServices,
-  });
+  }) : _characteristics = characteristics;
+
+  @override
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) {
+    if (uuid == null) return List.unmodifiable(_characteristics);
+    return List.unmodifiable(
+      _characteristics.where((c) => c.uuid == uuid),
+    );
+  }
 
   @override
   RemoteCharacteristic characteristic(UUID uuid) {
-    for (final char in characteristics) {
-      if (char.uuid == uuid) {
-        return char;
-      }
+    final matches = _characteristics.where((c) => c.uuid == uuid).toList();
+    if (matches.isEmpty) {
+      throw CharacteristicNotFoundException(uuid);
     }
-    throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'characteristic',
+      );
+    }
+    return matches.single;
   }
 
   /// Releases per-characteristic resources (notification subscriptions
@@ -683,7 +707,7 @@ class BlueyRemoteService implements RemoteService {
   /// prevent the leak documented in I003. Included services are
   /// disposed recursively. Idempotent.
   Future<void> dispose() async {
-    for (final char in characteristics) {
+    for (final char in _characteristics) {
       if (char is BlueyRemoteCharacteristic) {
         await char.dispose();
       }
@@ -713,8 +737,10 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   @override
   final CharacteristicProperties properties;
 
-  @override
-  final List<RemoteDescriptor> descriptors;
+  /// All descriptors of this characteristic. Stored as the full
+  /// discovered list; the public surface is [descriptors] (filterable)
+  /// and [descriptor] (singular, throws on ambiguity).
+  final List<RemoteDescriptor> _descriptors;
 
   StreamSubscription? _notificationSubscription;
   StreamController<Uint8List>? _notificationController;
@@ -738,12 +764,13 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.handle,
     required this.properties,
-    required this.descriptors,
+    required List<RemoteDescriptor> descriptors,
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
+       _descriptors = descriptors,
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {});
 
@@ -891,13 +918,25 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   }
 
   @override
+  List<RemoteDescriptor> descriptors({UUID? uuid}) {
+    if (uuid == null) return List.unmodifiable(_descriptors);
+    return List.unmodifiable(_descriptors.where((d) => d.uuid == uuid));
+  }
+
+  @override
   RemoteDescriptor descriptor(UUID uuid) {
-    for (final desc in descriptors) {
-      if (desc.uuid == uuid) {
-        return desc;
-      }
+    final matches = _descriptors.where((d) => d.uuid == uuid).toList();
+    if (matches.isEmpty) {
+      throw CharacteristicNotFoundException(uuid);
     }
-    throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'descriptor',
+      );
+    }
+    return matches.single;
   }
 }
 

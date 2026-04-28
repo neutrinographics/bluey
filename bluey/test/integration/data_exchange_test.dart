@@ -57,7 +57,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act
         final value = await characteristic.read();
@@ -106,7 +106,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act
         final value = await characteristic.read();
@@ -150,7 +150,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act & Assert
         expect(
@@ -197,7 +197,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act
         final dataToWrite = Uint8List.fromList([0xAA, 0xBB, 0xCC]);
@@ -244,7 +244,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act
         final dataToWrite = Uint8List.fromList([0x01, 0x02]);
@@ -288,7 +288,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act & Assert
         expect(
@@ -332,7 +332,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act
         final notifications = <Uint8List>[];
@@ -395,7 +395,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Act & Assert
         expect(

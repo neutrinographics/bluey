@@ -66,7 +66,7 @@ void main() {
       );
       final connection = await bluey.connect(device);
       final services = await connection.services();
-      final characteristic = services.first.characteristics.first;
+      final characteristic = services.first.characteristics().first;
 
       // Subscribe — this lazily creates the notification controller
       // inside BlueyRemoteCharacteristic. With the leak in place the
@@ -143,7 +143,7 @@ void main() {
       );
       final connection = await bluey.connect(device);
       final services = await connection.services();
-      final chars = services.first.characteristics;
+      final chars = services.first.characteristics();
 
       final doneCompleters = chars.map((_) => Completer<void>()).toList();
       final subs = <StreamSubscription<Uint8List>>[];

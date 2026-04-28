@@ -52,5 +52,5 @@ class FakeRemoteCharacteristic implements RemoteCharacteristic {
       throw UnimplementedError('FakeRemoteCharacteristic.descriptor');
 
   @override
-  List<RemoteDescriptor> get descriptors => const [];
+  List<RemoteDescriptor> descriptors({UUID? uuid}) => const [];
 }

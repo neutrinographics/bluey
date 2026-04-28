@@ -153,7 +153,7 @@ void main() {
 
         // Act
         final discoveredServices = await connection.services();
-        final characteristics = discoveredServices.first.characteristics;
+        final characteristics = discoveredServices.first.characteristics();
 
         // Assert
         expect(characteristics, hasLength(2));
@@ -200,7 +200,7 @@ void main() {
         // Act
         final discoveredServices = await connection.services();
         final descriptors =
-            discoveredServices.first.characteristics.first.descriptors;
+            discoveredServices.first.characteristics().first.descriptors();
 
         // Assert
         expect(descriptors, hasLength(1));
@@ -246,7 +246,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services();
-        final char = discoveredServices.first.characteristics.first;
+        final char = discoveredServices.first.characteristics().first;
 
         // Assert
         expect(char.properties.canRead, isTrue);
@@ -287,7 +287,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services();
-        final char = discoveredServices.first.characteristics.first;
+        final char = discoveredServices.first.characteristics().first;
 
         // Assert
         expect(char.properties.canRead, isFalse);
@@ -329,7 +329,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final discoveredServices = await connection.services();
-        final char = discoveredServices.first.characteristics.first;
+        final char = discoveredServices.first.characteristics().first;
 
         // Assert
         expect(char.properties.canNotify, isTrue);
@@ -512,7 +512,7 @@ void main() {
 
         // Assert
         expect(discoveredServices, hasLength(1));
-        expect(discoveredServices.first.characteristics, isEmpty);
+        expect(discoveredServices.first.characteristics(), isEmpty);
 
         await connection.disconnect();
         await bluey.dispose();

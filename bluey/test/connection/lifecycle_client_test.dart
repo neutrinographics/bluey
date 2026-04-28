@@ -1779,9 +1779,14 @@ class _TestRemoteService implements RemoteService {
   bool get isPrimary => _ps.isPrimary;
 
   @override
-  List<RemoteCharacteristic> get characteristics => _ps.characteristics
-      .map((pc) => _TestRemoteCharacteristic(pc, _fakePlatform, _connectionId))
-      .toList();
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) {
+    final all = _ps.characteristics
+        .map((pc) =>
+            _TestRemoteCharacteristic(pc, _fakePlatform, _connectionId))
+        .toList();
+    if (uuid == null) return all;
+    return all.where((c) => c.uuid == uuid).toList();
+  }
 
   @override
   List<RemoteService> get includedServices => _ps.includedServices
@@ -1790,10 +1795,17 @@ class _TestRemoteService implements RemoteService {
 
   @override
   RemoteCharacteristic characteristic(UUID uuid) {
-    for (final c in characteristics) {
-      if (c.uuid == uuid) return c;
+    final matches =
+        characteristics().where((c) => c.uuid == uuid).toList();
+    if (matches.isEmpty) throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'characteristic',
+      );
     }
-    throw CharacteristicNotFoundException(uuid);
+    return matches.single;
   }
 }
 
@@ -1837,5 +1849,5 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
       throw UnimplementedError('Not needed for lifecycle tests');
 
   @override
-  List<RemoteDescriptor> get descriptors => const [];
+  List<RemoteDescriptor> descriptors({UUID? uuid}) => const [];
 }

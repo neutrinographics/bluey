@@ -60,11 +60,11 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
-        expect(characteristic.descriptors, hasLength(1));
+        expect(characteristic.descriptors(), hasLength(1));
         expect(
-          characteristic.descriptors.first.uuid.toString().toLowerCase(),
+          characteristic.descriptors().first.uuid.toString().toLowerCase(),
           contains('2902'),
         );
 
@@ -102,8 +102,8 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
-        final descriptor = characteristic.descriptors.first;
+        final characteristic = services.first.characteristics().first;
+        final descriptor = characteristic.descriptors().first;
 
         // Read the descriptor
         final value = await descriptor.read();
@@ -147,12 +147,12 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
-        expect(characteristic.descriptors, hasLength(3));
+        expect(characteristic.descriptors(), hasLength(3));
 
         // Read all descriptors
-        for (final descriptor in characteristic.descriptors) {
+        for (final descriptor in characteristic.descriptors()) {
           final value = await descriptor.read();
           expect(value, isA<Uint8List>());
         }
@@ -193,8 +193,8 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
-        final cccd = characteristic.descriptors.first;
+        final characteristic = services.first.characteristics().first;
+        final cccd = characteristic.descriptors().first;
 
         // Write 0x0001 to enable notifications
         final enableNotifications = Uint8List.fromList([0x01, 0x00]);
@@ -234,8 +234,8 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
-        final cccd = characteristic.descriptors.first;
+        final characteristic = services.first.characteristics().first;
+        final cccd = characteristic.descriptors().first;
 
         // Write 0x0002 to enable indications
         final enableIndications = Uint8List.fromList([0x02, 0x00]);
@@ -275,8 +275,8 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
-        final cccd = characteristic.descriptors.first;
+        final characteristic = services.first.characteristics().first;
+        final cccd = characteristic.descriptors().first;
 
         // Enable then disable
         await cccd.write(Uint8List.fromList([0x01, 0x00]));
@@ -321,7 +321,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Find CCCD by UUID
         final cccd = characteristic.descriptor(UUID(cccdUuid));
@@ -362,7 +362,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         expect(
           () => characteristic.descriptor(UUID(cccdUuid)),

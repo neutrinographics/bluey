@@ -93,8 +93,8 @@ void main() {
       // Connect first to discover handles, then seed values by handle.
       final connection = await connectAndDiscover();
       final services = await connection.services();
-      final charA = services[0].characteristics.single;
-      final charB = services[1].characteristics.single;
+      final charA = services[0].characteristics().single;
+      final charB = services[1].characteristics().single;
 
       fakePlatform.setCharacteristicValueByHandle(
         TestDeviceIds.device1,
@@ -120,8 +120,8 @@ void main() {
     () async {
       final connection = await connectAndDiscover();
       final services = await connection.services();
-      final charA = services[0].characteristics.single;
-      final charB = services[1].characteristics.single;
+      final charA = services[0].characteristics().single;
+      final charB = services[1].characteristics().single;
 
       await charA.write(Uint8List.fromList([0xA1]));
       await charB.write(Uint8List.fromList([0xB2]));
@@ -141,8 +141,8 @@ void main() {
     () async {
       final connection = await connectAndDiscover();
       final services = await connection.services();
-      final charA = services[0].characteristics.single;
-      final charB = services[1].characteristics.single;
+      final charA = services[0].characteristics().single;
+      final charB = services[1].characteristics().single;
 
       expect(charA.uuid, equals(charB.uuid));
       expect(charA.handle, isNot(equals(charB.handle)));

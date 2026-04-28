@@ -18,7 +18,7 @@ class _StubRemoteService implements RemoteService {
   bool get isPrimary => true;
 
   @override
-  List<RemoteCharacteristic> get characteristics => const [];
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) => const [];
 
   @override
   List<RemoteService> get includedServices => const [];

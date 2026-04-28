@@ -94,7 +94,7 @@ class MockRemoteServiceMinimal implements RemoteService {
   final bool isPrimary;
 
   @override
-  List<RemoteCharacteristic> get characteristics => [];
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) => const [];
 
   @override
   List<RemoteService> get includedServices => [];

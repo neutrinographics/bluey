@@ -113,6 +113,57 @@ class CharacteristicNotFoundException extends BlueyException {
       );
 }
 
+/// Two or more attributes share the same UUID, so a singular accessor
+/// (`Connection.service`, `RemoteService.characteristic`, or
+/// `RemoteCharacteristic.descriptor`) cannot pick a unique target.
+///
+/// Thrown instead of silently returning the first match — a peripheral
+/// that legitimately exposes multiple services or characteristics with
+/// the same UUID would otherwise cause every read/write/notify on the
+/// "wrong" instance, with no signal to the caller. The disambiguation
+/// path is the plural accessor: `service.characteristics(uuid: ...)`,
+/// `characteristic.descriptors(uuid: ...)`, or
+/// `(await connection.services()).where((s) => s.uuid == uuid)`. From
+/// there, pick the intended attribute by its `handle` (which is
+/// guaranteed unique within the connection).
+class AmbiguousAttributeException extends BlueyException {
+  /// The UUID that resolved to more than one attribute.
+  final UUID uuid;
+
+  /// How many attributes share this UUID.
+  final int matchCount;
+
+  /// The kind of attribute that was ambiguous: `'service'`,
+  /// `'characteristic'`, or `'descriptor'`. Drives the recommended
+  /// plural accessor in [BlueyException.action].
+  final String attributeKind;
+
+  AmbiguousAttributeException(
+    this.uuid,
+    this.matchCount, {
+    required this.attributeKind,
+  }) : super(
+          '$matchCount $attributeKind' 's share UUID $uuid; '
+              'singular accessor cannot disambiguate. '
+              '${_actionFor(attributeKind)}',
+          action: _actionFor(attributeKind),
+        );
+
+  static String _actionFor(String kind) {
+    switch (kind) {
+      case 'service':
+        return 'Use (await connection.services()).where((s) => s.uuid == uuid) '
+            'and pick by handle.';
+      case 'characteristic':
+        return 'Use service.characteristics(uuid: uuid) and pick by handle.';
+      case 'descriptor':
+        return 'Use characteristic.descriptors(uuid: uuid) and pick by handle.';
+      default:
+        return 'Use the plural accessor and pick by handle.';
+    }
+  }
+}
+
 /// GATT operation status codes.
 enum GattStatus {
   success,

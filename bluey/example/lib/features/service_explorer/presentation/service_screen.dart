@@ -125,13 +125,13 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
                   child: SectionHeader(
                     title: 'Characteristics',
-                    count: _service.characteristics.length,
+                    count: _service.characteristics().length,
                     isRefreshing: _isRefreshing,
                     onRefresh: widget.onRefresh != null ? _refresh : null,
                   ),
                 ),
               ),
-              if (_service.characteristics.isEmpty)
+              if (_service.characteristics().isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(48),
@@ -146,7 +146,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final isLast = index == _service.characteristics.length - 1;
+                    final isLast = index == _service.characteristics().length - 1;
                     return Padding(
                       padding: EdgeInsets.fromLTRB(
                         24,
@@ -155,10 +155,10 @@ class _ServiceScreenState extends State<ServiceScreen> {
                         isLast ? 128 : 16,
                       ),
                       child: _CharacteristicCard(
-                        characteristic: _service.characteristics[index],
+                        characteristic: _service.characteristics()[index],
                       ),
                     );
-                  }, childCount: _service.characteristics.length),
+                  }, childCount: _service.characteristics().length),
                 ),
             ],
           ),

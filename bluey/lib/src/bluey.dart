@@ -447,12 +447,10 @@ class Bluey {
       }
 
       // Read the ServerId.
-      final serverIdChar = controlService.characteristics
-          .where(
+      final serverIdChar = controlService.characteristics().where(
             (c) =>
                 c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
-          )
-          .firstOrNull;
+          ).firstOrNull;
 
       ServerId? serverId;
       if (serverIdChar != null) {

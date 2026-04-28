@@ -53,7 +53,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Indication should allow subscription
         expect(characteristic.properties.canIndicate, isTrue);
@@ -93,7 +93,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         final values = <Uint8List>[];
         final subscription = characteristic.notifications.listen(values.add);
@@ -143,7 +143,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         expect(characteristic.properties.canNotify, isTrue);
         expect(characteristic.properties.canIndicate, isTrue);
@@ -401,7 +401,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         final values = <Uint8List>[];
         final subscription = characteristic.notifications.listen(values.add);
@@ -457,7 +457,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         final values = <Uint8List>[];
         final subscription = characteristic.notifications.listen(values.add);
@@ -511,7 +511,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         final values = <int>[];
         final subscription = characteristic.notifications.listen((data) {
@@ -706,7 +706,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Send 100 writes without response (like streaming audio/video data)
         for (var i = 0; i < 100; i++) {
@@ -752,7 +752,7 @@ void main() {
           final device = await scanFirstDevice(bluey);
           final connection = await bluey.connect(device);
           final services = await connection.services();
-          final characteristic = services.first.characteristics.first;
+          final characteristic = services.first.characteristics().first;
 
           // Both should work
           await characteristic.write(
@@ -932,7 +932,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Read initial value
         final initialValue = await characteristic.read();
@@ -983,7 +983,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Multiple writes
         for (var i = 0; i < 5; i++) {
@@ -1035,7 +1035,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Launch multiple concurrent reads
         final futures = List.generate(10, (_) => characteristic.read());
@@ -1095,8 +1095,9 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final char1 = services.first.characteristics[0];
-        final char2 = services.first.characteristics[1];
+        final allChars = services.first.characteristics();
+        final char1 = allChars[0];
+        final char2 = allChars[1];
 
         // Concurrent reads from different characteristics
         final results = await Future.wait([
@@ -1148,7 +1149,7 @@ void main() {
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
-        final characteristic = services.first.characteristics.first;
+        final characteristic = services.first.characteristics().first;
 
         // Interleaved operations - order matters for correctness
         await characteristic.write(Uint8List.fromList([0x01]));

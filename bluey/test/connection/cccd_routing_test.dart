@@ -73,7 +73,7 @@ void main() {
     final device = await scanFirstDevice(bluey);
     final connection = await bluey.connect(device);
     final services = await connection.services();
-    final chars = services.single.characteristics;
+    final chars = services.single.characteristics();
     return (
       connection: connection,
       charA: chars[0],
@@ -85,7 +85,7 @@ void main() {
   // or null if no CCCD is mapped (which would indicate the fake didn't
   // discover the descriptor properly — a test bug, not a domain bug).
   Uint8List? cccdFor(RemoteCharacteristic char) {
-    final descs = char.descriptors;
+    final descs = char.descriptors();
     final cccd = descs.firstWhere(
       (d) => d.uuid.toString().toLowerCase() == cccdUuid,
     );

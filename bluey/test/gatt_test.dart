@@ -34,17 +34,23 @@ class MockRemoteCharacteristic implements RemoteCharacteristic {
   @override
   final CharacteristicProperties properties;
 
-  @override
-  final List<RemoteDescriptor> descriptors;
+  final List<RemoteDescriptor> _descriptors;
 
   Uint8List _value = Uint8List(0);
 
   MockRemoteCharacteristic({
     required this.uuid,
     required this.properties,
-    this.descriptors = const [],
+    List<RemoteDescriptor> descriptors = const [],
     AttributeHandle? handle,
-  }) : handle = handle ?? AttributeHandle(1);
+  })  : _descriptors = descriptors,
+        handle = handle ?? AttributeHandle(1);
+
+  @override
+  List<RemoteDescriptor> descriptors({UUID? uuid}) {
+    if (uuid == null) return List.unmodifiable(_descriptors);
+    return List.unmodifiable(_descriptors.where((d) => d.uuid == uuid));
+  }
 
   @override
   Future<Uint8List> read() async {
@@ -75,11 +81,16 @@ class MockRemoteCharacteristic implements RemoteCharacteristic {
 
   @override
   RemoteDescriptor descriptor(UUID uuid) {
-    final desc = descriptors.where((d) => d.uuid == uuid).firstOrNull;
-    if (desc == null) {
-      throw CharacteristicNotFoundException(uuid);
+    final matches = _descriptors.where((d) => d.uuid == uuid).toList();
+    if (matches.isEmpty) throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'descriptor',
+      );
     }
-    return desc;
+    return matches.single;
   }
 
   void setValue(Uint8List value) {
@@ -94,8 +105,7 @@ class MockRemoteService implements RemoteService {
   @override
   final bool isPrimary;
 
-  @override
-  final List<RemoteCharacteristic> characteristics;
+  final List<RemoteCharacteristic> _characteristics;
 
   @override
   final List<RemoteService> includedServices;
@@ -103,17 +113,28 @@ class MockRemoteService implements RemoteService {
   MockRemoteService({
     required this.uuid,
     this.isPrimary = true,
-    this.characteristics = const [],
+    List<RemoteCharacteristic> characteristics = const [],
     this.includedServices = const [],
-  });
+  }) : _characteristics = characteristics;
+
+  @override
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) {
+    if (uuid == null) return List.unmodifiable(_characteristics);
+    return List.unmodifiable(_characteristics.where((c) => c.uuid == uuid));
+  }
 
   @override
   RemoteCharacteristic characteristic(UUID uuid) {
-    final char = characteristics.where((c) => c.uuid == uuid).firstOrNull;
-    if (char == null) {
-      throw CharacteristicNotFoundException(uuid);
+    final matches = _characteristics.where((c) => c.uuid == uuid).toList();
+    if (matches.isEmpty) throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'characteristic',
+      );
     }
-    return char;
+    return matches.single;
   }
 }
 
@@ -273,7 +294,7 @@ void main() {
         descriptors: [cccd],
       );
 
-      expect(characteristic.descriptors, hasLength(1));
+      expect(characteristic.descriptors(), hasLength(1));
     });
   });
 
@@ -323,7 +344,7 @@ void main() {
         characteristics: [char1, char2],
       );
 
-      expect(service.characteristics, hasLength(2));
+      expect(service.characteristics(), hasLength(2));
     });
 
     test('has included services list', () {

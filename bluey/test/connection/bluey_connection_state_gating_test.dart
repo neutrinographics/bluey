@@ -63,8 +63,8 @@ void main() {
     );
     final connection = await bluey.connect(device);
     final services = await connection.services();
-    final char = services.first.characteristics.first;
-    final desc = char.descriptors.first;
+    final char = services.first.characteristics().first;
+    final desc = char.descriptors().first;
     return (connection: connection, char: char, desc: desc);
   }
 

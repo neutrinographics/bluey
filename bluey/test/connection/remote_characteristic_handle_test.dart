@@ -55,7 +55,7 @@ void main() {
   test('BlueyRemoteCharacteristic exposes its AttributeHandle', () async {
     final connection = await connectAndDiscover();
     final services = await connection.services();
-    final characteristic = services.first.characteristics.first;
+    final characteristic = services.first.characteristics().first;
 
     expect(characteristic.handle, isA<AttributeHandle>());
     expect(characteristic.handle.value, greaterThan(0));
@@ -64,8 +64,8 @@ void main() {
   test('BlueyRemoteDescriptor exposes its AttributeHandle', () async {
     final connection = await connectAndDiscover();
     final services = await connection.services();
-    final characteristic = services.first.characteristics.first;
-    final descriptor = characteristic.descriptors.first;
+    final characteristic = services.first.characteristics().first;
+    final descriptor = characteristic.descriptors().first;
 
     expect(descriptor.handle, isA<AttributeHandle>());
     expect(descriptor.handle.value, greaterThan(0));
@@ -76,10 +76,10 @@ void main() {
     final connection = await connectAndDiscover();
     final firstServices = await connection.services();
     final firstHandle =
-        firstServices.first.characteristics.first.handle;
+        firstServices.first.characteristics().first.handle;
     final secondServices = await connection.services();
     final secondHandle =
-        secondServices.first.characteristics.first.handle;
+        secondServices.first.characteristics().first.handle;
 
     expect(secondHandle, equals(firstHandle));
   });
@@ -87,7 +87,7 @@ void main() {
   test('distinct characteristics get distinct handles', () async {
     final connection = await connectAndDiscover();
     final services = await connection.services();
-    final chars = services.first.characteristics;
+    final chars = services.first.characteristics();
 
     expect(chars[0].handle, isNot(equals(chars[1].handle)));
   });

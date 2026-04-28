@@ -101,11 +101,19 @@ abstract class RemoteCharacteristic {
 
   /// Get a descriptor by UUID.
   ///
-  /// Throws [CharacteristicNotFoundException] if the descriptor is not found.
+  /// Throws [CharacteristicNotFoundException] if no descriptor with [uuid]
+  /// exists. Throws [AmbiguousAttributeException] if more than one
+  /// descriptor on this characteristic shares [uuid] — use [descriptors]
+  /// with a UUID filter to disambiguate by handle.
   RemoteDescriptor descriptor(UUID uuid);
 
-  /// All descriptors of this characteristic.
-  List<RemoteDescriptor> get descriptors;
+  /// All descriptors of this characteristic, optionally filtered by UUID.
+  ///
+  /// Returns the full descriptor list when [uuid] is null. Returns the
+  /// subset whose UUID equals [uuid] when supplied — typically used to
+  /// resolve same-UUID duplicates (e.g. two CCCDs under one
+  /// characteristic) by examining [RemoteDescriptor.handle].
+  List<RemoteDescriptor> descriptors({UUID? uuid});
 }
 
 /// A service on a connected device.
@@ -124,11 +132,19 @@ abstract class RemoteService {
 
   /// Get a characteristic by UUID.
   ///
-  /// Throws [CharacteristicNotFoundException] if the characteristic is not found.
+  /// Throws [CharacteristicNotFoundException] if no characteristic with
+  /// [uuid] exists. Throws [AmbiguousAttributeException] if more than
+  /// one characteristic in this service shares [uuid] — use
+  /// [characteristics] with a UUID filter to disambiguate by handle.
   RemoteCharacteristic characteristic(UUID uuid);
 
-  /// All characteristics in this service.
-  List<RemoteCharacteristic> get characteristics;
+  /// All characteristics in this service, optionally filtered by UUID.
+  ///
+  /// Returns the full characteristic list when [uuid] is null. Returns
+  /// the subset whose UUID equals [uuid] when supplied — typically used
+  /// to resolve same-UUID duplicates by examining
+  /// [RemoteCharacteristic.handle].
+  List<RemoteCharacteristic> characteristics({UUID? uuid});
 
   /// Included services (services nested within this service).
   List<RemoteService> get includedServices;
