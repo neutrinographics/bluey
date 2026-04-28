@@ -144,6 +144,7 @@ class TestServiceBuilder {
         uuid: charUuid,
         properties: TestProperties.readOnly,
         descriptors: const [],
+        handle: 0,
       ),
     );
     return this;
@@ -156,6 +157,7 @@ class TestServiceBuilder {
         uuid: charUuid,
         properties: TestProperties.writeOnly,
         descriptors: const [],
+        handle: 0,
       ),
     );
     return this;
@@ -168,6 +170,7 @@ class TestServiceBuilder {
         uuid: charUuid,
         properties: TestProperties.notifyOnly,
         descriptors: const [],
+        handle: 0,
       ),
     );
     return this;
@@ -180,6 +183,7 @@ class TestServiceBuilder {
         uuid: charUuid,
         properties: TestProperties.readWrite,
         descriptors: const [],
+        handle: 0,
       ),
     );
     return this;
@@ -195,6 +199,7 @@ class TestServiceBuilder {
         uuid: charUuid,
         properties: properties,
         descriptors: const [],
+        handle: 0,
       ),
     );
     return this;

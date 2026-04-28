@@ -118,10 +118,30 @@ class PeerDiscovery {
       mtu: null,
     );
     await _platform.connect(address, config);
-    await _platform.discoverServices(address);
+    final services = await _platform.discoverServices(address);
+    // Find the serverId characteristic in the control service tree —
+    // platform reads are now keyed by handle (D.13), so we resolve
+    // here from the discovery output rather than passing UUID.
+    final controlService = services
+        .where((s) =>
+            s.uuid.toLowerCase() == lifecycle.controlServiceUuid)
+        .firstOrNull;
+    if (controlService == null) {
+      throw StateError(
+        'peer probe: control service not present on $address',
+      );
+    }
+    final serverIdChar = controlService.characteristics
+        .where((c) => c.uuid.toLowerCase() == lifecycle.serverIdCharUuid)
+        .firstOrNull;
+    if (serverIdChar == null) {
+      throw StateError(
+        'peer probe: serverId characteristic not present on $address',
+      );
+    }
     final bytes = await _platform.readCharacteristic(
       address,
-      lifecycle.serverIdCharUuid,
+      serverIdChar.handle,
     );
     return lifecycle.decodeServerId(bytes);
   }

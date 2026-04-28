@@ -95,9 +95,9 @@ class CharacteristicPropertiesDto {
 /// A descriptor on a remote device (DTO for platform channel).
 class DescriptorDto {
   final String uuid;
-  final int? handle;
+  final int handle;
 
-  DescriptorDto({required this.uuid, this.handle});
+  DescriptorDto({required this.uuid, required this.handle});
 }
 
 /// A characteristic on a remote device (DTO for platform channel).
@@ -105,13 +105,13 @@ class CharacteristicDto {
   final String uuid;
   final CharacteristicPropertiesDto properties;
   final List<DescriptorDto> descriptors;
-  final int? handle;
+  final int handle;
 
   CharacteristicDto({
     required this.uuid,
     required this.properties,
     required this.descriptors,
-    this.handle,
+    required this.handle,
   });
 }
 
@@ -161,11 +161,13 @@ class LocalDescriptorDto {
   final String uuid;
   final List<GattPermissionDto> permissions;
   final Uint8List? value;
+  final int handle;
 
   LocalDescriptorDto({
     required this.uuid,
     required this.permissions,
     this.value,
+    required this.handle,
   });
 }
 
@@ -175,12 +177,14 @@ class LocalCharacteristicDto {
   final CharacteristicPropertiesDto properties;
   final List<GattPermissionDto> permissions;
   final List<LocalDescriptorDto> descriptors;
+  final int handle;
 
   LocalCharacteristicDto({
     required this.uuid,
     required this.properties,
     required this.permissions,
     required this.descriptors,
+    required this.handle,
   });
 }
 
@@ -258,14 +262,14 @@ class ReadRequestDto {
   final String centralId;
   final String characteristicUuid;
   final int offset;
-  final int? characteristicHandle;
+  final int characteristicHandle;
 
   ReadRequestDto({
     required this.requestId,
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 }
 
@@ -277,7 +281,7 @@ class WriteRequestDto {
   final Uint8List value;
   final int offset;
   final bool responseNeeded;
-  final int? characteristicHandle;
+  final int characteristicHandle;
 
   WriteRequestDto({
     required this.requestId,
@@ -286,7 +290,7 @@ class WriteRequestDto {
     required this.value,
     required this.offset,
     required this.responseNeeded,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 }
 
@@ -386,60 +390,42 @@ abstract class BlueyHostApi {
   @async
   List<ServiceDto> discoverServices(String deviceId);
 
-  /// Read a characteristic value.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// characteristic. Native receivers prefer it when non-null; otherwise
-  /// they fall back to UUID-keyed lookup. Nullable during the additive
-  /// interim (D.8); D.13 makes it required and drops the UUID arg.
+  /// Read a characteristic value by platform-minted handle.
   @async
-  Uint8List readCharacteristic(
-    String deviceId,
-    String characteristicUuid,
-    int? characteristicHandle,
-  );
+  Uint8List readCharacteristic(String deviceId, int characteristicHandle);
 
-  /// Write a characteristic value.
+  /// Write a characteristic value by platform-minted handle.
   @async
   void writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
     bool withResponse,
-    int? characteristicHandle,
   );
 
-  /// Enable or disable notifications for a characteristic.
+  /// Enable or disable notifications for a characteristic by handle.
   @async
   void setNotification(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     bool enable,
-    int? characteristicHandle,
   );
 
-  /// Read a descriptor value.
-  ///
-  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
-  /// handles for the owning characteristic and the descriptor itself.
-  /// Native receivers prefer them when non-null; otherwise they fall
-  /// back to UUID-keyed lookup. Nullable during the additive interim.
+  /// Read a descriptor value by platform-minted handle.
   @async
   Uint8List readDescriptor(
     String deviceId,
-    String descriptorUuid,
-    int? characteristicHandle,
-    int? descriptorHandle,
+    int characteristicHandle,
+    int descriptorHandle,
   );
 
-  /// Write a descriptor value.
+  /// Write a descriptor value by platform-minted handle.
   @async
   void writeDescriptor(
     String deviceId,
-    String descriptorUuid,
+    int characteristicHandle,
+    int descriptorHandle,
     Uint8List value,
-    int? characteristicHandle,
-    int? descriptorHandle,
   );
 
   /// Request a specific MTU.
@@ -453,9 +439,10 @@ abstract class BlueyHostApi {
 
   // === Server (Peripheral) Operations ===
 
-  /// Add a service to the GATT server.
+  /// Add a service to the GATT server. Returns the service with all
+  /// characteristic and descriptor handles populated.
   @async
-  void addService(LocalServiceDto service);
+  LocalServiceDto addService(LocalServiceDto service);
 
   /// Remove a service from the GATT server.
   @async
@@ -469,25 +456,18 @@ abstract class BlueyHostApi {
   @async
   void stopAdvertising();
 
-  /// Send a notification to all subscribed centrals.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// local characteristic. Native receivers prefer it when non-null;
-  /// otherwise they fall back to UUID-keyed lookup.
+  /// Send a notification to all subscribed centrals, addressed by the
+  /// platform-minted handle of a local characteristic.
   @async
-  void notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value,
-    int? characteristicHandle,
-  );
+  void notifyCharacteristic(int characteristicHandle, Uint8List value);
 
-  /// Send a notification to a specific central.
+  /// Send a notification to a specific central, addressed by the
+  /// platform-minted handle of a local characteristic.
   @async
   void notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    int? characteristicHandle,
   );
 
   /// Respond to a read request.

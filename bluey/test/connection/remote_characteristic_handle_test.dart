@@ -33,13 +33,15 @@ void main() {
               uuid: TestUuids.customChar1,
               properties: TestProperties.readNotify,
               descriptors: const [
-                platform.PlatformDescriptor(uuid: cccdUuid),
+                platform.PlatformDescriptor(uuid: cccdUuid, handle: 0),
               ],
+              handle: 0,
             ),
             platform.PlatformCharacteristic(
               uuid: TestUuids.customChar2,
               properties: TestProperties.readOnly,
               descriptors: const [],
+              handle: 0,
             ),
           ],
           includedServices: const [],

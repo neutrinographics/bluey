@@ -182,6 +182,7 @@ class ConnectionManagerLifecycleTest {
      */
     private fun mockCharacteristic(
         charUuid: JavaUUID = testCharUuid,
+        handle: Long = 1L,
     ): BluetoothGattCharacteristic {
         val char = mockk<BluetoothGattCharacteristic>(relaxed = true)
         every { char.uuid } returns charUuid
@@ -190,7 +191,25 @@ class ConnectionManagerLifecycleTest {
         every { service.getCharacteristic(charUuid) } returns char
         every { service.characteristics } returns listOf(char)
         every { mockGatt.services } returns listOf(service)
+        // I088 D.13 — register the char in the per-device handle table
+        // so ConnectionManager's handle-keyed lookup resolves it.
+        injectHandle(deviceAddress, handle, char)
         return char
+    }
+
+    private fun injectHandle(
+        deviceAddr: String,
+        handle: Long,
+        char: BluetoothGattCharacteristic,
+    ) {
+        val field = ConnectionManager::class.java.getDeclaredField(
+            "characteristicByHandle",
+        )
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val table = field.get(connectionManager)
+            as MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>
+        table.getOrPut(deviceAddr) { mutableMapOf() }[handle.toInt()] = char
     }
 
     // ============================================================
@@ -247,10 +266,7 @@ class ConnectionManagerLifecycleTest {
         // Pre-fix, connections.remove() runs on the binder thread, so the
         // probe fails synchronously with DeviceNotConnected.
         var probeResult: Result<Unit>? = null
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { probeResult = it }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { probeResult = it }
 
         assertNull(
             "writeCharacteristic between binder STATE_DISCONNECTED and post " +
@@ -591,10 +607,7 @@ class ConnectionManagerLifecycleTest {
         ) } returns BluetoothGatt.GATT_SUCCESS
 
         var writeResult: Result<Unit>? = null
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { writeResult = it }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { writeResult = it }
 
         // Write is in flight (no callback yet — onCharacteristicWrite hasn't fired).
         assertNull(writeResult)

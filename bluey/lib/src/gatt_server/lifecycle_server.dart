@@ -35,11 +35,15 @@ class LifecycleServer {
   bool get isEnabled => _interval != null;
 
   /// Adds the control service to the platform if lifecycle is enabled
-  /// and it hasn't been added yet.
-  Future<void> addControlServiceIfNeeded() async {
-    if (_interval == null || _controlServiceAdded) return;
-    await _platform.addService(lifecycle.buildControlService());
+  /// and it hasn't been added yet. Returns the populated service so
+  /// callers can record its handles. Returns null when lifecycle is
+  /// disabled or the service was already added.
+  Future<platform.PlatformLocalService?> addControlServiceIfNeeded() async {
+    if (_interval == null || _controlServiceAdded) return null;
+    final populated =
+        await _platform.addService(lifecycle.buildControlService());
     _controlServiceAdded = true;
+    return populated;
   }
 
   /// Handles a write request to a control service characteristic.

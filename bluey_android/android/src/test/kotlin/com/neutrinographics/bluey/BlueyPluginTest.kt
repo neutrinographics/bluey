@@ -104,7 +104,7 @@ class BlueyPluginTest {
             includedServices = emptyList()
         )
 
-        val captured = mutableListOf<Result<Unit>>()
+        val captured = mutableListOf<Result<LocalServiceDto>>()
         plugin.addService(service) { captured += it }
 
         assertEquals(1, captured.size)

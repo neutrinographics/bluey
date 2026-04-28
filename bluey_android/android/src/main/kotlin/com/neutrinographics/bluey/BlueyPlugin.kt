@@ -400,13 +400,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun readCharacteristic(
         deviceId: String,
-        characteristicUuid: String,
-        characteristicHandle: Long?,
+        characteristicHandle: Long,
         callback: (Result<ByteArray>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.readCharacteristic(deviceId, characteristicUuid, characteristicHandle) { result ->
+            cm.readCharacteristic(deviceId, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -416,15 +415,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun writeCharacteristic(
         deviceId: String,
-        characteristicUuid: String,
+        characteristicHandle: Long,
         value: ByteArray,
         withResponse: Boolean,
-        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.writeCharacteristic(deviceId, characteristicUuid, value, withResponse, characteristicHandle) { result ->
+            cm.writeCharacteristic(deviceId, characteristicHandle, value, withResponse) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -434,14 +432,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun setNotification(
         deviceId: String,
-        characteristicUuid: String,
+        characteristicHandle: Long,
         enable: Boolean,
-        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.setNotification(deviceId, characteristicUuid, enable, characteristicHandle) { result ->
+            cm.setNotification(deviceId, characteristicHandle, enable) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -451,14 +448,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun readDescriptor(
         deviceId: String,
-        descriptorUuid: String,
-        characteristicHandle: Long?,
-        descriptorHandle: Long?,
+        characteristicHandle: Long,
+        descriptorHandle: Long,
         callback: (Result<ByteArray>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.readDescriptor(deviceId, descriptorUuid, characteristicHandle, descriptorHandle) { result ->
+            cm.readDescriptor(deviceId, characteristicHandle, descriptorHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -468,15 +464,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun writeDescriptor(
         deviceId: String,
-        descriptorUuid: String,
+        characteristicHandle: Long,
+        descriptorHandle: Long,
         value: ByteArray,
-        characteristicHandle: Long?,
-        descriptorHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.writeDescriptor(deviceId, descriptorUuid, value, characteristicHandle, descriptorHandle) { result ->
+            cm.writeDescriptor(deviceId, characteristicHandle, descriptorHandle, value) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -508,7 +503,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     // Server (Peripheral) operations
 
-    override fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
+    override fun addService(service: LocalServiceDto, callback: (Result<LocalServiceDto>) -> Unit) {
         try {
             val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
             gs.addService(service) { result ->
@@ -557,14 +552,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     }
 
     override fun notifyCharacteristic(
-        characteristicUuid: String,
+        characteristicHandle: Long,
         value: ByteArray,
-        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
-            gs.notifyCharacteristic(characteristicUuid, value, characteristicHandle) { result ->
+            gs.notifyCharacteristic(characteristicHandle, value) { result ->
                 callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
             }
         } catch (e: Throwable) {
@@ -574,14 +568,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun notifyCharacteristicTo(
         centralId: String,
-        characteristicUuid: String,
+        characteristicHandle: Long,
         value: ByteArray,
-        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
-            gs.notifyCharacteristicTo(centralId, characteristicUuid, value, characteristicHandle) { result ->
+            gs.notifyCharacteristicTo(centralId, characteristicHandle, value) { result ->
                 callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
             }
         } catch (e: Throwable) {

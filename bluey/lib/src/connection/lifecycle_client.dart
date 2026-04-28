@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import 'peer_silence_monitor.dart';
+import 'value_objects/attribute_handle.dart';
 
 /// Client-side lifecycle management.
 ///
@@ -26,10 +27,10 @@ class LifecycleClient {
   late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
 
-  /// UUID of the server's heartbeat characteristic, once we've found
+  /// Handle of the server's heartbeat characteristic, once we've found
   /// it during `start()`. Not a running sentinel — use [_isRunning] for
   /// that. Nulled by `stop()`.
-  String? _heartbeatCharUuid;
+  AttributeHandle? _heartbeatCharHandle;
 
   /// Authoritative "running" sentinel. True from the moment `start()`
   /// commits to run (after its pre-commit null checks pass) until
@@ -180,8 +181,9 @@ class LifecycleClient {
     // fully unwind so the class never exposes a partial-start state.
     _isRunning = true;
     _monitor.start();
-    _heartbeatCharUuid = heartbeatChar.uuid.toString();
-    dev.log('heartbeat started: char=$_heartbeatCharUuid', name: 'bluey.lifecycle');
+    _heartbeatCharHandle = heartbeatChar.handle;
+    dev.log('heartbeat started: handle=${_heartbeatCharHandle?.value}',
+        name: 'bluey.lifecycle');
 
     try {
       // Send the first heartbeat immediately so the server (especially
@@ -197,7 +199,7 @@ class LifecycleClient {
 
       if (intervalChar != null) {
         _platform
-            .readCharacteristic(_connectionId, intervalChar.uuid.toString())
+            .readCharacteristic(_connectionId, intervalChar.handle.value)
             .then((bytes) {
           if (!_isRunning) return;
           final serverInterval = lifecycle.decodeInterval(bytes);
@@ -220,13 +222,13 @@ class LifecycleClient {
 
   /// Sends a disconnect command to the server's control service.
   Future<void> sendDisconnectCommand() async {
-    final charUuid = _heartbeatCharUuid;
-    if (charUuid == null) return;
+    final charHandle = _heartbeatCharHandle;
+    if (charHandle == null) return;
 
     try {
       await _platform.writeCharacteristic(
         _connectionId,
-        charUuid,
+        charHandle.value,
         lifecycle.disconnectValue,
         true,
       );
@@ -237,14 +239,12 @@ class LifecycleClient {
 
   /// Stops the heartbeat timer and clears the char reference. Cancels
   /// the death watch via [PeerSilenceMonitor.stop] so the monitor does
-  /// not fire after teardown. After stop(): `recordActivity` bails on
-  /// the `isRunning` guard; `_scheduleProbe` and `_sendProbeOrDefer`
-  /// bail on the `_heartbeatCharUuid == null` guard.
+  /// not fire after teardown.
   void stop() {
     _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
-    _heartbeatCharUuid = null;
+    _heartbeatCharHandle = null;
     _monitor.stop();
   }
 
@@ -275,7 +275,7 @@ class LifecycleClient {
   ///
   /// No-op if the client has been stopped.
   void _scheduleProbe({Duration? after}) {
-    if (_heartbeatCharUuid == null) return;
+    if (_heartbeatCharHandle == null) return;
     _probeTimer?.cancel();
     final delay = after ?? _monitor.timeUntilNextProbe();
     _probeTimer = Timer(delay, _sendProbeOrDefer);
@@ -287,7 +287,7 @@ class LifecycleClient {
   /// raced the timer firing — if activity just shifted the deadline
   /// forward, reschedule instead of probing now.
   void _sendProbeOrDefer() {
-    if (_heartbeatCharUuid == null) return;
+    if (_heartbeatCharHandle == null) return;
     if (_monitor.probeInFlight) return;
     if (_pendingUserOps > 0) {
       // I097: defer while a user op is in flight — that op is itself
@@ -303,14 +303,14 @@ class LifecycleClient {
   }
 
   void _sendProbe() {
-    final charUuid = _heartbeatCharUuid;
-    if (charUuid == null) return;
+    final charHandle = _heartbeatCharHandle;
+    if (charHandle == null) return;
 
     _monitor.markProbeInFlight();
     _platform
         .writeCharacteristic(
           _connectionId,
-          charUuid,
+          charHandle.value,
           lifecycle.heartbeatValue,
           true,
         )

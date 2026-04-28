@@ -113,26 +113,23 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) async => Uint8List(0);
+    int characteristicHandle,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) async {}
+    bool withResponse,
+  ) async {}
 
   @override
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    bool enable,
+  ) async {}
 
   @override
   Stream<platform.PlatformNotification> notificationStream(String deviceId) =>
@@ -141,19 +138,17 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async => Uint8List(0);
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {}
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async => mtu;
@@ -216,8 +211,57 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   // === Server (Peripheral) Operations ===
 
   @override
-  Future<void> addService(platform.PlatformLocalService service) async {
-    addedServices.add(service);
+  Future<platform.PlatformLocalService> addService(
+    platform.PlatformLocalService service,
+  ) async {
+    final populated = _populateLocalHandles(service);
+    addedServices.add(populated);
+    return populated;
+  }
+
+  // Mints handles for every characteristic / descriptor in [service]
+  // so consumers (BlueyServer's UUID->handle resolver) can address
+  // them. Mirrors the production native side.
+  int _nextLocalHandle = 1;
+  final Map<String, int> localHandleByCharUuid = {};
+
+  platform.PlatformLocalService _populateLocalHandles(
+    platform.PlatformLocalService s,
+  ) {
+    final populatedChars = <platform.PlatformLocalCharacteristic>[];
+    for (final c in s.characteristics) {
+      final h = _nextLocalHandle++;
+      localHandleByCharUuid[c.uuid.toLowerCase()] = h;
+      var nextDesc = 1;
+      final populatedDescs = c.descriptors
+          .map((d) => platform.PlatformLocalDescriptor(
+                uuid: d.uuid,
+                permissions: d.permissions,
+                value: d.value,
+                handle: nextDesc++,
+              ))
+          .toList();
+      populatedChars.add(platform.PlatformLocalCharacteristic(
+        uuid: c.uuid,
+        properties: c.properties,
+        permissions: c.permissions,
+        descriptors: populatedDescs,
+        handle: h,
+      ));
+    }
+    return platform.PlatformLocalService(
+      uuid: s.uuid,
+      isPrimary: s.isPrimary,
+      characteristics: populatedChars,
+      includedServices: s.includedServices.map(_populateLocalHandles).toList(),
+    );
+  }
+
+  String _localUuidForHandle(int handle) {
+    for (final entry in localHandleByCharUuid.entries) {
+      if (entry.value == handle) return entry.key;
+    }
+    return '';
   }
 
   @override
@@ -238,26 +282,27 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     notifyCalls.add(
-      NotifyCall(characteristicUuid: characteristicUuid, value: value),
+      NotifyCall(
+        characteristicUuid: _localUuidForHandle(characteristicHandle),
+        value: value,
+      ),
     );
   }
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     notifyToCalls.add(
       NotifyToCall(
         centralId: centralId,
-        characteristicUuid: characteristicUuid,
+        characteristicUuid: _localUuidForHandle(characteristicHandle),
         value: value,
       ),
     );
@@ -265,26 +310,27 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     indicateCalls.add(
-      IndicateCall(characteristicUuid: characteristicUuid, value: value),
+      IndicateCall(
+        characteristicUuid: _localUuidForHandle(characteristicHandle),
+        value: value,
+      ),
     );
   }
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     indicateToCalls.add(
       IndicateToCall(
         centralId: centralId,
-        characteristicUuid: characteristicUuid,
+        characteristicUuid: _localUuidForHandle(characteristicHandle),
         value: value,
       ),
     );
@@ -659,8 +705,24 @@ void main() {
     });
 
     group('Notifications', () {
+      // BlueyServer post-D.13 resolves UUID -> handle from the
+      // populated PlatformLocalService returned by addService. Each
+      // test in this group registers a service hosting char 0x2A19
+      // first so the resolver has a handle to forward.
+      Future<void> registerNotifiableChar(Server server) async {
+        await server.addService(
+          HostedService(
+            uuid: UUID.short(0x180D),
+            characteristics: [
+              HostedCharacteristic.notifiable(uuid: UUID.short(0x2A19)),
+            ],
+          ),
+        );
+      }
+
       test('notify sends to all subscribed centrals', () async {
         final server = bluey.server()!;
+        await registerNotifiableChar(server);
         final charUuid = UUID.short(0x2A19);
         final data = Uint8List.fromList([42]);
 
@@ -676,6 +738,7 @@ void main() {
 
       test('notifyTo sends to specific central', () async {
         final server = bluey.server()!;
+        await registerNotifiableChar(server);
 
         // First connect a central
         server.connections.listen((_) {});
@@ -697,8 +760,30 @@ void main() {
     });
 
     group('Indications', () {
+      Future<void> registerIndicatableChar(Server server) async {
+        await server.addService(
+          HostedService(
+            uuid: UUID.short(0x180D),
+            characteristics: [
+              HostedCharacteristic(
+                uuid: UUID.short(0x2A19),
+                properties: const CharacteristicProperties(
+                  canRead: false,
+                  canWrite: false,
+                  canWriteWithoutResponse: false,
+                  canNotify: false,
+                  canIndicate: true,
+                ),
+                permissions: const [],
+              ),
+            ],
+          ),
+        );
+      }
+
       test('indicate sends indication to all subscribed centrals', () async {
         final server = bluey.server()!;
+        await registerIndicatableChar(server);
         final charUuid = UUID.short(0x2A19);
         final data = Uint8List.fromList([42]);
 
@@ -714,6 +799,7 @@ void main() {
 
       test('indicateTo sends indication to specific central', () async {
         final server = bluey.server()!;
+        await registerIndicatableChar(server);
 
         // First connect a central
         server.connections.listen((_) {});
@@ -786,6 +872,7 @@ void main() {
             centralId: 'central-1',
             characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
             offset: 0,
+            characteristicHandle: 0,
           ),
         );
 
@@ -817,6 +904,7 @@ void main() {
             centralId: 'central-1',
             characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
             offset: 0,
+            characteristicHandle: 0,
           ),
         );
         await Future.delayed(Duration(milliseconds: 10));
@@ -864,6 +952,7 @@ void main() {
             value: writeValue,
             offset: 0,
             responseNeeded: true,
+            characteristicHandle: 0,
           ),
         );
 
@@ -899,6 +988,7 @@ void main() {
             value: Uint8List.fromList([5]),
             offset: 0,
             responseNeeded: true,
+            characteristicHandle: 0,
           ),
         );
         await Future.delayed(Duration(milliseconds: 10));
@@ -956,6 +1046,7 @@ void main() {
                 value: lifecycle.heartbeatValue,
                 offset: 0,
                 responseNeeded: false,
+                characteristicHandle: 0,
               ),
             );
             async.flushMicrotasks();
@@ -975,6 +1066,7 @@ void main() {
                 value: Uint8List.fromList([0x99]),
                 offset: 0,
                 responseNeeded: false,
+                characteristicHandle: 0,
               ),
             );
             async.flushMicrotasks();
@@ -1020,6 +1112,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
 
@@ -1033,6 +1126,7 @@ void main() {
               value: Uint8List.fromList([0xAB]),
               responseNeeded: true,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
             expect(captured, isNotNull);
@@ -1078,6 +1172,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
 
@@ -1088,6 +1183,7 @@ void main() {
               centralId: 'client-A',
               characteristicUuid: '12345678-1234-1234-1234-123456789abc',
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
             expect(captured, isNotNull);
@@ -1129,6 +1225,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
 
@@ -1141,6 +1238,7 @@ void main() {
               value: Uint8List.fromList([0xEE]),
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
 
@@ -1178,6 +1276,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             WriteRequest? captured;
             server.writeRequests.listen((r) => captured = r);
@@ -1188,6 +1287,7 @@ void main() {
               value: Uint8List.fromList([0xAB]),
               responseNeeded: true,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
             expect(captured, isNotNull);
@@ -1214,6 +1314,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
 
@@ -1245,6 +1346,7 @@ void main() {
               value: lifecycle.heartbeatValue,
               responseNeeded: false,
               offset: 0,
+              characteristicHandle: 0,
             ));
             WriteRequest? captured;
             server.writeRequests.listen((r) => captured = r);
@@ -1255,6 +1357,7 @@ void main() {
               value: Uint8List.fromList([0xAB]),
               responseNeeded: true,
               offset: 0,
+              characteristicHandle: 0,
             ));
             async.flushMicrotasks();
             expect(captured, isNotNull);
@@ -1311,6 +1414,7 @@ void main() {
               centralId: 'central-1',
               characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
               offset: 0,
+              characteristicHandle: 0,
             ),
           );
           await Future.delayed(Duration(milliseconds: 10));
@@ -1353,6 +1457,7 @@ void main() {
             centralId: 'central-1',
             characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
             offset: 0,
+            characteristicHandle: 0,
           ),
         );
         await Future.delayed(Duration(milliseconds: 10));
@@ -1377,6 +1482,7 @@ void main() {
             value: Uint8List.fromList([1, 2, 3]),
             offset: 0,
             responseNeeded: true,
+            characteristicHandle: 0,
           ),
         );
         await Future.delayed(Duration(milliseconds: 10));

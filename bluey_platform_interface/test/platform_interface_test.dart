@@ -58,26 +58,23 @@ final class MockBlueyPlatform extends BlueyPlatform
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    bool withResponse,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    bool enable,
+  ) => throw UnimplementedError();
 
   @override
   Stream<PlatformNotification> notificationStream(String deviceId) =>
@@ -86,19 +83,17 @@ final class MockBlueyPlatform extends BlueyPlatform
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    int descriptorHandle,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) =>
@@ -109,7 +104,7 @@ final class MockBlueyPlatform extends BlueyPlatform
 
   // Server (Peripheral) operations
   @override
-  Future<void> addService(PlatformLocalService service) =>
+  Future<PlatformLocalService> addService(PlatformLocalService service) =>
       throw UnimplementedError();
 
   @override
@@ -124,18 +119,16 @@ final class MockBlueyPlatform extends BlueyPlatform
 
   @override
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Stream<PlatformCentral> get centralConnections => throw UnimplementedError();
@@ -218,18 +211,16 @@ final class MockBlueyPlatform extends BlueyPlatform
 
   @override
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) => throw UnimplementedError();
+    int characteristicHandle,
+    Uint8List value,
+  ) => throw UnimplementedError();
 
   @override
   Stream<String> get serviceChanges => throw UnimplementedError();

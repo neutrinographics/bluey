@@ -165,8 +165,9 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [
-                  DescriptorDto(uuid: '2902'),
+                  DescriptorDto(uuid: '2902', handle: 99),
                 ],
+                handle: 100,
               ),
             ],
             includedServices: [],
@@ -196,14 +197,14 @@ void main() {
     group('readCharacteristic', () {
       test('delegates to hostApi', () async {
         final data = Uint8List.fromList([0x42]);
-        when(() => mockHostApi.readCharacteristic(any(), any(), any()))
+        when(() => mockHostApi.readCharacteristic(any(), any()))
             .thenAnswer((_) async => data);
 
         final result =
-            await connectionManager.readCharacteristic('device-1', '2A37');
+            await connectionManager.readCharacteristic('device-1', 100);
 
         expect(result, equals(data));
-        verify(() => mockHostApi.readCharacteristic('device-1', '2A37', null))
+        verify(() => mockHostApi.readCharacteristic('device-1', 100))
             .called(1);
       });
     });
@@ -212,27 +213,27 @@ void main() {
       test('delegates to hostApi', () async {
         final data = Uint8List.fromList([0x01]);
         when(() => mockHostApi.writeCharacteristic(
-              any(), any(), any(), any(), any(),
+              any(), any(), any(), any(),
             )).thenAnswer((_) async {});
 
         await connectionManager.writeCharacteristic(
-            'device-1', '2A37', data, true);
+            'device-1', 100, data, true);
 
         verify(() => mockHostApi.writeCharacteristic(
-              'device-1', '2A37', data, true, null,
+              'device-1', 100, data, true,
             )).called(1);
       });
     });
 
     group('setNotification', () {
       test('delegates to hostApi', () async {
-        when(() => mockHostApi.setNotification('device-1', '2A37', true, null))
+        when(() => mockHostApi.setNotification('device-1', 100, true))
             .thenAnswer((_) async {});
 
-        await connectionManager.setNotification('device-1', '2A37', true);
+        await connectionManager.setNotification('device-1', 100, true);
 
         verify(() =>
-                mockHostApi.setNotification('device-1', '2A37', true, null))
+                mockHostApi.setNotification('device-1', 100, true))
             .called(1);
       });
     });
@@ -240,14 +241,14 @@ void main() {
     group('readDescriptor', () {
       test('delegates to hostApi', () async {
         final data = Uint8List.fromList([0x00, 0x01]);
-        when(() => mockHostApi.readDescriptor(any(), any(), any(), any()))
+        when(() => mockHostApi.readDescriptor(any(), any(), any()))
             .thenAnswer((_) async => data);
 
         final result =
-            await connectionManager.readDescriptor('device-1', '2902');
+            await connectionManager.readDescriptor('device-1', 100, 99);
 
         expect(result, equals(data));
-        verify(() => mockHostApi.readDescriptor('device-1', '2902', null, null))
+        verify(() => mockHostApi.readDescriptor('device-1', 100, 99))
             .called(1);
       });
     });
@@ -255,13 +256,13 @@ void main() {
     group('writeDescriptor', () {
       test('delegates to hostApi', () async {
         final data = Uint8List.fromList([0x01, 0x00]);
-        when(() => mockHostApi.writeDescriptor(any(), any(), any(), any(), any()))
+        when(() => mockHostApi.writeDescriptor(any(), any(), any(), any()))
             .thenAnswer((_) async {});
 
-        await connectionManager.writeDescriptor('device-1', '2902', data);
+        await connectionManager.writeDescriptor('device-1', 100, 99, data);
 
         verify(() =>
-                mockHostApi.writeDescriptor('device-1', '2902', data, null, null))
+                mockHostApi.writeDescriptor('device-1', 100, 99, data))
             .called(1);
       });
     });
@@ -344,7 +345,6 @@ void main() {
                 any(),
                 any(),
                 any(),
-                any(),
               )).thenThrow(
             PlatformException(code: 'gatt-timeout', message: 'Write timed out'),
           );
@@ -352,7 +352,7 @@ void main() {
           expect(
             () => connectionManager.writeCharacteristic(
               'device-1',
-              'char-uuid',
+              42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -374,13 +374,12 @@ void main() {
                 any(),
                 any(),
                 any(),
-                any(),
               )).thenThrow(original);
 
           expect(
             () => connectionManager.writeCharacteristic(
               'device-1',
-              'char-uuid',
+              42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -394,12 +393,12 @@ void main() {
       test(
         'readCharacteristic translates PlatformException(gatt-timeout) to GattOperationTimeoutException',
         () async {
-          when(() => mockHostApi.readCharacteristic(any(), any(), any())).thenThrow(
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
             PlatformException(code: 'gatt-timeout', message: 'Read timed out'),
           );
 
           expect(
-            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            () => connectionManager.readCharacteristic('device-1', 42),
             throwsA(isA<GattOperationTimeoutException>()
                 .having((e) => e.operation, 'operation', 'readCharacteristic')),
           );
@@ -426,7 +425,7 @@ void main() {
         'writeCharacteristic translates PlatformException(gatt-disconnected) to GattOperationDisconnectedException',
         () async {
           when(() => mockHostApi.writeCharacteristic(
-                any(), any(), any(), any(), any(),
+                any(), any(), any(), any(),
               )).thenThrow(
             PlatformException(code: 'gatt-disconnected', message: 'link lost'),
           );
@@ -434,7 +433,7 @@ void main() {
           expect(
             () => connectionManager.writeCharacteristic(
               'device-1',
-              'char-uuid',
+              42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -447,12 +446,12 @@ void main() {
       test(
         'readCharacteristic translates PlatformException(gatt-disconnected) to GattOperationDisconnectedException',
         () async {
-          when(() => mockHostApi.readCharacteristic(any(), any(), any())).thenThrow(
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
             PlatformException(code: 'gatt-disconnected', message: 'link lost'),
           );
 
           expect(
-            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            () => connectionManager.readCharacteristic('device-1', 42),
             throwsA(isA<GattOperationDisconnectedException>()
                 .having((e) => e.operation, 'operation', 'readCharacteristic')),
           );
@@ -467,27 +466,27 @@ void main() {
             message: 'link lost',
           );
 
-          when(() => mockHostApi.setNotification(any(), any(), any(), any()))
+          when(() => mockHostApi.setNotification(any(), any(), any()))
               .thenThrow(disconnect);
           await expectLater(
-            () => connectionManager.setNotification('d', 'c', true),
+            () => connectionManager.setNotification('d', 1, true),
             throwsA(isA<GattOperationDisconnectedException>()
                 .having((e) => e.operation, 'operation', 'setNotification')),
           );
 
-          when(() => mockHostApi.readDescriptor(any(), any(), any(), any()))
+          when(() => mockHostApi.readDescriptor(any(), any(), any()))
               .thenThrow(disconnect);
           await expectLater(
-            () => connectionManager.readDescriptor('d', 'desc'),
+            () => connectionManager.readDescriptor('d', 1, 2),
             throwsA(isA<GattOperationDisconnectedException>()
                 .having((e) => e.operation, 'operation', 'readDescriptor')),
           );
 
-          when(() => mockHostApi.writeDescriptor(any(), any(), any(), any(), any()))
+          when(() => mockHostApi.writeDescriptor(any(), any(), any(), any()))
               .thenThrow(disconnect);
           await expectLater(
             () => connectionManager.writeDescriptor(
-              'd', 'desc', Uint8List.fromList([0x01]),
+              'd', 1, 2, Uint8List.fromList([0x01]),
             ),
             throwsA(isA<GattOperationDisconnectedException>()
                 .having((e) => e.operation, 'operation', 'writeDescriptor')),
@@ -519,9 +518,7 @@ void main() {
       test(
         'writeCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
         () async {
-          when(() => mockHostApi.writeCharacteristic(
-                any(), any(), any(), any(), any(),
-              )).thenThrow(
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any())).thenThrow(
             PlatformException(
               code: 'gatt-status-failed',
               message: 'Write failed with status: 1',
@@ -530,9 +527,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.writeCharacteristic(
-              'device-1',
-              'char-uuid',
+            () => connectionManager.writeCharacteristic('device-1', 42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -546,7 +541,7 @@ void main() {
       test(
         'readCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
         () async {
-          when(() => mockHostApi.readCharacteristic(any(), any(), any())).thenThrow(
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
             PlatformException(
               code: 'gatt-status-failed',
               message: 'Read failed with status: 5',
@@ -555,7 +550,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.readCharacteristic('device-1', 'char-uuid'),
+            () => connectionManager.readCharacteristic('device-1', 42),
             throwsA(isA<GattOperationStatusFailedException>()
                 .having((e) => e.operation, 'operation', 'readCharacteristic')
                 .having((e) => e.status, 'status', 5)),
@@ -569,9 +564,7 @@ void main() {
           // Pigeon sometimes marshals details via String/JSON paths that
           // could arrive as a non-int. Sentinel -1 is the documented
           // fallback rather than throwing or guessing.
-          when(() => mockHostApi.writeCharacteristic(
-                any(), any(), any(), any(), any(),
-              )).thenThrow(
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any())).thenThrow(
             PlatformException(
               code: 'gatt-status-failed',
               message: 'Write failed',
@@ -580,9 +573,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.writeCharacteristic(
-              'device-1',
-              'char-uuid',
+            () => connectionManager.writeCharacteristic('device-1', 42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -605,31 +596,28 @@ void main() {
           );
 
           // setNotification
-          when(() => mockHostApi.setNotification(any(), any(), any(), any()))
+          when(() => mockHostApi.setNotification(any(), any(), any()))
               .thenThrow(timeout);
           await expectLater(
-            () => connectionManager.setNotification('d', 'c', true),
+            () => connectionManager.setNotification('d', 42, true),
             throwsA(isA<GattOperationTimeoutException>()
                 .having((e) => e.operation, 'operation', 'setNotification')),
           );
 
           // readDescriptor
-          when(() => mockHostApi.readDescriptor(any(), any(), any(), any()))
+          when(() => mockHostApi.readDescriptor(any(), any(), any()))
               .thenThrow(timeout);
           await expectLater(
-            () => connectionManager.readDescriptor('d', 'desc'),
+            () => connectionManager.readDescriptor('d', 42, 99),
             throwsA(isA<GattOperationTimeoutException>()
                 .having((e) => e.operation, 'operation', 'readDescriptor')),
           );
 
           // writeDescriptor
-          when(() => mockHostApi.writeDescriptor(any(), any(), any(), any(), any()))
+          when(() => mockHostApi.writeDescriptor(any(), any(), any(), any()))
               .thenThrow(timeout);
           await expectLater(
-            () => connectionManager.writeDescriptor(
-              'd',
-              'desc',
-              Uint8List.fromList([0x01]),
+            () => connectionManager.writeDescriptor('d', 42, 99, Uint8List.fromList([0x01]),
             ),
             throwsA(isA<GattOperationTimeoutException>()
                 .having((e) => e.operation, 'operation', 'writeDescriptor')),
@@ -657,7 +645,7 @@ void main() {
         'writeCharacteristic translates PlatformException(bluey-permission-denied) '
         'to PlatformPermissionDeniedException',
         () async {
-          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any(), any()))
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
               .thenThrow(
             PlatformException(
               code: 'bluey-permission-denied',
@@ -667,9 +655,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.writeCharacteristic(
-              'device-1',
-              'char-uuid',
+            () => connectionManager.writeCharacteristic('device-1', 42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -686,7 +672,7 @@ void main() {
         'writeCharacteristic translates bluey-permission-denied with null details '
         'to permission "unknown"',
         () async {
-          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any(), any()))
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
               .thenThrow(
             PlatformException(
               code: 'bluey-permission-denied',
@@ -696,9 +682,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.writeCharacteristic(
-              'device-1',
-              'char-uuid',
+            () => connectionManager.writeCharacteristic('device-1', 42,
               Uint8List.fromList([0x01]),
               true,
             ),
@@ -714,7 +698,7 @@ void main() {
         'writeCharacteristic translates bluey-permission-denied with non-String details '
         'to permission "unknown"',
         () async {
-          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any(), any()))
+          when(() => mockHostApi.writeCharacteristic(any(), any(), any(), any()))
               .thenThrow(
             PlatformException(
               code: 'bluey-permission-denied',
@@ -724,9 +708,7 @@ void main() {
           );
 
           expect(
-            () => connectionManager.writeCharacteristic(
-              'device-1',
-              'char-uuid',
+            () => connectionManager.writeCharacteristic('device-1', 42,
               Uint8List.fromList([0x01]),
               true,
             ),

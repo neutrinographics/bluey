@@ -126,9 +126,9 @@ class PlatformCharacteristicProperties {
 @immutable
 class PlatformDescriptor {
   final String uuid;
-  final int? handle;
+  final int handle;
 
-  const PlatformDescriptor({required this.uuid, this.handle});
+  const PlatformDescriptor({required this.uuid, required this.handle});
 }
 
 /// A characteristic from the platform layer.
@@ -137,13 +137,13 @@ class PlatformCharacteristic {
   final String uuid;
   final PlatformCharacteristicProperties properties;
   final List<PlatformDescriptor> descriptors;
-  final int? handle;
+  final int handle;
 
   const PlatformCharacteristic({
     required this.uuid,
     required this.properties,
     required this.descriptors,
-    this.handle,
+    required this.handle,
   });
 }
 
@@ -384,59 +384,44 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Discover services on a connected device.
   Future<List<PlatformService>> discoverServices(String deviceId);
 
-  /// Read a characteristic value.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// characteristic (D.8 additive interim, I088). Native receivers
-  /// prefer it when non-null; otherwise they fall back to UUID-keyed
-  /// lookup. D.13 will make it required and drop the UUID arg.
+  /// Read a characteristic value by platform-minted handle.
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  });
+    int characteristicHandle,
+  );
 
-  /// Write a characteristic value.
+  /// Write a characteristic value by platform-minted handle.
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  });
+    bool withResponse,
+  );
 
-  /// Enable or disable notifications for a characteristic.
+  /// Enable or disable notifications for a characteristic by handle.
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  });
+    int characteristicHandle,
+    bool enable,
+  );
 
   /// Stream of characteristic notifications.
   Stream<PlatformNotification> notificationStream(String deviceId);
 
-  /// Read a descriptor value.
-  ///
-  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
-  /// handles for the owning characteristic and the descriptor itself
-  /// (D.8 additive interim, I088). Native receivers prefer them when
-  /// non-null; otherwise they fall back to UUID-keyed lookup.
+  /// Read a descriptor value by platform-minted handle.
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  });
+    int characteristicHandle,
+    int descriptorHandle,
+  );
 
-  /// Write a descriptor value.
+  /// Write a descriptor value by platform-minted handle.
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  });
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  );
 
   /// Request a specific MTU.
   Future<int> requestMtu(String deviceId, int mtu);
@@ -489,8 +474,9 @@ abstract base class BlueyPlatform extends PlatformInterface {
 
   // === Server (Peripheral) Operations ===
 
-  /// Add a service to the GATT server.
-  Future<void> addService(PlatformLocalService service);
+  /// Add a service to the GATT server. Returns the service with all
+  /// characteristic and descriptor handles populated by the platform.
+  Future<PlatformLocalService> addService(PlatformLocalService service);
 
   /// Remove a service from the GATT server.
   Future<void> removeService(String serviceUuid);
@@ -501,44 +487,31 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Stop advertising.
   Future<void> stopAdvertising();
 
-  /// Send a notification to all subscribed centrals.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// local characteristic (D.8 additive interim, I088). Native
-  /// receivers prefer it when non-null; otherwise they fall back to
-  /// UUID-keyed lookup.
-  Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  });
+  /// Send a notification to all subscribed centrals, addressed by the
+  /// platform-minted handle of a local characteristic.
+  Future<void> notifyCharacteristic(int characteristicHandle, Uint8List value);
 
-  /// Send a notification to a specific central.
+  /// Send a notification to a specific central, addressed by the
+  /// platform-minted handle of a local characteristic.
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  });
+    int characteristicHandle,
+    Uint8List value,
+  );
 
-  /// Send an indication to all subscribed centrals.
-  ///
-  /// Unlike notifications, indications require acknowledgment from the central.
-  Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  });
+  /// Send an indication to all subscribed centrals, addressed by the
+  /// platform-minted handle of a local characteristic. Unlike
+  /// notifications, indications require acknowledgment from the central.
+  Future<void> indicateCharacteristic(int characteristicHandle, Uint8List value);
 
-  /// Send an indication to a specific central.
-  ///
-  /// Unlike notifications, indications require acknowledgment from the central.
+  /// Send an indication to a specific central, addressed by the
+  /// platform-minted handle of a local characteristic. Unlike
+  /// notifications, indications require acknowledgment from the central.
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  });
+    int characteristicHandle,
+    Uint8List value,
+  );
 
   /// Stream of device IDs whose GATT services have changed.
   ///
@@ -607,10 +580,16 @@ class PlatformLocalDescriptor {
   final List<PlatformGattPermission> permissions;
   final Uint8List? value;
 
+  /// Platform-minted handle. Set to 0 by callers when constructing a
+  /// service to register; the platform overwrites it with the assigned
+  /// handle in the value returned from [BlueyPlatform.addService].
+  final int handle;
+
   const PlatformLocalDescriptor({
     required this.uuid,
     required this.permissions,
     this.value,
+    this.handle = 0,
   });
 }
 
@@ -622,11 +601,17 @@ class PlatformLocalCharacteristic {
   final List<PlatformGattPermission> permissions;
   final List<PlatformLocalDescriptor> descriptors;
 
+  /// Platform-minted handle. Set to 0 by callers when constructing a
+  /// service to register; the platform overwrites it with the assigned
+  /// handle in the value returned from [BlueyPlatform.addService].
+  final int handle;
+
   const PlatformLocalCharacteristic({
     required this.uuid,
     required this.properties,
     required this.permissions,
     required this.descriptors,
+    this.handle = 0,
   });
 }
 
@@ -708,14 +693,14 @@ class PlatformReadRequest {
   final String centralId;
   final String characteristicUuid;
   final int offset;
-  final int? characteristicHandle;
+  final int characteristicHandle;
 
   const PlatformReadRequest({
     required this.requestId,
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 }
 
@@ -728,7 +713,7 @@ class PlatformWriteRequest {
   final Uint8List value;
   final int offset;
   final bool responseNeeded;
-  final int? characteristicHandle;
+  final int characteristicHandle;
 
   const PlatformWriteRequest({
     required this.requestId,
@@ -737,7 +722,7 @@ class PlatformWriteRequest {
     required this.value,
     required this.offset,
     required this.responseNeeded,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 }
 

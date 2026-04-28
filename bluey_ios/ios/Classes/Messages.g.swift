@@ -455,13 +455,13 @@ struct CharacteristicPropertiesDto: Hashable {
 /// Generated class from Pigeon that represents data sent in messages.
 struct DescriptorDto: Hashable {
   var uuid: String
-  var handle: Int64? = nil
+  var handle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> DescriptorDto? {
     let uuid = pigeonVar_list[0] as! String
-    let handle: Int64? = nilOrValue(pigeonVar_list[1])
+    let handle = pigeonVar_list[1] as! Int64
 
     return DescriptorDto(
       uuid: uuid,
@@ -495,7 +495,7 @@ struct CharacteristicDto: Hashable {
   var uuid: String
   var properties: CharacteristicPropertiesDto
   var descriptors: [DescriptorDto]
-  var handle: Int64? = nil
+  var handle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -503,7 +503,7 @@ struct CharacteristicDto: Hashable {
     let uuid = pigeonVar_list[0] as! String
     let properties = pigeonVar_list[1] as! CharacteristicPropertiesDto
     let descriptors = pigeonVar_list[2] as! [DescriptorDto]
-    let handle: Int64? = nilOrValue(pigeonVar_list[3])
+    let handle = pigeonVar_list[3] as! Int64
 
     return CharacteristicDto(
       uuid: uuid,
@@ -672,6 +672,7 @@ struct LocalDescriptorDto: Hashable {
   var uuid: String
   var permissions: [GattPermissionDto]
   var value: FlutterStandardTypedData? = nil
+  var handle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -679,11 +680,13 @@ struct LocalDescriptorDto: Hashable {
     let uuid = pigeonVar_list[0] as! String
     let permissions = pigeonVar_list[1] as! [GattPermissionDto]
     let value: FlutterStandardTypedData? = nilOrValue(pigeonVar_list[2])
+    let handle = pigeonVar_list[3] as! Int64
 
     return LocalDescriptorDto(
       uuid: uuid,
       permissions: permissions,
-      value: value
+      value: value,
+      handle: handle
     )
   }
   func toList() -> [Any?] {
@@ -691,13 +694,14 @@ struct LocalDescriptorDto: Hashable {
       uuid,
       permissions,
       value,
+      handle,
     ]
   }
   static func == (lhs: LocalDescriptorDto, rhs: LocalDescriptorDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.permissions, rhs.permissions) && deepEqualsMessages(lhs.value, rhs.value)
+    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.permissions, rhs.permissions) && deepEqualsMessages(lhs.value, rhs.value) && deepEqualsMessages(lhs.handle, rhs.handle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -705,6 +709,7 @@ struct LocalDescriptorDto: Hashable {
     deepHashMessages(value: uuid, hasher: &hasher)
     deepHashMessages(value: permissions, hasher: &hasher)
     deepHashMessages(value: value, hasher: &hasher)
+    deepHashMessages(value: handle, hasher: &hasher)
   }
 }
 
@@ -716,6 +721,7 @@ struct LocalCharacteristicDto: Hashable {
   var properties: CharacteristicPropertiesDto
   var permissions: [GattPermissionDto]
   var descriptors: [LocalDescriptorDto]
+  var handle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -724,12 +730,14 @@ struct LocalCharacteristicDto: Hashable {
     let properties = pigeonVar_list[1] as! CharacteristicPropertiesDto
     let permissions = pigeonVar_list[2] as! [GattPermissionDto]
     let descriptors = pigeonVar_list[3] as! [LocalDescriptorDto]
+    let handle = pigeonVar_list[4] as! Int64
 
     return LocalCharacteristicDto(
       uuid: uuid,
       properties: properties,
       permissions: permissions,
-      descriptors: descriptors
+      descriptors: descriptors,
+      handle: handle
     )
   }
   func toList() -> [Any?] {
@@ -738,13 +746,14 @@ struct LocalCharacteristicDto: Hashable {
       properties,
       permissions,
       descriptors,
+      handle,
     ]
   }
   static func == (lhs: LocalCharacteristicDto, rhs: LocalCharacteristicDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.properties, rhs.properties) && deepEqualsMessages(lhs.permissions, rhs.permissions) && deepEqualsMessages(lhs.descriptors, rhs.descriptors)
+    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.properties, rhs.properties) && deepEqualsMessages(lhs.permissions, rhs.permissions) && deepEqualsMessages(lhs.descriptors, rhs.descriptors) && deepEqualsMessages(lhs.handle, rhs.handle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -753,6 +762,7 @@ struct LocalCharacteristicDto: Hashable {
     deepHashMessages(value: properties, hasher: &hasher)
     deepHashMessages(value: permissions, hasher: &hasher)
     deepHashMessages(value: descriptors, hasher: &hasher)
+    deepHashMessages(value: handle, hasher: &hasher)
   }
 }
 
@@ -905,7 +915,7 @@ struct ReadRequestDto: Hashable {
   var centralId: String
   var characteristicUuid: String
   var offset: Int64
-  var characteristicHandle: Int64? = nil
+  var characteristicHandle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -914,7 +924,7 @@ struct ReadRequestDto: Hashable {
     let centralId = pigeonVar_list[1] as! String
     let characteristicUuid = pigeonVar_list[2] as! String
     let offset = pigeonVar_list[3] as! Int64
-    let characteristicHandle: Int64? = nilOrValue(pigeonVar_list[4])
+    let characteristicHandle = pigeonVar_list[4] as! Int64
 
     return ReadRequestDto(
       requestId: requestId,
@@ -960,7 +970,7 @@ struct WriteRequestDto: Hashable {
   var value: FlutterStandardTypedData
   var offset: Int64
   var responseNeeded: Bool
-  var characteristicHandle: Int64? = nil
+  var characteristicHandle: Int64
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -971,7 +981,7 @@ struct WriteRequestDto: Hashable {
     let value = pigeonVar_list[3] as! FlutterStandardTypedData
     let offset = pigeonVar_list[4] as! Int64
     let responseNeeded = pigeonVar_list[5] as! Bool
-    let characteristicHandle: Int64? = nilOrValue(pigeonVar_list[6])
+    let characteristicHandle = pigeonVar_list[6] as! Int64
 
     return WriteRequestDto(
       requestId: requestId,
@@ -1260,47 +1270,36 @@ protocol BlueyHostApi {
   func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void)
   /// Discover services on a connected device.
   func discoverServices(deviceId: String, completion: @escaping (Result<[ServiceDto], Error>) -> Void)
-  /// Read a characteristic value.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// characteristic. Native receivers prefer it when non-null; otherwise
-  /// they fall back to UUID-keyed lookup. Nullable during the additive
-  /// interim (D.8); D.13 makes it required and drops the UUID arg.
-  func readCharacteristic(deviceId: String, characteristicUuid: String, characteristicHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
-  /// Write a characteristic value.
-  func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
-  /// Enable or disable notifications for a characteristic.
-  func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
-  /// Read a descriptor value.
-  ///
-  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
-  /// handles for the owning characteristic and the descriptor itself.
-  /// Native receivers prefer them when non-null; otherwise they fall
-  /// back to UUID-keyed lookup. Nullable during the additive interim.
-  func readDescriptor(deviceId: String, descriptorUuid: String, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
-  /// Write a descriptor value.
-  func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Read a characteristic value by platform-minted handle.
+  func readCharacteristic(deviceId: String, characteristicHandle: Int64, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
+  /// Write a characteristic value by platform-minted handle.
+  func writeCharacteristic(deviceId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Enable or disable notifications for a characteristic by handle.
+  func setNotification(deviceId: String, characteristicHandle: Int64, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Read a descriptor value by platform-minted handle.
+  func readDescriptor(deviceId: String, characteristicHandle: Int64, descriptorHandle: Int64, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
+  /// Write a descriptor value by platform-minted handle.
+  func writeDescriptor(deviceId: String, characteristicHandle: Int64, descriptorHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void)
   /// Get the maximum write length for a characteristic.
   /// iOS automatically negotiates MTU, so this returns the current negotiated value.
   func getMaximumWriteLength(deviceId: String, withResponse: Bool) throws -> Int64
   /// Read the current RSSI for a connected device.
   func readRssi(deviceId: String, completion: @escaping (Result<Int64, Error>) -> Void)
-  /// Add a service to the GATT server.
-  func addService(service: LocalServiceDto, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Add a service to the GATT server. Returns the service with all
+  /// characteristic and descriptor handles populated.
+  func addService(service: LocalServiceDto, completion: @escaping (Result<LocalServiceDto, Error>) -> Void)
   /// Remove a service from the GATT server.
   func removeService(serviceUuid: String, completion: @escaping (Result<Void, Error>) -> Void)
   /// Start advertising.
   func startAdvertising(config: AdvertiseConfigDto, completion: @escaping (Result<Void, Error>) -> Void)
   /// Stop advertising.
   func stopAdvertising(completion: @escaping (Result<Void, Error>) -> Void)
-  /// Send a notification to all subscribed centrals.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// local characteristic. Native receivers prefer it when non-null;
-  /// otherwise they fall back to UUID-keyed lookup.
-  func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
-  /// Send a notification to a specific central.
-  func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Send a notification to all subscribed centrals, addressed by the
+  /// platform-minted handle of a local characteristic.
+  func notifyCharacteristic(characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Send a notification to a specific central, addressed by the
+  /// platform-minted handle of a local characteristic.
+  func notifyCharacteristicTo(centralId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void)
   /// Respond to a read request.
   func respondToReadRequest(requestId: Int64, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, Error>) -> Void)
   /// Respond to a write request.
@@ -1474,20 +1473,14 @@ class BlueyHostApiSetup {
     } else {
       discoverServicesChannel.setMessageHandler(nil)
     }
-    /// Read a characteristic value.
-    ///
-    /// [characteristicHandle] is the platform-minted handle for the
-    /// characteristic. Native receivers prefer it when non-null; otherwise
-    /// they fall back to UUID-keyed lookup. Nullable during the additive
-    /// interim (D.8); D.13 makes it required and drops the UUID arg.
+    /// Read a characteristic value by platform-minted handle.
     let readCharacteristicChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.readCharacteristic\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       readCharacteristicChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let deviceIdArg = args[0] as! String
-        let characteristicUuidArg = args[1] as! String
-        let characteristicHandleArg: Int64? = nilOrValue(args[2])
-        api.readCharacteristic(deviceId: deviceIdArg, characteristicUuid: characteristicUuidArg, characteristicHandle: characteristicHandleArg) { result in
+        let characteristicHandleArg = args[1] as! Int64
+        api.readCharacteristic(deviceId: deviceIdArg, characteristicHandle: characteristicHandleArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -1499,17 +1492,16 @@ class BlueyHostApiSetup {
     } else {
       readCharacteristicChannel.setMessageHandler(nil)
     }
-    /// Write a characteristic value.
+    /// Write a characteristic value by platform-minted handle.
     let writeCharacteristicChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.writeCharacteristic\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       writeCharacteristicChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let deviceIdArg = args[0] as! String
-        let characteristicUuidArg = args[1] as! String
+        let characteristicHandleArg = args[1] as! Int64
         let valueArg = args[2] as! FlutterStandardTypedData
         let withResponseArg = args[3] as! Bool
-        let characteristicHandleArg: Int64? = nilOrValue(args[4])
-        api.writeCharacteristic(deviceId: deviceIdArg, characteristicUuid: characteristicUuidArg, value: valueArg, withResponse: withResponseArg, characteristicHandle: characteristicHandleArg) { result in
+        api.writeCharacteristic(deviceId: deviceIdArg, characteristicHandle: characteristicHandleArg, value: valueArg, withResponse: withResponseArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))
@@ -1521,16 +1513,15 @@ class BlueyHostApiSetup {
     } else {
       writeCharacteristicChannel.setMessageHandler(nil)
     }
-    /// Enable or disable notifications for a characteristic.
+    /// Enable or disable notifications for a characteristic by handle.
     let setNotificationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.setNotification\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setNotificationChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let deviceIdArg = args[0] as! String
-        let characteristicUuidArg = args[1] as! String
+        let characteristicHandleArg = args[1] as! Int64
         let enableArg = args[2] as! Bool
-        let characteristicHandleArg: Int64? = nilOrValue(args[3])
-        api.setNotification(deviceId: deviceIdArg, characteristicUuid: characteristicUuidArg, enable: enableArg, characteristicHandle: characteristicHandleArg) { result in
+        api.setNotification(deviceId: deviceIdArg, characteristicHandle: characteristicHandleArg, enable: enableArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))
@@ -1542,21 +1533,15 @@ class BlueyHostApiSetup {
     } else {
       setNotificationChannel.setMessageHandler(nil)
     }
-    /// Read a descriptor value.
-    ///
-    /// [characteristicHandle] / [descriptorHandle] are the platform-minted
-    /// handles for the owning characteristic and the descriptor itself.
-    /// Native receivers prefer them when non-null; otherwise they fall
-    /// back to UUID-keyed lookup. Nullable during the additive interim.
+    /// Read a descriptor value by platform-minted handle.
     let readDescriptorChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.readDescriptor\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       readDescriptorChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let deviceIdArg = args[0] as! String
-        let descriptorUuidArg = args[1] as! String
-        let characteristicHandleArg: Int64? = nilOrValue(args[2])
-        let descriptorHandleArg: Int64? = nilOrValue(args[3])
-        api.readDescriptor(deviceId: deviceIdArg, descriptorUuid: descriptorUuidArg, characteristicHandle: characteristicHandleArg, descriptorHandle: descriptorHandleArg) { result in
+        let characteristicHandleArg = args[1] as! Int64
+        let descriptorHandleArg = args[2] as! Int64
+        api.readDescriptor(deviceId: deviceIdArg, characteristicHandle: characteristicHandleArg, descriptorHandle: descriptorHandleArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -1568,17 +1553,16 @@ class BlueyHostApiSetup {
     } else {
       readDescriptorChannel.setMessageHandler(nil)
     }
-    /// Write a descriptor value.
+    /// Write a descriptor value by platform-minted handle.
     let writeDescriptorChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.writeDescriptor\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       writeDescriptorChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let deviceIdArg = args[0] as! String
-        let descriptorUuidArg = args[1] as! String
-        let valueArg = args[2] as! FlutterStandardTypedData
-        let characteristicHandleArg: Int64? = nilOrValue(args[3])
-        let descriptorHandleArg: Int64? = nilOrValue(args[4])
-        api.writeDescriptor(deviceId: deviceIdArg, descriptorUuid: descriptorUuidArg, value: valueArg, characteristicHandle: characteristicHandleArg, descriptorHandle: descriptorHandleArg) { result in
+        let characteristicHandleArg = args[1] as! Int64
+        let descriptorHandleArg = args[2] as! Int64
+        let valueArg = args[3] as! FlutterStandardTypedData
+        api.writeDescriptor(deviceId: deviceIdArg, characteristicHandle: characteristicHandleArg, descriptorHandle: descriptorHandleArg, value: valueArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))
@@ -1626,7 +1610,8 @@ class BlueyHostApiSetup {
     } else {
       readRssiChannel.setMessageHandler(nil)
     }
-    /// Add a service to the GATT server.
+    /// Add a service to the GATT server. Returns the service with all
+    /// characteristic and descriptor handles populated.
     let addServiceChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.addService\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       addServiceChannel.setMessageHandler { message, reply in
@@ -1634,8 +1619,8 @@ class BlueyHostApiSetup {
         let serviceArg = args[0] as! LocalServiceDto
         api.addService(service: serviceArg) { result in
           switch result {
-          case .success:
-            reply(wrapResult(nil))
+          case .success(let res):
+            reply(wrapResult(res))
           case .failure(let error):
             reply(wrapError(error))
           }
@@ -1696,19 +1681,15 @@ class BlueyHostApiSetup {
     } else {
       stopAdvertisingChannel.setMessageHandler(nil)
     }
-    /// Send a notification to all subscribed centrals.
-    ///
-    /// [characteristicHandle] is the platform-minted handle for the
-    /// local characteristic. Native receivers prefer it when non-null;
-    /// otherwise they fall back to UUID-keyed lookup.
+    /// Send a notification to all subscribed centrals, addressed by the
+    /// platform-minted handle of a local characteristic.
     let notifyCharacteristicChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.notifyCharacteristic\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       notifyCharacteristicChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
-        let characteristicUuidArg = args[0] as! String
+        let characteristicHandleArg = args[0] as! Int64
         let valueArg = args[1] as! FlutterStandardTypedData
-        let characteristicHandleArg: Int64? = nilOrValue(args[2])
-        api.notifyCharacteristic(characteristicUuid: characteristicUuidArg, value: valueArg, characteristicHandle: characteristicHandleArg) { result in
+        api.notifyCharacteristic(characteristicHandle: characteristicHandleArg, value: valueArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))
@@ -1720,16 +1701,16 @@ class BlueyHostApiSetup {
     } else {
       notifyCharacteristicChannel.setMessageHandler(nil)
     }
-    /// Send a notification to a specific central.
+    /// Send a notification to a specific central, addressed by the
+    /// platform-minted handle of a local characteristic.
     let notifyCharacteristicToChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.notifyCharacteristicTo\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       notifyCharacteristicToChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let centralIdArg = args[0] as! String
-        let characteristicUuidArg = args[1] as! String
+        let characteristicHandleArg = args[1] as! Int64
         let valueArg = args[2] as! FlutterStandardTypedData
-        let characteristicHandleArg: Int64? = nilOrValue(args[3])
-        api.notifyCharacteristicTo(centralId: centralIdArg, characteristicUuid: characteristicUuidArg, value: valueArg, characteristicHandle: characteristicHandleArg) { result in
+        api.notifyCharacteristicTo(centralId: centralIdArg, characteristicHandle: characteristicHandleArg, value: valueArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))

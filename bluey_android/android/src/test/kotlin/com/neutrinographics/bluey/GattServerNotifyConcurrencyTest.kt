@@ -110,7 +110,7 @@ class GattServerNotifyConcurrencyTest {
                 characteristics = emptyList(),
                 includedServices = emptyList(),
             ),
-        ) {}
+        ) { _ -> }
         assertNotNull("setUp must capture the BluetoothGattServerCallback", capturedCallback)
     }
 
@@ -163,8 +163,10 @@ class GattServerNotifyConcurrencyTest {
     }
 
     /**
-     * Wires `mockBluetoothGattServer.services` so `findCharacteristic`
-     * returns a usable [BluetoothGattCharacteristic] for [testCharUuid].
+     * Wires `mockBluetoothGattServer.services` so it surfaces a single
+     * characteristic, and reflectively registers that char in the
+     * GattServer's `characteristicByHandle` table under [testCharHandle]
+     * so [GattServer.notifyCharacteristic]'s handle lookup succeeds.
      */
     private fun mockCharacteristicOnServer(): BluetoothGattCharacteristic {
         val char = mockk<BluetoothGattCharacteristic>(relaxed = true)
@@ -173,8 +175,17 @@ class GattServerNotifyConcurrencyTest {
         every { service.uuid } returns JavaUUID.fromString(testServiceUuid)
         every { service.characteristics } returns listOf(char)
         every { mockBluetoothGattServer.services } returns listOf(service)
+        // I088 D.13 — inject into the local handle table so notify can
+        // resolve testCharHandle -> char without a full addService roundtrip.
+        val field = GattServer::class.java.getDeclaredField("characteristicByHandle")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val table = field.get(gattServer) as MutableMap<Long, BluetoothGattCharacteristic>
+        table[testCharHandle] = char
         return char
     }
+
+    private val testCharHandle: Long = 1L
 
     private fun connectCentral(deviceId: String): BluetoothDevice {
         val device = mockk<BluetoothDevice>(relaxed = true)
@@ -220,9 +231,8 @@ class GattServerNotifyConcurrencyTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid,
+            testCharHandle,
             byteArrayOf(0x01),
-            null,
         ) { notifyResult = it }
 
         // Under I012, notify waits for onNotificationSent per central.
@@ -251,32 +261,29 @@ class GattServerNotifyConcurrencyTest {
     }
 
     @Test
-    fun `I086 removeService followed by notifyCharacteristic returns CharacteristicNotFound`() {
-        // After removeService, the characteristic is gone from the server.
-        // findCharacteristic walks server.services; with the service removed,
-        // the lookup returns null and the public op surfaces a typed error
-        // rather than crashing. (The defensive-snapshot fix from I082
-        // additionally protects fanout if removal lands mid-iteration.)
+    fun `I086 removeService followed by notifyCharacteristic returns HandleInvalidated`() {
+        // After removeService, the local handle table no longer
+        // resolves the characteristic's handle (D.13). The public op
+        // surfaces a typed HandleInvalidated rather than crashing.
         addSubscriptionDirect(testCharUuid, central1)
         connectCentral(central1)
 
-        // Server has no services after the conceptual removeService.
+        // No mock characteristic registered → handle table is empty.
         every { mockBluetoothGattServer.services } returns emptyList()
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid,
+            testCharHandle,
             byteArrayOf(0x01),
-            null,
         ) { notifyResult = it }
 
         assertNotNull(notifyResult)
         assertTrue(notifyResult!!.isFailure)
         val err = notifyResult!!.exceptionOrNull()
         assertTrue(
-            "expected BlueyAndroidError.CharacteristicNotFound, got " +
+            "expected BlueyAndroidError.HandleInvalidated, got " +
             "${err?.javaClass?.simpleName}: $err",
-            err is BlueyAndroidError.CharacteristicNotFound,
+            err is BlueyAndroidError.HandleInvalidated,
         )
     }
 
@@ -289,9 +296,8 @@ class GattServerNotifyConcurrencyTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid,
+            testCharHandle,
             byteArrayOf(0x01),
-            null,
         ) { notifyResult = it }
 
         assertNotNull(notifyResult)

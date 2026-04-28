@@ -70,10 +70,12 @@ class AndroidServer {
 
   // === Service Management ===
 
-  /// Adds a GATT service to the server.
-  Future<void> addService(PlatformLocalService service) async {
+  /// Adds a GATT service to the server. Returns the service with all
+  /// characteristic and descriptor handles populated by the platform.
+  Future<PlatformLocalService> addService(PlatformLocalService service) async {
     final dto = _mapLocalServiceToDto(service);
-    await _hostApi.addService(dto);
+    final populated = await _hostApi.addService(dto);
+    return _mapLocalServiceFromDto(populated);
   }
 
   /// Removes a GATT service from the server.
@@ -105,29 +107,22 @@ class AndroidServer {
 
   /// Sends a notification to all connected centrals.
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
-    await _hostApi.notifyCharacteristic(
-      characteristicUuid,
-      value,
-      characteristicHandle,
-    );
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    await _hostApi.notifyCharacteristic(characteristicHandle, value);
   }
 
   /// Sends a notification to a specific central.
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     await _hostApi.notifyCharacteristicTo(
       centralId,
-      characteristicUuid,
-      value,
       characteristicHandle,
+      value,
     );
   }
 
@@ -136,15 +131,10 @@ class AndroidServer {
   /// Android uses the same API for notifications and indications.
   /// The characteristic's properties determine which is used.
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
-    await _hostApi.notifyCharacteristic(
-      characteristicUuid,
-      value,
-      characteristicHandle,
-    );
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    await _hostApi.notifyCharacteristic(characteristicHandle, value);
   }
 
   /// Sends an indication to a specific central.
@@ -153,15 +143,13 @@ class AndroidServer {
   /// The characteristic's properties determine which is used.
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     await _hostApi.notifyCharacteristicTo(
       centralId,
-      characteristicUuid,
-      value,
       characteristicHandle,
+      value,
     );
   }
 
@@ -281,6 +269,7 @@ class AndroidServer {
           characteristic.permissions.map(_mapGattPermissionToDto).toList(),
       descriptors:
           characteristic.descriptors.map(_mapLocalDescriptorToDto).toList(),
+      handle: characteristic.handle,
     );
   }
 
@@ -291,7 +280,59 @@ class AndroidServer {
       uuid: descriptor.uuid,
       permissions: descriptor.permissions.map(_mapGattPermissionToDto).toList(),
       value: descriptor.value,
+      handle: descriptor.handle,
     );
+  }
+
+  PlatformLocalService _mapLocalServiceFromDto(LocalServiceDto dto) {
+    return PlatformLocalService(
+      uuid: dto.uuid,
+      isPrimary: dto.isPrimary,
+      characteristics:
+          dto.characteristics.map(_mapLocalCharacteristicFromDto).toList(),
+      includedServices:
+          dto.includedServices.map(_mapLocalServiceFromDto).toList(),
+    );
+  }
+
+  PlatformLocalCharacteristic _mapLocalCharacteristicFromDto(
+    LocalCharacteristicDto dto,
+  ) {
+    return PlatformLocalCharacteristic(
+      uuid: dto.uuid,
+      properties: PlatformCharacteristicProperties(
+        canRead: dto.properties.canRead,
+        canWrite: dto.properties.canWrite,
+        canWriteWithoutResponse: dto.properties.canWriteWithoutResponse,
+        canNotify: dto.properties.canNotify,
+        canIndicate: dto.properties.canIndicate,
+      ),
+      permissions: dto.permissions.map(_mapGattPermissionFromDto).toList(),
+      descriptors: dto.descriptors.map(_mapLocalDescriptorFromDto).toList(),
+      handle: dto.handle,
+    );
+  }
+
+  PlatformLocalDescriptor _mapLocalDescriptorFromDto(LocalDescriptorDto dto) {
+    return PlatformLocalDescriptor(
+      uuid: dto.uuid,
+      permissions: dto.permissions.map(_mapGattPermissionFromDto).toList(),
+      value: dto.value,
+      handle: dto.handle,
+    );
+  }
+
+  PlatformGattPermission _mapGattPermissionFromDto(GattPermissionDto dto) {
+    switch (dto) {
+      case GattPermissionDto.read:
+        return PlatformGattPermission.read;
+      case GattPermissionDto.readEncrypted:
+        return PlatformGattPermission.readEncrypted;
+      case GattPermissionDto.write:
+        return PlatformGattPermission.write;
+      case GattPermissionDto.writeEncrypted:
+        return PlatformGattPermission.writeEncrypted;
+    }
   }
 
   GattPermissionDto _mapGattPermissionToDto(PlatformGattPermission permission) {

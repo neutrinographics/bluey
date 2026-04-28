@@ -138,95 +138,78 @@ class AndroidConnectionManager {
     });
   }
 
-  /// Reads a characteristic value from the connected device.
+  /// Reads a characteristic value from the connected device by handle.
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+  ) async {
     return _translateGattPlatformError(
       'readCharacteristic',
-      () => _hostApi.readCharacteristic(
-        deviceId,
-        characteristicUuid,
-        characteristicHandle,
-      ),
+      () => _hostApi.readCharacteristic(deviceId, characteristicHandle),
     );
   }
 
-  /// Writes a characteristic value on the connected device.
+  /// Writes a characteristic value on the connected device by handle.
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) async {
+    bool withResponse,
+  ) async {
     return _translateGattPlatformError(
       'writeCharacteristic',
       () => _hostApi.writeCharacteristic(
         deviceId,
-        characteristicUuid,
+        characteristicHandle,
         value,
         withResponse,
-        characteristicHandle,
       ),
     );
   }
 
-  /// Enables or disables notifications for a characteristic.
+  /// Enables or disables notifications for a characteristic by handle.
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    bool enable,
+  ) async {
     // Wrapped defensively for Phase 2 — no Android timeout for setNotification today.
     return _translateGattPlatformError(
       'setNotification',
-      () => _hostApi.setNotification(
-        deviceId,
-        characteristicUuid,
-        enable,
-        characteristicHandle,
-      ),
+      () => _hostApi.setNotification(deviceId, characteristicHandle, enable),
     );
   }
 
-  /// Reads a descriptor value from the connected device.
+  /// Reads a descriptor value from the connected device by handle.
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async {
     return _translateGattPlatformError(
       'readDescriptor',
       () => _hostApi.readDescriptor(
         deviceId,
-        descriptorUuid,
         characteristicHandle,
         descriptorHandle,
       ),
     );
   }
 
-  /// Writes a descriptor value on the connected device.
+  /// Writes a descriptor value on the connected device by handle.
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {
     return _translateGattPlatformError(
       'writeDescriptor',
       () => _hostApi.writeDescriptor(
         deviceId,
-        descriptorUuid,
-        value,
         characteristicHandle,
         descriptorHandle,
+        value,
       ),
     );
   }

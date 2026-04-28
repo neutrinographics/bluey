@@ -210,26 +210,23 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) async => Uint8List(0);
+    int characteristicHandle,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) async {}
+    bool withResponse,
+  ) async {}
 
   @override
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    bool enable,
+  ) async {}
 
   @override
   Stream<platform.PlatformNotification> notificationStream(String deviceId) =>
@@ -238,19 +235,17 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async => Uint8List(0);
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {}
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async => mtu;
@@ -312,7 +307,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   // Server (Peripheral) operations - stub implementations
   @override
-  Future<void> addService(platform.PlatformLocalService service) async {}
+  Future<platform.PlatformLocalService> addService(platform.PlatformLocalService service) async => service;
 
   @override
   Future<void> removeService(String serviceUuid) async {}
@@ -327,33 +322,29 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   @override

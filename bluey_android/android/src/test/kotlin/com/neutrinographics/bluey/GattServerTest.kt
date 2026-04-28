@@ -229,8 +229,8 @@ class GattServerTest {
             includedServices = emptyList(),
         )
 
-        var result1: Result<Unit>? = null
-        var result2: Result<Unit>? = null
+        var result1: Result<LocalServiceDto>? = null
+        var result2: Result<LocalServiceDto>? = null
         gattServer.addService(service1) { result1 = it }
         gattServer.addService(service2) { result2 = it }
 

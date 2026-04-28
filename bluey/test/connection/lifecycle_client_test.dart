@@ -127,6 +127,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -288,6 +289,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
                 platform.PlatformCharacteristic(
                   uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
@@ -299,6 +301,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -378,6 +381,7 @@ void main() {
                       canIndicate: false,
                     ),
                     descriptors: [],
+                    handle: 0,
                   ),
                 ],
                 includedServices: [],
@@ -1821,7 +1825,8 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
   UUID get uuid => UUID(_pc.uuid);
 
   @override
-  AttributeHandle get handle => AttributeHandle(_pc.handle ?? 1);
+  AttributeHandle get handle =>
+      AttributeHandle(_pc.handle != 0 ? _pc.handle : 1);
 
   @override
   CharacteristicProperties get properties => CharacteristicProperties(
@@ -1834,12 +1839,12 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
 
   @override
   Future<Uint8List> read() =>
-      _fakePlatform.readCharacteristic(_connectionId, _pc.uuid);
+      _fakePlatform.readCharacteristic(_connectionId, handle.value);
 
   @override
   Future<void> write(Uint8List value, {bool withResponse = true}) =>
       _fakePlatform.writeCharacteristic(
-          _connectionId, _pc.uuid, value, withResponse);
+          _connectionId, handle.value, value, withResponse);
 
   @override
   Stream<Uint8List> get notifications => const Stream.empty();

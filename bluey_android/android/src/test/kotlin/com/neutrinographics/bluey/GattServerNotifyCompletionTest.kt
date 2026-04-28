@@ -178,6 +178,14 @@ class GattServerNotifyCompletionTest {
         every { service.uuid } returns JavaUUID.fromString(testServiceUuid)
         every { service.characteristics } returns listOf(char)
         every { mockBluetoothGattServer.services } returns listOf(service)
+        // I088 D.13 — register the char under handle 1 so
+        // GattServer.notifyCharacteristic can resolve it without going
+        // through addService.
+        val field = GattServer::class.java.getDeclaredField("characteristicByHandle")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val table = field.get(gattServer) as MutableMap<Long, BluetoothGattCharacteristic>
+        table[1L] = char
         return char
     }
 
@@ -199,9 +207,7 @@ class GattServerNotifyCompletionTest {
         mockCharacteristicOnServer()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { notifyResult = it }
 
         // notifyCharacteristicChanged was invoked for both centrals;
         // but onNotificationSent has not yet fired. The Dart-facing
@@ -240,9 +246,7 @@ class GattServerNotifyCompletionTest {
         mockCharacteristicOnServer()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { notifyResult = it }
 
         capturedCallback!!.onNotificationSent(device1, BluetoothGatt.GATT_SUCCESS)
         capturedCallback!!.onNotificationSent(device2, 0x85) // GATT_ERROR
@@ -266,9 +270,7 @@ class GattServerNotifyCompletionTest {
         capturedPostDelayed.clear()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { notifyResult = it }
 
         // A timeout runnable for the per-send window must have been scheduled.
         val timeout = capturedPostDelayed.firstOrNull {
@@ -302,9 +304,7 @@ class GattServerNotifyCompletionTest {
         capturedPostDelayed.clear()
         removedCallbacks.clear()
 
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { /* ignored */ }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { /* ignored */ }
 
         val timeout = capturedPostDelayed.firstOrNull {
             it.second == notificationSendTimeoutMs
@@ -332,12 +332,8 @@ class GattServerNotifyCompletionTest {
 
         var first: Result<Unit>? = null
         var second: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { first = it }
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x02), null,
-        ) { second = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { first = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x02)) { second = it }
 
         // Neither has fired yet.
         assertNull(first)
@@ -362,9 +358,7 @@ class GattServerNotifyCompletionTest {
         mockCharacteristicOnServer()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { notifyResult = it }
         assertNull(notifyResult)
 
         // Central disconnects before onNotificationSent arrives.
@@ -392,9 +386,7 @@ class GattServerNotifyCompletionTest {
         mockCharacteristicOnServer()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristicTo(
-            central1, testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristicTo(central1, 1L, byteArrayOf(0x01)) { notifyResult = it }
 
         verify(exactly = 1) {
             mockBluetoothGattServer.notifyCharacteristicChanged(
@@ -420,9 +412,7 @@ class GattServerNotifyCompletionTest {
         capturedPostDelayed.clear()
 
         var notifyResult: Result<Unit>? = null
-        gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01), null,
-        ) { notifyResult = it }
+        gattServer.notifyCharacteristic(1L, byteArrayOf(0x01)) { notifyResult = it }
 
         assertNotNull(notifyResult)
         assertTrue(notifyResult!!.isSuccess)

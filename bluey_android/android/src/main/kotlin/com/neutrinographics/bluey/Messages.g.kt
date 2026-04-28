@@ -542,13 +542,13 @@ data class CharacteristicPropertiesDto (
  */
 data class DescriptorDto (
   val uuid: String,
-  val handle: Long? = null
+  val handle: Long
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): DescriptorDto {
       val uuid = pigeonVar_list[0] as String
-      val handle = pigeonVar_list[1] as Long?
+      val handle = pigeonVar_list[1] as Long
       return DescriptorDto(uuid, handle)
     }
   }
@@ -586,7 +586,7 @@ data class CharacteristicDto (
   val uuid: String,
   val properties: CharacteristicPropertiesDto,
   val descriptors: List<DescriptorDto>,
-  val handle: Long? = null
+  val handle: Long
 )
  {
   companion object {
@@ -594,7 +594,7 @@ data class CharacteristicDto (
       val uuid = pigeonVar_list[0] as String
       val properties = pigeonVar_list[1] as CharacteristicPropertiesDto
       val descriptors = pigeonVar_list[2] as List<DescriptorDto>
-      val handle = pigeonVar_list[3] as Long?
+      val handle = pigeonVar_list[3] as Long
       return CharacteristicDto(uuid, properties, descriptors, handle)
     }
   }
@@ -773,7 +773,8 @@ data class MtuChangedEventDto (
 data class LocalDescriptorDto (
   val uuid: String,
   val permissions: List<GattPermissionDto>,
-  val value: ByteArray? = null
+  val value: ByteArray? = null,
+  val handle: Long
 )
  {
   companion object {
@@ -781,7 +782,8 @@ data class LocalDescriptorDto (
       val uuid = pigeonVar_list[0] as String
       val permissions = pigeonVar_list[1] as List<GattPermissionDto>
       val value = pigeonVar_list[2] as ByteArray?
-      return LocalDescriptorDto(uuid, permissions, value)
+      val handle = pigeonVar_list[3] as Long
+      return LocalDescriptorDto(uuid, permissions, value, handle)
     }
   }
   fun toList(): List<Any?> {
@@ -789,6 +791,7 @@ data class LocalDescriptorDto (
       uuid,
       permissions,
       value,
+      handle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -799,7 +802,7 @@ data class LocalDescriptorDto (
       return true
     }
     val other = other as LocalDescriptorDto
-    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.permissions, other.permissions) && MessagesPigeonUtils.deepEquals(this.value, other.value)
+    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.permissions, other.permissions) && MessagesPigeonUtils.deepEquals(this.value, other.value) && MessagesPigeonUtils.deepEquals(this.handle, other.handle)
   }
 
   override fun hashCode(): Int {
@@ -807,6 +810,7 @@ data class LocalDescriptorDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.uuid)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.permissions)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.value)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.handle)
     return result
   }
 }
@@ -820,7 +824,8 @@ data class LocalCharacteristicDto (
   val uuid: String,
   val properties: CharacteristicPropertiesDto,
   val permissions: List<GattPermissionDto>,
-  val descriptors: List<LocalDescriptorDto>
+  val descriptors: List<LocalDescriptorDto>,
+  val handle: Long
 )
  {
   companion object {
@@ -829,7 +834,8 @@ data class LocalCharacteristicDto (
       val properties = pigeonVar_list[1] as CharacteristicPropertiesDto
       val permissions = pigeonVar_list[2] as List<GattPermissionDto>
       val descriptors = pigeonVar_list[3] as List<LocalDescriptorDto>
-      return LocalCharacteristicDto(uuid, properties, permissions, descriptors)
+      val handle = pigeonVar_list[4] as Long
+      return LocalCharacteristicDto(uuid, properties, permissions, descriptors, handle)
     }
   }
   fun toList(): List<Any?> {
@@ -838,6 +844,7 @@ data class LocalCharacteristicDto (
       properties,
       permissions,
       descriptors,
+      handle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -848,7 +855,7 @@ data class LocalCharacteristicDto (
       return true
     }
     val other = other as LocalCharacteristicDto
-    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.properties, other.properties) && MessagesPigeonUtils.deepEquals(this.permissions, other.permissions) && MessagesPigeonUtils.deepEquals(this.descriptors, other.descriptors)
+    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.properties, other.properties) && MessagesPigeonUtils.deepEquals(this.permissions, other.permissions) && MessagesPigeonUtils.deepEquals(this.descriptors, other.descriptors) && MessagesPigeonUtils.deepEquals(this.handle, other.handle)
   }
 
   override fun hashCode(): Int {
@@ -857,6 +864,7 @@ data class LocalCharacteristicDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.properties)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.permissions)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.descriptors)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.handle)
     return result
   }
 }
@@ -1029,7 +1037,7 @@ data class ReadRequestDto (
   val centralId: String,
   val characteristicUuid: String,
   val offset: Long,
-  val characteristicHandle: Long? = null
+  val characteristicHandle: Long
 )
  {
   companion object {
@@ -1038,7 +1046,7 @@ data class ReadRequestDto (
       val centralId = pigeonVar_list[1] as String
       val characteristicUuid = pigeonVar_list[2] as String
       val offset = pigeonVar_list[3] as Long
-      val characteristicHandle = pigeonVar_list[4] as Long?
+      val characteristicHandle = pigeonVar_list[4] as Long
       return ReadRequestDto(requestId, centralId, characteristicUuid, offset, characteristicHandle)
     }
   }
@@ -1085,7 +1093,7 @@ data class WriteRequestDto (
   val value: ByteArray,
   val offset: Long,
   val responseNeeded: Boolean,
-  val characteristicHandle: Long? = null
+  val characteristicHandle: Long
 )
  {
   companion object {
@@ -1096,7 +1104,7 @@ data class WriteRequestDto (
       val value = pigeonVar_list[3] as ByteArray
       val offset = pigeonVar_list[4] as Long
       val responseNeeded = pigeonVar_list[5] as Boolean
-      val characteristicHandle = pigeonVar_list[6] as Long?
+      val characteristicHandle = pigeonVar_list[6] as Long
       return WriteRequestDto(requestId, centralId, characteristicUuid, value, offset, responseNeeded, characteristicHandle)
     }
   }
@@ -1475,30 +1483,16 @@ interface BlueyHostApi {
    * Services are cached after first discovery.
    */
   fun discoverServices(deviceId: String, callback: (Result<List<ServiceDto>>) -> Unit)
-  /**
-   * Read a characteristic value.
-   *
-   * [characteristicHandle] is the platform-minted handle for the
-   * characteristic. Native receivers prefer it when non-null; otherwise
-   * they fall back to UUID-keyed lookup. Nullable during the additive
-   * interim (D.8); D.13 makes it required and drops the UUID arg.
-   */
-  fun readCharacteristic(deviceId: String, characteristicUuid: String, characteristicHandle: Long?, callback: (Result<ByteArray>) -> Unit)
-  /** Write a characteristic value. */
-  fun writeCharacteristic(deviceId: String, characteristicUuid: String, value: ByteArray, withResponse: Boolean, characteristicHandle: Long?, callback: (Result<Unit>) -> Unit)
-  /** Enable or disable notifications for a characteristic. */
-  fun setNotification(deviceId: String, characteristicUuid: String, enable: Boolean, characteristicHandle: Long?, callback: (Result<Unit>) -> Unit)
-  /**
-   * Read a descriptor value.
-   *
-   * [characteristicHandle] / [descriptorHandle] are the platform-minted
-   * handles for the owning characteristic and the descriptor itself.
-   * Native receivers prefer them when non-null; otherwise they fall
-   * back to UUID-keyed lookup. Nullable during the additive interim.
-   */
-  fun readDescriptor(deviceId: String, descriptorUuid: String, characteristicHandle: Long?, descriptorHandle: Long?, callback: (Result<ByteArray>) -> Unit)
-  /** Write a descriptor value. */
-  fun writeDescriptor(deviceId: String, descriptorUuid: String, value: ByteArray, characteristicHandle: Long?, descriptorHandle: Long?, callback: (Result<Unit>) -> Unit)
+  /** Read a characteristic value by platform-minted handle. */
+  fun readCharacteristic(deviceId: String, characteristicHandle: Long, callback: (Result<ByteArray>) -> Unit)
+  /** Write a characteristic value by platform-minted handle. */
+  fun writeCharacteristic(deviceId: String, characteristicHandle: Long, value: ByteArray, withResponse: Boolean, callback: (Result<Unit>) -> Unit)
+  /** Enable or disable notifications for a characteristic by handle. */
+  fun setNotification(deviceId: String, characteristicHandle: Long, enable: Boolean, callback: (Result<Unit>) -> Unit)
+  /** Read a descriptor value by platform-minted handle. */
+  fun readDescriptor(deviceId: String, characteristicHandle: Long, descriptorHandle: Long, callback: (Result<ByteArray>) -> Unit)
+  /** Write a descriptor value by platform-minted handle. */
+  fun writeDescriptor(deviceId: String, characteristicHandle: Long, descriptorHandle: Long, value: ByteArray, callback: (Result<Unit>) -> Unit)
   /**
    * Request a specific MTU.
    * Returns the negotiated MTU.
@@ -1506,8 +1500,11 @@ interface BlueyHostApi {
   fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit)
   /** Read the current RSSI for a connected device. */
   fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit)
-  /** Add a service to the GATT server. */
-  fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit)
+  /**
+   * Add a service to the GATT server. Returns the service with all
+   * characteristic and descriptor handles populated.
+   */
+  fun addService(service: LocalServiceDto, callback: (Result<LocalServiceDto>) -> Unit)
   /** Remove a service from the GATT server. */
   fun removeService(serviceUuid: String, callback: (Result<Unit>) -> Unit)
   /** Start advertising. */
@@ -1515,15 +1512,15 @@ interface BlueyHostApi {
   /** Stop advertising. */
   fun stopAdvertising(callback: (Result<Unit>) -> Unit)
   /**
-   * Send a notification to all subscribed centrals.
-   *
-   * [characteristicHandle] is the platform-minted handle for the
-   * local characteristic. Native receivers prefer it when non-null;
-   * otherwise they fall back to UUID-keyed lookup.
+   * Send a notification to all subscribed centrals, addressed by the
+   * platform-minted handle of a local characteristic.
    */
-  fun notifyCharacteristic(characteristicUuid: String, value: ByteArray, characteristicHandle: Long?, callback: (Result<Unit>) -> Unit)
-  /** Send a notification to a specific central. */
-  fun notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: ByteArray, characteristicHandle: Long?, callback: (Result<Unit>) -> Unit)
+  fun notifyCharacteristic(characteristicHandle: Long, value: ByteArray, callback: (Result<Unit>) -> Unit)
+  /**
+   * Send a notification to a specific central, addressed by the
+   * platform-minted handle of a local characteristic.
+   */
+  fun notifyCharacteristicTo(centralId: String, characteristicHandle: Long, value: ByteArray, callback: (Result<Unit>) -> Unit)
   /** Respond to a read request. */
   fun respondToReadRequest(requestId: Long, status: GattStatusDto, value: ByteArray?, callback: (Result<Unit>) -> Unit)
   /** Respond to a write request. */
@@ -1738,9 +1735,8 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val deviceIdArg = args[0] as String
-            val characteristicUuidArg = args[1] as String
-            val characteristicHandleArg = args[2] as Long?
-            api.readCharacteristic(deviceIdArg, characteristicUuidArg, characteristicHandleArg) { result: Result<ByteArray> ->
+            val characteristicHandleArg = args[1] as Long
+            api.readCharacteristic(deviceIdArg, characteristicHandleArg) { result: Result<ByteArray> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1760,11 +1756,10 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val deviceIdArg = args[0] as String
-            val characteristicUuidArg = args[1] as String
+            val characteristicHandleArg = args[1] as Long
             val valueArg = args[2] as ByteArray
             val withResponseArg = args[3] as Boolean
-            val characteristicHandleArg = args[4] as Long?
-            api.writeCharacteristic(deviceIdArg, characteristicUuidArg, valueArg, withResponseArg, characteristicHandleArg) { result: Result<Unit> ->
+            api.writeCharacteristic(deviceIdArg, characteristicHandleArg, valueArg, withResponseArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1783,10 +1778,9 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val deviceIdArg = args[0] as String
-            val characteristicUuidArg = args[1] as String
+            val characteristicHandleArg = args[1] as Long
             val enableArg = args[2] as Boolean
-            val characteristicHandleArg = args[3] as Long?
-            api.setNotification(deviceIdArg, characteristicUuidArg, enableArg, characteristicHandleArg) { result: Result<Unit> ->
+            api.setNotification(deviceIdArg, characteristicHandleArg, enableArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1805,10 +1799,9 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val deviceIdArg = args[0] as String
-            val descriptorUuidArg = args[1] as String
-            val characteristicHandleArg = args[2] as Long?
-            val descriptorHandleArg = args[3] as Long?
-            api.readDescriptor(deviceIdArg, descriptorUuidArg, characteristicHandleArg, descriptorHandleArg) { result: Result<ByteArray> ->
+            val characteristicHandleArg = args[1] as Long
+            val descriptorHandleArg = args[2] as Long
+            api.readDescriptor(deviceIdArg, characteristicHandleArg, descriptorHandleArg) { result: Result<ByteArray> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1828,11 +1821,10 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val deviceIdArg = args[0] as String
-            val descriptorUuidArg = args[1] as String
-            val valueArg = args[2] as ByteArray
-            val characteristicHandleArg = args[3] as Long?
-            val descriptorHandleArg = args[4] as Long?
-            api.writeDescriptor(deviceIdArg, descriptorUuidArg, valueArg, characteristicHandleArg, descriptorHandleArg) { result: Result<Unit> ->
+            val characteristicHandleArg = args[1] as Long
+            val descriptorHandleArg = args[2] as Long
+            val valueArg = args[3] as ByteArray
+            api.writeDescriptor(deviceIdArg, characteristicHandleArg, descriptorHandleArg, valueArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1892,12 +1884,13 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val serviceArg = args[0] as LocalServiceDto
-            api.addService(serviceArg) { result: Result<Unit> ->
+            api.addService(serviceArg) { result: Result<LocalServiceDto> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
               } else {
-                reply.reply(MessagesPigeonUtils.wrapResult(null))
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
               }
             }
           }
@@ -1965,10 +1958,9 @@ interface BlueyHostApi {
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
-            val characteristicUuidArg = args[0] as String
+            val characteristicHandleArg = args[0] as Long
             val valueArg = args[1] as ByteArray
-            val characteristicHandleArg = args[2] as Long?
-            api.notifyCharacteristic(characteristicUuidArg, valueArg, characteristicHandleArg) { result: Result<Unit> ->
+            api.notifyCharacteristic(characteristicHandleArg, valueArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -1987,10 +1979,9 @@ interface BlueyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val centralIdArg = args[0] as String
-            val characteristicUuidArg = args[1] as String
+            val characteristicHandleArg = args[1] as Long
             val valueArg = args[2] as ByteArray
-            val characteristicHandleArg = args[3] as Long?
-            api.notifyCharacteristicTo(centralIdArg, characteristicUuidArg, valueArg, characteristicHandleArg) { result: Result<Unit> ->
+            api.notifyCharacteristicTo(centralIdArg, characteristicHandleArg, valueArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))

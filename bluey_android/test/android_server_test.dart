@@ -35,7 +35,11 @@ void main() {
   group('AndroidServer', () {
     group('addService', () {
       test('maps PlatformLocalService to DTO correctly', () async {
-        when(() => mockHostApi.addService(any())).thenAnswer((_) async {});
+        // Mock returns the same DTO back (handles populated would be from
+        // the native side; we just round-trip the input here).
+        when(() => mockHostApi.addService(any()))
+            .thenAnswer((invocation) async =>
+                invocation.positionalArguments.first as LocalServiceDto);
 
         final service = PlatformLocalService(
           uuid: '180D',
@@ -172,26 +176,26 @@ void main() {
 
     group('notifyCharacteristic', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristic(any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
-        await server.notifyCharacteristic('2A37', value);
+        await server.notifyCharacteristic(42, value);
 
-        verify(() => mockHostApi.notifyCharacteristic('2A37', value, null)).called(1);
+        verify(() => mockHostApi.notifyCharacteristic(42, value)).called(1);
       });
     });
 
     group('notifyCharacteristicTo', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
-        await server.notifyCharacteristicTo('central-1', '2A37', value);
+        await server.notifyCharacteristicTo('central-1', 42, value);
 
         verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value, null))
+                mockHostApi.notifyCharacteristicTo('central-1', 42, value))
             .called(1);
       });
     });
@@ -199,27 +203,27 @@ void main() {
     group('indicateCharacteristic', () {
       test('calls notifyCharacteristic on hostApi (same underlying call)',
           () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristic(any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x03, 0x04]);
-        await server.indicateCharacteristic('2A37', value);
+        await server.indicateCharacteristic(42, value);
 
-        verify(() => mockHostApi.notifyCharacteristic('2A37', value, null)).called(1);
+        verify(() => mockHostApi.notifyCharacteristic(42, value)).called(1);
       });
     });
 
     group('indicateCharacteristicTo', () {
       test('calls notifyCharacteristicTo on hostApi (same underlying call)',
           () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x03, 0x04]);
-        await server.indicateCharacteristicTo('central-1', '2A37', value);
+        await server.indicateCharacteristicTo('central-1', 42, value);
 
         verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value, null))
+                mockHostApi.notifyCharacteristicTo('central-1', 42, value))
             .called(1);
       });
     });
@@ -370,6 +374,7 @@ void main() {
           centralId: 'central-1',
           characteristicUuid: '2A37',
           offset: 0,
+          characteristicHandle: 42,
         ));
 
         final request = await future;
@@ -393,6 +398,7 @@ void main() {
           value: data,
           offset: 0,
           responseNeeded: true,
+          characteristicHandle: 42,
         ));
 
         final request = await future;

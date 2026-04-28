@@ -94,10 +94,12 @@ extension BlueyError {
                                message: self.errorDescription,
                                details: nil)
         case .handleInvalidated:
-            // Server-side never emits handleInvalidated (the server's
-            // hosted attribute table is owned by us, not by a peer's
-            // Service Changed). Map defensively to bluey-unknown.
-            return PigeonError(code: "bluey-unknown",
+            // I088 D.13 — server-side handle miss now real: e.g. a
+            // notify after removeService. Surface as the typed
+            // gatt-handle-invalidated code so Dart converts it into
+            // AttributeHandleInvalidatedException, same as the client
+            // side.
+            return PigeonError(code: "gatt-handle-invalidated",
                                message: self.errorDescription,
                                details: nil)
         }

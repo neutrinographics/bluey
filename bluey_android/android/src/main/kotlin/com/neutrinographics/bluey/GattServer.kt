@@ -61,7 +61,42 @@ class GattServer(
     // Pre-I080 this was a single slot — parallel addService calls
     // overwrote each other and the first caller's Future never
     // resolved. Now each pending registration has its own slot.
-    private val pendingServiceCallbacks = mutableMapOf<String, (Result<Unit>) -> Unit>()
+    //
+    // The callback receives the populated `LocalServiceDto` (handles
+    // filled in for every characteristic / descriptor) on success.
+    private val pendingServiceCallbacks = mutableMapOf<String, (Result<LocalServiceDto>) -> Unit>()
+
+    /** Populated LocalServiceDto (handles stamped) per pending key. */
+    private val pendingServiceDtos = mutableMapOf<String, LocalServiceDto>()
+
+    // I088 D.13 — handle table for the local server's characteristics.
+    // Module-wide monotonic counter starting at 1 (0 is reserved as
+    // "invalid handle"); minted once per characteristic the first time
+    // [addService] sees it. Cleared per-service on [removeService] and
+    // entirely on [cleanup]. Used by [notifyCharacteristic] /
+    // [notifyCharacteristicTo] to address local characteristics; the
+    // CCCD-write path that surfaces ReadRequestDto / WriteRequestDto
+    // also reverse-looks-up the handle here so the Dart peer can
+    // dispatch on handle even when multiple characteristics share a
+    // UUID across services.
+    private val characteristicByHandle = mutableMapOf<Long, BluetoothGattCharacteristic>()
+    private var nextLocalHandle: Long = 1
+
+    /** Mints a handle for [characteristic] and stores it. */
+    private fun mintLocalHandle(characteristic: BluetoothGattCharacteristic): Long {
+        val h = nextLocalHandle
+        nextLocalHandle += 1
+        characteristicByHandle[h] = characteristic
+        return h
+    }
+
+    /** Reverse lookup by reference identity. */
+    private fun handleForCharacteristic(c: BluetoothGattCharacteristic): Long? {
+        for ((h, ref) in characteristicByHandle) {
+            if (ref === c) return h
+        }
+        return null
+    }
 
     // Pending per-central notification completions (I012). Android's
     // `onNotificationSent(device, status)` doesn't carry the
@@ -103,7 +138,7 @@ class GattServer(
         this.activity = activity
     }
 
-    fun addService(service: LocalServiceDto, callback: (Result<Unit>) -> Unit) {
+    fun addService(service: LocalServiceDto, callback: (Result<LocalServiceDto>) -> Unit) {
         Log.d("GattServer", "addService: ${service.uuid}")
         if (!hasRequiredPermissions()) {
             Log.d("GattServer", "addService: missing permissions")
@@ -119,18 +154,29 @@ class GattServer(
             return
         }
 
-        val gattService = createGattService(service)
+        val builtChars = mutableListOf<BluetoothGattCharacteristic>()
+        val gattService = createGattService(service, builtChars)
+        // I088 D.13 — mint handles for every newly-built
+        // BluetoothGattCharacteristic in the live Android service tree
+        // and stamp them into a populated LocalServiceDto that we return
+        // to Dart on success. We pass the freshly-collected `builtChars`
+        // list rather than reading `gattService.characteristics` because
+        // the JVM stub used in unit tests doesn't implement getters on
+        // BluetoothGattService.
+        val populated = populateHandles(service, builtChars)
         // Key by the service's *normalized* UUID (lowercase canonical form)
         // so onServiceAdded — which receives a BluetoothGattService whose
         // .uuid.toString() is also lowercase canonical — can match.
         val key = normalizeUuid(service.uuid).lowercase()
         pendingServiceCallbacks[key] = callback
+        pendingServiceDtos[key] = populated
 
         try {
             Log.d("GattServer", "addService: calling server.addService")
             if (!server.addService(gattService)) {
                 Log.d("GattServer", "addService: server.addService returned false")
                 pendingServiceCallbacks.remove(key)
+                pendingServiceDtos.remove(key)
                 callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid)))
             }
             Log.d("GattServer", "addService: server.addService returned true, waiting for onServiceAdded")
@@ -138,8 +184,66 @@ class GattServer(
         } catch (e: SecurityException) {
             Log.e("GattServer", "addService: SecurityException", e)
             pendingServiceCallbacks.remove(key)
+            pendingServiceDtos.remove(key)
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
         }
+    }
+
+    /**
+     * Walks the just-built [gattService] in lock-step with [dto], minting
+     * a handle for every characteristic and a per-characteristic
+     * monotonic descriptor handle (parallel to the central-side scheme).
+     * Returns a populated [LocalServiceDto] with handles stamped in.
+     * The [characteristicByHandle] table is updated as a side-effect so
+     * subsequent [notifyCharacteristic] calls and incoming ATT requests
+     * can resolve handle ↔ BluetoothGattCharacteristic.
+     */
+    private fun populateHandles(
+        dto: LocalServiceDto,
+        builtChars: List<BluetoothGattCharacteristic>,
+    ): LocalServiceDto {
+        val populatedChars = mutableListOf<LocalCharacteristicDto>()
+        // The builtChars list matches createGattService's append order,
+        // so a positional zip is exact. CCCDs auto-added inside the
+        // BluetoothGattCharacteristic itself stay out of the DTO and
+        // out of this list.
+        for ((idx, charDto) in dto.characteristics.withIndex()) {
+            val gattChar = builtChars[idx]
+            val charHandle = mintLocalHandle(gattChar)
+            // Descriptor handles are minted per characteristic from a
+            // local counter starting at 1, mirroring the central-side
+            // scheme. CCCDs auto-added by createGattService aren't in
+            // the DTO so they don't get DTO-side handles (they're never
+            // addressed by Dart).
+            var nextDescHandle = 1L
+            val populatedDescs = charDto.descriptors.map { descDto ->
+                LocalDescriptorDto(
+                    uuid = descDto.uuid,
+                    permissions = descDto.permissions,
+                    value = descDto.value,
+                    handle = nextDescHandle++,
+                )
+            }
+            populatedChars.add(
+                LocalCharacteristicDto(
+                    uuid = charDto.uuid,
+                    properties = charDto.properties,
+                    permissions = charDto.permissions,
+                    descriptors = populatedDescs,
+                    handle = charHandle,
+                ),
+            )
+        }
+        // Included services aren't supported by the test fixtures and
+        // this code path isn't exercised in production yet, so we
+        // forward them unchanged rather than recurse with a fresh
+        // builtChars list.
+        return LocalServiceDto(
+            uuid = dto.uuid,
+            isPrimary = dto.isPrimary,
+            characteristics = populatedChars,
+            includedServices = dto.includedServices,
+        )
     }
 
     fun removeService(serviceUuid: String, callback: (Result<Unit>) -> Unit) {
@@ -153,6 +257,13 @@ class GattServer(
             val uuid = UUID.fromString(normalizeUuid(serviceUuid))
             val service = server.getService(uuid)
             if (service != null) {
+                // I088 D.13 — drop handle entries for the service's
+                // characteristics before removing the service. The
+                // counter does NOT reset (matches the iOS handle store).
+                for (char in service.characteristics ?: emptyList()) {
+                    val h = handleForCharacteristic(char)
+                    if (h != null) characteristicByHandle.remove(h)
+                }
                 server.removeService(service)
             }
             callback(Result.success(Unit))
@@ -164,28 +275,22 @@ class GattServer(
     }
 
     fun notifyCharacteristic(
-        characteristicUuid: String,
+        characteristicHandle: Long,
         value: ByteArray,
-        @Suppress("UNUSED_PARAMETER") characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
-        // I088 (D.8 additive interim) — handle is accepted on the wire
-        // but the server side does not yet mint handles for its own
-        // local services, so the parameter is currently unused. UUID
-        // lookup remains the only path; D.13 + the server-side handle
-        // story will land together.
         val server = gattServer
         if (server == null) {
             callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
             return
         }
 
-        val normalizedUuid = normalizeUuid(characteristicUuid)
-        val characteristic = findCharacteristic(normalizedUuid)
+        val characteristic = characteristicByHandle[characteristicHandle]
         if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
+            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
             return
         }
+        val normalizedUuid = characteristic.uuid.toString().lowercase()
 
         // Defensive snapshot of the subscribed-centrals set. The
         // underlying MutableSet is mutated from binder-thread callbacks
@@ -195,9 +300,9 @@ class GattServer(
         // central disconnects or unsubscribes mid-fanout (I082).
         //
         // Snapshot semantics also make I086 a no-op: a removed service's
-        // characteristic returns null from findCharacteristic above, so
-        // we don't even reach this point — and any mid-fanout removal
-        // affects only the subscription map, not the captured snapshot.
+        // handle is dropped from characteristicByHandle, so we return
+        // early above — any mid-fanout removal affects only the
+        // subscription map, not the captured snapshot.
         val subscribedCentralIds = subscriptions[normalizedUuid]?.toList() ?: emptyList()
         val recipients = subscribedCentralIds.mapNotNull { id ->
             connectedCentrals[id]?.let { id to it }
@@ -261,9 +366,8 @@ class GattServer(
 
     fun notifyCharacteristicTo(
         centralId: String,
-        characteristicUuid: String,
+        characteristicHandle: Long,
         value: ByteArray,
-        @Suppress("UNUSED_PARAMETER") characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         val server = gattServer
@@ -278,10 +382,9 @@ class GattServer(
             return
         }
 
-        val normalizedUuid = normalizeUuid(characteristicUuid)
-        val characteristic = findCharacteristic(normalizedUuid)
+        val characteristic = characteristicByHandle[characteristicHandle]
         if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
+            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
             return
         }
 
@@ -446,6 +549,8 @@ class GattServer(
         pendingReadRequests.clear()
         pendingWriteRequests.clear()
         pendingServiceCallbacks.clear()
+        pendingServiceDtos.clear()
+        characteristicByHandle.clear()
 
         // I012: drain in-flight notifications so callers' Futures don't
         // hang past server teardown. Mirrors the I061 cleanup contract
@@ -623,10 +728,11 @@ class GattServer(
             // canonical form used as the key in addService.
             val key = service.uuid.toString().lowercase()
             val callback = pendingServiceCallbacks.remove(key)
+            val populated = pendingServiceDtos.remove(key)
 
             if (callback != null) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    callback(Result.success(Unit))
+                if (status == BluetoothGatt.GATT_SUCCESS && populated != null) {
+                    callback(Result.success(populated))
                 } else {
                     callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid.toString(), status)))
                 }
@@ -650,16 +756,18 @@ class GattServer(
                 PendingRead(device, requestId, offset)
             )
 
+            // I088 D.13 — reverse-look-up the minted handle from our
+            // local table. Falls back to instanceId for the auto-added
+            // CCCDs / control-service paths that aren't in the DTO yet
+            // — those still surface a stable identifier.
+            val charHandle = handleForCharacteristic(characteristic)
+                ?: characteristic.instanceId.toLong()
             val request = ReadRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
                 characteristicUuid = characteristic.uuid.toString(),
                 offset = offset.toLong(),
-                // I088 — emit the characteristic's instanceId so the Dart
-                // peer can dispatch on handle (UUIDs aren't unique when
-                // the same characteristic UUID is hosted under multiple
-                // services).
-                characteristicHandle = characteristic.instanceId.toLong(),
+                characteristicHandle = charHandle,
             )
             // Must dispatch to main thread for Flutter platform channel.
             handler.post {
@@ -680,6 +788,8 @@ class GattServer(
         ) {
             Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded")
 
+            val charHandle = handleForCharacteristic(characteristic)
+                ?: characteristic.instanceId.toLong()
             val request = WriteRequestDto(
                 requestId = requestId.toLong(),
                 centralId = device.address,
@@ -687,9 +797,7 @@ class GattServer(
                 value = value,
                 offset = offset.toLong(),
                 responseNeeded = responseNeeded,
-                // I088 — emit the characteristic's instanceId; see the
-                // matching comment in onCharacteristicReadRequest.
-                characteristicHandle = characteristic.instanceId.toLong(),
+                characteristicHandle = charHandle,
             )
 
             // Stash only for the "simple write with response" path. The
@@ -837,7 +945,10 @@ class GattServer(
         }
     }
 
-    private fun createGattService(dto: LocalServiceDto): BluetoothGattService {
+    private fun createGattService(
+        dto: LocalServiceDto,
+        outBuiltChars: MutableList<BluetoothGattCharacteristic>? = null,
+    ): BluetoothGattService {
         val serviceType = if (dto.isPrimary) {
             BluetoothGattService.SERVICE_TYPE_PRIMARY
         } else {
@@ -853,6 +964,7 @@ class GattServer(
         for (charDto in dto.characteristics) {
             val characteristic = createGattCharacteristic(charDto)
             service.addCharacteristic(characteristic)
+            outBuiltChars?.add(characteristic)
         }
 
         // Add included services
@@ -926,19 +1038,6 @@ class GattServer(
         dto.value?.let { descriptor.value = it }
 
         return descriptor
-    }
-
-    private fun findCharacteristic(uuid: String): BluetoothGattCharacteristic? {
-        val server = gattServer ?: return null
-
-        for (service in server.services) {
-            for (characteristic in service.characteristics) {
-                if (characteristic.uuid.toString().equals(uuid, ignoreCase = true)) {
-                    return characteristic
-                }
-            }
-        }
-        return null
     }
 
     private fun sendNotification(

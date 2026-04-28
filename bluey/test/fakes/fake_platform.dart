@@ -90,19 +90,124 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       _deviceStates.putIfAbsent(deviceId, () => _DeviceState());
 
   /// Returns the minted handle for [characteristicUuid] on [deviceId],
-  /// or null if no discovery has happened yet (or the characteristic is
-  /// not present in the simulated peripheral). Test-only helper for
-  /// assertions that want to compare against the platform-side handle.
+  /// minting one on the fly if discovery hasn't happened yet. The
+  /// peripheral fixture is consulted to walk the service tree so the
+  /// minted handle stays consistent with what `discoverServices` would
+  /// later emit.
   ///
   /// For duplicate-UUID characteristics this returns the first occurrence
   /// only — tests that need to address a specific instance should obtain
   /// the handle from the discovered services tree instead.
   int? handleFor(String deviceId, String characteristicUuid) {
     final state = _deviceStates[deviceId];
-    if (state == null) return null;
-    final handles = state.charHandlesByUuid[characteristicUuid.toLowerCase()];
-    if (handles == null || handles.isEmpty) return null;
-    return handles.first;
+    if (state != null) {
+      final handles = state.charHandlesByUuid[characteristicUuid.toLowerCase()];
+      if (handles != null && handles.isNotEmpty) return handles.first;
+    }
+    // Pre-discovery: mint handles for the simulated peripheral's
+    // service tree so direct fake calls in tests can address chars
+    // by UUID without first requiring `discoverServices`.
+    final peripheral = _peripherals[deviceId];
+    if (peripheral != null) {
+      final s = _stateFor(deviceId);
+      _withHandlesAll(s, peripheral);
+      final handles = s.charHandlesByUuid[characteristicUuid.toLowerCase()];
+      if (handles != null && handles.isNotEmpty) return handles.first;
+    }
+    return null;
+  }
+
+  /// Eagerly mints handles for every characteristic / descriptor in
+  /// [peripheral]'s service tree by walking it through the same
+  /// minting helpers used by `discoverServices`. Idempotent thanks to
+  /// `putIfAbsent` in `_characteristicWithHandle`.
+  void _withHandlesAll(_DeviceState state, _SimulatedPeripheral peripheral) {
+    for (var sIdx = 0; sIdx < peripheral.services.length; sIdx++) {
+      _withHandles(state, peripheral, peripheral.services[sIdx], '$sIdx');
+    }
+  }
+
+  /// Test-only helper: read by UUID. Resolves [characteristicUuid] to
+  /// its minted handle (minting on demand) and forwards to the
+  /// handle-keyed [readCharacteristic]. Mirrors the legacy convenience
+  /// of the pre-D.13 wire format for integration tests that bypass the
+  /// `Bluey` API surface.
+  Future<Uint8List> readCharacteristicByUuid(
+    String deviceId,
+    String characteristicUuid,
+  ) {
+    final h = handleFor(deviceId, characteristicUuid);
+    if (h == null) {
+      throw StateError('Characteristic not found: $characteristicUuid');
+    }
+    return readCharacteristic(deviceId, h);
+  }
+
+  /// Test-only helper: write by UUID. See [readCharacteristicByUuid].
+  Future<void> writeCharacteristicByUuid(
+    String deviceId,
+    String characteristicUuid,
+    Uint8List value,
+    bool withResponse,
+  ) {
+    final h = handleFor(deviceId, characteristicUuid);
+    if (h == null) {
+      throw StateError('Characteristic not found: $characteristicUuid');
+    }
+    return writeCharacteristic(deviceId, h, value, withResponse);
+  }
+
+  /// Test-only helper: setNotification by UUID. See
+  /// [readCharacteristicByUuid].
+  Future<void> setNotificationByUuid(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+  ) {
+    final h = handleFor(deviceId, characteristicUuid);
+    if (h == null) {
+      throw StateError('Characteristic not found: $characteristicUuid');
+    }
+    return setNotification(deviceId, h, enable);
+  }
+
+  /// Test-only helper: notify by UUID. Resolves the local server-side
+  /// handle minted at addService time.
+  Future<void> notifyCharacteristicByUuid(
+    String characteristicUuid,
+    Uint8List value,
+  ) {
+    final h = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    return notifyCharacteristic(h, value);
+  }
+
+  /// Test-only helper: notifyTo by UUID.
+  Future<void> notifyCharacteristicToByUuid(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) {
+    final h = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    return notifyCharacteristicTo(centralId, h, value);
+  }
+
+  /// Test-only helper: indicate by UUID.
+  Future<void> indicateCharacteristicByUuid(
+    String characteristicUuid,
+    Uint8List value,
+  ) {
+    final h = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    return indicateCharacteristic(h, value);
+  }
+
+  /// Test-only helper: indicateTo by UUID.
+  Future<void> indicateCharacteristicToByUuid(
+    String centralId,
+    String characteristicUuid,
+    Uint8List value,
+  ) {
+    final h = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    return indicateCharacteristicTo(centralId, h, value);
   }
 
   /// Seeds the per-handle backing value for [characteristicHandle] on
@@ -133,6 +238,16 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   PlatformAdvertiseConfig? _advertiseConfig;
   final Map<String, _ConnectedCentral> _connectedCentrals = {};
   int _nextRequestId = 1;
+
+  /// Module-wide counter for handles minted by [addService] (mirrors
+  /// the server-role behaviour on iOS / Android). Starts at 1.
+  int _nextLocalHandle = 1;
+
+  /// Maps a local characteristic UUID to the most-recently-minted
+  /// handle. Lets [notifyCharacteristic] / [notifyCharacteristicTo]
+  /// resolve the handle a real platform would have stamped onto the
+  /// inbound CCCD subscriber's request.
+  final Map<String, int> _localHandleByCharUuid = {};
 
   // === Stream Controllers ===
   final _serviceChangesController = StreamController<String>.broadcast();
@@ -389,6 +504,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
                 canIndicate: false,
               ),
               descriptors: [],
+              handle: 0,
             ),
             PlatformCharacteristic(
               uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
@@ -400,6 +516,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
                 canIndicate: false,
               ),
               descriptors: [],
+              handle: 0,
             ),
             PlatformCharacteristic(
               uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
@@ -411,6 +528,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
                 canIndicate: false,
               ),
               descriptors: [],
+              handle: 0,
             ),
           ],
           includedServices: [],
@@ -461,12 +579,14 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     final completer = Completer<Uint8List>();
     _pendingReadRequests[requestId] = completer;
 
+    final handle = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
     _readRequestController.add(
       PlatformReadRequest(
         requestId: requestId,
         centralId: centralId,
         characteristicUuid: characteristicUuid,
         offset: offset,
+        characteristicHandle: handle,
       ),
     );
 
@@ -489,6 +609,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     final completer = Completer<void>();
     _pendingWriteRequests[requestId] = completer;
 
+    final handle = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
     _writeRequestController.add(
       PlatformWriteRequest(
         requestId: requestId,
@@ -497,6 +618,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
         value: value,
         offset: offset,
         responseNeeded: responseNeeded,
+        characteristicHandle: handle,
       ),
     );
 
@@ -826,36 +948,16 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     _deviceStates.remove(deviceId);
   }
 
-  /// Resolves [characteristicUuid] on [deviceId] to its single minted
-  /// handle, or returns null if discovery has not happened yet or the
-  /// UUID is not present. Throws [StateError] on ambiguity (multiple
-  /// chars with the same UUID) — UUID-only callers cannot disambiguate
-  /// and the production layer (post D.10) throws
-  /// [AmbiguousAttributeException] before reaching the platform anyway.
-  int? _resolveCharHandle(String deviceId, String characteristicUuid) {
-    final state = _deviceStates[deviceId];
-    if (state == null) return null;
-    final handles = state.charHandlesByUuid[characteristicUuid.toLowerCase()];
-    if (handles == null || handles.isEmpty) return null;
-    if (handles.length > 1) {
-      throw StateError(
-        'FakeBlueyPlatform: ambiguous UUID-only lookup for '
-        '$characteristicUuid on $deviceId — ${handles.length} matches. '
-        'Pass characteristicHandle explicitly.',
-      );
-    }
-    return handles.first;
-  }
-
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+  ) async {
     readCharacteristicCalls.add(ReadCharacteristicCall(
       deviceId: deviceId,
-      characteristicUuid: characteristicUuid,
+      characteristicHandle: characteristicHandle,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
     ));
 
     final held = _heldRead;
@@ -894,58 +996,57 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
-    // Resolve the operation to a handle. Production callers (D.7+)
-    // supply a handle directly; the UUID-only fallback exists only so
-    // legacy tests can still address single-occurrence chars by UUID.
-    final state = _deviceStates[deviceId];
-    final handle = characteristicHandle ??
-        _resolveCharHandle(deviceId, characteristicUuid);
-    if (handle != null && state != null) {
-      final value = state.charValuesByHandle[handle];
+    var state = _deviceStates[deviceId];
+    if (state != null) {
+      final value = state.charValuesByHandle[characteristicHandle];
       if (value != null) {
         return value;
       }
     }
-    // Pre-discovery legacy path: a handful of tests call
-    // `readCharacteristic` directly off the fake without first running
-    // `discoverServices`, so no handles have been minted yet. Fall
-    // back to the UUID-keyed seed on `_SimulatedPeripheral`. Once
-    // D.13 lands and the platform interface drops the UUID parameter,
-    // this branch can go.
-    final seed =
-        connection.peripheral.characteristicValues[characteristicUuid] ??
-        connection
-            .peripheral.characteristicValues[characteristicUuid.toLowerCase()];
-    if (seed != null) {
-      return seed;
+    // Pre-discovery: if the test constructed a BlueyRemoteCharacteristic
+    // by hand and called read() before services() ran, mint handles
+    // eagerly from the simulated peripheral's tree so the seeded
+    // characteristic value is reachable. The first encountered char
+    // gets handle 1, matching the typical test fixture.
+    final peripheral = _peripherals[deviceId];
+    if (peripheral != null) {
+      state = _stateFor(deviceId);
+      _withHandlesAll(state, peripheral);
+      final value = state.charValuesByHandle[characteristicHandle];
+      if (value != null) {
+        return value;
+      }
     }
-    throw Exception('Characteristic not found: $characteristicUuid');
+    throw Exception(
+      'Characteristic not found for handle $characteristicHandle on $deviceId',
+    );
   }
 
   @override
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) {
+    bool withResponse,
+  ) {
     if (simulateSyncWriteThrow) {
       simulateSyncWriteThrow = false;
       throw StateError('simulated synchronous writeCharacteristic throw');
     }
     return _writeCharacteristicAsync(
-        deviceId, characteristicUuid, value, withResponse,
-        characteristicHandle: characteristicHandle);
+      deviceId,
+      characteristicHandle,
+      value,
+      withResponse,
+    );
   }
 
   Future<void> _writeCharacteristicAsync(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) async {
+    bool withResponse,
+  ) async {
     final held = _heldWrite;
     if (held != null) {
       _heldWrite = null;
@@ -976,37 +1077,34 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
+    // Pre-discovery: mint handles eagerly so this write lands at the
+    // correct slot when the caller constructed a BlueyRemoteCharacteristic
+    // by hand without going through `services()`.
+    final peripheral = _peripherals[deviceId];
+    if (peripheral != null) {
+      _withHandlesAll(_stateFor(deviceId), peripheral);
+    }
+
     writeCharacteristicCalls.add(WriteCharacteristicCall(
       deviceId: deviceId,
-      characteristicUuid: characteristicUuid,
+      characteristicHandle: characteristicHandle,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
       value: Uint8List.fromList(value),
       withResponse: withResponse,
     ));
 
-    // Resolve to a handle and store there. Handle is the primary key.
-    final state = _stateFor(deviceId);
-    final handle = characteristicHandle ??
-        _resolveCharHandle(deviceId, characteristicUuid);
-    if (handle != null) {
-      state.charValuesByHandle[handle] = Uint8List.fromList(value);
-      return;
-    }
-    // Pre-discovery legacy path: a few integration tests write before
-    // calling `discoverServices`, so no handle has been minted. Mirror
-    // the read-side fallback by writing into the UUID-keyed seed map
-    // on `_SimulatedPeripheral` so a subsequent UUID-only read can
-    // find it. Once D.13 lands, this branch can go.
-    connection.peripheral.characteristicValues[characteristicUuid] =
+    // Handle is the primary key.
+    _stateFor(deviceId).charValuesByHandle[characteristicHandle] =
         Uint8List.fromList(value);
   }
 
   @override
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    bool enable,
+  ) async {
     if (simulateSetNotificationDisconnected) {
       throw const GattOperationDisconnectedException('setNotification');
     }
@@ -1015,10 +1113,14 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
-    if (enable) {
-      connection.subscribedCharacteristics.add(characteristicUuid);
-    } else {
-      connection.subscribedCharacteristics.remove(characteristicUuid);
+    final state = _stateFor(deviceId);
+    final charUuid = state.charUuidByHandle[characteristicHandle];
+    if (charUuid != null) {
+      if (enable) {
+        connection.subscribedCharacteristics.add(charUuid);
+      } else {
+        connection.subscribedCharacteristics.remove(charUuid);
+      }
     }
 
     // Write the CCCD value at the descriptor handle that belongs to
@@ -1030,15 +1132,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     // domain side request indications independently — that path goes
     // through `subscribeIndicate`, which the fake doesn't model
     // separately.
-    final state = _stateFor(deviceId);
-    final charHandle = characteristicHandle ??
-        _resolveCharHandle(deviceId, characteristicUuid);
-    if (charHandle != null) {
-      final cccdHandle = state.cccdHandleByCharHandle[charHandle];
-      if (cccdHandle != null) {
-        state.descriptorValuesByHandle[cccdHandle] =
-            Uint8List.fromList(enable ? [0x01, 0x00] : [0x00, 0x00]);
-      }
+    final cccdHandle = state.cccdHandleByCharHandle[characteristicHandle];
+    if (cccdHandle != null) {
+      state.descriptorValuesByHandle[cccdHandle] =
+          Uint8List.fromList(enable ? [0x01, 0x00] : [0x00, 0x00]);
     }
   }
 
@@ -1050,30 +1147,24 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
-    if (descriptorHandle != null) {
-      final value =
-          _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
-      if (value != null) return value;
-    }
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async {
+    final value =
+        _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
+    if (value != null) return value;
     return Uint8List(0);
   }
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
-    if (descriptorHandle != null) {
-      _stateFor(deviceId).descriptorValuesByHandle[descriptorHandle] =
-          Uint8List.fromList(value);
-    }
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {
+    _stateFor(deviceId).descriptorValuesByHandle[descriptorHandle] =
+        Uint8List.fromList(value);
   }
 
   @override
@@ -1249,14 +1340,51 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   @override
-  Future<void> addService(PlatformLocalService service) async {
+  Future<PlatformLocalService> addService(PlatformLocalService service) async {
     final held = _heldAddService;
     if (held != null) {
       _heldAddService = null;
       _heldAddServiceInFlight = held;
       await held.future;
     }
-    _localServices.add(service);
+    final populated = _populateLocalHandles(service);
+    _localServices.add(populated);
+    return populated;
+  }
+
+  /// Mints handles for every characteristic / descriptor in [service]
+  /// and returns a populated copy. Mirrors the native server-role
+  /// behaviour from [PeripheralManagerImpl.addService] (iOS) /
+  /// [GattServer.populateHandles] (Android).
+  PlatformLocalService _populateLocalHandles(PlatformLocalService service) {
+    final populatedChars = <PlatformLocalCharacteristic>[];
+    for (final c in service.characteristics) {
+      final h = _nextLocalHandle++;
+      _localHandleByCharUuid[c.uuid.toLowerCase()] = h;
+      var nextDesc = 1;
+      final populatedDescs = c.descriptors
+          .map((d) => PlatformLocalDescriptor(
+                uuid: d.uuid,
+                permissions: d.permissions,
+                value: d.value,
+                handle: nextDesc++,
+              ))
+          .toList();
+      populatedChars.add(PlatformLocalCharacteristic(
+        uuid: c.uuid,
+        properties: c.properties,
+        permissions: c.permissions,
+        descriptors: populatedDescs,
+        handle: h,
+      ));
+    }
+    return PlatformLocalService(
+      uuid: service.uuid,
+      isPrimary: service.isPrimary,
+      characteristics: populatedChars,
+      includedServices:
+          service.includedServices.map(_populateLocalHandles).toList(),
+    );
   }
 
   @override
@@ -1278,15 +1406,20 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
-    // Notify all subscribed centrals
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    // Notify all subscribed centrals. Resolve handle -> UUID for
+    // subscription bookkeeping (the fake's central-side fixture tracks
+    // subscriptions by UUID).
+    final charUuid = _localHandleByCharUuid.entries
+        .firstWhere((e) => e.value == characteristicHandle,
+            orElse: () => const MapEntry('', 0))
+        .key;
+    if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
-      if (central.subscribedCharacteristics.contains(characteristicUuid)) {
-        // In a real implementation, this would send over BLE
-        // For testing, we can verify it was called
+      if (central.subscribedCharacteristics.contains(charUuid)) {
+        // In a real implementation, this would send over BLE.
       }
     }
   }
@@ -1294,10 +1427,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     final central = _connectedCentrals[centralId];
     if (central == null) {
       throw Exception('Central not connected: $centralId');
@@ -1307,14 +1439,17 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
-    // Indicate all subscribed centrals (with acknowledgment)
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    final charUuid = _localHandleByCharUuid.entries
+        .firstWhere((e) => e.value == characteristicHandle,
+            orElse: () => const MapEntry('', 0))
+        .key;
+    if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
-      if (central.subscribedCharacteristics.contains(characteristicUuid)) {
-        // In a real implementation, this would wait for acknowledgment
+      if (central.subscribedCharacteristics.contains(charUuid)) {
+        // In a real implementation, this would wait for acknowledgment.
       }
     }
   }
@@ -1322,10 +1457,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
     final central = _connectedCentrals[centralId];
     if (central == null) {
       throw Exception('Central not connected: $centralId');
@@ -1535,12 +1669,19 @@ class RespondWriteCall {
 }
 
 /// A recorded call to [FakeBlueyPlatform.readCharacteristic].
+///
+/// Carries both the wire-level [characteristicHandle] and the
+/// fake-resolved [characteristicUuid] (lowercase) so existing tests
+/// that filter by UUID stay working without requiring every assertion
+/// to know about handles.
 class ReadCharacteristicCall {
   final String deviceId;
+  final int characteristicHandle;
   final String characteristicUuid;
 
   const ReadCharacteristicCall({
     required this.deviceId,
+    required this.characteristicHandle,
     required this.characteristicUuid,
   });
 }
@@ -1548,12 +1689,14 @@ class ReadCharacteristicCall {
 /// A recorded call to [FakeBlueyPlatform.writeCharacteristic].
 class WriteCharacteristicCall {
   final String deviceId;
+  final int characteristicHandle;
   final String characteristicUuid;
   final Uint8List value;
   final bool withResponse;
 
   WriteCharacteristicCall({
     required this.deviceId,
+    required this.characteristicHandle,
     required this.characteristicUuid,
     required this.value,
     required this.withResponse,

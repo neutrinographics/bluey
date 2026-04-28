@@ -15,15 +15,11 @@ class PeripheralManagerImpl: NSObject {
 
     // Added services
     private var services: [String: CBMutableService] = [:] // [serviceUuid: service]
-    private var characteristics: [String: CBMutableCharacteristic] = [:] // [charUuid: char]
 
-    // I088 — handle-keyed store for the server role. Module-wide
-    // counter (only one local server). Used to surface a stable
-    // attribute handle on `ReadRequestDto` / `WriteRequestDto` so the
-    // Dart peer can dispatch on handle even when multiple
-    // characteristics share a UUID across services. Kept alongside
-    // the UUID-keyed `characteristics` dict during the additive
-    // interim — D.13 retires the UUID-keyed map.
+    // I088 D.13 — handle-keyed store for the server role. Module-wide
+    // counter (only one local server). Replaces the legacy UUID-keyed
+    // `characteristics` map: every notify / indicate / request DTO
+    // is addressed by handle.
     //
     // Stored as `CBCharacteristic` (parent type of
     // `CBMutableCharacteristic`) so reverse-lookup at
@@ -45,7 +41,9 @@ class PeripheralManagerImpl: NSObject {
     private var nextRequestId: Int = 0
 
     // Completion handlers
-    private var addServiceCompletions: [String: (Result<Void, Error>) -> Void] = [:]
+    private var addServiceCompletions: [String: (Result<LocalServiceDto, Error>) -> Void] = [:]
+    /// Populated LocalServiceDto (handles stamped) per pending serviceUuid.
+    private var addServicePopulated: [String: LocalServiceDto] = [:]
     private var startAdvertisingCompletion: ((Result<Void, Error>) -> Void)?
 
     init(messenger: FlutterBinaryMessenger) {
@@ -57,32 +55,51 @@ class PeripheralManagerImpl: NSObject {
 
     // MARK: - Service Management
 
-    func addService(service: LocalServiceDto, completion: @escaping (Result<Void, Error>) -> Void) {
+    func addService(service: LocalServiceDto, completion: @escaping (Result<LocalServiceDto, Error>) -> Void) {
         let mutableService = service.toMutableService()
         let serviceUuid = service.uuid.lowercased()
 
-        // Store characteristics for later lookup. Maintained in two
-        // tables during the additive interim (I088):
-        //  - UUID-keyed `characteristics` for legacy lookup (retired
-        //    in D.13).
-        //  - Handle-keyed `handleStore` for the new path. A handle
-        //    is minted for each characteristic at add time and
-        //    surfaced on subsequent ReadRequestDto / WriteRequestDto
-        //    so the Dart peer can dispatch on handle (UUIDs aren't
-        //    unique when the same UUID is hosted under multiple
-        //    services).
-        if let chars = mutableService.characteristics {
-            for char in chars {
-                if let mutableChar = char as? CBMutableCharacteristic {
-                    let charUuid = char.uuid.uuidString.lowercased()
-                    characteristics[charUuid] = mutableChar
-                    handleStore.recordCharacteristic(mutableChar)
-                }
+        // I088 D.13 — mint handles in lock-step with the DTO order so
+        // we can return a populated LocalServiceDto with handles
+        // stamped for every characteristic / descriptor. The DTO order
+        // matches `toMutableService`'s build order, so a positional
+        // walk is exact.
+        let mutableChars = mutableService.characteristics ?? []
+        var populatedChars: [LocalCharacteristicDto] = []
+        for (idx, charDto) in service.characteristics.enumerated() {
+            let mutableChar = mutableChars[idx] as! CBMutableCharacteristic
+            let handle = handleStore.recordCharacteristic(mutableChar)
+            // Descriptor handles are minted per characteristic from a
+            // local counter starting at 1, mirroring the central side.
+            var nextDesc: Int64 = 1
+            let populatedDescs = charDto.descriptors.map { d -> LocalDescriptorDto in
+                let h = nextDesc
+                nextDesc += 1
+                return LocalDescriptorDto(
+                    uuid: d.uuid,
+                    permissions: d.permissions,
+                    value: d.value,
+                    handle: h
+                )
             }
+            populatedChars.append(LocalCharacteristicDto(
+                uuid: charDto.uuid,
+                properties: charDto.properties,
+                permissions: charDto.permissions,
+                descriptors: populatedDescs,
+                handle: Int64(handle)
+            ))
         }
+        let populated = LocalServiceDto(
+            uuid: service.uuid,
+            isPrimary: service.isPrimary,
+            characteristics: populatedChars,
+            includedServices: service.includedServices
+        )
 
         services[serviceUuid] = mutableService
         addServiceCompletions[serviceUuid] = completion
+        addServicePopulated[serviceUuid] = populated
         peripheralManager.add(mutableService)
     }
 
@@ -93,15 +110,13 @@ class PeripheralManagerImpl: NSObject {
             return
         }
 
-        // Remove characteristics from both the UUID-keyed dict and
-        // the handle-keyed store. The handle-store counter does NOT
-        // reset — once a handle has been issued it is never reused.
-        // (I088)
+        // I088 D.13 — drop handle entries for this service's
+        // characteristics. The handle-store counter does NOT reset
+        // — once a handle has been issued it is never reused.
         if let chars = service.characteristics {
             var mutableCharsToRemove: [CBMutableCharacteristic] = []
             for char in chars {
                 let charUuid = char.uuid.uuidString.lowercased()
-                characteristics.removeValue(forKey: charUuid)
                 subscribedCentrals.removeValue(forKey: charUuid)
                 if let mutableChar = char as? CBMutableCharacteristic {
                     mutableCharsToRemove.append(mutableChar)
@@ -142,15 +157,9 @@ class PeripheralManagerImpl: NSObject {
 
     // MARK: - Notifications
 
-    func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
-        // I088 (D.8 additive interim) — handle is accepted on the wire
-        // but the peripheral side does not yet mint handles for its own
-        // local services, so the parameter is currently unused. UUID
-        // lookup remains the only path.
-        _ = characteristicHandle
-        let uuid = characteristicUuid.lowercased()
-        guard let characteristic = characteristics[uuid] else {
-            completion(.failure(BlueyError.notFound.toServerPigeonError()))
+    func notifyCharacteristic(characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let characteristic = handleStore.characteristicByHandle[Int(characteristicHandle)] as? CBMutableCharacteristic else {
+            completion(.failure(BlueyError.handleInvalidated.toServerPigeonError()))
             return
         }
 
@@ -164,11 +173,9 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
-    func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
-        _ = characteristicHandle  // see notifyCharacteristic above (D.8 additive interim)
-        let uuid = characteristicUuid.lowercased()
-        guard let characteristic = characteristics[uuid] else {
-            completion(.failure(BlueyError.notFound.toServerPigeonError()))
+    func notifyCharacteristicTo(centralId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let characteristic = handleStore.characteristicByHandle[Int(characteristicHandle)] as? CBMutableCharacteristic else {
+            completion(.failure(BlueyError.handleInvalidated.toServerPigeonError()))
             return
         }
 
@@ -253,7 +260,6 @@ class PeripheralManagerImpl: NSObject {
         handleStore.removeCharacteristics(allChars)
 
         services.removeAll()
-        characteristics.removeAll()
         subscribedCentrals.removeAll()
         centrals.removeAll()
         pendingReadRequests.removeAll()
@@ -291,6 +297,7 @@ class PeripheralManagerImpl: NSObject {
         guard let completion = addServiceCompletions.removeValue(forKey: serviceUuid) else {
             return
         }
+        let populated = addServicePopulated.removeValue(forKey: serviceUuid)
 
         if let error = error {
             services.removeValue(forKey: serviceUuid)
@@ -299,8 +306,10 @@ class PeripheralManagerImpl: NSObject {
             } else {
                 completion(.failure(BlueyError.unknown.toServerPigeonError()))
             }
+        } else if let populated = populated {
+            completion(.success(populated))
         } else {
-            completion(.success(()))
+            completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
     }
 
@@ -362,18 +371,16 @@ class PeripheralManagerImpl: NSObject {
         nextRequestId += 1
         pendingReadRequests[requestId] = request
 
-        // Notify Flutter. I088 — surface the minted attribute handle
-        // so the Dart peer can dispatch on handle (UUIDs aren't
-        // unique when the same UUID is hosted under multiple
-        // services). Handle is nullable on the wire for the additive
-        // interim; D.13 makes it non-nullable.
+        // I088 D.13 — handle is now non-nullable on the wire. Default
+        // to 0 ("invalid handle") if reverse-lookup fails; the Dart
+        // side will treat that as gatt-handle-invalidated.
         let handle = handleStore.handleForCharacteristic(request.characteristic)
         let requestDto = ReadRequestDto(
             requestId: Int64(requestId),
             centralId: centralId,
             characteristicUuid: charUuid,
             offset: Int64(request.offset),
-            characteristicHandle: handle.map { Int64($0) }
+            characteristicHandle: handle.map { Int64($0) } ?? 0
         )
         flutterApi.onReadRequest(request: requestDto) { _ in }
     }
@@ -391,9 +398,8 @@ class PeripheralManagerImpl: NSObject {
         nextRequestId += 1
         pendingWriteRequests[requestId] = requests
 
-        // Notify Flutter for each request. I088 — surface the
-        // minted attribute handle (see matching note in
-        // didReceiveRead).
+        // Notify Flutter for each request. I088 D.13 — handle is now
+        // non-nullable on the wire; see matching note in didReceiveRead.
         for request in requests {
             let charUuid = request.characteristic.uuid.uuidString.lowercased()
             let value = request.value ?? Data()
@@ -406,7 +412,7 @@ class PeripheralManagerImpl: NSObject {
                 value: FlutterStandardTypedData(bytes: value),
                 offset: Int64(request.offset),
                 responseNeeded: true, // iOS always requires response for write requests received this way
-                characteristicHandle: handle.map { Int64($0) }
+                characteristicHandle: handle.map { Int64($0) } ?? 0
             )
             flutterApi.onWriteRequest(request: requestDto) { _ in }
         }

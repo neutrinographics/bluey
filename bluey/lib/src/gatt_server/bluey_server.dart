@@ -21,10 +21,18 @@ class BlueyServer implements Server {
   final BlueyEventBus _eventBus;
   final ServerId _serverId;
   late final LifecycleServer _lifecycle;
-  late final Future<void> _controlServiceReady;
+  late final Future<platform.PlatformLocalService?> _controlServiceReady;
 
   bool _isAdvertising = false;
   final Map<String, BlueyClient> _connectedClients = {};
+
+  /// Local handle table populated from `addService`'s populated return
+  /// value. Keyed by `(serviceUuid, charUuid)` lowercase. Used by
+  /// `notify` / `indicate` / `notifyTo` / `indicateTo` to resolve a
+  /// user-supplied UUID into the platform-minted handle the wire
+  /// format requires (I088 D.13). Public API stays UUID-based for
+  /// users; only internal storage moves to handle.
+  final Map<(String, String), int> _localCharHandles = {};
 
   /// User-initiated `addService` futures still in flight. Tracked here
   /// so [startAdvertising] can await them — without this, advertising
@@ -73,6 +81,9 @@ class BlueyServer implements Server {
     // it — Android's BluetoothGattServer requires services to be added
     // sequentially (no concurrent addService calls).
     _controlServiceReady = _lifecycle.addControlServiceIfNeeded();
+    _controlServiceReady.then((populated) {
+      if (populated != null) _recordLocalHandles(populated);
+    });
 
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
     dev.log('server initialized', name: 'bluey.server');
@@ -161,7 +172,8 @@ class BlueyServer implements Server {
     final platformFuture = _platform.addService(platformService);
     _pendingServiceAdds.add(platformFuture);
     try {
-      await platformFuture;
+      final populated = await platformFuture;
+      _recordLocalHandles(populated);
       dev.log('service added: ${service.uuid}', name: 'bluey.server');
       _emitEvent(
         ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
@@ -169,6 +181,34 @@ class BlueyServer implements Server {
     } finally {
       _pendingServiceAdds.remove(platformFuture);
     }
+  }
+
+  /// Walks [populated] and stamps each (serviceUuid, charUuid) ->
+  /// handle pair into [_localCharHandles] so subsequent notify /
+  /// indicate calls can resolve UUID -> handle. Recurses into included
+  /// services.
+  void _recordLocalHandles(platform.PlatformLocalService populated) {
+    final svcKey = populated.uuid.toLowerCase();
+    for (final c in populated.characteristics) {
+      _localCharHandles[(svcKey, c.uuid.toLowerCase())] = c.handle;
+    }
+    for (final inc in populated.includedServices) {
+      _recordLocalHandles(inc);
+    }
+  }
+
+  /// Resolves [characteristic] to a platform handle. Falls back to a
+  /// scan across every recorded service when the caller hasn't passed a
+  /// service UUID — `notify(charUuid)` in the public API only carries
+  /// the characteristic UUID. If the same UUID is hosted under multiple
+  /// services the first match wins; users that need to disambiguate
+  /// should host the UUID under exactly one service.
+  int? _resolveLocalHandle(UUID characteristic) {
+    final lc = characteristic.toString().toLowerCase();
+    for (final entry in _localCharHandles.entries) {
+      if (entry.key.$2 == lc) return entry.value;
+    }
+    return null;
   }
 
   @override
@@ -232,7 +272,11 @@ class BlueyServer implements Server {
 
   @override
   Future<void> notify(UUID characteristic, {required Uint8List data}) async {
-    await _platform.notifyCharacteristic(characteristic.toString(), data);
+    final handle = _resolveLocalHandle(characteristic);
+    if (handle == null) {
+      throw CharacteristicNotFoundException(characteristic);
+    }
+    await _platform.notifyCharacteristic(handle, data);
     _emitEvent(
       NotificationSentEvent(
         characteristicId: characteristic,
@@ -249,9 +293,13 @@ class BlueyServer implements Server {
     required Uint8List data,
   }) async {
     final blueyClient = client as BlueyClient;
+    final handle = _resolveLocalHandle(characteristic);
+    if (handle == null) {
+      throw CharacteristicNotFoundException(characteristic);
+    }
     await _platform.notifyCharacteristicTo(
       blueyClient._platformId,
-      characteristic.toString(),
+      handle,
       data,
     );
     _emitEvent(
@@ -266,7 +314,11 @@ class BlueyServer implements Server {
 
   @override
   Future<void> indicate(UUID characteristic, {required Uint8List data}) async {
-    await _platform.indicateCharacteristic(characteristic.toString(), data);
+    final handle = _resolveLocalHandle(characteristic);
+    if (handle == null) {
+      throw CharacteristicNotFoundException(characteristic);
+    }
+    await _platform.indicateCharacteristic(handle, data);
     _emitEvent(
       IndicationSentEvent(
         characteristicId: characteristic,
@@ -283,9 +335,13 @@ class BlueyServer implements Server {
     required Uint8List data,
   }) async {
     final blueyClient = client as BlueyClient;
+    final handle = _resolveLocalHandle(characteristic);
+    if (handle == null) {
+      throw CharacteristicNotFoundException(characteristic);
+    }
     await _platform.indicateCharacteristicTo(
       blueyClient._platformId,
-      characteristic.toString(),
+      handle,
       data,
     );
     _emitEvent(

@@ -440,12 +440,12 @@ class CharacteristicPropertiesDto {
 class DescriptorDto {
   DescriptorDto({
     required this.uuid,
-    this.handle,
+    required this.handle,
   });
 
   String uuid;
 
-  int? handle;
+  int handle;
 
   List<Object?> _toList() {
     return <Object?>[
@@ -461,7 +461,7 @@ class DescriptorDto {
     result as List<Object?>;
     return DescriptorDto(
       uuid: result[0]! as String,
-      handle: result[1] as int?,
+      handle: result[1]! as int,
     );
   }
 
@@ -488,7 +488,7 @@ class CharacteristicDto {
     required this.uuid,
     required this.properties,
     required this.descriptors,
-    this.handle,
+    required this.handle,
   });
 
   String uuid;
@@ -497,7 +497,7 @@ class CharacteristicDto {
 
   List<DescriptorDto> descriptors;
 
-  int? handle;
+  int handle;
 
   List<Object?> _toList() {
     return <Object?>[
@@ -517,7 +517,7 @@ class CharacteristicDto {
       uuid: result[0]! as String,
       properties: result[1]! as CharacteristicPropertiesDto,
       descriptors: (result[2]! as List<Object?>).cast<DescriptorDto>(),
-      handle: result[3] as int?,
+      handle: result[3]! as int,
     );
   }
 
@@ -697,6 +697,7 @@ class LocalDescriptorDto {
     required this.uuid,
     required this.permissions,
     this.value,
+    required this.handle,
   });
 
   String uuid;
@@ -705,11 +706,14 @@ class LocalDescriptorDto {
 
   Uint8List? value;
 
+  int handle;
+
   List<Object?> _toList() {
     return <Object?>[
       uuid,
       permissions,
       value,
+      handle,
     ];
   }
 
@@ -722,6 +726,7 @@ class LocalDescriptorDto {
       uuid: result[0]! as String,
       permissions: (result[1]! as List<Object?>).cast<GattPermissionDto>(),
       value: result[2] as Uint8List?,
+      handle: result[3]! as int,
     );
   }
 
@@ -734,7 +739,7 @@ class LocalDescriptorDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(permissions, other.permissions) && _deepEquals(value, other.value);
+    return _deepEquals(uuid, other.uuid) && _deepEquals(permissions, other.permissions) && _deepEquals(value, other.value) && _deepEquals(handle, other.handle);
   }
 
   @override
@@ -749,6 +754,7 @@ class LocalCharacteristicDto {
     required this.properties,
     required this.permissions,
     required this.descriptors,
+    required this.handle,
   });
 
   String uuid;
@@ -759,12 +765,15 @@ class LocalCharacteristicDto {
 
   List<LocalDescriptorDto> descriptors;
 
+  int handle;
+
   List<Object?> _toList() {
     return <Object?>[
       uuid,
       properties,
       permissions,
       descriptors,
+      handle,
     ];
   }
 
@@ -778,6 +787,7 @@ class LocalCharacteristicDto {
       properties: result[1]! as CharacteristicPropertiesDto,
       permissions: (result[2]! as List<Object?>).cast<GattPermissionDto>(),
       descriptors: (result[3]! as List<Object?>).cast<LocalDescriptorDto>(),
+      handle: result[4]! as int,
     );
   }
 
@@ -790,7 +800,7 @@ class LocalCharacteristicDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(permissions, other.permissions) && _deepEquals(descriptors, other.descriptors);
+    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(permissions, other.permissions) && _deepEquals(descriptors, other.descriptors) && _deepEquals(handle, other.handle);
   }
 
   @override
@@ -979,7 +989,7 @@ class ReadRequestDto {
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 
   int requestId;
@@ -990,7 +1000,7 @@ class ReadRequestDto {
 
   int offset;
 
-  int? characteristicHandle;
+  int characteristicHandle;
 
   List<Object?> _toList() {
     return <Object?>[
@@ -1012,7 +1022,7 @@ class ReadRequestDto {
       centralId: result[1]! as String,
       characteristicUuid: result[2]! as String,
       offset: result[3]! as int,
-      characteristicHandle: result[4] as int?,
+      characteristicHandle: result[4]! as int,
     );
   }
 
@@ -1042,7 +1052,7 @@ class WriteRequestDto {
     required this.value,
     required this.offset,
     required this.responseNeeded,
-    this.characteristicHandle,
+    required this.characteristicHandle,
   });
 
   int requestId;
@@ -1057,7 +1067,7 @@ class WriteRequestDto {
 
   bool responseNeeded;
 
-  int? characteristicHandle;
+  int characteristicHandle;
 
   List<Object?> _toList() {
     return <Object?>[
@@ -1083,7 +1093,7 @@ class WriteRequestDto {
       value: result[3]! as Uint8List,
       offset: result[4]! as int,
       responseNeeded: result[5]! as bool,
-      characteristicHandle: result[6] as int?,
+      characteristicHandle: result[6]! as int,
     );
   }
 
@@ -1547,20 +1557,15 @@ class BlueyHostApi {
     return (pigeonVar_replyValue! as List<Object?>).cast<ServiceDto>();
   }
 
-  /// Read a characteristic value.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// characteristic. Native receivers prefer it when non-null; otherwise
-  /// they fall back to UUID-keyed lookup. Nullable during the additive
-  /// interim (D.8); D.13 makes it required and drops the UUID arg.
-  Future<Uint8List> readCharacteristic(String deviceId, String characteristicUuid, int? characteristicHandle) async {
+  /// Read a characteristic value by platform-minted handle.
+  Future<Uint8List> readCharacteristic(String deviceId, int characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -1572,15 +1577,15 @@ class BlueyHostApi {
     return pigeonVar_replyValue! as Uint8List;
   }
 
-  /// Write a characteristic value.
-  Future<void> writeCharacteristic(String deviceId, String characteristicUuid, Uint8List value, bool withResponse, int? characteristicHandle) async {
+  /// Write a characteristic value by platform-minted handle.
+  Future<void> writeCharacteristic(String deviceId, int characteristicHandle, Uint8List value, bool withResponse) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, value, withResponse, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, value, withResponse]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1591,15 +1596,15 @@ class BlueyHostApi {
     ;
   }
 
-  /// Enable or disable notifications for a characteristic.
-  Future<void> setNotification(String deviceId, String characteristicUuid, bool enable, int? characteristicHandle) async {
+  /// Enable or disable notifications for a characteristic by handle.
+  Future<void> setNotification(String deviceId, int characteristicHandle, bool enable) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.setNotification$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, enable, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, enable]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1610,20 +1615,15 @@ class BlueyHostApi {
     ;
   }
 
-  /// Read a descriptor value.
-  ///
-  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
-  /// handles for the owning characteristic and the descriptor itself.
-  /// Native receivers prefer them when non-null; otherwise they fall
-  /// back to UUID-keyed lookup. Nullable during the additive interim.
-  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid, int? characteristicHandle, int? descriptorHandle) async {
+  /// Read a descriptor value by platform-minted handle.
+  Future<Uint8List> readDescriptor(String deviceId, int characteristicHandle, int descriptorHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, characteristicHandle, descriptorHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, descriptorHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -1635,15 +1635,15 @@ class BlueyHostApi {
     return pigeonVar_replyValue! as Uint8List;
   }
 
-  /// Write a descriptor value.
-  Future<void> writeDescriptor(String deviceId, String descriptorUuid, Uint8List value, int? characteristicHandle, int? descriptorHandle) async {
+  /// Write a descriptor value by platform-minted handle.
+  Future<void> writeDescriptor(String deviceId, int characteristicHandle, int descriptorHandle, Uint8List value) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, value, characteristicHandle, descriptorHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, descriptorHandle, value]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1695,8 +1695,9 @@ class BlueyHostApi {
     return pigeonVar_replyValue! as int;
   }
 
-  /// Add a service to the GATT server.
-  Future<void> addService(LocalServiceDto service) async {
+  /// Add a service to the GATT server. Returns the service with all
+  /// characteristic and descriptor handles populated.
+  Future<LocalServiceDto> addService(LocalServiceDto service) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.addService$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1706,12 +1707,13 @@ class BlueyHostApi {
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[service]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
-    _extractReplyValueOrThrow(
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
         pigeonVar_replyList,
         pigeonVar_channelName,
-        isNullValid: true,
+        isNullValid: false,
     )
     ;
+    return pigeonVar_replyValue! as LocalServiceDto;
   }
 
   /// Remove a service from the GATT server.
@@ -1771,19 +1773,16 @@ class BlueyHostApi {
     ;
   }
 
-  /// Send a notification to all subscribed centrals.
-  ///
-  /// [characteristicHandle] is the platform-minted handle for the
-  /// local characteristic. Native receivers prefer it when non-null;
-  /// otherwise they fall back to UUID-keyed lookup.
-  Future<void> notifyCharacteristic(String characteristicUuid, Uint8List value, int? characteristicHandle) async {
+  /// Send a notification to all subscribed centrals, addressed by the
+  /// platform-minted handle of a local characteristic.
+  Future<void> notifyCharacteristic(int characteristicHandle, Uint8List value) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[characteristicUuid, value, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[characteristicHandle, value]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1794,15 +1793,16 @@ class BlueyHostApi {
     ;
   }
 
-  /// Send a notification to a specific central.
-  Future<void> notifyCharacteristicTo(String centralId, String characteristicUuid, Uint8List value, int? characteristicHandle) async {
+  /// Send a notification to a specific central, addressed by the
+  /// platform-minted handle of a local characteristic.
+  Future<void> notifyCharacteristicTo(String centralId, int characteristicHandle, Uint8List value) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristicTo$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId, characteristicUuid, value, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId, characteristicHandle, value]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(

@@ -56,50 +56,11 @@ extension CBPeripheral {
     }
 }
 
-extension CBService {
-    func toDto() -> ServiceDto {
-        let uuid = self.uuid.uuidString.lowercased()
-        let characteristics = self.characteristics?.map { $0.toDto() } ?? []
-        let includedServices = self.includedServices?.map { $0.toDto() } ?? []
-
-        return ServiceDto(
-            uuid: uuid,
-            isPrimary: isPrimary,
-            characteristics: characteristics,
-            includedServices: includedServices
-        )
-    }
-}
-
-extension CBCharacteristic {
-    func toDto() -> CharacteristicDto {
-        let uuid = self.uuid.uuidString.lowercased()
-        let props = properties
-
-        let propertiesDto = CharacteristicPropertiesDto(
-            canRead: props.contains(.read),
-            canWrite: props.contains(.write),
-            canWriteWithoutResponse: props.contains(.writeWithoutResponse),
-            canNotify: props.contains(.notify),
-            canIndicate: props.contains(.indicate)
-        )
-
-        let descriptors = self.descriptors?.map { $0.toDto() } ?? []
-
-        return CharacteristicDto(
-            uuid: uuid,
-            properties: propertiesDto,
-            descriptors: descriptors
-        )
-    }
-}
-
-extension CBDescriptor {
-    func toDto() -> DescriptorDto {
-        let uuid = self.uuid.uuidString.lowercased()
-        return DescriptorDto(uuid: uuid)
-    }
-}
+// I088 D.13 — handle-less CB*.toDto() helpers were retired alongside
+// the UUID-fallback code paths. CharacteristicDto / DescriptorDto now
+// require a non-nullable handle, which only the per-device handle store
+// (`mapCharacteristicWithHandle` / `mapDescriptorWithHandle` in
+// `CentralManagerImpl`) can supply.
 
 extension CBCentral {
     func toCentralDto(mtu: Int) -> CentralDto {

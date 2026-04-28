@@ -70,11 +70,13 @@ void main() {
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
           platform.PlatformCharacteristic(
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
         ],
       );
@@ -94,6 +96,7 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [],
+            handle: 0,
           ),
         ],
       );
@@ -111,6 +114,7 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [],
+            handle: 0,
           ),
         ],
       );
@@ -129,16 +133,19 @@ void main() {
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
           platform.PlatformCharacteristic(
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
           platform.PlatformCharacteristic(
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [],
+            handle: 0,
           ),
         ],
       );
@@ -158,16 +165,19 @@ void main() {
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
           platform.PlatformCharacteristic(
             uuid: charDupUuid,
             properties: TestProperties.readWrite,
             descriptors: [],
+            handle: 0,
           ),
           platform.PlatformCharacteristic(
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [],
+            handle: 0,
           ),
         ],
       );
@@ -251,9 +261,14 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid),
-              platform.PlatformDescriptor(uuid: descDupUuid),
+              platform.PlatformDescriptor(uuid: descDupUuid,
+  handle: 0,
+),
+              platform.PlatformDescriptor(uuid: descDupUuid,
+  handle: 0,
+),
             ],
+            handle: 0,
           ),
         ],
       );
@@ -275,8 +290,11 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [
-              platform.PlatformDescriptor(uuid: descUniqueUuid),
+              platform.PlatformDescriptor(uuid: descUniqueUuid,
+  handle: 0,
+),
             ],
+            handle: 0,
           ),
         ],
       );
@@ -295,10 +313,17 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid),
-              platform.PlatformDescriptor(uuid: descDupUuid),
-              platform.PlatformDescriptor(uuid: descUniqueUuid),
+              platform.PlatformDescriptor(uuid: descDupUuid,
+  handle: 0,
+),
+              platform.PlatformDescriptor(uuid: descDupUuid,
+  handle: 0,
+),
+              platform.PlatformDescriptor(uuid: descUniqueUuid,
+  handle: 0,
+),
             ],
+            handle: 0,
           ),
         ],
       );
@@ -317,9 +342,14 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid),
-              platform.PlatformDescriptor(uuid: descUniqueUuid),
+              platform.PlatformDescriptor(uuid: descDupUuid,
+  handle: 0,
+),
+              platform.PlatformDescriptor(uuid: descUniqueUuid,
+  handle: 0,
+),
             ],
+            handle: 0,
           ),
         ],
       );
@@ -337,11 +367,13 @@ void main() {
           uuid: charDupUuid,
           properties: TestProperties.readWrite,
           descriptors: [],
+          handle: 0,
         ),
         platform.PlatformCharacteristic(
           uuid: charDupUuid,
           properties: TestProperties.readWrite,
           descriptors: [],
+          handle: 0,
         ),
       ],
     );

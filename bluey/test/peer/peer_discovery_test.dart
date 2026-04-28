@@ -159,6 +159,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],

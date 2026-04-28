@@ -44,8 +44,10 @@ void main() {
               descriptors: [
                 platform.PlatformDescriptor(
                   uuid: '00002902-0000-1000-8000-00805f9b34fb',
+                  handle: 0,
                 ),
               ],
+              handle: 0,
             ),
           ],
           includedServices: [],

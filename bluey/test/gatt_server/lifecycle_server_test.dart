@@ -31,6 +31,7 @@ PlatformWriteRequest _writeReq({
     value: Uint8List.fromList(value),
     offset: 0,
     responseNeeded: responseNeeded,
+    characteristicHandle: 0,
   );
 }
 
@@ -44,6 +45,7 @@ PlatformReadRequest _readReq({
     centralId: centralId,
     characteristicUuid: characteristicUuid,
     offset: 0,
+    characteristicHandle: 0,
   );
 }
 
@@ -407,6 +409,7 @@ void main() {
         centralId: 'central-1',
         characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
         offset: 0,
+        characteristicHandle: 0,
       ));
       expect(handled, isTrue);
 
@@ -438,6 +441,7 @@ void main() {
           value: lifecycle.heartbeatValue,
           responseNeeded: false,
           offset: 0,
+          characteristicHandle: 0,
         ));
 
         // Advance 9s — just under the timeout.

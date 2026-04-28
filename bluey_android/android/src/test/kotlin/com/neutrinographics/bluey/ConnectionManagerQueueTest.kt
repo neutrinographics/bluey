@@ -149,15 +149,25 @@ class ConnectionManagerQueueTest {
      */
     private fun mockCharacteristic(
         charUuid: JavaUUID = testCharUuid,
+        handle: Long = 1L,
     ): BluetoothGattCharacteristic {
         val char = mockk<BluetoothGattCharacteristic>(relaxed = true)
         every { char.uuid } returns charUuid
         val service = mockk<BluetoothGattService>(relaxed = true)
         every { service.uuid } returns testServiceUuid
         every { service.getCharacteristic(charUuid) } returns char
-        // findCharacteristic iterates service.characteristics, not getCharacteristic
         every { service.characteristics } returns listOf(char)
         every { mockGatt.services } returns listOf(service)
+        // I088 D.13 — register in handle table so ConnectionManager's
+        // handle-keyed lookup resolves the char.
+        val field = ConnectionManager::class.java.getDeclaredField(
+            "characteristicByHandle",
+        )
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val table = field.get(connectionManager)
+            as MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>
+        table.getOrPut(deviceAddress) { mutableMapOf() }[handle.toInt()] = char
         return char
     }
 
@@ -170,15 +180,9 @@ class ConnectionManagerQueueTest {
 
         val results = mutableListOf<String>()
 
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { results.add("first=$it") }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { results.add("first=$it") }
 
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x02), true, null,
-        ) { results.add("second=$it") }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x02), true) { results.add("second=$it") }
 
         // Only the first write should have reached the OS yet
         verify(exactly = 1) {
@@ -209,14 +213,8 @@ class ConnectionManagerQueueTest {
         ) } returns BluetoothGatt.GATT_SUCCESS
 
         val results = mutableListOf<Result<Unit>>()
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { results.add(it) }
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x02), true, null,
-        ) { results.add(it) }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { results.add(it) }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x02), true) { results.add(it) }
 
         // Both ops must still be in flight (neither synchronously completed nor failed)
         // before the disconnect fires.  If this asserts 0, drain is what populates results,
@@ -249,9 +247,7 @@ class ConnectionManagerQueueTest {
         every { mockGatt.writeDescriptor(any<BluetoothGattDescriptor>(), any()) } returns BluetoothGatt.GATT_SUCCESS
 
         var captured: Result<Unit>? = null
-        connectionManager.setNotification(
-            deviceAddress, testCharUuid.toString(), true, null,
-        ) { captured = it }
+        connectionManager.setNotification(deviceAddress, 1L, true) { captured = it }
 
         verify { mockGatt.setCharacteristicNotification(char, true) }
         verify(exactly = 1) { mockGatt.writeDescriptor(cccd, any()) }
@@ -277,10 +273,7 @@ class ConnectionManagerQueueTest {
         ) } returns BluetoothGatt.GATT_SUCCESS
 
         var captured: Result<Unit>? = null
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { captured = it }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { captured = it }
 
         // Fire the OS callback with GATT_INVALID_HANDLE (status 0x01)
         capturedGattCallback!!.onCharacteristicWrite(mockGatt, char, 0x01)
@@ -310,9 +303,7 @@ class ConnectionManagerQueueTest {
         every { mockGatt.setCharacteristicNotification(char, true) } throws denied
 
         var captured: Result<Unit>? = null
-        connectionManager.setNotification(
-            deviceAddress, testCharUuid.toString(), true, null,
-        ) { captured = it }
+        connectionManager.setNotification(deviceAddress, 1L, true) { captured = it }
 
         assertNotNull("callback must fire even when sync enable throws", captured)
         assertTrue(captured!!.isFailure)
@@ -335,10 +326,7 @@ class ConnectionManagerQueueTest {
         ) } returns BluetoothGatt.GATT_SUCCESS
 
         // Put an op in flight to prove the notification doesn't disturb it
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true, null,
-        ) { /* ignored */ }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x01), true) { /* ignored */ }
         verify(exactly = 1) {
             mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())
         }
@@ -366,10 +354,7 @@ class ConnectionManagerQueueTest {
         // "completed" the current op, allowing a subsequent enqueue to execute.
         // Verify that is NOT what happened: submit a second write and confirm it
         // has NOT reached the OS yet — the queue is still busy with the first write.
-        connectionManager.writeCharacteristic(
-            deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x99.toByte()), true, null,
-        ) { /* ignored */ }
+        connectionManager.writeCharacteristic(deviceAddress, 1L, byteArrayOf(0x99.toByte()), true) { /* ignored */ }
         verify(exactly = 1) {
             mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())
         }

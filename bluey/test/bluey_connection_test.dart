@@ -12,11 +12,17 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   // Services to return from discoverServices
   List<platform.PlatformService> mockServices = [];
 
-  // Characteristic values for read operations
+  // Characteristic values for read operations, keyed by lowercase UUID.
+  // The mock minted handles in [_withMintedHandles] are tracked here so
+  // handle-keyed reads can resolve back to the seed UUID.
   Map<String, Uint8List> characteristicValues = {};
 
-  // Descriptor values for read operations
+  // Descriptor values for read operations, keyed by lowercase UUID.
   Map<String, Uint8List> descriptorValues = {};
+
+  /// handle -> UUID, populated as [_withMintedHandles] mints handles.
+  final Map<int, String> _charUuidByHandle = {};
+  final Map<int, String> _descUuidByHandle = {};
 
   // Track write calls
   List<WriteCharacteristicCall> writeCharacteristicCalls = [];
@@ -115,16 +121,20 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
       uuid: s.uuid,
       isPrimary: s.isPrimary,
       characteristics: s.characteristics.map((c) {
+        final charHandle = c.handle != 0 ? c.handle : ++_nextHandle;
+        _charUuidByHandle[charHandle] = c.uuid.toLowerCase();
         return platform.PlatformCharacteristic(
           uuid: c.uuid,
           properties: c.properties,
-          descriptors: c.descriptors
-              .map((d) => platform.PlatformDescriptor(
-                    uuid: d.uuid,
-                    handle: d.handle ?? ++_nextHandle,
-                  ))
-              .toList(),
-          handle: c.handle ?? ++_nextHandle,
+          descriptors: c.descriptors.map((d) {
+            final descHandle = d.handle != 0 ? d.handle : ++_nextHandle;
+            _descUuidByHandle[descHandle] = d.uuid.toLowerCase();
+            return platform.PlatformDescriptor(
+              uuid: d.uuid,
+              handle: descHandle,
+            );
+          }).toList(),
+          handle: charHandle,
         );
       }).toList(),
       includedServices: s.includedServices.map(_withMintedHandles).toList(),
@@ -134,12 +144,12 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid, {
-    int? characteristicHandle,
-  }) async {
-    final value = characteristicValues[characteristicUuid.toLowerCase()];
+    int characteristicHandle,
+  ) async {
+    final uuid = _charUuidByHandle[characteristicHandle] ?? '';
+    final value = characteristicValues[uuid];
     if (value == null) {
-      throw StateError('Characteristic not found: $characteristicUuid');
+      throw StateError('Characteristic not found: handle=$characteristicHandle');
     }
     return value;
   }
@@ -147,15 +157,15 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> writeCharacteristic(
     String deviceId,
-    String characteristicUuid,
+    int characteristicHandle,
     Uint8List value,
-    bool withResponse, {
-    int? characteristicHandle,
-  }) async {
+    bool withResponse,
+  ) async {
+    final uuid = _charUuidByHandle[characteristicHandle] ?? '';
     writeCharacteristicCalls.add(
       WriteCharacteristicCall(
         deviceId: deviceId,
-        characteristicUuid: characteristicUuid,
+        characteristicUuid: uuid,
         value: value,
         withResponse: withResponse,
       ),
@@ -165,14 +175,14 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> setNotification(
     String deviceId,
-    String characteristicUuid,
-    bool enable, {
-    int? characteristicHandle,
-  }) async {
+    int characteristicHandle,
+    bool enable,
+  ) async {
+    final uuid = _charUuidByHandle[characteristicHandle] ?? '';
     setNotificationCalls.add(
       SetNotificationCall(
         deviceId: deviceId,
-        characteristicUuid: characteristicUuid,
+        characteristicUuid: uuid,
         enable: enable,
       ),
     );
@@ -187,13 +197,13 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
-    final value = descriptorValues[descriptorUuid.toLowerCase()];
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async {
+    final uuid = _descUuidByHandle[descriptorHandle] ?? '';
+    final value = descriptorValues[uuid];
     if (value == null) {
-      throw StateError('Descriptor not found: $descriptorUuid');
+      throw StateError('Descriptor not found: handle=$descriptorHandle');
     }
     return value;
   }
@@ -201,15 +211,15 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> writeDescriptor(
     String deviceId,
-    String descriptorUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-    int? descriptorHandle,
-  }) async {
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {
+    final uuid = _descUuidByHandle[descriptorHandle] ?? '';
     writeDescriptorCalls.add(
       WriteDescriptorCall(
         deviceId: deviceId,
-        descriptorUuid: descriptorUuid,
+        descriptorUuid: uuid,
         value: value,
       ),
     );
@@ -279,7 +289,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   // Server (Peripheral) operations - stub implementations
   @override
-  Future<void> addService(platform.PlatformLocalService service) async {}
+  Future<platform.PlatformLocalService> addService(platform.PlatformLocalService service) async => service;
 
   @override
   Future<void> removeService(String serviceUuid) async {}
@@ -294,33 +304,29 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> notifyCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> indicateCharacteristic(
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
-    String characteristicUuid,
-    Uint8List value, {
-    int? characteristicHandle,
-  }) async {}
+    int characteristicHandle,
+    Uint8List value,
+  ) async {}
 
   @override
   @override
@@ -526,6 +532,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -564,6 +571,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -600,6 +608,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -637,6 +646,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -672,6 +682,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -708,6 +719,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -761,6 +773,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -797,6 +810,7 @@ void main() {
                   canIndicate: false,
                 ),
                 descriptors: [],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -855,7 +869,10 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [platform.PlatformDescriptor(uuid: descUuid)],
+                descriptors: [platform.PlatformDescriptor(uuid: descUuid,
+  handle: 0,
+)],
+                handle: 0,
               ),
             ],
             includedServices: [],
@@ -893,7 +910,10 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [platform.PlatformDescriptor(uuid: descUuid)],
+                descriptors: [platform.PlatformDescriptor(uuid: descUuid,
+  handle: 0,
+)],
+                handle: 0,
               ),
             ],
             includedServices: [],

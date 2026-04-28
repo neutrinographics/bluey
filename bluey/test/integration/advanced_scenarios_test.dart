@@ -42,6 +42,7 @@ void main() {
                     canIndicate: true,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -82,6 +83,7 @@ void main() {
                     canIndicate: true,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -132,6 +134,7 @@ void main() {
                     canIndicate: true,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -255,6 +258,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -270,18 +274,10 @@ void main() {
         // Write 100 bytes (would need fragmentation in real scenario)
         final largeData = Uint8List.fromList(List.generate(100, (i) => i));
 
-        await fakePlatform.writeCharacteristic(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-          largeData,
-          true,
-        );
+        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', largeData, true, );
 
         // Verify write succeeded
-        final readBack = await fakePlatform.readCharacteristic(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-        );
+        final readBack = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
         expect(readBack, equals(largeData));
 
         await connection.disconnect();
@@ -307,6 +303,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -330,12 +327,7 @@ void main() {
           List.generate(500, (i) => i % 256),
         );
 
-        await fakePlatform.writeCharacteristic(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-          largeData,
-          true,
-        );
+        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', largeData, true, );
 
         await connection.disconnect();
         await bluey.dispose();
@@ -390,6 +382,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -446,6 +439,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -500,6 +494,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -695,6 +690,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -741,6 +737,7 @@ void main() {
                       canIndicate: false,
                     ),
                     descriptors: [],
+                    handle: 0,
                   ),
                 ],
                 includedServices: [],
@@ -918,6 +915,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -969,6 +967,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -1017,6 +1016,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -1069,6 +1069,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
                 platform.PlatformCharacteristic(
                   uuid: '00002a38-0000-1000-8000-00805f9b34fb',
@@ -1080,6 +1081,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -1135,6 +1137,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],

@@ -41,6 +41,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -128,6 +129,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
                 platform.PlatformCharacteristic(
                   uuid:
@@ -140,6 +142,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -183,9 +186,11 @@ void main() {
                   ),
                   descriptors: [
                     platform.PlatformDescriptor(
-                      uuid: '00002902-0000-1000-8000-00805f9b34fb', // CCCD
+                      uuid: '00002902-0000-1000-8000-00805f9b34fb', // CCCD,
+                      handle: 0,
                     ),
                   ],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -235,6 +240,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -276,6 +282,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
@@ -318,6 +325,7 @@ void main() {
                     canIndicate: false,
                   ),
                   descriptors: [],
+                  handle: 0,
                 ),
               ],
               includedServices: [],
