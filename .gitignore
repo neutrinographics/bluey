@@ -33,7 +33,7 @@ migrate_working_dir/
 build/
 
 # AI related files
-.claude/settings.local.json
+.claude/
 .superpowers/
 
 # Worktrees
