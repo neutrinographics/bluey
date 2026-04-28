@@ -161,3 +161,13 @@ Starting with iOS 16, `UIDevice.current.name` returns only the generic model nam
 7. **Device name restricted (iOS 16+)** — `UIDevice.current.name` returns generic model name without special entitlement.
 8. **cancelPeripheralConnection unreliable** — iOS treats connections as shared resources; `cancelPeripheralConnection` only releases the app's reference. The physical link stays up if system services (ANCS, etc.) maintain their own reference. The remote device may never receive a disconnect.
 9. **BLE address rotation** — iOS uses random addresses per connection, causing stale client entries on remote servers.
+
+## Handle minting (2026-04-28, I088)
+
+GATT attribute identity on the wire is a per-connection opaque `int handle` (`AttributeHandle` on the Dart side). UUIDs are kept on DTOs for navigation/display only.
+
+- CoreBluetooth has no native equivalent of `BluetoothGattCharacteristic.getInstanceId()`; we mint our own. `CBCharacteristic` and `CBDescriptor` only expose UUIDs, which is insufficient for duplicate-UUID peripherals.
+- Per-device monotonic counter; characteristics and descriptors share the pool. The counter starts at 1 and increments on every minted handle. Handles are minted at `peripheral(_:didDiscoverCharacteristicsFor:)` (one per characteristic) and `peripheral(_:didDiscoverDescriptorsFor:)` (one per descriptor).
+- The handle table is cleared on `centralManager(_:didDisconnectPeripheral:error:)` and `peripheral(_:didModifyServices:)` (the iOS Service Changed equivalent — fired before the system invalidates the affected services).
+- **Server side**: `PeripheralManagerImpl.swift` mints handles in `addService` via a separate module-wide counter (only one local server per process). Cleared on `removeService`. A full clear on `peripheralManagerDidUpdateState(.poweredOff)` is its own backlog item — see I083.
+- Stale-handle lookup (handle non-null in the call but absent from the table) returns Pigeon error `gatt-handle-invalidated`, which the Dart side translates to `AttributeHandleInvalidatedException`. Callers must re-discover services to obtain fresh handles.
