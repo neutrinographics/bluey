@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -8,6 +7,7 @@ import '../connection/bluey_connection.dart';
 import '../connection/lifecycle_client.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import 'peer.dart';
 import 'peer_connection.dart';
 import 'peer_discovery.dart';
@@ -59,19 +59,38 @@ class _BlueyPeer implements BlueyPeer {
     try {
       final effectiveScanTimeout = scanTimeout ?? const Duration(seconds: 5);
 
-      dev.log('connect attempt: serverId=$serverId', name: 'bluey.peer');
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.peer',
+        'peer connect entered',
+        data: {'serverId': serverId.toString()},
+      );
 
       final discovery = PeerDiscovery(
         platformApi: _platform,
         logger: _logger,
       );
-      final rawConnection = await discovery.connectTo(
-        serverId,
-        scanTimeout: effectiveScanTimeout,
-        timeout: timeout,
-      );
-
-      final blueyConnection = rawConnection as BlueyConnection;
+      final BlueyConnection blueyConnection;
+      try {
+        final rawConnection = await discovery.connectTo(
+          serverId,
+          scanTimeout: effectiveScanTimeout,
+          timeout: timeout,
+        );
+        blueyConnection = rawConnection as BlueyConnection;
+      } catch (e) {
+        _logger.log(
+          BlueyLogLevel.error,
+          'bluey.peer',
+          'peer connect failed',
+          data: {
+            'serverId': serverId.toString(),
+            'reason': e.runtimeType.toString(),
+          },
+          errorCode: e.runtimeType.toString(),
+        );
+        rethrow;
+      }
 
       // Discover services on the raw connection (includes control service)
       // so the LifecycleClient can locate its characteristics.
@@ -90,10 +109,14 @@ class _BlueyPeer implements BlueyPeer {
       );
       lifecycleClient.start(allServices: allServices);
 
-      dev.log(
-        'connect complete: deviceId=${blueyConnection.deviceId}, '
-        'serverId=$serverId',
-        name: 'bluey.peer',
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.peer',
+        'peer connect resolved',
+        data: {
+          'serverId': serverId.toString(),
+          'deviceId': blueyConnection.deviceId.toString(),
+        },
       );
 
       return PeerConnection.create(

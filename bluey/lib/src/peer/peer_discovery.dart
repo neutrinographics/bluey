@@ -7,6 +7,7 @@ import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import '../shared/device_id_coercion.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
@@ -20,7 +21,6 @@ import 'server_id.dart';
 /// public API.
 class PeerDiscovery {
   final platform.BlueyPlatform _platform;
-  // ignore: unused_field
   final BlueyLogger _logger;
 
   /// Creates a [PeerDiscovery] backed by the given platform API.
@@ -36,16 +36,55 @@ class PeerDiscovery {
   /// [timeout] bounds the scan phase. After the timeout, the scan is
   /// stopped and the collected candidates are probed sequentially.
   Future<List<ServerId>> discover({required Duration timeout}) async {
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.peer.discovery',
+      'discoverPeers scan started',
+      data: {'timeoutMs': timeout.inMilliseconds},
+    );
     final candidates = await _collectCandidates(timeout);
     final ids = <ServerId>{};
     for (final address in candidates) {
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.peer.discovery',
+        'discoverPeers probe attempt',
+        data: {'deviceId': address},
+      );
       try {
         final id = await _probeServerId(address);
         ids.add(id);
-      } catch (_) {
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.peer.discovery',
+          'discoverPeers probe success',
+          data: {
+            'deviceId': address,
+            'serverId': id.toString(),
+          },
+        );
+      } catch (e) {
+        _logger.log(
+          BlueyLogLevel.debug,
+          'bluey.peer.discovery',
+          'discoverPeers probe failure',
+          data: {
+            'deviceId': address,
+            'exception': e.runtimeType.toString(),
+          },
+        );
         // Skip candidates that fail to connect or read.
       }
     }
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.peer.discovery',
+      'discoverPeers stopped',
+      data: {
+        'candidates': candidates.length,
+        'matched': ids.length,
+      },
+    );
     return ids.toList();
   }
 
