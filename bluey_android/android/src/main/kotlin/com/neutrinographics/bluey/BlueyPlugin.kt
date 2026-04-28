@@ -65,6 +65,11 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         BlueyHostApi.setUp(binding.binaryMessenger, this)
         flutterApi = BlueyFlutterApi(binding.binaryMessenger)
 
+        // Bind structured logger before any other component is constructed so
+        // their early init logs are bridged to Dart. (Early logs before this
+        // point are intentionally dropped per the bootstrap-loss policy.)
+        BlueyLog.bind(flutterApi!!)
+
         // Initialize Bluetooth
         bluetoothManager = context?.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
@@ -621,6 +626,15 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
             }
         } catch (e: Throwable) {
             callback(Result.failure(e.toServerFlutterError()))
+        }
+    }
+
+    override fun setLogLevel(level: LogLevelDto, callback: (Result<Unit>) -> Unit) {
+        try {
+            BlueyLog.setLevel(level)
+            callback(Result.success(Unit))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
         }
     }
 
