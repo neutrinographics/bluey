@@ -242,3 +242,13 @@ The completion-then-disconnect order matters: completing the user-facing callbac
 JVM unit tests (`ConnectionManagerLifecycleTest.kt`, 15 cases) validate the lifecycle contract end-to-end with mockk. They cover: handler.post deferral of map mutations (I062), connect-mutex semantics (I098), disconnect-await + fallback paths (I060), cleanup ordering (I061).
 
 What unit tests **cannot** prove: `mockkConstructor(Handler).post { runImmediately() }` flattens threading, so race conditions across binder ↔ main are observably absent in tests but may still be present at runtime. Manual stress-test verification on real Android (the example app's `runSoak` and `runFailureInjection` scenarios) remains the load-bearing gate for the threading invariant.
+
+## Handle lifetime (2026-04-28, I088)
+
+GATT attribute identity on the wire is a per-connection opaque `int handle` (`AttributeHandle` on the Dart side). UUIDs are kept on DTOs for navigation/display only.
+
+- **Characteristic handles** come from `BluetoothGattCharacteristic.getInstanceId()`. This is the canonical identity Android exposes for a discovered characteristic and is stable across the connection.
+- **Descriptor handles** are minted client-side via a per-device monotonic counter. `BluetoothGattDescriptor.getInstanceId()` exists in AOSP but is `@hide` and not part of the public SDK; we cannot rely on it. The same minting strategy is used on iOS for symmetry.
+- The handle table is populated in `onServicesDiscovered`, gated on `status == GATT_SUCCESS`. Each characteristic's `getInstanceId()` and each descriptor's freshly minted id are inserted before the discovery callback resolves.
+- The handle table is cleared in the `STATE_DISCONNECTED` branch of `onConnectionStateChange` AND in `onServiceChanged` (before re-discovery is kicked off). Any handle issued before either event is permanently invalid.
+- Stale-handle lookup (handle non-null in the call but absent from the table) returns Pigeon error `gatt-handle-invalidated`, which the Dart side translates to `AttributeHandleInvalidatedException`. Callers must re-discover services to obtain fresh handles.
