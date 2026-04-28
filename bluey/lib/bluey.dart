@@ -23,6 +23,7 @@ export 'src/discovery/scan.dart';
 
 // Connection bounded context
 export 'src/connection/connection.dart';
+export 'src/connection/value_objects/attribute_handle.dart';
 
 // GATT Client bounded context
 export 'src/gatt_client/gatt.dart';
