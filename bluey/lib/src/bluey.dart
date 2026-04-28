@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:meta/meta.dart';
 
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
@@ -16,6 +17,9 @@ import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
+import 'log/bluey_logger.dart';
+import 'log/log_event.dart';
+import 'log/log_level.dart';
 import 'peer/bluey_peer.dart';
 import 'peer/peer.dart';
 import 'peer/peer_discovery.dart';
@@ -82,6 +86,7 @@ class Bluey {
 
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
+  final BlueyLogger _logger = BlueyLogger();
 
   StreamSubscription? _stateSubscription;
   final StreamController<BluetoothState> _stateController =
@@ -206,6 +211,34 @@ class Bluey {
   /// });
   /// ```
   Stream<BlueyEvent> get events => _eventBus.stream;
+
+  /// Stream of structured log events emitted by Bluey internals.
+  ///
+  /// Events at or above the current log level (see [setLogLevel]) are
+  /// delivered on this broadcast stream. Events below the threshold are
+  /// dropped without allocation.
+  ///
+  /// Example:
+  /// ```dart
+  /// bluey.setLogLevel(BlueyLogLevel.debug);
+  /// bluey.logEvents.listen((event) => print(event));
+  /// ```
+  Stream<BlueyLogEvent> get logEvents => _logger.events;
+
+  /// Sets the minimum severity threshold for [logEvents].
+  ///
+  /// Events strictly below [level] are dropped. Defaults to
+  /// [BlueyLogLevel.info].
+  void setLogLevel(BlueyLogLevel level) => _logger.setLevel(level);
+
+  /// Internal logger seam for tests.
+  ///
+  /// Production code outside the [Bluey] facade must not depend on this
+  /// getter; subsystems receive the logger via constructor injection
+  /// (see plan I307 phase A.5). This exists solely to let tests verify
+  /// the wiring between the logger and the public [logEvents] stream.
+  @visibleForTesting
+  BlueyLogger get logger => _logger;
 
   /// Get current Bluetooth state.
   Future<BluetoothState> get state async {
@@ -612,6 +645,7 @@ class Bluey {
     await _stateController.close();
     await _errorController.close();
     await _eventBus.close();
+    await _logger.dispose();
     if (_shared == this) {
       _shared = null;
     }

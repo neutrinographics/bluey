@@ -59,3 +59,7 @@ export 'src/peer/server_id.dart' show ServerId;
 
 // Domain events
 export 'src/events.dart';
+
+// Structured logging
+export 'src/log/log_event.dart' show BlueyLogEvent;
+export 'src/log/log_level.dart' show BlueyLogLevel;
