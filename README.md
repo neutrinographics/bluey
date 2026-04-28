@@ -353,6 +353,26 @@ await connection.android?.requestConnectionParameters(
 );
 ```
 
+### Logging
+
+Bluey emits structured log events from both the Dart domain layer and the
+native (Android/iOS) sides. Events flow through a single broadcast stream
+filtered by a level you set; setting the level also pushes the filter down
+to the native side, so no Pigeon traffic is incurred for filtered events.
+
+```dart
+final bluey = Bluey();
+bluey.setLogLevel(BlueyLogLevel.debug);
+bluey.logEvents.listen((event) {
+  print('${event.timestamp.toIso8601String()} '
+        '[${event.level.name}] ${event.context}: ${event.message} '
+        '${event.data}');
+});
+```
+
+Levels: `trace`, `debug`, `info` (default), `warn`, `error`. Native logs
+also tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging.
+
 #### Server Cleanup
 
 By default, Bluey automatically cleans up BLE resources when the Android activity is destroyed.
