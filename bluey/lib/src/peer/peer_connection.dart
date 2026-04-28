@@ -2,6 +2,7 @@ import '../connection/connection.dart' show Connection;
 import '../connection/lifecycle_client.dart';
 import '../gatt_client/gatt.dart' show RemoteService;
 import '../shared/uuid.dart';
+import 'peer_remote_service_view.dart';
 import 'server_id.dart';
 
 /// A connection to a Bluey peer (a device exposing the lifecycle control
@@ -81,11 +82,13 @@ class _BlueyPeerConnection implements PeerConnection {
     required LifecycleClient lifecycleClient,
   }) : _connection = connection,
        _serverId = serverId,
-       _lifecycle = lifecycleClient;
+       _lifecycle = lifecycleClient,
+       _serviceView = PeerRemoteServiceView(connection);
 
   final Connection _connection;
   final ServerId _serverId;
   final LifecycleClient _lifecycle;
+  final PeerRemoteServiceView _serviceView;
 
   @override
   Connection get connection => _connection;
@@ -93,18 +96,19 @@ class _BlueyPeerConnection implements PeerConnection {
   @override
   ServerId get serverId => _serverId;
 
-  // C.1: services / service / hasService delegate directly to the
-  // wrapped connection. C.3 will wrap them through PeerRemoteServiceView
-  // to hide the control service.
+  // C.3: services / service / hasService delegate through
+  // PeerRemoteServiceView to hide the lifecycle control service from the
+  // peer-protocol surface. Raw access via `connection` still returns the
+  // full tree.
   @override
   Future<List<RemoteService>> services({bool cache = false}) =>
-      _connection.services(cache: cache);
+      _serviceView.services(cache: cache);
 
   @override
-  RemoteService service(UUID uuid) => _connection.service(uuid);
+  RemoteService service(UUID uuid) => _serviceView.service(uuid);
 
   @override
-  Future<bool> hasService(UUID uuid) => _connection.hasService(uuid);
+  Future<bool> hasService(UUID uuid) => _serviceView.hasService(uuid);
 
   @override
   Future<void> sendDisconnectCommand() async {

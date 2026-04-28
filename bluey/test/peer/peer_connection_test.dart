@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/connection/lifecycle_client.dart';
+import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
@@ -10,11 +11,13 @@ import '../fakes/fake_platform.dart';
 /// delegation. Only stubs the methods the C.1 PeerConnection actually
 /// invokes; everything else throws [UnimplementedError].
 class _SpyConnection implements Connection {
-  _SpyConnection({UUID? deviceId})
-    : _deviceId = deviceId ?? UUID.short(0xAAAA);
+  _SpyConnection({
+    UUID? deviceId,
+    this.servicesResult = const [],
+  }) : _deviceId = deviceId ?? UUID.short(0xAAAA);
 
   final UUID _deviceId;
-  final List<RemoteService> servicesResult = const [];
+  final List<RemoteService> servicesResult;
 
   /// Ordered list of method names invoked on this stub. The
   /// `sendDisconnectCommand` test inspects this against the lifecycle
@@ -167,6 +170,96 @@ void main() {
     expect(conn.hasServiceArgs, equals([lookupUuid]));
   });
 
+  group('control-service filtering (delegated through PeerRemoteServiceView)',
+      () {
+    final controlServiceUuid = UUID(lifecycle.controlServiceUuid);
+    final userUuid = UUID.short(0x180D);
+
+    test('peer.services() excludes the control service', () async {
+      final controlSvc = _StubRemoteService(controlServiceUuid);
+      final userSvc = _StubRemoteService(userUuid);
+      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+      final peerConn = PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycleClient,
+      );
+
+      final result = await peerConn.services();
+      expect(result.map((s) => s.uuid), [userUuid]);
+    });
+
+    test('peer.connection.services() returns the FULL tree (raw access '
+        'unchanged)', () async {
+      final controlSvc = _StubRemoteService(controlServiceUuid);
+      final userSvc = _StubRemoteService(userUuid);
+      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+      final peerConn = PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycleClient,
+      );
+
+      final raw = await peerConn.connection.services();
+      expect(raw.map((s) => s.uuid), [controlServiceUuid, userUuid]);
+    });
+
+    test('peer.service(controlServiceUuid) throws ServiceNotFoundException',
+        () {
+      final controlSvc = _StubRemoteService(controlServiceUuid);
+      final userSvc = _StubRemoteService(userUuid);
+      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+      final peerConn = PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycleClient,
+      );
+
+      expect(
+        () => peerConn.service(controlServiceUuid),
+        throwsA(isA<ServiceNotFoundException>()),
+      );
+    });
+
+    test('peer.hasService(controlServiceUuid) returns false', () async {
+      final controlSvc = _StubRemoteService(controlServiceUuid);
+      final conn = _SpyConnection(servicesResult: [controlSvc]);
+      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+      final peerConn = PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycleClient,
+      );
+
+      expect(await peerConn.hasService(controlServiceUuid), isFalse);
+    });
+
+    test('peer.service(userUuid) and peer.hasService(userUuid) delegate '
+        'to the underlying connection', () async {
+      final userSvc = _StubRemoteService(userUuid);
+      final conn = _SpyConnection(servicesResult: [userSvc]);
+      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+      final peerConn = PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycleClient,
+      );
+
+      expect(identical(peerConn.service(userUuid), userSvc), isTrue);
+      expect(await peerConn.hasService(userUuid), isTrue);
+      expect(conn.serviceArgs, equals([userUuid]));
+      expect(conn.hasServiceArgs, equals([userUuid]));
+    });
+  });
+
   test('disconnect() delegates to wrapped Connection.disconnect()', () async {
     final conn = _SpyConnection();
     final lifecycle = _SpyLifecycleClient(callLog: []);
@@ -211,6 +304,29 @@ void main() {
       expect(conn.calls, isEmpty);
     },
   );
+}
+
+/// Minimal RemoteService stub for the control-service filtering tests.
+/// Only [uuid] is exercised — the filter inspects nothing else — so the
+/// remaining members throw if accidentally touched.
+class _StubRemoteService implements RemoteService {
+  _StubRemoteService(this.uuid);
+
+  @override
+  final UUID uuid;
+
+  @override
+  bool get isPrimary => true;
+
+  @override
+  List<RemoteCharacteristic> get characteristics => const [];
+
+  @override
+  List<RemoteService> get includedServices => const [];
+
+  @override
+  RemoteCharacteristic characteristic(UUID uuid) =>
+      throw UnimplementedError();
 }
 
 /// Minimal connection stub that records 'connection.disconnect' into a
