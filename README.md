@@ -276,22 +276,26 @@ await server.notify(
 await server.dispose();
 ```
 
-### Bonding/Pairing
+### Bonding/Pairing (Android-only)
+
+Bonding, PHY, and connection parameters are Android-only — iOS does not expose
+central-side APIs for these (per Apple's CoreBluetooth design). Access them
+via `connection.android?` on connections; the accessor is `null` on iOS.
 
 ```dart
-// Check bond state
-print('Bond state: ${connection.bondState}'); // none, bonding, bonded
+// Check bond state (null on iOS)
+print('Bond state: ${connection.android?.bondState}'); // none, bonding, bonded
 
-// Listen for bond state changes
-connection.bondStateChanges.listen((state) {
+// Listen for bond state changes (no events on iOS)
+connection.android?.bondStateChanges.listen((state) {
   print('Bond state changed: $state');
 });
 
-// Initiate bonding
-await connection.bond();
+// Initiate bonding (no-op on iOS)
+await connection.android?.bond();
 
-// Remove bond
-await connection.removeBond();
+// Remove bond (no-op on iOS)
+await connection.android?.removeBond();
 
 // Get all bonded devices
 final bondedDevices = await bluey.bondedDevices;
@@ -300,36 +304,38 @@ for (final device in bondedDevices) {
 }
 ```
 
-### PHY (Physical Layer) Configuration
+### PHY (Physical Layer) Configuration (Android-only)
 
 ```dart
-// Check current PHY
-print('TX PHY: ${connection.txPhy}'); // le1m, le2m, leCoded
-print('RX PHY: ${connection.rxPhy}');
+// Check current PHY (null on iOS)
+print('TX PHY: ${connection.android?.txPhy}'); // le1m, le2m, leCoded
+print('RX PHY: ${connection.android?.rxPhy}');
 
-// Listen for PHY changes
-connection.phyChanges.listen((phy) {
+// Listen for PHY changes (no events on iOS)
+connection.android?.phyChanges.listen((phy) {
   print('PHY changed - TX: ${phy.tx}, RX: ${phy.rx}');
 });
 
 // Request faster PHY (2 Mbps) for higher throughput
-await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
+await connection.android?.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
 
 // Request coded PHY for longer range
-await connection.requestPhy(txPhy: Phy.leCoded, rxPhy: Phy.leCoded);
+await connection.android?.requestPhy(txPhy: Phy.leCoded, rxPhy: Phy.leCoded);
 ```
 
-### Connection Parameters
+### Connection Parameters (Android-only)
 
 ```dart
-// Check current connection parameters
-final params = connection.connectionParameters;
-print('Interval: ${params.interval.milliseconds}ms');
-print('Latency: ${params.latency.events}');
-print('Timeout: ${params.timeout.milliseconds}ms');
+// Check current connection parameters (null on iOS)
+final params = connection.android?.connectionParameters;
+if (params != null) {
+  print('Interval: ${params.interval.milliseconds}ms');
+  print('Latency: ${params.latency.events}');
+  print('Timeout: ${params.timeout.milliseconds}ms');
+}
 
 // Request faster connection parameters (lower latency)
-await connection.requestConnectionParameters(
+await connection.android?.requestConnectionParameters(
   ConnectionParameters(
     interval: ConnectionInterval(7.5),  // Minimum interval for low latency
     latency: PeripheralLatency(0),      // No skipped events
@@ -338,7 +344,7 @@ await connection.requestConnectionParameters(
 );
 
 // Request power-saving parameters
-await connection.requestConnectionParameters(
+await connection.android?.requestConnectionParameters(
   ConnectionParameters(
     interval: ConnectionInterval(100), // Longer interval saves power
     latency: PeripheralLatency(4),     // Allow skipping 4 events
