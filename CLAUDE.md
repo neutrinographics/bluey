@@ -105,6 +105,15 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - `Bluey.tryUpgrade(connection)` returns `PeerConnection?` for the rare post-connect upgrade path.
 - `PeerConnection` is a composition wrapper: it holds a `Connection` (use `peer.connection` for raw GATT) plus a `serverId` and the lifecycle-protocol disconnect path.
 
+### Structured logging (post-I307)
+
+- `bluey.logEvents` is a broadcast `Stream<BlueyLogEvent>` covering domain-layer **and** native (Android + iOS) events in arrival order — single subscription point for the whole stack.
+- `bluey.setLogLevel(BlueyLogLevel level)` filters Dart-side and pushes the filter down to the native side, so no Pigeon traffic is incurred for filtered events. Default level is `info`.
+- Levels: `trace`, `debug`, `info`, `warn`, `error`.
+- Context naming convention: `bluey`, `bluey.connection`, `bluey.connection.lifecycle`, `bluey.server`, `bluey.server.lifecycle`, `bluey.peer`, `bluey.peer.discovery`, `bluey.android.{plugin,gatt_server,gatt_queue,advertiser}`, `bluey.ios.{plugin,central,peripheral,op_slot}`.
+- Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
+- Bootstrap caveat: events emitted during `Bluey()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
+
 ### Ubiquitous Language (avoid platform-specific terms)
 
 | Use | Avoid |
