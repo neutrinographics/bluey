@@ -4,6 +4,7 @@ import 'package:bluey/bluey.dart';
 class ConnectionScreenState {
   final Device device;
   final Connection? connection;
+  final PeerConnection? peer;
   final ConnectionState connectionState;
   final List<RemoteService>? services;
   final bool isDiscovering;
@@ -12,15 +13,19 @@ class ConnectionScreenState {
   const ConnectionScreenState({
     required this.device,
     this.connection,
+    this.peer,
     this.connectionState = ConnectionState.disconnected,
     this.services,
     this.isDiscovering = false,
     this.error,
   });
 
+  bool get isBlueyPeer => peer != null;
+
   ConnectionScreenState copyWith({
     Device? device,
     Connection? connection,
+    PeerConnection? peer,
     ConnectionState? connectionState,
     List<RemoteService>? services,
     bool? isDiscovering,
@@ -29,6 +34,7 @@ class ConnectionScreenState {
     return ConnectionScreenState(
       device: device ?? this.device,
       connection: connection ?? this.connection,
+      peer: peer ?? this.peer,
       connectionState: connectionState ?? this.connectionState,
       services: services ?? this.services,
       isDiscovering: isDiscovering ?? this.isDiscovering,
@@ -41,6 +47,7 @@ class ConnectionScreenState {
     return ConnectionScreenState(
       device: device,
       connection: null,
+      peer: null,
       connectionState: ConnectionState.disconnected,
       services: null,
       isDiscovering: false,
@@ -54,6 +61,7 @@ class ConnectionScreenState {
     return other is ConnectionScreenState &&
         other.device == device &&
         other.connection == connection &&
+        other.peer == peer &&
         other.connectionState == connectionState &&
         _listEquals(other.services, services) &&
         other.isDiscovering == isDiscovering &&
@@ -65,6 +73,7 @@ class ConnectionScreenState {
     return Object.hash(
       device,
       connection,
+      peer,
       connectionState,
       services != null ? Object.hashAll(services!) : null,
       isDiscovering,

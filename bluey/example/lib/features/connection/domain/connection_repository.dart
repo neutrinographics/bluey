@@ -12,6 +12,13 @@ abstract class ConnectionRepository {
     ConnectionSettings settings = const ConnectionSettings(),
   });
 
+  /// Attempts to upgrade [connection] to a [PeerConnection] if the
+  /// remote exposes the Bluey lifecycle service. Returns `null` for
+  /// non-peer devices. The returned [PeerConnection] starts a
+  /// [LifecycleClient] internally — heartbeats begin flowing
+  /// immediately.
+  Future<PeerConnection?> tryUpgrade(Connection connection);
+
   /// Disconnects from a device.
   Future<void> disconnect(Connection connection);
 

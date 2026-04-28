@@ -6,6 +6,7 @@ import 'package:bluey/bluey.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
+import '../application/try_upgrade.dart';
 import '../domain/connection_settings.dart';
 import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
@@ -15,6 +16,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final ConnectToDevice _connectToDevice;
   final DisconnectDevice _disconnectDevice;
   final GetServices _getServices;
+  final TryUpgrade _tryUpgrade;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
   StreamSubscription<ConnectionSettings>? _settingsSubscription;
@@ -31,10 +33,12 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required ConnectToDevice connectToDevice,
     required DisconnectDevice disconnectDevice,
     required GetServices getServices,
+    required TryUpgrade tryUpgrade,
     required ConnectionSettingsCubit settingsCubit,
   })  : _connectToDevice = connectToDevice,
         _disconnectDevice = disconnectDevice,
         _getServices = getServices,
+        _tryUpgrade = tryUpgrade,
         _settings = settingsCubit.state,
         super(ConnectionScreenState(device: device)) {
     _settingsSubscription =
@@ -111,6 +115,18 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
           connectionState: connection.state,
         ),
       );
+
+      // Opportunistically upgrade to a PeerConnection if the remote
+      // exposes the Bluey lifecycle service. This starts a
+      // LifecycleClient internally — heartbeats begin flowing.
+      // For non-peer devices, peer is null and the badge / heartbeat
+      // path stays dormant.
+      try {
+        final peer = await _tryUpgrade(connection);
+        if (peer != null) emit(state.copyWith(peer: peer));
+      } catch (_) {
+        // Best-effort; raw connection still works for non-peer devices.
+      }
 
       // Load services after connecting
       await loadServices();

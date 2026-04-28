@@ -4,6 +4,7 @@ import 'package:bluey/bluey.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
+import '../application/try_upgrade.dart';
 import '../domain/connection_repository.dart';
 import '../infrastructure/bluey_connection_repository.dart';
 import '../presentation/connection_settings_cubit.dart';
@@ -21,6 +22,9 @@ void registerConnectionDependencies(GetIt getIt) {
   );
   getIt.registerFactory<GetServices>(
     () => GetServices(getIt<ConnectionRepository>()),
+  );
+  getIt.registerFactory<TryUpgrade>(
+    () => TryUpgrade(getIt<ConnectionRepository>()),
   );
 
   // Session-scoped settings — keep the same instance so settings persist

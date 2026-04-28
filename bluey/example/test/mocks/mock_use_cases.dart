@@ -11,6 +11,7 @@ import 'package:bluey_example/features/scanner/application/request_enable.dart';
 import 'package:bluey_example/features/connection/application/connect_to_device.dart';
 import 'package:bluey_example/features/connection/application/disconnect_device.dart';
 import 'package:bluey_example/features/connection/application/get_services.dart';
+import 'package:bluey_example/features/connection/application/try_upgrade.dart';
 
 // Service Explorer Use Cases
 import 'package:bluey_example/features/service_explorer/application/read_characteristic.dart';
@@ -52,6 +53,8 @@ class MockConnectToDevice extends Mock implements ConnectToDevice {}
 class MockDisconnectDevice extends Mock implements DisconnectDevice {}
 
 class MockGetServices extends Mock implements GetServices {}
+
+class MockTryUpgrade extends Mock implements TryUpgrade {}
 
 // Service Explorer Mocks
 class MockReadCharacteristic extends Mock implements ReadCharacteristic {}

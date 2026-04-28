@@ -15,6 +15,7 @@ import '../../../shared/stress_protocol.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
+import '../application/try_upgrade.dart';
 import 'connection_cubit.dart';
 import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
@@ -52,6 +53,7 @@ class ConnectionScreen extends StatelessWidget {
             connectToDevice: getIt<ConnectToDevice>(),
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
+            tryUpgrade: getIt<TryUpgrade>(),
             settingsCubit: getIt<ConnectionSettingsCubit>(),
           )..connect(),
       child: const _ConnectionView(),
@@ -408,6 +410,7 @@ class _ConnectedContentState extends State<_ConnectedContent> {
               device: state.device,
               connection: state.connection!,
               services: state.services,
+              isBlueyPeer: state.isBlueyPeer,
             ),
           ),
         ),
@@ -488,10 +491,12 @@ class _DeviceInfoCard extends StatelessWidget {
   final bluey.Device device;
   final bluey.Connection connection;
   final List<bluey.RemoteService>? services;
+  final bool isBlueyPeer;
 
   const _DeviceInfoCard({
     required this.device,
     required this.connection,
+    required this.isBlueyPeer,
     this.services,
   });
 
@@ -555,10 +560,27 @@ class _DeviceInfoCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // TODO(C.7): re-introduce a BLUEY badge driven by
-                        // a separate `PeerConnection?` field on the
-                        // connection cubit (post-C.6 the raw `Connection`
-                        // no longer exposes `isBlueyServer`).
+                        if (isBlueyPeer) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'BLUEY',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],

@@ -15,6 +15,7 @@ void main() {
   late MockConnectToDevice mockConnectToDevice;
   late MockDisconnectDevice mockDisconnectDevice;
   late MockGetServices mockGetServices;
+  late MockTryUpgrade mockTryUpgrade;
   late Device testDevice;
 
   setUpAll(() {
@@ -27,6 +28,8 @@ void main() {
     mockConnectToDevice = MockConnectToDevice();
     mockDisconnectDevice = MockDisconnectDevice();
     mockGetServices = MockGetServices();
+    mockTryUpgrade = MockTryUpgrade();
+    when(() => mockTryUpgrade(any())).thenAnswer((_) async => null);
 
     testDevice = Device(
       id: UUID('00000000-0000-0000-0000-000000000001'),
@@ -41,6 +44,7 @@ void main() {
       connectToDevice: mockConnectToDevice,
       disconnectDevice: mockDisconnectDevice,
       getServices: mockGetServices,
+      tryUpgrade: mockTryUpgrade,
       settingsCubit: settingsCubit ?? ConnectionSettingsCubit(),
     );
   }
