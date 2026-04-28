@@ -24,6 +24,42 @@ class TestUuids {
   static const customChar2 = '12345678-1234-1234-1234-123456789abe';
 }
 
+/// Canonical attribute handles paired with [TestUuids].
+///
+/// These are stable test fixtures that match the order in which the
+/// fake platform mints handles when a peripheral is discovered with
+/// the standard test services. Handle 1 is the first characteristic
+/// minted (battery level under battery service), and so on.
+///
+/// Tests that need a handle without going through the full discovery
+/// dance can refer to these directly. Tests that DO go through
+/// discovery should still read the handle off the discovered
+/// `RemoteCharacteristic` — these constants exist purely as
+/// human-readable references in fixtures and assertions.
+///
+/// The exact integer values are not load-bearing; they're stable so
+/// multiple tests can rely on them without coupling to mint order.
+class TestHandles {
+  // Standard BLE characteristics (paired with TestUuids).
+  static final batteryLevel = AttributeHandle(1);
+  static final heartRateMeasurement = AttributeHandle(2);
+  static final bodySensorLocation = AttributeHandle(3);
+  static final temperature = AttributeHandle(4);
+  static final humidity = AttributeHandle(5);
+
+  // Custom characteristics.
+  static final customChar1 = AttributeHandle(6);
+  static final customChar2 = AttributeHandle(7);
+
+  // Reserved range for descriptor handles in fixtures (so test code
+  // can distinguish characteristic handles from descriptor handles
+  // at a glance). The fake mints from a single shared pool, so these
+  // values never collide with characteristic-handle values above
+  // because the fake numbers them in tree order, not by kind.
+  static final descriptor1 = AttributeHandle(100);
+  static final descriptor2 = AttributeHandle(101);
+}
+
 /// Common device IDs used in tests (MAC address format).
 class TestDeviceIds {
   static const device1 = 'AA:BB:CC:DD:EE:01';

@@ -52,12 +52,20 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   final Capabilities _capabilities;
 
   // === Simulated Peripherals (devices we can discover/connect to) ===
+  //
+  // Test fixtures supplied via [simulatePeripheral]. The shape stored
+  // here is the *input data* used to populate per-device handle-keyed
+  // storage at discovery time. The UUID-keyed `characteristicValues`
+  // map is a seed — it is read once during [discoverServices] and
+  // written into the per-handle storage on [_DeviceState]. Once
+  // discovery has happened, all reads/writes go through handle-keyed
+  // storage; the seed map is metadata only.
   final Map<String, _SimulatedPeripheral> _peripherals = {};
 
   // === Connected Devices (as central) ===
   final Map<String, _ConnectedDevice> _connections = {};
 
-  // === Minted attribute handles ===
+  // === Per-device handle-keyed state ===
   //
   // The fake mirrors the iOS approach: a per-device monotonic counter
   // starting at 1, drawn from a single pool shared by characteristics
@@ -67,46 +75,19 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   // Cleared on [disconnect] / [simulateServiceChange] so a fresh
   // discovery mints fresh handles, matching real-platform behaviour.
   //
-  // Handles are keyed by tree position, not by attribute UUID. This is
-  // load-bearing for I088: two characteristics with the same UUID under
-  // two different services must get distinct handles. Position keys
-  // are `'sIdx/cIdx'` for chars and `'sIdx/cIdx/dIdx'` for descriptors.
-  // The first matching UUID is also tracked in [_firstCharHandleByUuid]
-  // so the [handleFor] helper still resolves the common
-  // single-occurrence case.
-  final Map<String, int> _nextHandle = {};
-  // Position-keyed: deviceId -> 'sIdx/cIdx' -> handle.
-  final Map<String, Map<String, int>> _charHandles = {};
-  // Position-keyed: deviceId -> 'sIdx/cIdx/dIdx' -> handle.
-  final Map<String, Map<String, int>> _descriptorHandles = {};
-  // First-occurrence lookup: deviceId -> charUuid (lower) -> handle.
-  // Used by the [handleFor] helper for backward compat in tests with
-  // unique-UUID peripherals.
-  final Map<String, Map<String, int>> _firstCharHandleByUuid = {};
-  // Reverse lookup: per-device, per-handle char UUID. Used by the
-  // platform read/write/notification implementations to find the
-  // UUID-keyed value storage on `_SimulatedPeripheral.characteristicValues`
-  // when a per-handle value was not explicitly seeded.
-  final Map<String, Map<int, String>> _charUuidByHandle = {};
-  // Reverse lookup: per-device, per-char-handle, the CCCD descriptor
-  // handle (if any). Used by [setNotification] to write a CCCD value
-  // scoped to the right characteristic instance — the load-bearing
-  // I011 fix.
-  final Map<String, Map<int, int>> _cccdHandleByCharHandle = {};
-  // Per-handle backing storage. Reads/writes prefer this over the
-  // UUID-keyed [_SimulatedPeripheral.characteristicValues] when a
-  // value has been set here for the operation's handle. This is what
-  // lets duplicate-UUID-cross-services tests seed distinct values per
-  // instance.
-  final Map<String, Map<int, Uint8List>> _charValuesByHandle = {};
-  // Per-descriptor-handle backing storage. Used by [readDescriptor]
-  // and (via [setNotification]) for CCCD writes. Default for an
-  // un-touched CCCD is `0x0000` (notifications/indications disabled).
-  final Map<String, Map<int, Uint8List>> _descriptorValuesByHandle = {};
+  // Handles are minted by tree position, not by attribute UUID — two
+  // characteristics with the same UUID under two different services
+  // get distinct handles. The handle is the **primary storage key**;
+  // UUID is metadata used only for reverse lookup (and only for legacy
+  // UUID-only call paths that D.13 will remove entirely).
+  final Map<String, _DeviceState> _deviceStates = {};
 
   // CCCD UUID (Client Characteristic Configuration Descriptor, 0x2902)
   // expanded to the 128-bit form used throughout the test fixtures.
   static const String _cccdUuid = '00002902-0000-1000-8000-00805f9b34fb';
+
+  _DeviceState _stateFor(String deviceId) =>
+      _deviceStates.putIfAbsent(deviceId, () => _DeviceState());
 
   /// Returns the minted handle for [characteristicUuid] on [deviceId],
   /// or null if no discovery has happened yet (or the characteristic is
@@ -116,8 +97,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// For duplicate-UUID characteristics this returns the first occurrence
   /// only — tests that need to address a specific instance should obtain
   /// the handle from the discovered services tree instead.
-  int? handleFor(String deviceId, String characteristicUuid) =>
-      _firstCharHandleByUuid[deviceId]?[characteristicUuid.toLowerCase()];
+  int? handleFor(String deviceId, String characteristicUuid) {
+    final state = _deviceStates[deviceId];
+    if (state == null) return null;
+    final handles = state.charHandlesByUuid[characteristicUuid.toLowerCase()];
+    if (handles == null || handles.isEmpty) return null;
+    return handles.first;
+  }
 
   /// Seeds the per-handle backing value for [characteristicHandle] on
   /// [deviceId]. Required for tests that set up duplicate-UUID
@@ -130,8 +116,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) {
-    _charValuesByHandle
-        .putIfAbsent(deviceId, () => {})[characteristicHandle] =
+    _stateFor(deviceId).charValuesByHandle[characteristicHandle] =
         Uint8List.fromList(value);
   }
 
@@ -140,7 +125,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Test-only helper for asserting on the CCCD state after
   /// [setNotification] toggles it.
   Uint8List? cccdValueByHandle(String deviceId, int descriptorHandle) =>
-      _descriptorValuesByHandle[deviceId]?[descriptorHandle];
+      _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
 
   // === Server State (as peripheral) ===
   final List<PlatformLocalService> _localServices = [];
@@ -715,22 +700,26 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
     final services = connection.peripheral.services;
+    final state = _stateFor(deviceId);
     final out = <PlatformService>[];
     for (var sIdx = 0; sIdx < services.length; sIdx++) {
-      out.add(_withHandles(deviceId, services[sIdx], '$sIdx'));
+      out.add(_withHandles(state, connection.peripheral, services[sIdx],
+          '$sIdx'));
     }
     return out;
   }
 
   PlatformService _withHandles(
-    String deviceId,
+    _DeviceState state,
+    _SimulatedPeripheral peripheral,
     PlatformService service,
     String servicePath,
   ) {
     final chars = <PlatformCharacteristic>[];
     for (var cIdx = 0; cIdx < service.characteristics.length; cIdx++) {
       chars.add(_characteristicWithHandle(
-        deviceId,
+        state,
+        peripheral,
         service.characteristics[cIdx],
         '$servicePath/$cIdx',
       ));
@@ -738,7 +727,8 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     final included = <PlatformService>[];
     for (var iIdx = 0; iIdx < service.includedServices.length; iIdx++) {
       included.add(_withHandles(
-        deviceId,
+        state,
+        peripheral,
         service.includedServices[iIdx],
         '$servicePath/i$iIdx',
       ));
@@ -752,25 +742,45 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   PlatformCharacteristic _characteristicWithHandle(
-    String deviceId,
+    _DeviceState state,
+    _SimulatedPeripheral peripheral,
     PlatformCharacteristic c,
     String charPath,
   ) {
-    final charHandles = _charHandles.putIfAbsent(deviceId, () => {});
-    final handle =
-        charHandles.putIfAbsent(charPath, () => _mintHandle(deviceId));
+    final handle = state.charHandleByPath.putIfAbsent(
+      charPath,
+      () => state.mintHandle(),
+    );
     final uuidKey = c.uuid.toLowerCase();
-    // Track first-occurrence UUID -> handle for the [handleFor] helper.
-    _firstCharHandleByUuid.putIfAbsent(deviceId, () => {})
-        .putIfAbsent(uuidKey, () => handle);
-    // Reverse lookup: handle -> uuid, used by read/write fallback to
-    // the UUID-keyed `characteristicValues` map.
-    _charUuidByHandle.putIfAbsent(deviceId, () => {})[handle] = uuidKey;
+    // UUID -> handles reverse lookup (multiple handles per UUID for
+    // duplicate-UUID peripherals). The list is kept stable in
+    // discovery (= tree) order.
+    final handlesForUuid =
+        state.charHandlesByUuid.putIfAbsent(uuidKey, () => <int>[]);
+    if (!handlesForUuid.contains(handle)) {
+      handlesForUuid.add(handle);
+    }
+    // Handle -> UUID reverse lookup (1:1).
+    state.charUuidByHandle[handle] = uuidKey;
+
+    // Seed the per-handle value from the UUID-keyed seed map on first
+    // discovery, but never clobber a value that has already been
+    // written/seeded against the handle directly. Re-discoveries (e.g.
+    // post-Service-Changed with new handles) re-seed under the new
+    // handle naturally.
+    final seed = peripheral.characteristicValues[c.uuid] ??
+        peripheral.characteristicValues[uuidKey];
+    if (seed != null) {
+      state.charValuesByHandle.putIfAbsent(
+        handle,
+        () => Uint8List.fromList(seed),
+      );
+    }
 
     final descs = <PlatformDescriptor>[];
     for (var dIdx = 0; dIdx < c.descriptors.length; dIdx++) {
       descs.add(_descriptorWithHandle(
-        deviceId,
+        state,
         handle,
         c.descriptors[dIdx],
         '$charPath/$dIdx',
@@ -785,7 +795,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   PlatformDescriptor _descriptorWithHandle(
-    String deviceId,
+    _DeviceState state,
     int parentCharHandle,
     PlatformDescriptor d,
     String descPath,
@@ -793,39 +803,48 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     // Descriptor handles are minted by tree position so the same
     // descriptor UUID under two different characteristic instances
     // gets distinct handles.
-    final perDevice = _descriptorHandles.putIfAbsent(deviceId, () => {});
-    final handle =
-        perDevice.putIfAbsent(descPath, () => _mintHandle(deviceId));
+    final handle = state.descriptorHandleByPath.putIfAbsent(
+      descPath,
+      () => state.mintHandle(),
+    );
 
     // For CCCDs, record the parent char -> CCCD handle mapping so
     // [setNotification] can write the CCCD value to the right slot.
     // Also seed a default value of [0x00, 0x00] (disabled) the first
     // time we see this CCCD on this connection.
     if (d.uuid.toLowerCase() == _cccdUuid) {
-      _cccdHandleByCharHandle
-          .putIfAbsent(deviceId, () => {})[parentCharHandle] = handle;
-      _descriptorValuesByHandle
-          .putIfAbsent(deviceId, () => {})
-          .putIfAbsent(handle, () => Uint8List.fromList([0x00, 0x00]));
+      state.cccdHandleByCharHandle[parentCharHandle] = handle;
+      state.descriptorValuesByHandle.putIfAbsent(
+        handle,
+        () => Uint8List.fromList([0x00, 0x00]),
+      );
     }
     return PlatformDescriptor(uuid: d.uuid, handle: handle);
   }
 
-  int _mintHandle(String deviceId) {
-    final next = (_nextHandle[deviceId] ?? 0) + 1;
-    _nextHandle[deviceId] = next;
-    return next;
+  void _clearHandles(String deviceId) {
+    _deviceStates.remove(deviceId);
   }
 
-  void _clearHandles(String deviceId) {
-    _nextHandle.remove(deviceId);
-    _charHandles.remove(deviceId);
-    _descriptorHandles.remove(deviceId);
-    _firstCharHandleByUuid.remove(deviceId);
-    _charUuidByHandle.remove(deviceId);
-    _cccdHandleByCharHandle.remove(deviceId);
-    _charValuesByHandle.remove(deviceId);
-    _descriptorValuesByHandle.remove(deviceId);
+  /// Resolves [characteristicUuid] on [deviceId] to its single minted
+  /// handle, or returns null if discovery has not happened yet or the
+  /// UUID is not present. Throws [StateError] on ambiguity (multiple
+  /// chars with the same UUID) — UUID-only callers cannot disambiguate
+  /// and the production layer (post D.10) throws
+  /// [AmbiguousAttributeException] before reaching the platform anyway.
+  int? _resolveCharHandle(String deviceId, String characteristicUuid) {
+    final state = _deviceStates[deviceId];
+    if (state == null) return null;
+    final handles = state.charHandlesByUuid[characteristicUuid.toLowerCase()];
+    if (handles == null || handles.isEmpty) return null;
+    if (handles.length > 1) {
+      throw StateError(
+        'FakeBlueyPlatform: ambiguous UUID-only lookup for '
+        '$characteristicUuid on $deviceId — ${handles.length} matches. '
+        'Pass characteristicHandle explicitly.',
+      );
+    }
+    return handles.first;
   }
 
   @override
@@ -875,22 +894,32 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
-    // Prefer per-handle storage when the production caller supplied a
-    // handle (D.7+) AND a value has been seeded/written for it. This is
-    // load-bearing for I088 (duplicate-UUID-cross-services).
-    if (characteristicHandle != null) {
-      final byHandle = _charValuesByHandle[deviceId]?[characteristicHandle];
-      if (byHandle != null) {
-        return byHandle;
+    // Resolve the operation to a handle. Production callers (D.7+)
+    // supply a handle directly; the UUID-only fallback exists only so
+    // legacy tests can still address single-occurrence chars by UUID.
+    final state = _deviceStates[deviceId];
+    final handle = characteristicHandle ??
+        _resolveCharHandle(deviceId, characteristicUuid);
+    if (handle != null && state != null) {
+      final value = state.charValuesByHandle[handle];
+      if (value != null) {
+        return value;
       }
     }
-
-    final value =
-        connection.peripheral.characteristicValues[characteristicUuid];
-    if (value == null) {
-      throw Exception('Characteristic not found: $characteristicUuid');
+    // Pre-discovery legacy path: a handful of tests call
+    // `readCharacteristic` directly off the fake without first running
+    // `discoverServices`, so no handles have been minted yet. Fall
+    // back to the UUID-keyed seed on `_SimulatedPeripheral`. Once
+    // D.13 lands and the platform interface drops the UUID parameter,
+    // this branch can go.
+    final seed =
+        connection.peripheral.characteristicValues[characteristicUuid] ??
+        connection
+            .peripheral.characteristicValues[characteristicUuid.toLowerCase()];
+    if (seed != null) {
+      return seed;
     }
-    return value;
+    throw Exception('Characteristic not found: $characteristicUuid');
   }
 
   @override
@@ -954,15 +983,21 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       withResponse: withResponse,
     ));
 
-    connection.peripheral.characteristicValues[characteristicUuid] = value;
-    // Also store keyed by handle when the caller supplied one (D.7+),
-    // so a subsequent read on the SAME handle observes the write —
-    // load-bearing for the duplicate-UUID-cross-services case where
-    // two chars share a UUID but have distinct handles.
-    if (characteristicHandle != null) {
-      _charValuesByHandle.putIfAbsent(deviceId, () => {})[characteristicHandle] =
-          Uint8List.fromList(value);
+    // Resolve to a handle and store there. Handle is the primary key.
+    final state = _stateFor(deviceId);
+    final handle = characteristicHandle ??
+        _resolveCharHandle(deviceId, characteristicUuid);
+    if (handle != null) {
+      state.charValuesByHandle[handle] = Uint8List.fromList(value);
+      return;
     }
+    // Pre-discovery legacy path: a few integration tests write before
+    // calling `discoverServices`, so no handle has been minted. Mirror
+    // the read-side fallback by writing into the UUID-keyed seed map
+    // on `_SimulatedPeripheral` so a subsequent UUID-only read can
+    // find it. Once D.13 lands, this branch can go.
+    connection.peripheral.characteristicValues[characteristicUuid] =
+        Uint8List.fromList(value);
   }
 
   @override
@@ -995,11 +1030,13 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     // domain side request indications independently — that path goes
     // through `subscribeIndicate`, which the fake doesn't model
     // separately.
-    if (characteristicHandle != null) {
-      final cccdHandle =
-          _cccdHandleByCharHandle[deviceId]?[characteristicHandle];
+    final state = _stateFor(deviceId);
+    final charHandle = characteristicHandle ??
+        _resolveCharHandle(deviceId, characteristicUuid);
+    if (charHandle != null) {
+      final cccdHandle = state.cccdHandleByCharHandle[charHandle];
       if (cccdHandle != null) {
-        _descriptorValuesByHandle.putIfAbsent(deviceId, () => {})[cccdHandle] =
+        state.descriptorValuesByHandle[cccdHandle] =
             Uint8List.fromList(enable ? [0x01, 0x00] : [0x00, 0x00]);
       }
     }
@@ -1018,7 +1055,8 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     int? descriptorHandle,
   }) async {
     if (descriptorHandle != null) {
-      final value = _descriptorValuesByHandle[deviceId]?[descriptorHandle];
+      final value =
+          _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
       if (value != null) return value;
     }
     return Uint8List(0);
@@ -1033,7 +1071,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     int? descriptorHandle,
   }) async {
     if (descriptorHandle != null) {
-      _descriptorValuesByHandle.putIfAbsent(deviceId, () => {})[descriptorHandle] =
+      _stateFor(deviceId).descriptorValuesByHandle[descriptorHandle] =
           Uint8List.fromList(value);
     }
   }
@@ -1384,6 +1422,53 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 }
 
 // === Internal Helper Classes ===
+
+/// Per-device handle-keyed storage. Handle is the primary identity for
+/// every attribute; UUID is metadata used only by reverse-lookup paths
+/// for legacy UUID-only call sites (which D.13 will remove).
+///
+/// All maps share a single per-device handle counter ([nextHandle])
+/// drawn from a single pool for both characteristics and descriptors —
+/// this matches the iOS implementation. Handle values start at 1.
+class _DeviceState {
+  /// Monotonic per-device handle counter. Single pool shared between
+  /// characteristics and descriptors. Starts at 0; minted handles
+  /// start at 1.
+  int nextHandle = 0;
+
+  /// Tree-position -> handle for characteristics. Keys are
+  /// `'sIdx/cIdx'` (with `/iN` segments for included services). Lets
+  /// re-discovery reuse handles for the same tree position.
+  final Map<String, int> charHandleByPath = {};
+
+  /// Tree-position -> handle for descriptors. Keys are
+  /// `'sIdx/cIdx/dIdx'` (with `/iN` for included services).
+  final Map<String, int> descriptorHandleByPath = {};
+
+  /// UUID (lowercase) -> ordered list of handles. Multiple entries on
+  /// duplicate-UUID peripherals; order matches discovery order.
+  final Map<String, List<int>> charHandlesByUuid = {};
+
+  /// Handle -> UUID (lowercase). 1:1.
+  final Map<int, String> charUuidByHandle = {};
+
+  /// Char handle -> CCCD descriptor handle (if any). Used by
+  /// [setNotification] to write the CCCD value to the right slot for
+  /// the right characteristic instance.
+  final Map<int, int> cccdHandleByCharHandle = {};
+
+  /// **Primary** handle-keyed value storage for characteristics.
+  final Map<int, Uint8List> charValuesByHandle = {};
+
+  /// **Primary** handle-keyed value storage for descriptors. Default
+  /// CCCD entries (0x0000 = disabled) are seeded at discovery time.
+  final Map<int, Uint8List> descriptorValuesByHandle = {};
+
+  int mintHandle() {
+    nextHandle += 1;
+    return nextHandle;
+  }
+}
 
 class _SimulatedPeripheral {
   final PlatformDevice device;
