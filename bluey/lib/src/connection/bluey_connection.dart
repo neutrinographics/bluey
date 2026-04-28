@@ -599,12 +599,13 @@ class BlueyConnection implements Connection {
         'that has not been updated to emit handles in CharacteristicDto.',
       );
     }
+    final characteristicHandle = AttributeHandle(platformHandle);
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pc.uuid),
-      handle: AttributeHandle(platformHandle),
+      handle: characteristicHandle,
       properties: CharacteristicProperties(
         canRead: pc.properties.canRead,
         canWrite: pc.properties.canWrite,
@@ -612,12 +613,17 @@ class BlueyConnection implements Connection {
         canNotify: pc.properties.canNotify,
         canIndicate: pc.properties.canIndicate,
       ),
-      descriptors: pc.descriptors.map(_mapDescriptor).toList(),
+      descriptors: pc.descriptors
+          .map((pd) => _mapDescriptor(pd, characteristicHandle))
+          .toList(),
       ensureConnected: _ensureConnected,
     );
   }
 
-  BlueyRemoteDescriptor _mapDescriptor(platform.PlatformDescriptor pd) {
+  BlueyRemoteDescriptor _mapDescriptor(
+    platform.PlatformDescriptor pd,
+    AttributeHandle characteristicHandle,
+  ) {
     final platformHandle = pd.handle;
     if (platformHandle == null) {
       throw StateError(
@@ -632,6 +638,7 @@ class BlueyConnection implements Connection {
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
       handle: AttributeHandle(platformHandle),
+      characteristicHandle: characteristicHandle,
       ensureConnected: _ensureConnected,
     );
   }
@@ -750,7 +757,11 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
       deviceId: _deviceId,
       op: 'readCharacteristic',
       startDetail: 'char=$uuid',
-      body: () => _platform.readCharacteristic(_connectionId, uuid.toString()),
+      body: () => _platform.readCharacteristic(
+        _connectionId,
+        uuid.toString(),
+        characteristicHandle: handle.value,
+      ),
       completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
       lifecycleClient: _lifecycle(),
     );
@@ -774,6 +785,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         uuid.toString(),
         value,
         withResponse,
+        characteristicHandle: handle.value,
       ),
       completeDetail: (_) => 'char=$uuid',
       lifecycleClient: _lifecycle(),
@@ -807,7 +819,12 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     _runGattOp(
       _deviceId,
       'setNotification',
-      () => _platform.setNotification(_connectionId, uuid.toString(), true),
+      () => _platform.setNotification(
+        _connectionId,
+        uuid.toString(),
+        true,
+        characteristicHandle: handle.value,
+      ),
       lifecycleClient: _lifecycle(),
     ).catchError((Object error) {
       _notificationController?.addError(error);
@@ -843,7 +860,12 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     _runGattOp(
       _deviceId,
       'setNotification',
-      () => _platform.setNotification(_connectionId, uuid.toString(), false),
+      () => _platform.setNotification(
+        _connectionId,
+        uuid.toString(),
+        false,
+        characteristicHandle: handle.value,
+      ),
       lifecycleClient: _lifecycle(),
     ).catchError((Object _) {});
 
@@ -887,6 +909,14 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
 
+  /// Handle of the parent characteristic. Threaded onto the wire
+  /// alongside [handle] so native receivers can route descriptor ops
+  /// through the same handle table used for the owning characteristic
+  /// (D.8 additive interim, I088). Nullable so tests that construct a
+  /// descriptor in isolation without a parent characteristic still
+  /// type-check.
+  final AttributeHandle? _characteristicHandle;
+
   @override
   final UUID uuid;
 
@@ -901,17 +931,23 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   /// [ensureConnected] is the connection's pre-flight gate (I002).
   /// Defaults to a no-op for tests that build a descriptor without a
   /// parent connection.
+  ///
+  /// [characteristicHandle] is the parent characteristic's handle; it
+  /// rides on every descriptor op so native receivers can prefer
+  /// handle-keyed lookup over UUID-keyed lookup.
   BlueyRemoteDescriptor({
     required platform.BlueyPlatform platform,
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
     required this.handle,
+    AttributeHandle? characteristicHandle,
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
+       _characteristicHandle = characteristicHandle,
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {});
 
@@ -921,7 +957,12 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     return _runGattOp(
       _deviceId,
       'readDescriptor',
-      () => _platform.readDescriptor(_connectionId, uuid.toString()),
+      () => _platform.readDescriptor(
+        _connectionId,
+        uuid.toString(),
+        characteristicHandle: _characteristicHandle?.value,
+        descriptorHandle: handle.value,
+      ),
       lifecycleClient: _lifecycle(),
     );
   }
@@ -932,7 +973,13 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     return _runGattOp(
       _deviceId,
       'writeDescriptor',
-      () => _platform.writeDescriptor(_connectionId, uuid.toString(), value),
+      () => _platform.writeDescriptor(
+        _connectionId,
+        uuid.toString(),
+        value,
+        characteristicHandle: _characteristicHandle?.value,
+        descriptorHandle: handle.value,
+      ),
       lifecycleClient: _lifecycle(),
     );
   }

@@ -158,11 +158,16 @@ class IosConnectionManager {
   /// Reads a characteristic value from a connected device.
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async {
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async {
     return _translateGattPlatformError(
       'readCharacteristic',
-      () => _hostApi.readCharacteristic(deviceId, characteristicUuid),
+      () => _hostApi.readCharacteristic(
+        deviceId,
+        characteristicUuid,
+        characteristicHandle,
+      ),
     );
   }
 
@@ -171,8 +176,9 @@ class IosConnectionManager {
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) async {
+    bool withResponse, {
+    int? characteristicHandle,
+  }) async {
     return _translateGattPlatformError(
       'writeCharacteristic',
       () => _hostApi.writeCharacteristic(
@@ -180,6 +186,7 @@ class IosConnectionManager {
         characteristicUuid,
         value,
         withResponse,
+        characteristicHandle,
       ),
     );
   }
@@ -188,23 +195,36 @@ class IosConnectionManager {
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {
+    bool enable, {
+    int? characteristicHandle,
+  }) async {
     // Wrapped defensively for Phase 2 — no iOS timeout for setNotification today.
     return _translateGattPlatformError(
       'setNotification',
-      () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
+      () => _hostApi.setNotification(
+        deviceId,
+        characteristicUuid,
+        enable,
+        characteristicHandle,
+      ),
     );
   }
 
   /// Reads a descriptor value from a connected device.
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async {
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     return _translateGattPlatformError(
       'readDescriptor',
-      () => _hostApi.readDescriptor(deviceId, descriptorUuid),
+      () => _hostApi.readDescriptor(
+        deviceId,
+        descriptorUuid,
+        characteristicHandle,
+        descriptorHandle,
+      ),
     );
   }
 
@@ -212,11 +232,19 @@ class IosConnectionManager {
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     return _translateGattPlatformError(
       'writeDescriptor',
-      () => _hostApi.writeDescriptor(deviceId, descriptorUuid, value),
+      () => _hostApi.writeDescriptor(
+        deviceId,
+        descriptorUuid,
+        value,
+        characteristicHandle,
+        descriptorHandle,
+      ),
     );
   }
 

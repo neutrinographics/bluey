@@ -127,11 +127,16 @@ class AndroidConnectionManager {
   /// Reads a characteristic value from the connected device.
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async {
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async {
     return _translateGattPlatformError(
       'readCharacteristic',
-      () => _hostApi.readCharacteristic(deviceId, characteristicUuid),
+      () => _hostApi.readCharacteristic(
+        deviceId,
+        characteristicUuid,
+        characteristicHandle,
+      ),
     );
   }
 
@@ -140,8 +145,9 @@ class AndroidConnectionManager {
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) async {
+    bool withResponse, {
+    int? characteristicHandle,
+  }) async {
     return _translateGattPlatformError(
       'writeCharacteristic',
       () => _hostApi.writeCharacteristic(
@@ -149,6 +155,7 @@ class AndroidConnectionManager {
         characteristicUuid,
         value,
         withResponse,
+        characteristicHandle,
       ),
     );
   }
@@ -157,23 +164,36 @@ class AndroidConnectionManager {
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {
+    bool enable, {
+    int? characteristicHandle,
+  }) async {
     // Wrapped defensively for Phase 2 — no Android timeout for setNotification today.
     return _translateGattPlatformError(
       'setNotification',
-      () => _hostApi.setNotification(deviceId, characteristicUuid, enable),
+      () => _hostApi.setNotification(
+        deviceId,
+        characteristicUuid,
+        enable,
+        characteristicHandle,
+      ),
     );
   }
 
   /// Reads a descriptor value from the connected device.
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async {
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     return _translateGattPlatformError(
       'readDescriptor',
-      () => _hostApi.readDescriptor(deviceId, descriptorUuid),
+      () => _hostApi.readDescriptor(
+        deviceId,
+        descriptorUuid,
+        characteristicHandle,
+        descriptorHandle,
+      ),
     );
   }
 
@@ -181,11 +201,19 @@ class AndroidConnectionManager {
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     return _translateGattPlatformError(
       'writeDescriptor',
-      () => _hostApi.writeDescriptor(deviceId, descriptorUuid, value),
+      () => _hostApi.writeDescriptor(
+        deviceId,
+        descriptorUuid,
+        value,
+        characteristicHandle,
+        descriptorHandle,
+      ),
     );
   }
 

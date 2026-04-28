@@ -80,24 +80,24 @@ class BlueyHostApiImpl: BlueyHostApi {
         centralManager.discoverServices(deviceId: deviceId, completion: completion)
     }
 
-    func readCharacteristic(deviceId: String, characteristicUuid: String, completion: @escaping (Result<FlutterStandardTypedData, any Error>) -> Void) {
-        centralManager.readCharacteristic(deviceId: deviceId, characteristicUuid: characteristicUuid, completion: completion)
+    func readCharacteristic(deviceId: String, characteristicUuid: String, characteristicHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, any Error>) -> Void) {
+        centralManager.readCharacteristic(deviceId: deviceId, characteristicUuid: characteristicUuid, characteristicHandle: characteristicHandle, completion: completion)
     }
 
-    func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, any Error>) -> Void) {
-        centralManager.writeCharacteristic(deviceId: deviceId, characteristicUuid: characteristicUuid, value: value, withResponse: withResponse, completion: completion)
+    func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, any Error>) -> Void) {
+        centralManager.writeCharacteristic(deviceId: deviceId, characteristicUuid: characteristicUuid, value: value, withResponse: withResponse, characteristicHandle: characteristicHandle, completion: completion)
     }
 
-    func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, completion: @escaping (Result<Void, any Error>) -> Void) {
-        centralManager.setNotification(deviceId: deviceId, characteristicUuid: characteristicUuid, enable: enable, completion: completion)
+    func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, any Error>) -> Void) {
+        centralManager.setNotification(deviceId: deviceId, characteristicUuid: characteristicUuid, enable: enable, characteristicHandle: characteristicHandle, completion: completion)
     }
 
-    func readDescriptor(deviceId: String, descriptorUuid: String, completion: @escaping (Result<FlutterStandardTypedData, any Error>) -> Void) {
-        centralManager.readDescriptor(deviceId: deviceId, descriptorUuid: descriptorUuid, completion: completion)
+    func readDescriptor(deviceId: String, descriptorUuid: String, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, any Error>) -> Void) {
+        centralManager.readDescriptor(deviceId: deviceId, descriptorUuid: descriptorUuid, characteristicHandle: characteristicHandle, descriptorHandle: descriptorHandle, completion: completion)
     }
 
-    func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, any Error>) -> Void) {
-        centralManager.writeDescriptor(deviceId: deviceId, descriptorUuid: descriptorUuid, value: value, completion: completion)
+    func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<Void, any Error>) -> Void) {
+        centralManager.writeDescriptor(deviceId: deviceId, descriptorUuid: descriptorUuid, value: value, characteristicHandle: characteristicHandle, descriptorHandle: descriptorHandle, completion: completion)
     }
 
     func getMaximumWriteLength(deviceId: String, withResponse: Bool) throws -> Int64 {
@@ -126,12 +126,12 @@ class BlueyHostApiImpl: BlueyHostApi {
         peripheralManager.stopAdvertising(completion: completion)
     }
 
-    func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, any Error>) -> Void) {
-        peripheralManager.notifyCharacteristic(characteristicUuid: characteristicUuid, value: value, completion: completion)
+    func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, any Error>) -> Void) {
+        peripheralManager.notifyCharacteristic(characteristicUuid: characteristicUuid, value: value, characteristicHandle: characteristicHandle, completion: completion)
     }
 
-    func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, any Error>) -> Void) {
-        peripheralManager.notifyCharacteristicTo(centralId: centralId, characteristicUuid: characteristicUuid, value: value, completion: completion)
+    func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, any Error>) -> Void) {
+        peripheralManager.notifyCharacteristicTo(centralId: centralId, characteristicUuid: characteristicUuid, value: value, characteristicHandle: characteristicHandle, completion: completion)
     }
 
     func respondToReadRequest(requestId: Int64, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, any Error>) -> Void) {

@@ -142,7 +142,12 @@ class PeripheralManagerImpl: NSObject {
 
     // MARK: - Notifications
 
-    func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+    func notifyCharacteristic(characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
+        // I088 (D.8 additive interim) — handle is accepted on the wire
+        // but the peripheral side does not yet mint handles for its own
+        // local services, so the parameter is currently unused. UUID
+        // lookup remains the only path.
+        _ = characteristicHandle
         let uuid = characteristicUuid.lowercased()
         guard let characteristic = characteristics[uuid] else {
             completion(.failure(BlueyError.notFound.toServerPigeonError()))
@@ -159,7 +164,8 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
-    func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+    func notifyCharacteristicTo(centralId: String, characteristicUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
+        _ = characteristicHandle  // see notifyCharacteristic above (D.8 additive interim)
         let uuid = characteristicUuid.lowercased()
         guard let characteristic = characteristics[uuid] else {
             completion(.failure(BlueyError.notFound.toServerPigeonError()))

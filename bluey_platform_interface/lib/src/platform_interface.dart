@@ -385,38 +385,58 @@ abstract base class BlueyPlatform extends PlatformInterface {
   Future<List<PlatformService>> discoverServices(String deviceId);
 
   /// Read a characteristic value.
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// characteristic (D.8 additive interim, I088). Native receivers
+  /// prefer it when non-null; otherwise they fall back to UUID-keyed
+  /// lookup. D.13 will make it required and drop the UUID arg.
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  );
+    String characteristicUuid, {
+    int? characteristicHandle,
+  });
 
   /// Write a characteristic value.
   Future<void> writeCharacteristic(
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  );
+    bool withResponse, {
+    int? characteristicHandle,
+  });
 
   /// Enable or disable notifications for a characteristic.
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  );
+    bool enable, {
+    int? characteristicHandle,
+  });
 
   /// Stream of characteristic notifications.
   Stream<PlatformNotification> notificationStream(String deviceId);
 
   /// Read a descriptor value.
-  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid);
+  ///
+  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
+  /// handles for the owning characteristic and the descriptor itself
+  /// (D.8 additive interim, I088). Native receivers prefer them when
+  /// non-null; otherwise they fall back to UUID-keyed lookup.
+  Future<Uint8List> readDescriptor(
+    String deviceId,
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  });
 
   /// Write a descriptor value.
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  );
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  });
 
   /// Request a specific MTU.
   Future<int> requestMtu(String deviceId, int mtu);
@@ -482,22 +502,33 @@ abstract base class BlueyPlatform extends PlatformInterface {
   Future<void> stopAdvertising();
 
   /// Send a notification to all subscribed centrals.
-  Future<void> notifyCharacteristic(String characteristicUuid, Uint8List value);
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// local characteristic (D.8 additive interim, I088). Native
+  /// receivers prefer it when non-null; otherwise they fall back to
+  /// UUID-keyed lookup.
+  Future<void> notifyCharacteristic(
+    String characteristicUuid,
+    Uint8List value, {
+    int? characteristicHandle,
+  });
 
   /// Send a notification to a specific central.
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  );
+    Uint8List value, {
+    int? characteristicHandle,
+  });
 
   /// Send an indication to all subscribed centrals.
   ///
   /// Unlike notifications, indications require acknowledgment from the central.
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  );
+    Uint8List value, {
+    int? characteristicHandle,
+  });
 
   /// Send an indication to a specific central.
   ///
@@ -505,8 +536,9 @@ abstract base class BlueyPlatform extends PlatformInterface {
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  );
+    Uint8List value, {
+    int? characteristicHandle,
+  });
 
   /// Stream of device IDs whose GATT services have changed.
   ///

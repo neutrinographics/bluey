@@ -401,11 +401,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     override fun readCharacteristic(
         deviceId: String,
         characteristicUuid: String,
+        characteristicHandle: Long?,
         callback: (Result<ByteArray>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.readCharacteristic(deviceId, characteristicUuid) { result ->
+            cm.readCharacteristic(deviceId, characteristicUuid, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -418,11 +419,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         characteristicUuid: String,
         value: ByteArray,
         withResponse: Boolean,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.writeCharacteristic(deviceId, characteristicUuid, value, withResponse) { result ->
+            cm.writeCharacteristic(deviceId, characteristicUuid, value, withResponse, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -434,11 +436,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         deviceId: String,
         characteristicUuid: String,
         enable: Boolean,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.setNotification(deviceId, characteristicUuid, enable) { result ->
+            cm.setNotification(deviceId, characteristicUuid, enable, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -449,11 +452,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     override fun readDescriptor(
         deviceId: String,
         descriptorUuid: String,
+        characteristicHandle: Long?,
+        descriptorHandle: Long?,
         callback: (Result<ByteArray>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.readDescriptor(deviceId, descriptorUuid) { result ->
+            cm.readDescriptor(deviceId, descriptorUuid, characteristicHandle, descriptorHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -465,11 +470,13 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         deviceId: String,
         descriptorUuid: String,
         value: ByteArray,
+        characteristicHandle: Long?,
+        descriptorHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
-            cm.writeDescriptor(deviceId, descriptorUuid, value) { result ->
+            cm.writeDescriptor(deviceId, descriptorUuid, value, characteristicHandle, descriptorHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
             }
         } catch (e: Throwable) {
@@ -552,11 +559,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     override fun notifyCharacteristic(
         characteristicUuid: String,
         value: ByteArray,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
-            gs.notifyCharacteristic(characteristicUuid, value) { result ->
+            gs.notifyCharacteristic(characteristicUuid, value, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
             }
         } catch (e: Throwable) {
@@ -568,11 +576,12 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         centralId: String,
         characteristicUuid: String,
         value: ByteArray,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         try {
             val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
-            gs.notifyCharacteristicTo(centralId, characteristicUuid, value) { result ->
+            gs.notifyCharacteristicTo(centralId, characteristicUuid, value, characteristicHandle) { result ->
                 callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
             }
         } catch (e: Throwable) {

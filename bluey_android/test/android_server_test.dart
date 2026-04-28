@@ -172,26 +172,26 @@ void main() {
 
     group('notifyCharacteristic', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any()))
+        when(() => mockHostApi.notifyCharacteristic(any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
         await server.notifyCharacteristic('2A37', value);
 
-        verify(() => mockHostApi.notifyCharacteristic('2A37', value)).called(1);
+        verify(() => mockHostApi.notifyCharacteristic('2A37', value, null)).called(1);
       });
     });
 
     group('notifyCharacteristicTo', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
         await server.notifyCharacteristicTo('central-1', '2A37', value);
 
         verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value))
+                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value, null))
             .called(1);
       });
     });
@@ -199,27 +199,27 @@ void main() {
     group('indicateCharacteristic', () {
       test('calls notifyCharacteristic on hostApi (same underlying call)',
           () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any()))
+        when(() => mockHostApi.notifyCharacteristic(any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x03, 0x04]);
         await server.indicateCharacteristic('2A37', value);
 
-        verify(() => mockHostApi.notifyCharacteristic('2A37', value)).called(1);
+        verify(() => mockHostApi.notifyCharacteristic('2A37', value, null)).called(1);
       });
     });
 
     group('indicateCharacteristicTo', () {
       test('calls notifyCharacteristicTo on hostApi (same underlying call)',
           () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
+        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any(), any()))
             .thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x03, 0x04]);
         await server.indicateCharacteristicTo('central-1', '2A37', value);
 
         verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value))
+                mockHostApi.notifyCharacteristicTo('central-1', '2A37', value, null))
             .called(1);
       });
     });

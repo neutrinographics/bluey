@@ -233,9 +233,9 @@ class CentralManagerImpl: NSObject {
 
     // MARK: - Characteristic Operations
 
-    func readCharacteristic(deviceId: String, characteristicUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
+    func readCharacteristic(deviceId: String, characteristicUuid: String, characteristicHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
+        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -256,9 +256,9 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: characteristic)
     }
 
-    func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+    func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
+        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -288,9 +288,9 @@ class CentralManagerImpl: NSObject {
         }
     }
 
-    func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+    func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = findCharacteristic(deviceId: deviceId, uuid: charUuid) else {
+        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -309,6 +309,27 @@ class CentralManagerImpl: NSObject {
             makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Set notification timed out", details: nil)
         )
         peripheral.setNotifyValue(enable, for: characteristic)
+    }
+
+    /// I088 — handle-first lookup. Prefers the per-device
+    /// `handleStore.characteristicByHandle` table when [handle] is
+    /// non-null; otherwise falls back to UUID-keyed traversal via
+    /// [findCharacteristic]. Mirrors the Android side.
+    /// D.13 will make handles required and retire the UUID fallback.
+    private func lookupCharacteristic(deviceId: String, uuid: String, handle: Int64?) -> CBCharacteristic? {
+        if let h = handle, let match = handleStore.characteristicByHandle[deviceId]?[Int(h)] {
+            return match
+        }
+        return findCharacteristic(deviceId: deviceId, uuid: uuid)
+    }
+
+    /// I088 — handle-first lookup for descriptors. Mirrors
+    /// [lookupCharacteristic].
+    private func lookupDescriptor(deviceId: String, uuid: String, handle: Int64?) -> CBDescriptor? {
+        if let h = handle, let match = handleStore.descriptorByHandle[deviceId]?[Int(h)] {
+            return match
+        }
+        return findDescriptor(deviceId: deviceId, uuid: uuid)
     }
 
     /// Finds a characteristic by UUID, handling both short and full UUID formats.
@@ -338,9 +359,9 @@ class CentralManagerImpl: NSObject {
 
     // MARK: - Descriptor Operations
 
-    func readDescriptor(deviceId: String, descriptorUuid: String, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
+    func readDescriptor(deviceId: String, descriptorUuid: String, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
-        guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
+        guard let descriptor = lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -361,9 +382,9 @@ class CentralManagerImpl: NSObject {
         peripheral.readValue(for: descriptor)
     }
 
-    func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+    func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
-        guard let descriptor = findDescriptor(deviceId: deviceId, uuid: descUuid) else {
+        guard let descriptor = lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }

@@ -210,23 +210,26 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async => Uint8List(0);
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async => Uint8List(0);
 
   @override
   Future<void> writeCharacteristic(
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) async {}
+    bool withResponse, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {}
+    bool enable, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Stream<platform.PlatformNotification> notificationStream(String deviceId) =>
@@ -235,15 +238,19 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async => Uint8List(0);
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async => Uint8List(0);
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {}
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async => mtu;
@@ -321,28 +328,32 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> notifyCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   @override

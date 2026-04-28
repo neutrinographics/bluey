@@ -342,8 +342,17 @@ abstract class BlueyHostApi {
   List<ServiceDto> discoverServices(String deviceId);
 
   /// Read a characteristic value.
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// characteristic. Native receivers prefer it when non-null; otherwise
+  /// they fall back to UUID-keyed lookup. Nullable during the additive
+  /// interim (D.8); D.13 makes it required and drops the UUID arg.
   @async
-  Uint8List readCharacteristic(String deviceId, String characteristicUuid);
+  Uint8List readCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+    int? characteristicHandle,
+  );
 
   /// Write a characteristic value.
   @async
@@ -352,19 +361,41 @@ abstract class BlueyHostApi {
     String characteristicUuid,
     Uint8List value,
     bool withResponse,
+    int? characteristicHandle,
   );
 
   /// Enable or disable notifications for a characteristic.
   @async
-  void setNotification(String deviceId, String characteristicUuid, bool enable);
+  void setNotification(
+    String deviceId,
+    String characteristicUuid,
+    bool enable,
+    int? characteristicHandle,
+  );
 
   /// Read a descriptor value.
+  ///
+  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
+  /// handles for the owning characteristic and the descriptor itself.
+  /// Native receivers prefer them when non-null; otherwise they fall
+  /// back to UUID-keyed lookup. Nullable during the additive interim.
   @async
-  Uint8List readDescriptor(String deviceId, String descriptorUuid);
+  Uint8List readDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    int? characteristicHandle,
+    int? descriptorHandle,
+  );
 
   /// Write a descriptor value.
   @async
-  void writeDescriptor(String deviceId, String descriptorUuid, Uint8List value);
+  void writeDescriptor(
+    String deviceId,
+    String descriptorUuid,
+    Uint8List value,
+    int? characteristicHandle,
+    int? descriptorHandle,
+  );
 
   /// Get the maximum write length for a characteristic.
   /// iOS automatically negotiates MTU, so this returns the current negotiated value.
@@ -393,8 +424,16 @@ abstract class BlueyHostApi {
   void stopAdvertising();
 
   /// Send a notification to all subscribed centrals.
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// local characteristic. Native receivers prefer it when non-null;
+  /// otherwise they fall back to UUID-keyed lookup.
   @async
-  void notifyCharacteristic(String characteristicUuid, Uint8List value);
+  void notifyCharacteristic(
+    String characteristicUuid,
+    Uint8List value,
+    int? characteristicHandle,
+  );
 
   /// Send a notification to a specific central.
   @async
@@ -402,6 +441,7 @@ abstract class BlueyHostApi {
     String centralId,
     String characteristicUuid,
     Uint8List value,
+    int? characteristicHandle,
   );
 
   /// Respond to a read request.

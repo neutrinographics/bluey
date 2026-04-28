@@ -172,12 +172,12 @@ class ConnectionManagerQueueTest {
 
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { results.add("first=$it") }
 
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x02), true,
+            byteArrayOf(0x02), true, null,
         ) { results.add("second=$it") }
 
         // Only the first write should have reached the OS yet
@@ -211,11 +211,11 @@ class ConnectionManagerQueueTest {
         val results = mutableListOf<Result<Unit>>()
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { results.add(it) }
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x02), true,
+            byteArrayOf(0x02), true, null,
         ) { results.add(it) }
 
         // Both ops must still be in flight (neither synchronously completed nor failed)
@@ -250,7 +250,7 @@ class ConnectionManagerQueueTest {
 
         var captured: Result<Unit>? = null
         connectionManager.setNotification(
-            deviceAddress, testCharUuid.toString(), true,
+            deviceAddress, testCharUuid.toString(), true, null,
         ) { captured = it }
 
         verify { mockGatt.setCharacteristicNotification(char, true) }
@@ -279,7 +279,7 @@ class ConnectionManagerQueueTest {
         var captured: Result<Unit>? = null
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { captured = it }
 
         // Fire the OS callback with GATT_INVALID_HANDLE (status 0x01)
@@ -311,7 +311,7 @@ class ConnectionManagerQueueTest {
 
         var captured: Result<Unit>? = null
         connectionManager.setNotification(
-            deviceAddress, testCharUuid.toString(), true,
+            deviceAddress, testCharUuid.toString(), true, null,
         ) { captured = it }
 
         assertNotNull("callback must fire even when sync enable throws", captured)
@@ -337,7 +337,7 @@ class ConnectionManagerQueueTest {
         // Put an op in flight to prove the notification doesn't disturb it
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { /* ignored */ }
         verify(exactly = 1) {
             mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())
@@ -368,7 +368,7 @@ class ConnectionManagerQueueTest {
         // has NOT reached the OS yet — the queue is still busy with the first write.
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x99.toByte()), true,
+            byteArrayOf(0x99.toByte()), true, null,
         ) { /* ignored */ }
         verify(exactly = 1) {
             mockGatt.writeCharacteristic(any<BluetoothGattCharacteristic>(), any(), any())

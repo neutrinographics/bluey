@@ -173,12 +173,14 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async {
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
     return await _connectionManager.readCharacteristic(
       deviceId,
       characteristicUuid,
+      characteristicHandle: characteristicHandle,
     );
   }
 
@@ -187,14 +189,16 @@ final class BlueyIos extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) async {
+    bool withResponse, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
     await _connectionManager.writeCharacteristic(
       deviceId,
       characteristicUuid,
       value,
       withResponse,
+      characteristicHandle: characteristicHandle,
     );
   }
 
@@ -202,13 +206,15 @@ final class BlueyIos extends BlueyPlatform {
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {
+    bool enable, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
     await _connectionManager.setNotification(
       deviceId,
       characteristicUuid,
       enable,
+      characteristicHandle: characteristicHandle,
     );
   }
 
@@ -221,20 +227,35 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async {
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     _ensureInitialized();
-    return await _connectionManager.readDescriptor(deviceId, descriptorUuid);
+    return await _connectionManager.readDescriptor(
+      deviceId,
+      descriptorUuid,
+      characteristicHandle: characteristicHandle,
+      descriptorHandle: descriptorHandle,
+    );
   }
 
   @override
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     _ensureInitialized();
-    await _connectionManager.writeDescriptor(deviceId, descriptorUuid, value);
+    await _connectionManager.writeDescriptor(
+      deviceId,
+      descriptorUuid,
+      value,
+      characteristicHandle: characteristicHandle,
+      descriptorHandle: descriptorHandle,
+    );
   }
 
   @override
@@ -342,46 +363,60 @@ final class BlueyIos extends BlueyPlatform {
   @override
   Future<void> notifyCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
-    await _server.notifyCharacteristic(characteristicUuid, value);
+    await _server.notifyCharacteristic(
+      characteristicUuid,
+      value,
+      characteristicHandle: characteristicHandle,
+    );
   }
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
     await _server.notifyCharacteristicTo(
       centralId,
       characteristicUuid,
       value,
+      characteristicHandle: characteristicHandle,
     );
   }
 
   @override
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
-    await _server.indicateCharacteristic(characteristicUuid, value);
+    await _server.indicateCharacteristic(
+      characteristicUuid,
+      value,
+      characteristicHandle: characteristicHandle,
+    );
   }
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     _ensureInitialized();
     await _server.indicateCharacteristicTo(
       centralId,
       characteristicUuid,
       value,
+      characteristicHandle: characteristicHandle,
     );
   }
 

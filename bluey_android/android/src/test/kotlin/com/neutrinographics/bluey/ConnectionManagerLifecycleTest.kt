@@ -249,7 +249,7 @@ class ConnectionManagerLifecycleTest {
         var probeResult: Result<Unit>? = null
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { probeResult = it }
 
         assertNull(
@@ -593,7 +593,7 @@ class ConnectionManagerLifecycleTest {
         var writeResult: Result<Unit>? = null
         connectionManager.writeCharacteristic(
             deviceAddress, testCharUuid.toString(),
-            byteArrayOf(0x01), true,
+            byteArrayOf(0x01), true, null,
         ) { writeResult = it }
 
         // Write is in flight (no callback yet — onCharacteristicWrite hasn't fired).

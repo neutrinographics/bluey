@@ -134,8 +134,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async {
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async {
     final value = characteristicValues[characteristicUuid.toLowerCase()];
     if (value == null) {
       throw StateError('Characteristic not found: $characteristicUuid');
@@ -148,8 +149,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) async {
+    bool withResponse, {
+    int? characteristicHandle,
+  }) async {
     writeCharacteristicCalls.add(
       WriteCharacteristicCall(
         deviceId: deviceId,
@@ -164,8 +166,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {
+    bool enable, {
+    int? characteristicHandle,
+  }) async {
     setNotificationCalls.add(
       SetNotificationCall(
         deviceId: deviceId,
@@ -184,8 +187,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async {
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     final value = descriptorValues[descriptorUuid.toLowerCase()];
     if (value == null) {
       throw StateError('Descriptor not found: $descriptorUuid');
@@ -197,8 +202,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     writeDescriptorCalls.add(
       WriteDescriptorCall(
         deviceId: deviceId,
@@ -288,28 +295,32 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> notifyCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {}
 
   @override
   @override

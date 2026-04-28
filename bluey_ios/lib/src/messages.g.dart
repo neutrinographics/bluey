@@ -1479,14 +1479,19 @@ class BlueyHostApi {
   }
 
   /// Read a characteristic value.
-  Future<Uint8List> readCharacteristic(String deviceId, String characteristicUuid) async {
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// characteristic. Native receivers prefer it when non-null; otherwise
+  /// they fall back to UUID-keyed lookup. Nullable during the additive
+  /// interim (D.8); D.13 makes it required and drops the UUID arg.
+  Future<Uint8List> readCharacteristic(String deviceId, String characteristicUuid, int? characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -1499,14 +1504,14 @@ class BlueyHostApi {
   }
 
   /// Write a characteristic value.
-  Future<void> writeCharacteristic(String deviceId, String characteristicUuid, Uint8List value, bool withResponse) async {
+  Future<void> writeCharacteristic(String deviceId, String characteristicUuid, Uint8List value, bool withResponse, int? characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, value, withResponse]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, value, withResponse, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1518,14 +1523,14 @@ class BlueyHostApi {
   }
 
   /// Enable or disable notifications for a characteristic.
-  Future<void> setNotification(String deviceId, String characteristicUuid, bool enable) async {
+  Future<void> setNotification(String deviceId, String characteristicUuid, bool enable, int? characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.setNotification$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, enable]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicUuid, enable, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1537,14 +1542,19 @@ class BlueyHostApi {
   }
 
   /// Read a descriptor value.
-  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid) async {
+  ///
+  /// [characteristicHandle] / [descriptorHandle] are the platform-minted
+  /// handles for the owning characteristic and the descriptor itself.
+  /// Native receivers prefer them when non-null; otherwise they fall
+  /// back to UUID-keyed lookup. Nullable during the additive interim.
+  Future<Uint8List> readDescriptor(String deviceId, String descriptorUuid, int? characteristicHandle, int? descriptorHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, characteristicHandle, descriptorHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -1557,14 +1567,14 @@ class BlueyHostApi {
   }
 
   /// Write a descriptor value.
-  Future<void> writeDescriptor(String deviceId, String descriptorUuid, Uint8List value) async {
+  Future<void> writeDescriptor(String deviceId, String descriptorUuid, Uint8List value, int? characteristicHandle, int? descriptorHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, descriptorUuid, value, characteristicHandle, descriptorHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1693,14 +1703,18 @@ class BlueyHostApi {
   }
 
   /// Send a notification to all subscribed centrals.
-  Future<void> notifyCharacteristic(String characteristicUuid, Uint8List value) async {
+  ///
+  /// [characteristicHandle] is the platform-minted handle for the
+  /// local characteristic. Native receivers prefer it when non-null;
+  /// otherwise they fall back to UUID-keyed lookup.
+  Future<void> notifyCharacteristic(String characteristicUuid, Uint8List value, int? characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.notifyCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[characteristicUuid, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[characteristicUuid, value, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1712,14 +1726,14 @@ class BlueyHostApi {
   }
 
   /// Send a notification to a specific central.
-  Future<void> notifyCharacteristicTo(String centralId, String characteristicUuid, Uint8List value) async {
+  Future<void> notifyCharacteristicTo(String centralId, String characteristicUuid, Uint8List value, int? characteristicHandle) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.notifyCharacteristicTo$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId, characteristicUuid, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId, characteristicUuid, value, characteristicHandle]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(

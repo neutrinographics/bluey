@@ -222,6 +222,7 @@ class GattServerNotifyConcurrencyTest {
         gattServer.notifyCharacteristic(
             testCharUuid,
             byteArrayOf(0x01),
+            null,
         ) { notifyResult = it }
 
         // Under I012, notify waits for onNotificationSent per central.
@@ -266,6 +267,7 @@ class GattServerNotifyConcurrencyTest {
         gattServer.notifyCharacteristic(
             testCharUuid,
             byteArrayOf(0x01),
+            null,
         ) { notifyResult = it }
 
         assertNotNull(notifyResult)
@@ -289,6 +291,7 @@ class GattServerNotifyConcurrencyTest {
         gattServer.notifyCharacteristic(
             testCharUuid,
             byteArrayOf(0x01),
+            null,
         ) { notifyResult = it }
 
         assertNotNull(notifyResult)

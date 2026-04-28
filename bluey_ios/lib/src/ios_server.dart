@@ -81,18 +81,29 @@ class IosServer {
   /// Sends a notification to all connected centrals.
   Future<void> notifyCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
-    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
+    await _hostApi.notifyCharacteristic(
+      characteristicUuid,
+      value,
+      characteristicHandle,
+    );
   }
 
   /// Sends a notification to a specific central.
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
-    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
+    await _hostApi.notifyCharacteristicTo(
+      centralId,
+      characteristicUuid,
+      value,
+      characteristicHandle,
+    );
   }
 
   /// Sends an indication to all connected centrals.
@@ -101,9 +112,14 @@ class IosServer {
   /// indications. The characteristic's properties determine which is used.
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
-    await _hostApi.notifyCharacteristic(characteristicUuid, value);
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
+    await _hostApi.notifyCharacteristic(
+      characteristicUuid,
+      value,
+      characteristicHandle,
+    );
   }
 
   /// Sends an indication to a specific central.
@@ -113,9 +129,15 @@ class IosServer {
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
-    await _hostApi.notifyCharacteristicTo(centralId, characteristicUuid, value);
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
+    await _hostApi.notifyCharacteristicTo(
+      centralId,
+      characteristicUuid,
+      value,
+      characteristicHandle,
+    );
   }
 
   // === Request Handling ===

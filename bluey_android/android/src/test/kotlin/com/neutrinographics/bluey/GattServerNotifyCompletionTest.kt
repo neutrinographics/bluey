@@ -200,7 +200,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
 
         // notifyCharacteristicChanged was invoked for both centrals;
@@ -241,7 +241,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
 
         capturedCallback!!.onNotificationSent(device1, BluetoothGatt.GATT_SUCCESS)
@@ -267,7 +267,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
 
         // A timeout runnable for the per-send window must have been scheduled.
@@ -303,7 +303,7 @@ class GattServerNotifyCompletionTest {
         removedCallbacks.clear()
 
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { /* ignored */ }
 
         val timeout = capturedPostDelayed.firstOrNull {
@@ -333,10 +333,10 @@ class GattServerNotifyCompletionTest {
         var first: Result<Unit>? = null
         var second: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { first = it }
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x02),
+            testCharUuid, byteArrayOf(0x02), null,
         ) { second = it }
 
         // Neither has fired yet.
@@ -363,7 +363,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
         assertNull(notifyResult)
 
@@ -393,7 +393,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristicTo(
-            central1, testCharUuid, byteArrayOf(0x01),
+            central1, testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
 
         verify(exactly = 1) {
@@ -421,7 +421,7 @@ class GattServerNotifyCompletionTest {
 
         var notifyResult: Result<Unit>? = null
         gattServer.notifyCharacteristic(
-            testCharUuid, byteArrayOf(0x01),
+            testCharUuid, byteArrayOf(0x01), null,
         ) { notifyResult = it }
 
         assertNotNull(notifyResult)

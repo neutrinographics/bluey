@@ -321,6 +321,7 @@ class ConnectionManager(
     fun readCharacteristic(
         deviceId: String,
         characteristicUuid: String,
+        characteristicHandle: Long?,
         callback: (Result<ByteArray>) -> Unit
     ) {
         val gatt = connections[deviceId]
@@ -328,7 +329,7 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = findCharacteristic(gatt, characteristicUuid)
+        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
         if (characteristic == null) {
             callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
@@ -346,6 +347,7 @@ class ConnectionManager(
         characteristicUuid: String,
         value: ByteArray,
         withResponse: Boolean,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         val gatt = connections[deviceId]
@@ -353,7 +355,7 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = findCharacteristic(gatt, characteristicUuid)
+        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
         if (characteristic == null) {
             callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
@@ -379,6 +381,7 @@ class ConnectionManager(
         deviceId: String,
         characteristicUuid: String,
         enable: Boolean,
+        characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         val gatt = connections[deviceId]
@@ -386,7 +389,7 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = findCharacteristic(gatt, characteristicUuid)
+        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
         if (characteristic == null) {
             callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
             return
@@ -436,6 +439,8 @@ class ConnectionManager(
     fun readDescriptor(
         deviceId: String,
         descriptorUuid: String,
+        characteristicHandle: Long?,
+        descriptorHandle: Long?,
         callback: (Result<ByteArray>) -> Unit
     ) {
         val gatt = connections[deviceId]
@@ -443,7 +448,7 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val descriptor = findDescriptor(gatt, descriptorUuid)
+        val descriptor = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)
         if (descriptor == null) {
             callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
             return
@@ -460,6 +465,8 @@ class ConnectionManager(
         deviceId: String,
         descriptorUuid: String,
         value: ByteArray,
+        characteristicHandle: Long?,
+        descriptorHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         val gatt = connections[deviceId]
@@ -467,7 +474,7 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val descriptor = findDescriptor(gatt, descriptorUuid)
+        val descriptor = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)
         if (descriptor == null) {
             callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
             return
@@ -906,6 +913,54 @@ class ConnectionManager(
         handler.post {
             flutterApi.onConnectionStateChanged(event) {}
         }
+    }
+
+    /**
+     * I088 — handle-first lookup. Prefers the per-device
+     * `characteristicByHandle` table when [handle] is non-null;
+     * otherwise falls back to UUID-keyed traversal via [findCharacteristic].
+     * The handle table is populated in `onServicesDiscovered` from each
+     * characteristic's public `getInstanceId()` (Int), so the wire-level
+     * `Long?` is coerced down to an `Int` key for the lookup.
+     *
+     * D.13 will make handles required and retire the UUID fallback.
+     */
+    private fun lookupCharacteristic(
+        deviceId: String,
+        gatt: BluetoothGatt,
+        uuid: String,
+        handle: Long?,
+    ): BluetoothGattCharacteristic? {
+        if (handle != null) {
+            val match = characteristicByHandle[deviceId]?.get(handle.toInt())
+            if (match != null) {
+                return match
+            }
+            // Handle present but not in the table — fall through to UUID
+            // lookup so a stale handle from a pre-Service-Changed cache
+            // still resolves rather than silently failing.
+        }
+        return findCharacteristic(gatt, uuid)
+    }
+
+    /**
+     * I088 — handle-first lookup for descriptors. Mirrors
+     * [lookupCharacteristic]: prefer the per-device descriptor handle
+     * table when [handle] is non-null; fall back to UUID-keyed traversal.
+     */
+    private fun lookupDescriptor(
+        deviceId: String,
+        gatt: BluetoothGatt,
+        uuid: String,
+        handle: Long?,
+    ): BluetoothGattDescriptor? {
+        if (handle != null) {
+            val match = descriptorByHandle[deviceId]?.get(handle.toInt())
+            if (match != null) {
+                return match
+            }
+        }
+        return findDescriptor(gatt, uuid)
     }
 
     private fun findCharacteristic(gatt: BluetoothGatt, uuid: String): BluetoothGattCharacteristic? {

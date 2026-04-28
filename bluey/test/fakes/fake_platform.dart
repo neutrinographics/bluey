@@ -707,8 +707,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<Uint8List> readCharacteristic(
     String deviceId,
-    String characteristicUuid,
-  ) async {
+    String characteristicUuid, {
+    int? characteristicHandle,
+  }) async {
     readCharacteristicCalls.add(ReadCharacteristicCall(
       deviceId: deviceId,
       characteristicUuid: characteristicUuid,
@@ -763,8 +764,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     String characteristicUuid,
     Uint8List value,
-    bool withResponse,
-  ) {
+    bool withResponse, {
+    int? characteristicHandle,
+  }) {
     if (simulateSyncWriteThrow) {
       simulateSyncWriteThrow = false;
       throw StateError('simulated synchronous writeCharacteristic throw');
@@ -823,8 +825,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   Future<void> setNotification(
     String deviceId,
     String characteristicUuid,
-    bool enable,
-  ) async {
+    bool enable, {
+    int? characteristicHandle,
+  }) async {
     if (simulateSetNotificationDisconnected) {
       throw const GattOperationDisconnectedException('setNotification');
     }
@@ -848,8 +851,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<Uint8List> readDescriptor(
     String deviceId,
-    String descriptorUuid,
-  ) async {
+    String descriptorUuid, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {
     return Uint8List(0);
   }
 
@@ -857,8 +862,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   Future<void> writeDescriptor(
     String deviceId,
     String descriptorUuid,
-    Uint8List value,
-  ) async {}
+    Uint8List value, {
+    int? characteristicHandle,
+    int? descriptorHandle,
+  }) async {}
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async {
@@ -1063,8 +1070,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> notifyCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     // Notify all subscribed centrals
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(characteristicUuid)) {
@@ -1078,8 +1086,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   Future<void> notifyCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     final central = _connectedCentrals[centralId];
     if (central == null) {
       throw Exception('Central not connected: $centralId');
@@ -1090,8 +1099,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> indicateCharacteristic(
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     // Indicate all subscribed centrals (with acknowledgment)
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(characteristicUuid)) {
@@ -1104,8 +1114,9 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   Future<void> indicateCharacteristicTo(
     String centralId,
     String characteristicUuid,
-    Uint8List value,
-  ) async {
+    Uint8List value, {
+    int? characteristicHandle,
+  }) async {
     final central = _connectedCentrals[centralId];
     if (central == null) {
       throw Exception('Central not connected: $centralId');

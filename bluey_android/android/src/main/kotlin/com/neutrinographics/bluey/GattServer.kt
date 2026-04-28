@@ -166,8 +166,14 @@ class GattServer(
     fun notifyCharacteristic(
         characteristicUuid: String,
         value: ByteArray,
+        @Suppress("UNUSED_PARAMETER") characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
+        // I088 (D.8 additive interim) — handle is accepted on the wire
+        // but the server side does not yet mint handles for its own
+        // local services, so the parameter is currently unused. UUID
+        // lookup remains the only path; D.13 + the server-side handle
+        // story will land together.
         val server = gattServer
         if (server == null) {
             callback(Result.failure(BlueyAndroidError.NotInitialized("GattServer")))
@@ -257,6 +263,7 @@ class GattServer(
         centralId: String,
         characteristicUuid: String,
         value: ByteArray,
+        @Suppress("UNUSED_PARAMETER") characteristicHandle: Long?,
         callback: (Result<Unit>) -> Unit
     ) {
         val server = gattServer
