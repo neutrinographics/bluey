@@ -54,6 +54,7 @@ export 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 // Peer bounded context
 export 'src/peer/peer.dart' show BlueyPeer;
+export 'src/peer/peer_connection.dart' show PeerConnection;
 export 'src/peer/server_id.dart' show ServerId;
 
 // Domain events
