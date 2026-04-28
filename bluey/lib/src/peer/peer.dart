@@ -1,4 +1,4 @@
-import '../connection/connection.dart';
+import 'peer_connection.dart';
 import 'server_id.dart';
 
 /// A stable handle to a Bluey server identified by its [ServerId].
@@ -12,7 +12,10 @@ import 'server_id.dart';
 /// Calling [connect] performs a targeted scan for the peer,
 /// establishes a GATT connection, verifies the server's [serverId]
 /// matches the expected value, starts the lifecycle heartbeat, and
-/// returns a live [Connection].
+/// returns a live [PeerConnection] — the peer-protocol surface
+/// (filtered service tree, lifecycle disconnect). Use
+/// `peerConnection.connection` to drop down to the raw GATT handle
+/// when needed.
 abstract class BlueyPeer {
   /// The stable Bluey identifier of the remote server.
   ServerId get serverId;
@@ -26,10 +29,16 @@ abstract class BlueyPeer {
   /// [scanTimeout] bounds the discovery phase. [timeout] bounds each
   /// individual platform-level connect attempt.
   ///
+  /// Returns a [PeerConnection] — a peer-protocol wrapper around the
+  /// raw GATT [Connection] that hides the lifecycle control service
+  /// from the service tree and forwards disconnect through the
+  /// lifecycle protocol. Access the underlying raw connection via
+  /// `peerConnection.connection`.
+  ///
   /// Throws [PeerNotFoundException] if no matching server is found
   /// within [scanTimeout]. Throws [ConnectionException] for BLE-level
   /// connection failures.
-  Future<Connection> connect({
+  Future<PeerConnection> connect({
     Duration? scanTimeout,
     Duration? timeout,
   });

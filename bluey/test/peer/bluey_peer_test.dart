@@ -17,7 +17,7 @@ void main() {
   });
 
   group('BlueyPeer', () {
-    test('connect() returns a Connection with control service hidden',
+    test('connect() returns a PeerConnection with control service hidden',
         () async {
       final id = ServerId.generate();
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
@@ -26,16 +26,18 @@ void main() {
         platformApi: fakePlatform,
         serverId: id,
       );
-      final conn = await peer.connect();
+      final peerConn = await peer.connect();
 
-      expect(conn.state, ConnectionState.ready);
-      final services = await conn.services();
+      expect(peerConn, isA<PeerConnection>());
+      expect(peerConn.serverId, equals(id));
+      expect(peerConn.connection.state, ConnectionState.ready);
+      final services = await peerConn.services();
       expect(
         services.any((s) => s.uuid.toString() == controlServiceUuid),
         isFalse,
       );
 
-      await conn.disconnect();
+      await peerConn.disconnect();
     });
 
     test('connect() throws PeerNotFoundException if no match', () async {
@@ -67,10 +69,10 @@ void main() {
           peerSilenceTimeout: const Duration(seconds: 8),
         );
 
-        late Connection conn;
+        late PeerConnection peerConn;
         peer
             .connect(scanTimeout: const Duration(milliseconds: 500))
-            .then((c) => conn = c);
+            .then((c) => peerConn = c);
 
         // The scan phase uses Stream.timeout which needs elapsed time
         // in fakeAsync to close the scan stream.
@@ -78,7 +80,7 @@ void main() {
         async.flushMicrotasks();
 
         final states = <ConnectionState>[];
-        conn.stateChanges.listen(states.add);
+        peerConn.connection.stateChanges.listen(states.add);
 
         // Simulate server unreachable.
         fakePlatform.simulateWriteTimeout = true;
@@ -121,8 +123,8 @@ void main() {
       expect(() => peer.connect(), throwsStateError);
 
       // Let the first one finish
-      final conn = await first;
-      await conn.disconnect();
+      final peerConn = await first;
+      await peerConn.disconnect();
     });
   });
 }

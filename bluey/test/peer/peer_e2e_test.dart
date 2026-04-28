@@ -53,9 +53,11 @@ void main() {
 
       final bluey = Bluey();
       final peer = bluey.peer(id);
-      final conn = await peer.connect();
-      expect(conn.state, ConnectionState.ready);
-      await conn.disconnect();
+      final peerConn = await peer.connect();
+      expect(peerConn, isA<PeerConnection>());
+      expect(peerConn.serverId, equals(id));
+      expect(peerConn.connection.state, ConnectionState.ready);
+      await peerConn.disconnect();
       await bluey.dispose();
     });
 
