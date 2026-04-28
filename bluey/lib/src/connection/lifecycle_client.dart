@@ -329,18 +329,53 @@ class LifecycleClient {
   /// side happens to keep `getInstanceId()` stable, so the handle is
   /// usually the same — but the contract should hold both sides).
   void _refreshFromServices(List<RemoteService> allServices) {
-    if (!_isRunning) return;
+    if (!_isRunning) {
+      _logger.log(
+        BlueyLogLevel.trace,
+        'bluey.connection.lifecycle',
+        'servicesChanges received but lifecycle not running, skipping',
+        data: {'connectionId': _connectionId},
+      );
+      return;
+    }
     final controlService = allServices
         .where((s) => lifecycle.isControlService(s.uuid.toString()))
         .firstOrNull;
-    if (controlService == null) return;
+    if (controlService == null) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.connection.lifecycle',
+        'servicesChanges received but control service is gone',
+        data: {'connectionId': _connectionId},
+      );
+      return;
+    }
     final heartbeatChar = controlService.characteristics().where(
           (c) =>
               c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
         ).firstOrNull;
-    if (heartbeatChar == null) return;
-    if (_heartbeatCharHandle == heartbeatChar.handle) return;
+    if (heartbeatChar == null) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.connection.lifecycle',
+        'servicesChanges received but heartbeat char is gone',
+        data: {'connectionId': _connectionId},
+      );
+      return;
+    }
     final previous = _heartbeatCharHandle;
+    if (previous == heartbeatChar.handle) {
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.connection.lifecycle',
+        'heartbeat-char handle refresh: unchanged',
+        data: {
+          'connectionId': _connectionId,
+          'handle': heartbeatChar.handle.value,
+        },
+      );
+      return;
+    }
     _heartbeatCharHandle = heartbeatChar.handle;
     _logger.log(
       BlueyLogLevel.info,
