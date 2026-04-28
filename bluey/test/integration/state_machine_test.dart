@@ -96,6 +96,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         final states = <ConnectionState>[];
         final subscription = connection.stateChanges.listen(states.add);
@@ -172,6 +173,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         // Perform operations
         await fakePlatform.readCharacteristic(
@@ -444,6 +446,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         // Request MTU change
         final newMtu = await connection.requestMtu(
@@ -530,6 +533,7 @@ void main() {
 
         // Connect
         final connection1 = await bluey.connect(device);
+        await connection1.services(); // promote linked → ready
         expect(connection1.state, equals(ConnectionState.ready));
 
         // Unexpected disconnection
@@ -539,6 +543,7 @@ void main() {
 
         // Reconnect
         final connection2 = await bluey.connect(device);
+        await connection2.services(); // promote linked → ready
         expect(connection2.state, equals(ConnectionState.ready));
 
         await connection2.disconnect();

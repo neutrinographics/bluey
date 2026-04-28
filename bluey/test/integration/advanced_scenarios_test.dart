@@ -352,6 +352,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         expect(connection.state, equals(ConnectionState.ready));
 
@@ -553,6 +554,7 @@ void main() {
         // Connect to first device
         final device1 = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device1);
+        await connection.services(); // promote linked → ready
         expect(connection.state, equals(ConnectionState.ready));
 
         // Add another device before second scan
@@ -603,9 +605,11 @@ void main() {
 
         // Connect to first
         final connection1 = await bluey.connect(scanResults[0].device);
+        await connection1.services(); // promote linked → ready
 
         // Connect to second while first is connected
         final connection2 = await bluey.connect(scanResults[1].device);
+        await connection2.services(); // promote linked → ready
 
         expect(connection1.state, equals(ConnectionState.ready));
         expect(connection2.state, equals(ConnectionState.ready));
@@ -776,6 +780,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         expect(connection.state, equals(ConnectionState.ready));
 
@@ -806,6 +811,7 @@ void main() {
         final bluey = Bluey();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
+        await connection.services(); // promote linked → ready
 
         // Initially connected
         expect(connection.state, equals(ConnectionState.ready));

@@ -76,8 +76,9 @@ void main() {
     });
   });
 
-  group('bluey.connect auto-upgrade', () {
-    test('auto-upgrades to peer connection for Bluey servers', () async {
+  group('bluey.connectAsPeer', () {
+    test('returns a peer connection with the correct serverId for Bluey '
+        'servers', () async {
       final id = ServerId.generate();
       fakePlatform.simulateBlueyServer(
         address: 'AA:BB:CC:DD:EE:01',
@@ -90,23 +91,23 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Bluey Server',
       );
-      final conn = await bluey.connect(device);
+      final peerConn = await bluey.connectAsPeer(device);
 
-      expect(conn.isBlueyServer, isTrue);
-      expect(conn.serverId, equals(id));
+      expect(peerConn, isA<PeerConnection>());
+      expect(peerConn.serverId, equals(id));
 
-      // The control service should be hidden
-      final services = await conn.services();
+      // The control service should be hidden from the peer wrapper.
+      final services = await peerConn.services();
       final controlServicePresent = services.any(
         (s) => s.uuid.toString().toLowerCase() == 'b1e70001-0000-1000-8000-00805f9b34fb',
       );
       expect(controlServicePresent, isFalse);
 
-      await conn.disconnect();
+      await peerConn.disconnect();
       await bluey.dispose();
     });
 
-    test('returns raw connection for non-Bluey devices', () async {
+    test('tryUpgrade returns null for non-Bluey devices', () async {
       fakePlatform.simulatePeripheral(
         id: 'AA:BB:CC:DD:EE:01',
         name: 'Generic Device',
@@ -127,9 +128,9 @@ void main() {
         name: 'Generic Device',
       );
       final conn = await bluey.connect(device);
+      final peerConn = await bluey.tryUpgrade(conn);
 
-      expect(conn.isBlueyServer, isFalse);
-      expect(conn.serverId, isNull);
+      expect(peerConn, isNull);
 
       await conn.disconnect();
       await bluey.dispose();

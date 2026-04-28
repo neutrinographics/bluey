@@ -39,26 +39,32 @@ void main() {
 
       final connection = await bluey.connect(device);
 
-      // Connection is established after connect() completes
+      // Connection is established after connect() completes. The state is
+      // `linked` (platform link up, services not yet discovered). Calling
+      // `services()` promotes the connection to `ready`.
+      expect(connection.state, equals(ConnectionState.linked));
+      await connection.services();
       expect(connection.state, equals(ConnectionState.ready));
     });
 
     test('I067: connection lifecycle emits linked → ready', () async {
-      // Subscribe to the state stream BEFORE bluey.connect() returns so
-      // we capture the full transition sequence: platform CONNECTED →
-      // `linked` (link up, services not yet discovered) → `ready` once
-      // services() completes its post-connect discovery.
-      //
-      // Done by hooking the state stream from the connection-state
-      // listener path: emit a connecting → connected platform sequence
-      // and observe the domain-side events.
+      // After C.5, `bluey.connect` no longer auto-discovers services;
+      // it returns at `linked`. Calling `services()` discovers the
+      // service tree and promotes to `ready`. We capture the full
+      // transition sequence here: platform CONNECTED → `linked` (link
+      // up) → `ready` once services() completes.
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
       );
 
       final connection = await bluey.connect(device);
+      expect(connection.state, equals(ConnectionState.linked));
+
       final states = <ConnectionState>[connection.state];
       connection.stateChanges.listen(states.add);
+
+      await connection.services();
+      expect(connection.state, equals(ConnectionState.ready));
 
       // Re-poke the platform state stream to verify the listener filter
       // does not regress us from `ready` back to `linked`.
@@ -68,12 +74,13 @@ void main() {
       );
       await Future.delayed(Duration(milliseconds: 10));
 
-      // The connection should have reached `ready` by the time
-      // bluey.connect() returned.
-      expect(connection.state, equals(ConnectionState.ready));
       // No regression: post-ready, a duplicate platform-CONNECTED does
       // NOT walk the connection back to `linked`.
-      expect(states, isNot(contains(ConnectionState.linked)));
+      expect(connection.state, equals(ConnectionState.ready));
+      // The post-ready stream has no `linked` entry (we filter no-op
+      // backwards transitions; see I067). Note: the initial `linked`
+      // captured at index 0 is the snapshot, not a stream event.
+      expect(states.skip(2), isNot(contains(ConnectionState.linked)));
     });
 
     test('platform-driven state changes are emitted post-connect', () async {

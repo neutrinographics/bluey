@@ -306,11 +306,11 @@ class Bluey {
   ///   chosen to exceed the typical OS link-supervision timeout (~20 s) so
   ///   the OS path fires first on genuine link loss.
   ///
-  /// After connecting, this method automatically discovers services. If the
-  /// device hosts the Bluey control service, the lifecycle heartbeat is
-  /// started and the connection is upgraded in place so that it hides the
-  /// control service. For non-Bluey devices a raw connection is returned.
-  /// Callers can check [Connection.isBlueyServer] to distinguish.
+  /// Returns a raw [Connection]. This method does **not** auto-upgrade
+  /// to the Bluey peer protocol even when the device hosts the control
+  /// service. Callers that want peer-aware behavior should use
+  /// [connectAsPeer] (which throws [NotABlueyPeerException] for non-peer
+  /// devices) or call [tryUpgrade] on the returned connection.
   ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(
@@ -336,17 +336,10 @@ class Bluey {
 
       _emitEvent(ConnectedEvent(deviceId: device.id));
 
-      final rawConnection = BlueyConnection(
+      final connection = BlueyConnection(
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
-        peerSilenceTimeout: peerSilenceTimeout,
-      );
-
-      // Auto-upgrade: if the server hosts the Bluey control service,
-      // start the lifecycle heartbeat and upgrade the connection in place.
-      final connection = await _upgradeIfBlueyServer(
-        rawConnection,
         peerSilenceTimeout: peerSilenceTimeout,
       );
 
@@ -370,80 +363,6 @@ class Bluey {
         ),
       );
       throw _wrapError(e);
-    }
-  }
-
-  /// Checks if the connected device hosts the Bluey control service.
-  /// If yes, reads the ServerId, starts the lifecycle heartbeat, and
-  /// upgrades the connection in place. If not, returns the raw connection
-  /// unchanged.
-  Future<Connection> _upgradeIfBlueyServer(
-    BlueyConnection rawConnection, {
-    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
-  }) async {
-    try {
-      dev.log('upgrade attempt: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
-
-      // Fetch services before upgrade so the full list (including control
-      // service) is available for the lifecycle client.
-      final services = await rawConnection.services();
-
-      final controlService = services
-          .where((s) => lifecycle.isControlService(s.uuid.toString()))
-          .firstOrNull;
-
-      dev.log(
-        controlService != null
-            ? 'control service discovered'
-            : 'no control service — peer is not a bluey peer',
-        name: 'bluey.peer',
-      );
-
-      if (controlService == null) return rawConnection;
-
-      // Read the ServerId
-      final serverIdChar = controlService.characteristics
-          .where(
-            (c) => c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
-          )
-          .firstOrNull;
-
-      ServerId? serverId;
-      if (serverIdChar != null) {
-        try {
-          final bytes = await serverIdChar.read();
-          serverId = lifecycle.decodeServerId(bytes);
-        } catch (_) {
-          // ServerId read failed -- still upgrade for lifecycle benefits
-        }
-      }
-
-      dev.log('serverId read: $serverId', name: 'bluey.peer');
-
-      // Start lifecycle heartbeat
-      final lifecycleClient = LifecycleClient(
-        platformApi: _platform,
-        connectionId: rawConnection.connectionId,
-        peerSilenceTimeout: peerSilenceTimeout,
-        onServerUnreachable: () {
-          rawConnection.disconnect().catchError((_) {});
-        },
-      );
-      lifecycleClient.start(allServices: services);
-
-      // Upgrade the connection in place — sets isBlueyServer, enables
-      // service filtering, and invalidates the service cache.
-      rawConnection.upgrade(
-        lifecycleClient: lifecycleClient,
-        serverId: serverId ?? ServerId.generate(),
-      );
-
-      dev.log('upgrade complete: deviceId=${rawConnection.deviceId}', name: 'bluey.peer');
-
-      return rawConnection;
-    } catch (_) {
-      // Service discovery failed -- return raw connection
-      return rawConnection;
     }
   }
 
@@ -504,9 +423,10 @@ class Bluey {
   /// Builds a [PeerConnection] wrapping [rawConnection] if the device
   /// hosts the lifecycle control service.
   ///
-  /// Mirrors the detection logic in [_upgradeIfBlueyServer], but
-  /// **does not mutate** the underlying [Connection] (no
-  /// `BlueyConnection.upgrade` call). Instead, on success, a fresh
+  /// Discovers services on [rawConnection] and, if the Bluey lifecycle
+  /// control service is present, builds a [PeerConnection] around it.
+  /// Does **not** mutate the underlying [Connection] (no
+  /// `BlueyConnection.upgrade` call). On success, a fresh
   /// [PeerConnection] wrapper is returned around the existing raw
   /// connection.
   ///
@@ -523,34 +443,41 @@ class Bluey {
         name: 'bluey.peer',
       );
 
-      // Fast path: the legacy auto-upgrade in [connect] already ran
-      // and detected the control service in place. The connection's
-      // [Connection.services] now filters out the control service, so
-      // service discovery here would miss it. Use the upgraded state
-      // (isBlueyServer + serverId) to build the wrapper directly.
+      // Fast path: the underlying [BlueyConnection] is already upgraded
+      // (e.g. via the late-upgrade triggered by [BlueyConnection.services]
+      // or by a service-change notification). The filtered services list
+      // would no longer expose the control service, so we can't rediscover
+      // it; reuse the existing upgraded state instead.
       //
-      // Reuse the running LifecycleClient that's already attached to
-      // the [BlueyConnection]. A fresh, unstarted client here would
-      // leave [PeerConnection.sendDisconnectCommand] silently a no-op
-      // because [LifecycleClient.sendDisconnectCommand] short-circuits
-      // when its `_heartbeatCharUuid` is null (set only by `start()`).
-      // By reusing the legacy client, the wrapper's peer-protocol ops
-      // reach the peer through the same client that's already driving
-      // heartbeats. The legacy auto-upgrade and peer wrapper coexist
-      // through this shared client until C.5 collapses the two paths.
-      if (rawConnection is BlueyConnection && rawConnection.isBlueyServer) {
+      // Reuse the running LifecycleClient already attached to the
+      // [BlueyConnection]. A fresh, unstarted client here would leave
+      // [PeerConnection.sendDisconnectCommand] silently a no-op because
+      // [LifecycleClient.sendDisconnectCommand] short-circuits when its
+      // `_heartbeatCharUuid` is null (set only by `start()`).
+      PeerConnection? buildFromUpgraded() {
+        if (rawConnection is! BlueyConnection) return null;
+        if (!rawConnection.isBlueyServer) return null;
         final existingLifecycle = rawConnection.lifecycleClient;
         final existingServerId = rawConnection.serverId;
-        if (existingLifecycle != null && existingServerId != null) {
-          return PeerConnection.create(
-            connection: rawConnection,
-            serverId: existingServerId,
-            lifecycleClient: existingLifecycle,
-          );
-        }
+        if (existingLifecycle == null || existingServerId == null) return null;
+        return PeerConnection.create(
+          connection: rawConnection,
+          serverId: existingServerId,
+          lifecycleClient: existingLifecycle,
+        );
       }
 
+      final fastPath = buildFromUpgraded();
+      if (fastPath != null) return fastPath;
+
       final services = await rawConnection.services();
+
+      // [BlueyConnection.services] may have late-upgraded the connection
+      // in place if the control service was present. In that case, the
+      // returned services list has already filtered out the control
+      // service — re-check the upgraded state and use it.
+      final fastPathPostServices = buildFromUpgraded();
+      if (fastPathPostServices != null) return fastPathPostServices;
 
       final controlService = services
           .where((s) => lifecycle.isControlService(s.uuid.toString()))

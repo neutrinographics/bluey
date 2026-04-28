@@ -670,6 +670,7 @@ void main() {
         final connections = <Connection>[];
         for (final result in scanResults) {
           final connection = await bluey.connect(result.device);
+          await connection.services(); // promote linked → ready
           connections.add(connection);
         }
 

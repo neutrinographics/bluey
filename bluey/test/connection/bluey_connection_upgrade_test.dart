@@ -50,7 +50,8 @@ void main() {
       await bluey.dispose();
     });
 
-    test('auto-upgrades to Bluey when control service is present', () async {
+    test('auto-upgrades to Bluey when control service is present on services() '
+        'discovery', () async {
       final id = ServerId.generate();
       fakePlatform.simulateBlueyServer(
         address: 'AA:BB:CC:DD:EE:01',
@@ -64,6 +65,11 @@ void main() {
         name: 'Bluey Server',
       ));
 
+      // After C.5, `bluey.connect` does not auto-upgrade. The first
+      // `services()` call discovers the control service and triggers
+      // the in-place upgrade via `BlueyConnection._tryUpgrade`.
+      expect(conn.isBlueyServer, isFalse);
+      await conn.services();
       expect(conn.isBlueyServer, isTrue);
       expect(conn.serverId, equals(id));
 
@@ -85,6 +91,9 @@ void main() {
         name: 'Bluey Server',
       ));
 
+      // The first services() call discovers the control service and
+      // triggers the in-place upgrade. The returned list filters out
+      // the control service.
       final services = await conn.services();
       expect(
         services.any((s) => lifecycle.isControlService(s.uuid.toString())),
@@ -114,6 +123,11 @@ void main() {
               name: 'Test',
             ))
             .then((c) => conn = c);
+        async.flushMicrotasks();
+
+        // Trigger services discovery to drive the late-upgrade (C.5
+        // removed the auto-upgrade in `bluey.connect`).
+        conn.services();
         async.flushMicrotasks();
 
         expect(conn.isBlueyServer, isTrue);
@@ -178,6 +192,8 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Bluey Server',
       ));
+      // Drive services discovery to trigger the late-upgrade.
+      await conn.services();
 
       expect(conn.state, ConnectionState.ready);
       expect(conn.isBlueyServer, isTrue);
@@ -205,6 +221,8 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Peer',
       ));
+      // Drive services discovery to trigger the late-upgrade.
+      await conn.services();
 
       expect(conn.isBlueyServer, isTrue);
       expect(
@@ -236,6 +254,8 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Peer',
       ));
+      // Drive services discovery to trigger the late-upgrade.
+      await conn.services();
 
       expect(conn.isBlueyServer, isTrue);
       expect(
@@ -343,6 +363,8 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Server',
       ));
+      // Drive services discovery to trigger the late-upgrade.
+      await conn.services();
 
       expect(conn.isBlueyServer, isTrue);
 
@@ -458,6 +480,8 @@ void main() {
         address: 'AA:BB:CC:DD:EE:01',
         name: 'Bluey Server',
       ));
+      // Drive services discovery to trigger the late-upgrade.
+      await conn.services();
 
       expect(conn.isBlueyServer, isTrue);
 
