@@ -4,7 +4,7 @@
 
 **Structured logging pipeline (I307):**
 
-- New `BlueyLog` Swift singleton with native-side level filter + tee to `os_log` + Pigeon bridge to Dart.
+- New `BlueyLog` Swift singleton with native-side level filter + Pigeon bridge to Dart. Native log events flow into the unified `bluey.logEvents` stream as the single source of truth.
 - New native logs at meaningful points (CB delegate callbacks, op-slot events, addService/advertising, request handling, state transitions). Closes the iOS observability gap (the iOS library previously had zero `NSLog`/`print` calls).
 - `setLogLevel` HostApi method honors the Dart-set level — no Pigeon traffic for filtered events.
 

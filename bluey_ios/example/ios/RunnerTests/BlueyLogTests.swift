@@ -31,10 +31,6 @@ final class FakeBlueyFlutterApi: BlueyFlutterApiProtocol {
 }
 
 /// Unit tests for `BlueyLog` Swift singleton.
-///
-/// The `os_log` tee path is intentionally not asserted — it is observable
-/// via Console.app in manual smoke testing; the test cost of intercepting
-/// `os_log` is not worth it.
 final class BlueyLogTests: XCTestCase {
 
     private var fakeApi: FakeBlueyFlutterApi!

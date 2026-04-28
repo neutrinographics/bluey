@@ -1,18 +1,15 @@
 import Foundation
-import os.log
 
 /// Process-wide structured logger for the Bluey iOS plugin.
 ///
-/// Emits log events along two paths:
-///   1. **`os_log` tee** — visible in Console.app / `xcrun simctl spawn ... log stream`.
-///   2. **Pigeon bridge** — `BlueyFlutterApi.onLog(...)` for forwarding into
-///      the Dart side's `Bluey.logEvents` stream. The bridge is best-effort:
-///      if no api is bound (e.g. very early plugin attach, or after detach),
-///      bridge emits are silently dropped per the bootstrap-loss policy of
-///      the structured-logging plan (I307).
+/// Forwards log events to the Dart side via `BlueyFlutterApi.onLog(...)` so
+/// they reach the unified `Bluey.logEvents` stream. The bridge is
+/// best-effort: if no api is bound (e.g. very early plugin attach, or
+/// after detach), emits are silently dropped per the bootstrap-loss
+/// policy of the structured-logging plan (I307).
 ///
-/// Level filtering is applied before either path runs — events below
-/// the current level are dropped entirely. Default threshold is `.info`;
+/// Level filtering is applied before forwarding — events below the
+/// current level are dropped entirely. Default threshold is `.info`;
 /// Dart side updates it via the `BlueyHostApi.setLogLevel` channel.
 ///
 /// Singleton because there is exactly one Flutter engine per process. Tests
@@ -60,18 +57,6 @@ final class BlueyLog {
     ) {
         let (current, api) = queue.sync { (minLevel, flutterApi) }
         guard level.rawValue >= current.rawValue else { return }
-
-        // Tee to os_log.
-        let osType: OSLogType = {
-            switch level {
-            case .trace, .debug: return .debug
-            case .info: return .info
-            case .warn: return .default  // os_log has no dedicated warn level
-            case .error: return .error
-            }
-        }()
-        let logger = OSLog(subsystem: "com.neutrinographics.bluey", category: context)
-        os_log("%{public}@", log: logger, type: osType, message)
 
         // Bridge to Dart (best-effort).
         guard let api = api else { return }

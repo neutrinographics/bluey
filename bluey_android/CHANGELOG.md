@@ -4,8 +4,8 @@
 
 **Structured logging pipeline (I307):**
 
-- New `BlueyLog` Kotlin singleton with native-side level filter + tee to logcat + Pigeon bridge to Dart.
-- All internal `Log.d/i/w/e` calls replaced. Native log events flow to `bluey.logEvents` on the Dart side.
+- New `BlueyLog` Kotlin singleton with native-side level filter + Pigeon bridge to Dart. Native log events flow into the unified `bluey.logEvents` stream as the single source of truth.
+- All internal `Log.d/i/w/e` calls replaced. Logs are no longer written to `logcat` directly — consumers route the unified Dart stream wherever they want.
 - `setLogLevel` HostApi method honors the Dart-set level — no Pigeon traffic for filtered events.
 
 ## 0.2.0

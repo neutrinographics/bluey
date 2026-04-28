@@ -1,9 +1,7 @@
 package com.neutrinographics.bluey
 
-import android.util.Log
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
@@ -12,29 +10,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Unit tests for [BlueyLog] singleton.
- *
- * Note: the logcat tee path is intentionally not unit-tested. Verifying
- * `android.util.Log.{d,i,w,e}` calls would either require PowerMock-style
- * dynamic class manipulation or duplicate the static-mock setup we already
- * do for unrelated tests. The behavior is observable via `adb logcat` in
- * manual smoke testing; the test cost isn't worth it here.
- */
+/** Unit tests for [BlueyLog] singleton. */
 class BlueyLogTest {
 
     private lateinit var mockFlutterApi: BlueyFlutterApi
 
     @Before
     fun setUp() {
-        // Stub static Log so the tee path doesn't crash on the JVM (no Android
-        // runtime). We're not asserting against it.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any<String>()) } returns 0
-        every { Log.i(any(), any<String>()) } returns 0
-        every { Log.w(any(), any<String>()) } returns 0
-        every { Log.e(any(), any<String>()) } returns 0
-
         BlueyLog.resetForTest()
         mockFlutterApi = mockk(relaxed = true)
     }

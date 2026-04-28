@@ -1,21 +1,17 @@
 package com.neutrinographics.bluey
 
-import android.util.Log
-
 /**
  * Process-wide structured logger for the Bluey Android plugin.
  *
- * Emits log events along two paths:
- *   1. **Logcat tee** — `android.util.Log.{d,i,w,e}` for visibility under `adb logcat`.
- *   2. **Pigeon bridge** — `BlueyFlutterApi.onLog(...)` for forwarding into the Dart
- *      side's `Bluey.logEvents` stream. The bridge is best-effort: if no
- *      [BlueyFlutterApi] is bound (e.g. very early plugin attach, or after
- *      detach), bridge emits are silently dropped per the bootstrap-loss
- *      policy of the structured-logging plan (I307).
+ * Forwards log events to the Dart side via `BlueyFlutterApi.onLog(...)` so
+ * they reach the unified `Bluey.logEvents` stream. The bridge is
+ * best-effort: if no [BlueyFlutterApi] is bound (e.g. very early plugin
+ * attach, or after detach), emits are silently dropped per the
+ * bootstrap-loss policy of the structured-logging plan (I307).
  *
- * Level filtering is applied before either path runs — events below
- * [minLevel] are dropped entirely. Default threshold is [LogLevelDto.INFO];
- * Dart side updates it via the `BlueyHostApi.setLogLevel` channel.
+ * Level filtering is applied before forwarding — events below [minLevel]
+ * are dropped entirely. Default threshold is [LogLevelDto.INFO]; Dart
+ * side updates it via the `BlueyHostApi.setLogLevel` channel.
  *
  * This is a singleton because there is exactly one Flutter engine per
  * process for the plugin. Tests use [resetForTest] to clear state between
@@ -62,14 +58,6 @@ object BlueyLog {
         errorCode: String? = null,
     ) {
         if (level.raw < minLevel.raw) return
-
-        // Tee to logcat.
-        when (level) {
-            LogLevelDto.TRACE, LogLevelDto.DEBUG -> Log.d(context, message)
-            LogLevelDto.INFO -> Log.i(context, message)
-            LogLevelDto.WARN -> Log.w(context, message)
-            LogLevelDto.ERROR -> Log.e(context, message)
-        }
 
         // Bridge to Dart (best-effort).
         val api = flutterApi ?: return
