@@ -4,7 +4,6 @@ import '../shared/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'connection_state.dart';
 import 'ios_connection_extensions.dart';
-import 'value_objects/connection_parameters.dart';
 import 'value_objects/mtu.dart';
 
 export 'connection_state.dart';
@@ -191,89 +190,6 @@ abstract class Connection {
   /// none of the Android-only flags are set). Currently exposes no
   /// members; reserved for future iOS-specific features.
   IosConnectionExtensions? get ios;
-
-  // === Bonding ===
-
-  /// Current bonding state.
-  ///
-  /// Returns the current bond state between this device and the local device.
-  BondState get bondState;
-
-  /// Stream of bonding state changes.
-  ///
-  /// Emits whenever the bonding state changes. Use this to react to
-  /// bonding completion or failure.
-  Stream<BondState> get bondStateChanges;
-
-  /// Initiate bonding/pairing with the device.
-  ///
-  /// This will start the bonding process, which may prompt the user to
-  /// confirm a pairing code on one or both devices.
-  ///
-  /// The [bondStateChanges] stream will emit [BondState.bonding] when
-  /// the process starts, and [BondState.bonded] when complete.
-  ///
-  /// Throws [DisconnectedException] if not connected.
-  Future<void> bond();
-
-  /// Remove bond with the device.
-  ///
-  /// This removes the stored bonding information. The device will need
-  /// to be paired again for encrypted characteristic access.
-  ///
-  /// Throws [DisconnectedException] if not connected.
-  Future<void> removeBond();
-
-  // === PHY ===
-
-  /// Current transmit PHY.
-  ///
-  /// Returns the PHY being used for transmitting data to the device.
-  Phy get txPhy;
-
-  /// Current receive PHY.
-  ///
-  /// Returns the PHY being used for receiving data from the device.
-  Phy get rxPhy;
-
-  /// Stream of PHY changes.
-  ///
-  /// Emits whenever either the transmit or receive PHY changes.
-  /// The record contains both the new transmit and receive PHY values.
-  Stream<({Phy tx, Phy rx})> get phyChanges;
-
-  /// Request specific PHY settings.
-  ///
-  /// Requests the controller to use the specified PHY for transmit and/or
-  /// receive. The actual PHY used may differ based on what the remote
-  /// device supports.
-  ///
-  /// [txPhy] - Preferred transmit PHY. If null, no preference is specified.
-  /// [rxPhy] - Preferred receive PHY. If null, no preference is specified.
-  ///
-  /// The [phyChanges] stream will emit when the PHY actually changes.
-  ///
-  /// Throws [DisconnectedException] if not connected.
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy});
-
-  // === Connection Parameters ===
-
-  /// Current connection parameters.
-  ///
-  /// Returns the current connection parameters including interval,
-  /// latency, and supervision timeout.
-  ConnectionParameters get connectionParameters;
-
-  /// Request updated connection parameters.
-  ///
-  /// Requests the controller to use the specified connection parameters.
-  /// The actual parameters used may differ based on what the remote
-  /// device and controller support.
-  ///
-  /// [params] - The desired connection parameters.
-  ///
-  /// Throws [DisconnectedException] if not connected.
-  Future<void> requestConnectionParameters(ConnectionParameters params);
 }
 
 /// Connection state for a device.

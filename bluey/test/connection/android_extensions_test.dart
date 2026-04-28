@@ -98,7 +98,7 @@ void main() {
       bluey.dispose();
     });
 
-    test('android.bond() delegates to the underlying connection.bond()',
+    test('android.bond() resolves without throwing on a canBond=true fake',
         () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
@@ -108,11 +108,9 @@ void main() {
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
-      // Both paths must resolve without throwing on a canBond=true fake.
-      // Calling via the extension should be observably the same as calling
-      // `connection.bond()` directly.
+      // Post-B.3, `connection.bond()` is gone — bonding is reachable
+      // only via `connection.android?.bond()`.
       await conn.android?.bond();
-      await conn.bond();
 
       await conn.disconnect();
       bluey.dispose();
@@ -139,8 +137,8 @@ void main() {
       bluey.dispose();
     });
 
-    test('exposes bond/PHY/connection-parameter delegates that match the '
-        'underlying connection state', () async {
+    test('exposes bond/PHY/connection-parameter delegates with sensible '
+        'initial values', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -149,14 +147,17 @@ void main() {
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
+      // Post-B.3 (I089), bond/PHY/conn-params live behind
+      // `connection.android` and are no longer reachable via the
+      // top-level `Connection` API. Verify the facade exposes the
+      // expected initial values from BlueyConnection's private state.
       final android = conn.android!;
-      expect(android.bondState, equals(conn.bondState));
-      expect(android.txPhy, equals(conn.txPhy));
-      expect(android.rxPhy, equals(conn.rxPhy));
-      expect(
-        android.connectionParameters,
-        equals(conn.connectionParameters),
-      );
+      expect(android.bondState, equals(BondState.none));
+      expect(android.txPhy, equals(Phy.le1m));
+      expect(android.rxPhy, equals(Phy.le1m));
+      expect(android.connectionParameters.interval.milliseconds, 30.0);
+      expect(android.connectionParameters.latency.events, 0);
+      expect(android.connectionParameters.timeout.milliseconds, 4000);
 
       await conn.disconnect();
       bluey.dispose();

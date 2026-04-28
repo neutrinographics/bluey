@@ -19,41 +19,16 @@ class MockConnection implements Connection {
   @override
   Mtu mtu;
 
-  @override
-  BondState bondState;
-
-  @override
-  Phy txPhy;
-
-  @override
-  Phy rxPhy;
-
-  @override
-  ConnectionParameters connectionParameters;
-
   final List<RemoteService> _services;
 
   final _stateController = StreamController<ConnectionState>.broadcast();
-  final _bondStateController = StreamController<BondState>.broadcast();
-  final _phyController = StreamController<({Phy tx, Phy rx})>.broadcast();
 
   MockConnection({
     required this.deviceId,
     this.state = ConnectionState.ready,
     Mtu? mtu,
-    this.bondState = BondState.none,
-    this.txPhy = Phy.le1m,
-    this.rxPhy = Phy.le1m,
-    ConnectionParameters? connectionParameters,
     List<RemoteService>? services,
-  }) : connectionParameters =
-           connectionParameters ??
-           ConnectionParameters(
-             interval: ConnectionInterval(30),
-             latency: PeripheralLatency(0),
-             timeout: SupervisionTimeout(4000),
-           ),
-       mtu = mtu ?? Mtu.fromPlatform(23),
+  }) : mtu = mtu ?? Mtu.fromPlatform(23),
        _services = services ?? [];
 
   @override
@@ -101,38 +76,6 @@ class MockConnection implements Connection {
   }
 
   @override
-  Stream<BondState> get bondStateChanges => _bondStateController.stream;
-
-  @override
-  Future<void> bond() async {
-    bondState = BondState.bonding;
-    _bondStateController.add(bondState);
-    bondState = BondState.bonded;
-    _bondStateController.add(bondState);
-  }
-
-  @override
-  Future<void> removeBond() async {
-    bondState = BondState.none;
-    _bondStateController.add(bondState);
-  }
-
-  @override
-  Stream<({Phy tx, Phy rx})> get phyChanges => _phyController.stream;
-
-  @override
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
-    if (txPhy != null) this.txPhy = txPhy;
-    if (rxPhy != null) this.rxPhy = rxPhy;
-    _phyController.add((tx: this.txPhy, rx: this.rxPhy));
-  }
-
-  @override
-  Future<void> requestConnectionParameters(ConnectionParameters params) async {
-    connectionParameters = params;
-  }
-
-  @override
   AndroidConnectionExtensions? get android => null;
 
   @override
@@ -145,8 +88,6 @@ class MockConnection implements Connection {
 
   void dispose() {
     _stateController.close();
-    _bondStateController.close();
-    _phyController.close();
   }
 }
 
@@ -313,121 +254,11 @@ void main() {
       });
     });
 
-    group('Bonding', () {
-      test('has bondState property', () {
-        expect(connection.bondState, isA<BondState>());
-      });
-
-      test('bondState defaults to none', () {
-        expect(connection.bondState, equals(BondState.none));
-      });
-
-      test('provides bondStateChanges stream', () {
-        expect(connection.bondStateChanges, isA<Stream<BondState>>());
-      });
-
-      test('bond() initiates bonding', () async {
-        await connection.bond();
-        expect(connection.bondState, equals(BondState.bonded));
-      });
-
-      test('bond() emits state changes', () async {
-        final states = <BondState>[];
-        final subscription = connection.bondStateChanges.listen(states.add);
-
-        await connection.bond();
-
-        await Future.delayed(Duration(milliseconds: 10));
-        await subscription.cancel();
-
-        expect(states, contains(BondState.bonding));
-        expect(states, contains(BondState.bonded));
-      });
-
-      test('removeBond() removes bond', () async {
-        await connection.bond();
-        expect(connection.bondState, equals(BondState.bonded));
-
-        await connection.removeBond();
-        expect(connection.bondState, equals(BondState.none));
-      });
-    });
-
-    group('PHY', () {
-      test('has txPhy property', () {
-        expect(connection.txPhy, isA<Phy>());
-      });
-
-      test('has rxPhy property', () {
-        expect(connection.rxPhy, isA<Phy>());
-      });
-
-      test('txPhy defaults to le1m', () {
-        expect(connection.txPhy, equals(Phy.le1m));
-      });
-
-      test('rxPhy defaults to le1m', () {
-        expect(connection.rxPhy, equals(Phy.le1m));
-      });
-
-      test('provides phyChanges stream', () {
-        expect(connection.phyChanges, isA<Stream<({Phy tx, Phy rx})>>());
-      });
-
-      test('requestPhy updates PHY values', () async {
-        await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
-
-        expect(connection.txPhy, equals(Phy.le2m));
-        expect(connection.rxPhy, equals(Phy.le2m));
-      });
-
-      test('requestPhy emits changes', () async {
-        final changes = <({Phy tx, Phy rx})>[];
-        final subscription = connection.phyChanges.listen(changes.add);
-
-        await connection.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.leCoded);
-
-        await Future.delayed(Duration(milliseconds: 10));
-        await subscription.cancel();
-
-        expect(changes.length, greaterThanOrEqualTo(1));
-        expect(changes.last.tx, equals(Phy.le2m));
-        expect(changes.last.rx, equals(Phy.leCoded));
-      });
-    });
-
-    group('Connection Parameters', () {
-      test('has connectionParameters property', () {
-        expect(connection.connectionParameters, isA<ConnectionParameters>());
-      });
-
-      test('connectionParameters has default values', () {
-        final params = connection.connectionParameters;
-        expect(params.interval, isA<ConnectionInterval>());
-        expect(params.latency, isA<PeripheralLatency>());
-        expect(params.timeout, isA<SupervisionTimeout>());
-      });
-
-      test('requestConnectionParameters updates values', () async {
-        final newParams = ConnectionParameters(
-          interval: ConnectionInterval(15),
-          latency: PeripheralLatency(2),
-          timeout: SupervisionTimeout(5000),
-        );
-
-        await connection.requestConnectionParameters(newParams);
-
-        expect(
-          connection.connectionParameters.interval.milliseconds,
-          equals(15),
-        );
-        expect(connection.connectionParameters.latency.events, equals(2));
-        expect(
-          connection.connectionParameters.timeout.milliseconds,
-          equals(5000),
-        );
-      });
-    });
+    // Bonding / PHY / Connection Parameters are no longer part of the
+    // Connection interface as of B.3 (I089). They live behind
+    // `connection.android?.X()`. See:
+    //   - test/connection/android_extensions_test.dart
+    //   - test/connection/bluey_connection_capabilities_test.dart
   });
 }
 

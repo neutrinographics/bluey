@@ -84,38 +84,6 @@ class FakeConnection implements Connection {
   Future<int> readRssi() => throw UnimplementedError();
 
   @override
-  BondState get bondState => throw UnimplementedError();
-
-  @override
-  Stream<BondState> get bondStateChanges => throw UnimplementedError();
-
-  @override
-  Future<void> bond() => throw UnimplementedError();
-
-  @override
-  Future<void> removeBond() => throw UnimplementedError();
-
-  @override
-  Phy get txPhy => throw UnimplementedError();
-
-  @override
-  Phy get rxPhy => throw UnimplementedError();
-
-  @override
-  Stream<({Phy tx, Phy rx})> get phyChanges => throw UnimplementedError();
-
-  @override
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) =>
-      throw UnimplementedError();
-
-  @override
-  ConnectionParameters get connectionParameters => throw UnimplementedError();
-
-  @override
-  Future<void> requestConnectionParameters(ConnectionParameters params) =>
-      throw UnimplementedError();
-
-  @override
   AndroidConnectionExtensions? get android => null;
 
   @override

@@ -539,39 +539,31 @@ class BlueyConnection implements Connection {
     await _cleanup();
   }
 
-  // === Bonding ===
+  // === Bonding (private; exposed via connection.android?.X) ===
 
-  @override
-  BondState get bondState => _bondState;
+  BondState get _bondStateValue => _bondState;
 
-  @override
-  Stream<BondState> get bondStateChanges => _bondStateController.stream;
+  Stream<BondState> get _bondStateChanges => _bondStateController.stream;
 
-  @override
-  Future<void> bond() async {
+  Future<void> _bondImpl() async {
     _ensureConnected();
     await _platform.bond(_connectionId);
   }
 
-  @override
-  Future<void> removeBond() async {
+  Future<void> _removeBondImpl() async {
     _ensureConnected();
     await _platform.removeBond(_connectionId);
   }
 
-  // === PHY ===
+  // === PHY (private; exposed via connection.android?.X) ===
 
-  @override
-  Phy get txPhy => _txPhy;
+  Phy get _txPhyValue => _txPhy;
 
-  @override
-  Phy get rxPhy => _rxPhy;
+  Phy get _rxPhyValue => _rxPhy;
 
-  @override
-  Stream<({Phy tx, Phy rx})> get phyChanges => _phyController.stream;
+  Stream<({Phy tx, Phy rx})> get _phyChanges => _phyController.stream;
 
-  @override
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {
+  Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureConnected();
     await _platform.requestPhy(
       _connectionId,
@@ -580,13 +572,13 @@ class BlueyConnection implements Connection {
     );
   }
 
-  // === Connection Parameters ===
+  // === Connection Parameters (private; exposed via connection.android?.X) ===
 
-  @override
-  ConnectionParameters get connectionParameters => _connectionParameters;
+  ConnectionParameters get _connectionParametersValue => _connectionParameters;
 
-  @override
-  Future<void> requestConnectionParameters(ConnectionParameters params) async {
+  Future<void> _requestConnectionParametersImpl(
+    ConnectionParameters params,
+  ) async {
     _ensureConnected();
     await _platform.requestConnectionParameters(
       _connectionId,
@@ -1084,46 +1076,48 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 /// reports any of the Android-only capability flags. Created at most
 /// once per connection and lazy-cached.
 ///
-/// Each member delegates straight back to the corresponding member on
-/// the wrapping [BlueyConnection]; the existing methods on
-/// [BlueyConnection] continue to coexist (B.3 will remove them from the
-/// [Connection] interface).
+/// Each member delegates straight back to the corresponding private
+/// member on the wrapping [BlueyConnection]. The bond/PHY/conn-params
+/// members are private on [BlueyConnection] (since B.3 removed them
+/// from the [Connection] interface) and only reachable via this
+/// facade.
 class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
   final BlueyConnection _conn;
 
   _AndroidConnectionExtensionsImpl(this._conn);
 
   @override
-  BondState get bondState => _conn.bondState;
+  BondState get bondState => _conn._bondStateValue;
 
   @override
-  Stream<BondState> get bondStateChanges => _conn.bondStateChanges;
+  Stream<BondState> get bondStateChanges => _conn._bondStateChanges;
 
   @override
-  Future<void> bond() => _conn.bond();
+  Future<void> bond() => _conn._bondImpl();
 
   @override
-  Future<void> removeBond() => _conn.removeBond();
+  Future<void> removeBond() => _conn._removeBondImpl();
 
   @override
-  Phy get txPhy => _conn.txPhy;
+  Phy get txPhy => _conn._txPhyValue;
 
   @override
-  Phy get rxPhy => _conn.rxPhy;
+  Phy get rxPhy => _conn._rxPhyValue;
 
   @override
-  Stream<({Phy tx, Phy rx})> get phyChanges => _conn.phyChanges;
+  Stream<({Phy tx, Phy rx})> get phyChanges => _conn._phyChanges;
 
   @override
   Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) =>
-      _conn.requestPhy(txPhy: txPhy, rxPhy: rxPhy);
+      _conn._requestPhyImpl(txPhy: txPhy, rxPhy: rxPhy);
 
   @override
-  ConnectionParameters get connectionParameters => _conn.connectionParameters;
+  ConnectionParameters get connectionParameters =>
+      _conn._connectionParametersValue;
 
   @override
   Future<void> requestConnectionParameters(ConnectionParameters params) =>
-      _conn.requestConnectionParameters(params);
+      _conn._requestConnectionParametersImpl(params);
 }
 
 /// Empty const singleton implementing [IosConnectionExtensions]. Reserved
