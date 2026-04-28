@@ -140,6 +140,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 | [I099](I099-typed-error-translation-rewrite.md) | Replace string-matching error wrapping with typed catch ladder (architectural) | high |
+| [I307](I307-structured-logging-pipeline.md) | Add a structured logging pipeline from domain through platform code | medium |
 
 ### Open — Android native
 
