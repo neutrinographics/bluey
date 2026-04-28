@@ -265,6 +265,69 @@ void main() {
       });
     });
 
+    // Regression: when the first heartbeat fails transient (e.g. the
+    // platform returns a non-dead-peer error like
+    // `GattOperationUnknownPlatformException` after Service Changed
+    // invalidates the cached handle), the LifecycleClient must keep
+    // probing on schedule. Without this, `_lastActivityAt` stays null,
+    // `_monitor.timeUntilNextProbe()` returns the full activityWindow
+    // each time the probe timer fires, and `_sendProbeOrDefer` reschedules
+    // forever instead of firing.
+    test('keeps re-sending probes after a transient write failure', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        // Server interval = 10s => heartbeat at 5s.
+        _setUpConnectedClient(
+          onServerUnreachable: () {},
+          intervalValue: const Duration(seconds: 10),
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        // All heartbeat writes fail transient (Exception, not a
+        // typed dead-peer signal). Mirrors the
+        // `GattOperationUnknownPlatformException` the user observed in
+        // real-device logs after Service Changed.
+        fakePlatform.simulateWriteFailure = true;
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // First probe sent immediately at start, fails transient.
+        final initial = fakePlatform.writeCharacteristicCalls
+            .where((c) =>
+                c.characteristicUuid == lifecycle.heartbeatCharUuid &&
+                c.value.length == 1 &&
+                c.value[0] == 0x01)
+            .length;
+        expect(initial, equals(1),
+            reason: 'first probe fires synchronously at start()');
+
+        // Advance 30 seconds. With heartbeat interval = 5s, the timer
+        // should re-fire 6 times in this window despite each write
+        // failing transient.
+        async.elapse(const Duration(seconds: 30));
+
+        final retries = fakePlatform.writeCharacteristicCalls
+            .where((c) =>
+                c.characteristicUuid == lifecycle.heartbeatCharUuid &&
+                c.value.length == 1 &&
+                c.value[0] == 0x01)
+            .length;
+        expect(retries, greaterThanOrEqualTo(initial + 5),
+            reason: 'subsequent probes must keep firing on every '
+                'activityWindow tick despite transient failures');
+
+        client.stop();
+      });
+    });
+
     // 6. start() falls back to default interval when interval read fails
     test('start() falls back to default interval when interval read fails', () {
       fakeAsync((async) {

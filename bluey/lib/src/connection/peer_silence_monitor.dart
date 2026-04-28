@@ -166,6 +166,13 @@ class PeerSilenceMonitor {
     _probeInFlight = true;
   }
 
+  /// Whether any successful activity has been recorded since the
+  /// monitor was last (re)started. Used by `LifecycleClient` to
+  /// distinguish between "timer fired exactly when scheduled, no
+  /// activity has shifted the deadline" (fire the probe) and "activity
+  /// raced the timer and pushed the deadline forward" (defer).
+  bool get hasActivity => _lastActivityAt != null;
+
   /// How long from now until the next probe is due. Used by
   /// `LifecycleClient` to decide when to schedule the next probe
   /// timer in idle.

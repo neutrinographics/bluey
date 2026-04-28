@@ -1078,6 +1078,28 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       return held.future;
     }
 
+    // Pre-discovery: mint handles eagerly so this write lands at the
+    // correct slot when the caller constructed a BlueyRemoteCharacteristic
+    // by hand without going through `services()`. Done before the
+    // simulate-failure guards so the recorded call carries the real
+    // characteristic UUID even on simulated failures.
+    final peripheral = _peripherals[deviceId];
+    if (peripheral != null) {
+      _withHandlesAll(_stateFor(deviceId), peripheral);
+    }
+
+    // Record attempts before failure simulation so tests can count
+    // "writes the caller asked for" regardless of whether the platform
+    // simulates a failure.
+    writeCharacteristicCalls.add(WriteCharacteristicCall(
+      deviceId: deviceId,
+      characteristicHandle: characteristicHandle,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
+      value: Uint8List.fromList(value),
+      withResponse: withResponse,
+    ));
+
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
     }
@@ -1100,23 +1122,6 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
     }
-
-    // Pre-discovery: mint handles eagerly so this write lands at the
-    // correct slot when the caller constructed a BlueyRemoteCharacteristic
-    // by hand without going through `services()`.
-    final peripheral = _peripherals[deviceId];
-    if (peripheral != null) {
-      _withHandlesAll(_stateFor(deviceId), peripheral);
-    }
-
-    writeCharacteristicCalls.add(WriteCharacteristicCall(
-      deviceId: deviceId,
-      characteristicHandle: characteristicHandle,
-      characteristicUuid:
-          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
-      value: Uint8List.fromList(value),
-      withResponse: withResponse,
-    ));
 
     // Handle is the primary key.
     _stateFor(deviceId).charValuesByHandle[characteristicHandle] =

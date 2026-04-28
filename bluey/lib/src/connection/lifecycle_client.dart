@@ -356,7 +356,18 @@ class LifecycleClient {
       _scheduleProbe(after: _monitor.activityWindow);
       return;
     }
-    if (_monitor.timeUntilNextProbe() > Duration.zero) {
+    // Re-check the deadline: if activity raced the timer firing and
+    // shifted the deadline forward, defer instead of probing now.
+    // Only meaningful when activity has actually been recorded; if no
+    // activity has happened yet, the timer was scheduled to fire at
+    // exactly this moment (e.g. via the explicit `_scheduleProbe(after:
+    // activityWindow)` failure-retry path), so fire the probe.
+    // Without this `hasActivity` guard, `timeUntilNextProbe` returns
+    // the full `activityWindow` when `_lastActivityAt` is null, causing
+    // an infinite-defer loop after the first probe fails transient
+    // before any successful exchange has happened.
+    if (_monitor.hasActivity &&
+        _monitor.timeUntilNextProbe() > Duration.zero) {
       _scheduleProbe();
       return;
     }
