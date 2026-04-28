@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -7,6 +6,7 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
@@ -111,10 +111,18 @@ Future<T> _loggedGattOp<T>({
   String startDetail = '',
   String Function(T result)? completeDetail,
   LifecycleClient? lifecycleClient,
+  BlueyLogger? logger,
 }) async {
-  final startSuffix = startDetail.isEmpty ? '' : ', $startDetail';
-  dev.log('$op start: deviceId=$deviceId$startSuffix',
-      name: 'bluey.gatt', level: 500);
+  logger?.log(
+    BlueyLogLevel.debug,
+    'bluey.gatt',
+    '$op start',
+    data: {
+      'deviceId': deviceId.toString(),
+      'op': op,
+      if (startDetail.isNotEmpty) 'detail': startDetail,
+    },
+  );
   final sw = Stopwatch()..start();
   try {
     final result = await _runGattOp(
@@ -124,20 +132,33 @@ Future<T> _loggedGattOp<T>({
       lifecycleClient: lifecycleClient,
     );
     final detail = completeDetail?.call(result);
-    final completeSuffix = (detail == null || detail.isEmpty) ? '' : ', $detail';
-    dev.log(
-        '$op complete: deviceId=$deviceId$completeSuffix, ${sw.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 500);
+    logger?.log(
+      BlueyLogLevel.debug,
+      'bluey.gatt',
+      '$op complete',
+      data: {
+        'deviceId': deviceId.toString(),
+        'op': op,
+        'durationMs': sw.elapsedMilliseconds,
+        if (detail != null && detail.isNotEmpty) 'detail': detail,
+      },
+    );
     return result;
   } catch (e) {
-    final status =
-        e is GattOperationFailedException ? ' status=${e.status}' : '';
-    dev.log(
-        '$op failed: deviceId=$deviceId$startSuffix, exception=${e.runtimeType}$status, ${sw.elapsedMilliseconds}ms',
-        name: 'bluey.gatt',
-        level: 900,
-        error: e);
+    logger?.log(
+      BlueyLogLevel.error,
+      'bluey.gatt',
+      '$op failed',
+      data: {
+        'deviceId': deviceId.toString(),
+        'op': op,
+        'exception': e.runtimeType.toString(),
+        'durationMs': sw.elapsedMilliseconds,
+        if (e is GattOperationFailedException) 'status': e.status,
+        if (startDetail.isNotEmpty) 'detail': startDetail,
+      },
+      errorCode: e.runtimeType.toString(),
+    );
     rethrow;
   }
 }
@@ -155,7 +176,6 @@ Future<T> _loggedGattOp<T>({
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
-  // ignore: unused_field
   final BlueyLogger _logger;
 
   /// The platform-level connection identifier.
@@ -353,7 +373,22 @@ class BlueyConnection implements Connection {
   /// every in-flight op. Idempotent: a second event with no in-flight
   /// ops is a no-op.
   void _onServiceChanged() {
+    _logger.log(
+      BlueyLogLevel.warn,
+      'bluey.connection',
+      'Service Changed received',
+      data: {
+        'deviceId': deviceId.toString(),
+        'inFlight': _pendingGattOpAborters.length,
+      },
+    );
     _cachedServices = null;
+    _logger.log(
+      BlueyLogLevel.warn,
+      'bluey.connection',
+      'service cache cleared, re-discovery pending',
+      data: {'deviceId': deviceId.toString()},
+    );
     if (_pendingGattOpAborters.isEmpty) return;
     final aborters = _pendingGattOpAborters.toList(growable: false);
     _pendingGattOpAborters.clear();
@@ -377,9 +412,14 @@ class BlueyConnection implements Connection {
       return;
     }
     _state = newState;
-    dev.log(
-      'state transition: → $_state',
-      name: 'bluey.connection',
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'state transition',
+      data: {
+        'deviceId': deviceId.toString(),
+        'state': _state.toString(),
+      },
     );
     _stateController.add(_state);
   }
@@ -423,10 +463,11 @@ class BlueyConnection implements Connection {
       return _cachedServices!;
     }
 
-    dev.log(
-      'services start: deviceId=$deviceId',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'services discovery started',
+      data: {'deviceId': deviceId.toString()},
     );
     final stopwatch = Stopwatch()..start();
     final platformServices = await _trackInFlight(() => _runGattOp(
@@ -437,10 +478,15 @@ class BlueyConnection implements Connection {
     _cachedServices =
         platformServices.map((ps) => _mapService(ps)).toList();
 
-    dev.log(
-      'services complete: deviceId=$deviceId, count=${_cachedServices!.length}, ${stopwatch.elapsedMilliseconds}ms',
-      name: 'bluey.gatt',
-      level: 500, // Level.FINE — per-op chatter; suppressed in default log views
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'services discovery resolved',
+      data: {
+        'deviceId': deviceId.toString(),
+        'count': _cachedServices!.length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
     );
 
     // Services discovered → promote linked → ready.
@@ -466,6 +512,7 @@ class BlueyConnection implements Connection {
           body: () => _platform.requestMtu(_connectionId, requested),
           completeDetail: (negotiated) =>
               'requested=$requested, negotiated=$negotiated',
+          logger: _logger,
         ));
     return Mtu.fromPlatform(_mtu);
   }
@@ -478,6 +525,7 @@ class BlueyConnection implements Connection {
           op: 'readRssi',
           body: () => _platform.readRssi(_connectionId),
           completeDetail: (rssi) => 'rssi=${rssi}dBm',
+          logger: _logger,
         ));
   }
 
@@ -518,6 +566,13 @@ class BlueyConnection implements Connection {
       return;
     }
 
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'disconnect entered',
+      data: {'deviceId': deviceId.toString()},
+    );
+
     _setState(ConnectionState.disconnecting);
 
     await _platform.disconnect(_connectionId);
@@ -525,6 +580,13 @@ class BlueyConnection implements Connection {
     _setState(ConnectionState.disconnected);
 
     await _cleanup();
+
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'disconnect resolved',
+      data: {'deviceId': deviceId.toString()},
+    );
   }
 
   // === Bonding (private; exposed via connection.android?.X) ===
@@ -690,6 +752,7 @@ class BlueyConnection implements Connection {
           .toList(),
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
+      logger: _logger,
     );
   }
 
@@ -706,6 +769,7 @@ class BlueyConnection implements Connection {
       characteristicHandle: characteristicHandle,
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
+      logger: _logger,
     );
   }
 }
@@ -795,6 +859,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
   final _TrackInFlight _trackInFlight;
+  final BlueyLogger? _logger;
 
   @override
   final UUID uuid;
@@ -836,13 +901,15 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
     _TrackInFlight? trackInFlight,
+    BlueyLogger? logger,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
        _descriptors = descriptors,
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {}),
-       _trackInFlight = trackInFlight ?? _passthroughInFlight;
+       _trackInFlight = trackInFlight ?? _passthroughInFlight,
+       _logger = logger;
 
   @override
   Future<Uint8List> read() async {
@@ -860,6 +927,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
           ),
           completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
           lifecycleClient: _lifecycle(),
+          logger: _logger,
         ));
   }
 
@@ -884,6 +952,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
           ),
           completeDetail: (_) => 'char=$uuid',
           lifecycleClient: _lifecycle(),
+          logger: _logger,
         ));
   }
 
@@ -1014,6 +1083,8 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
   final _TrackInFlight _trackInFlight;
+  // ignore: unused_field
+  final BlueyLogger? _logger;
 
   /// Handle of the parent characteristic. Threaded onto the wire
   /// alongside [handle] so native receivers can route descriptor ops
@@ -1048,13 +1119,15 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
     _TrackInFlight? trackInFlight,
+    BlueyLogger? logger,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
        _characteristicHandle = characteristicHandle,
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {}),
-       _trackInFlight = trackInFlight ?? _passthroughInFlight;
+       _trackInFlight = trackInFlight ?? _passthroughInFlight,
+       _logger = logger;
 
   @override
   Future<Uint8List> read() async {

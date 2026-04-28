@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -348,9 +347,21 @@ class Bluey {
       mtu: null,
     );
 
-    dev.log(
-      'connect started: deviceId=${device.id}, address=${device.address}',
-      name: 'bluey.connection',
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey',
+      'connect entered',
+      data: {'deviceId': device.id.toString()},
+    );
+
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection',
+      'connect started',
+      data: {
+        'deviceId': device.id.toString(),
+        'address': device.address,
+      },
     );
 
     _emitEvent(ConnectingEvent(deviceId: device.id));
@@ -368,18 +379,24 @@ class Bluey {
         logger: _logger,
       );
 
-      dev.log(
-        'connect succeeded: deviceId=${device.id}',
-        name: 'bluey.connection',
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.connection',
+        'connect succeeded',
+        data: {'deviceId': device.id.toString()},
       );
 
       return connection;
     } catch (e) {
-      dev.log(
-        'connect failed: deviceId=${device.id}, exception=${e.runtimeType}',
-        name: 'bluey.connection',
-        level: 1000, // Level.SEVERE
-        error: e,
+      _logger.log(
+        BlueyLogLevel.error,
+        'bluey.connection',
+        'connect failed',
+        data: {
+          'deviceId': device.id.toString(),
+          'exception': e.runtimeType.toString(),
+        },
+        errorCode: e.runtimeType.toString(),
       );
       _emitEvent(
         ErrorEvent(
@@ -413,6 +430,12 @@ class Bluey {
     Duration? timeout,
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey',
+      'connectAsPeer entered',
+      data: {'deviceId': device.id.toString()},
+    );
     final connection = await connect(
       device,
       timeout: timeout,
@@ -440,8 +463,24 @@ class Bluey {
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer
   /// wrapper.
-  Future<PeerConnection?> tryUpgrade(Connection connection) {
-    return _tryBuildPeerConnection(connection);
+  Future<PeerConnection?> tryUpgrade(Connection connection) async {
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey',
+      'tryUpgrade entered',
+      data: {'deviceId': connection.deviceId.toString()},
+    );
+    final result = await _tryBuildPeerConnection(connection);
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey',
+      'tryUpgrade resolved',
+      data: {
+        'deviceId': connection.deviceId.toString(),
+        'peer': result == null ? 'null' : 'present',
+      },
+    );
+    return result;
   }
 
   /// Builds a [PeerConnection] wrapping [rawConnection] if the device
@@ -461,9 +500,11 @@ class Bluey {
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
     try {
-      dev.log(
-        'tryBuildPeerConnection: deviceId=${rawConnection.deviceId}',
-        name: 'bluey.peer',
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.peer',
+        'tryBuildPeerConnection',
+        data: {'deviceId': rawConnection.deviceId.toString()},
       );
 
       final services = await rawConnection.services();
@@ -473,9 +514,11 @@ class Bluey {
           .firstOrNull;
 
       if (controlService == null) {
-        dev.log(
+        _logger.log(
+          BlueyLogLevel.debug,
+          'bluey.peer',
           'no control service — peer is not a bluey peer',
-          name: 'bluey.peer',
+          data: {'deviceId': rawConnection.deviceId.toString()},
         );
         return null;
       }
