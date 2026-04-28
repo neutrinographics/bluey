@@ -104,6 +104,18 @@ abstract class Connection {
   /// disconnection events.
   Stream<ConnectionState> get stateChanges;
 
+  /// Stream of service-tree changes.
+  ///
+  /// Emits the freshly-discovered service list each time a Service
+  /// Changed indication from the peer triggers a successful
+  /// re-discovery. Consumers holding [RemoteService] / [RemoteCharacteristic]
+  /// references obtained before the change should treat them as stale
+  /// — re-fetch via [services] or by re-resolving from the emitted
+  /// list.
+  ///
+  /// Broadcast stream — multiple consumers may subscribe.
+  Stream<List<RemoteService>> get servicesChanges;
+
   /// Current MTU (Maximum Transmission Unit).
   ///
   /// The MTU determines the maximum size of data that can be sent in a

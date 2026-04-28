@@ -85,6 +85,8 @@ class _SpyConnection implements Connection {
   @override
   Stream<ConnectionState> get stateChanges => _stateController.stream;
   @override
+  Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
+  @override
   Mtu get mtu => throw UnimplementedError();
   @override
   Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
@@ -421,6 +423,8 @@ class _OrderingSpyConnection implements Connection {
   ConnectionState get state => throw UnimplementedError();
   @override
   Stream<ConnectionState> get stateChanges => const Stream.empty();
+  @override
+  Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
   @override
   Mtu get mtu => throw UnimplementedError();
   @override

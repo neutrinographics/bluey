@@ -29,6 +29,9 @@ class MockConnection implements Connection {
   Stream<ConnectionState> get stateChanges => _stateController.stream;
 
   @override
+  Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
+
+  @override
   RemoteService service(UUID uuid) {
     final svc = _services.where((s) => s.uuid == uuid).firstOrNull;
     if (svc == null) {

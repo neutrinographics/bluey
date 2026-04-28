@@ -212,6 +212,8 @@ class BlueyConnection implements Connection {
       StreamController<BondState>.broadcast();
   final StreamController<({Phy tx, Phy rx})> _phyController =
       StreamController<({Phy tx, Phy rx})>.broadcast();
+  final StreamController<List<RemoteService>> _servicesChangesController =
+      StreamController<List<RemoteService>>.broadcast();
 
   StreamSubscription? _platformStateSubscription;
   StreamSubscription? _platformBondStateSubscription;
@@ -372,6 +374,10 @@ class BlueyConnection implements Connection {
   /// Service Changed handler. Drops the cached service tree and aborts
   /// every in-flight op. Idempotent: a second event with no in-flight
   /// ops is a no-op.
+  ///
+  /// After clearing the cache, kicks off a fresh re-discovery and emits
+  /// the new service list on [servicesChanges] for proactive consumers
+  /// (e.g. the lifecycle client refreshing its heartbeat-char handle).
   void _onServiceChanged() {
     _logger.log(
       BlueyLogLevel.warn,
@@ -389,14 +395,27 @@ class BlueyConnection implements Connection {
       'service cache cleared, re-discovery pending',
       data: {'deviceId': deviceId.toString()},
     );
-    if (_pendingGattOpAborters.isEmpty) return;
-    final aborters = _pendingGattOpAborters.toList(growable: false);
-    _pendingGattOpAborters.clear();
-    for (final aborter in aborters) {
-      if (!aborter.isCompleted) {
-        aborter.completeError(AttributeHandleInvalidatedException());
+    if (_pendingGattOpAborters.isNotEmpty) {
+      final aborters = _pendingGattOpAborters.toList(growable: false);
+      _pendingGattOpAborters.clear();
+      for (final aborter in aborters) {
+        if (!aborter.isCompleted) {
+          aborter.completeError(AttributeHandleInvalidatedException());
+        }
       }
     }
+
+    // Eagerly re-discover so consumers get a fresh service tree without
+    // having to call services() themselves. Fire-and-forget; errors
+    // surface as a stream error to subscribers (rather than an
+    // unhandled future).
+    services().then((fresh) {
+      if (_servicesChangesController.isClosed) return;
+      _servicesChangesController.add(fresh);
+    }).catchError((Object e, StackTrace st) {
+      if (_servicesChangesController.isClosed) return;
+      _servicesChangesController.addError(e, st);
+    });
   }
 
   /// Idempotent, non-regressing state transition. Skips the emit if the
@@ -429,6 +448,10 @@ class BlueyConnection implements Connection {
 
   @override
   Stream<ConnectionState> get stateChanges => _stateController.stream;
+
+  @override
+  Stream<List<RemoteService>> get servicesChanges =>
+      _servicesChangesController.stream;
 
   @override
   Mtu get mtu => Mtu.fromPlatform(_mtu);
@@ -662,6 +685,7 @@ class BlueyConnection implements Connection {
     await _stateController.close();
     await _bondStateController.close();
     await _phyController.close();
+    await _servicesChangesController.close();
 
     // I003 — dispose every cached service before nulling the cache, so
     // each BlueyRemoteCharacteristic's lazily-built notification

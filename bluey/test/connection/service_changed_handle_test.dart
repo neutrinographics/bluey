@@ -109,6 +109,65 @@ void main() {
     );
 
     test(
+      'servicesChanges emits the freshly-discovered service list after '
+      'Service Changed',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        await conn.services();
+
+        // Capture every emission on the new stream.
+        final emissions = <List<RemoteService>>[];
+        final sub = conn.servicesChanges.listen(emissions.add);
+        addTearDown(sub.cancel);
+
+        // No emission yet — the stream fires on Service-Changed-driven
+        // re-discovery, not on initial discovery.
+        expect(emissions, isEmpty);
+
+        fakePlatform.simulateServiceChange(TestDeviceIds.device1);
+        // Let the platform's serviceChanges stream deliver to the
+        // BlueyConnection listener AND let the re-discovery complete.
+        await pumpEventQueue();
+
+        expect(emissions, hasLength(1),
+            reason: 'one emission expected after Service Changed re-discovery');
+        expect(emissions.single, isNotEmpty,
+            reason: 'emission carries the freshly-discovered service list');
+        expect(
+          emissions.single.map((s) => s.uuid.toString()).toList(),
+          contains(_serviceUuid),
+        );
+
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'servicesChanges is a broadcast stream supporting multiple listeners',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        await conn.services();
+
+        final a = <List<RemoteService>>[];
+        final b = <List<RemoteService>>[];
+        final subA = conn.servicesChanges.listen(a.add);
+        final subB = conn.servicesChanges.listen(b.add);
+        addTearDown(() async {
+          await subA.cancel();
+          await subB.cancel();
+        });
+
+        fakePlatform.simulateServiceChange(TestDeviceIds.device1);
+        await pumpEventQueue();
+
+        expect(a, hasLength(1));
+        expect(b, hasLength(1));
+
+        await conn.disconnect();
+      },
+    );
+
+    test(
       'new handles work for reads after re-discovery',
       () async {
         final conn = await bluey.connect(buildDevice());
