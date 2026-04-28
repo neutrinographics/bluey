@@ -1,5 +1,8 @@
 package com.neutrinographics.bluey
 
+import android.os.Handler
+import android.os.Looper
+
 /**
  * Process-wide structured logger for the Bluey Android plugin.
  *
@@ -13,6 +16,12 @@ package com.neutrinographics.bluey
  * are dropped entirely. Default threshold is [LogLevelDto.INFO]; Dart
  * side updates it via the `BlueyHostApi.setLogLevel` channel.
  *
+ * Pigeon's `BlueyFlutterApi.onLog(...)` is `@UiThread` — calling it off
+ * the main thread throws "Methods marked with @UiThread must be executed
+ * on the main thread". Native callbacks (binder threads, BLE callback
+ * threads) emit logs from arbitrary threads, so [log] always posts the
+ * Pigeon dispatch to the main thread via [mainHandler].
+ *
  * This is a singleton because there is exactly one Flutter engine per
  * process for the plugin. Tests use [resetForTest] to clear state between
  * runs.
@@ -23,6 +32,18 @@ object BlueyLog {
 
     @Volatile
     private var flutterApi: BlueyFlutterApi? = null
+
+    /// Lazy + nullable. JVM unit tests don't have an Android runtime, so
+    /// `Looper.getMainLooper()` throws `RuntimeException("Method ... not
+    /// mocked")` — caught here so tests can exercise [log] without
+    /// mocking the entire Android Looper subsystem.
+    private val mainHandler: Handler? by lazy {
+        try {
+            Looper.getMainLooper()?.let { Handler(it) }
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
 
     /** Bind the Pigeon FlutterApi for native→Dart log forwarding. */
     fun bind(api: BlueyFlutterApi) {
@@ -64,15 +85,27 @@ object BlueyLog {
         // Pigeon generates `Map<String?, Any?>` for `data`; widen the key type
         // so callers can pass a plain `Map<String, Any?>`.
         val pigeonData: Map<String?, Any?> = data.mapKeys { it.key }
-        api.onLog(
-            LogEventDto(
-                context = context,
-                level = level,
-                message = message,
-                data = pigeonData,
-                errorCode = errorCode,
-                timestampMicros = System.currentTimeMillis() * 1000L,
-            ),
-        ) {}
+        val event = LogEventDto(
+            context = context,
+            level = level,
+            message = message,
+            data = pigeonData,
+            errorCode = errorCode,
+            timestampMicros = System.currentTimeMillis() * 1000L,
+        )
+        // Pigeon's onLog requires the main thread (Flutter `@UiThread`).
+        // Native callbacks run on binder/BLE threads, so post to main
+        // unless we're already on it. On JVM unit tests `mainHandler` is
+        // null (no Android Looper), in which case we call directly.
+        val handler = mainHandler
+        if (handler == null) {
+            api.onLog(event) {}
+            return
+        }
+        if (Looper.myLooper() == handler.looper) {
+            api.onLog(event) {}
+        } else {
+            handler.post { api.onLog(event) {} }
+        }
     }
 }

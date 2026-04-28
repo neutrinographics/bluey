@@ -74,6 +74,14 @@ final class BlueyLog {
             errorCode: errorCode,
             timestampMicros: Int64(Date().timeIntervalSince1970 * 1_000_000)
         )
-        api.onLog(event: event) { _ in }
+        // Pigeon FlutterApi calls require the main thread. CB delegate
+        // callbacks run on CB's own queue, so always hop to main.
+        if Thread.isMainThread {
+            api.onLog(event: event) { _ in }
+        } else {
+            DispatchQueue.main.async {
+                api.onLog(event: event) { _ in }
+            }
+        }
     }
 }
