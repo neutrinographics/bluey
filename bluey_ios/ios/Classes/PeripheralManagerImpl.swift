@@ -58,6 +58,9 @@ class PeripheralManagerImpl: NSObject {
     func addService(service: LocalServiceDto, completion: @escaping (Result<LocalServiceDto, Error>) -> Void) {
         let mutableService = service.toMutableService()
         let serviceUuid = service.uuid.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "addService",
+                            data: ["serviceUuid": serviceUuid,
+                                   "characteristicCount": service.characteristics.count])
 
         // I088 D.13 — mint handles in lock-step with the DTO order so
         // we can return a populated LocalServiceDto with handles
@@ -105,7 +108,11 @@ class PeripheralManagerImpl: NSObject {
 
     func removeService(serviceUuid: String, completion: @escaping (Result<Void, Error>) -> Void) {
         let uuid = serviceUuid.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "removeService",
+                            data: ["serviceUuid": uuid])
         guard let service = services.removeValue(forKey: uuid) else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "removeService: not found",
+                                data: ["serviceUuid": uuid], errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
@@ -132,6 +139,9 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Advertising
 
     func startAdvertising(config: AdvertiseConfigDto, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "startAdvertising",
+                            data: ["serviceUuidCount": config.serviceUuids.count,
+                                   "hasName": config.name != nil])
         var advertisement: [String: Any] = [:]
 
         if let name = config.name {
@@ -151,6 +161,7 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func stopAdvertising(completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "stopAdvertising")
         peripheralManager.stopAdvertising()
         completion(.success(()))
     }
@@ -158,7 +169,13 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Notifications
 
     func notifyCharacteristic(characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristic (broadcast)",
+                            data: ["characteristicHandle": characteristicHandle,
+                                   "length": value.data.count])
         guard let characteristic = handleStore.characteristicByHandle[Int(characteristicHandle)] as? CBMutableCharacteristic else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristic: handle invalidated",
+                                data: ["characteristicHandle": characteristicHandle],
+                                errorCode: "handle-invalidated")
             completion(.failure(BlueyError.handleInvalidated.toServerPigeonError()))
             return
         }
@@ -169,17 +186,30 @@ class PeripheralManagerImpl: NSObject {
         } else {
             // Queue is full, will retry when isReadyToUpdateSubscribers is called
             // For simplicity, we report failure here
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristic: updateValue queue full",
+                                data: ["characteristicHandle": characteristicHandle],
+                                errorCode: "notify-queue-full")
             completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
     }
 
     func notifyCharacteristicTo(centralId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristicTo (targeted)",
+                            data: ["centralId": centralId,
+                                   "characteristicHandle": characteristicHandle,
+                                   "length": value.data.count])
         guard let characteristic = handleStore.characteristicByHandle[Int(characteristicHandle)] as? CBMutableCharacteristic else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristicTo: handle invalidated",
+                                data: ["characteristicHandle": characteristicHandle],
+                                errorCode: "handle-invalidated")
             completion(.failure(BlueyError.handleInvalidated.toServerPigeonError()))
             return
         }
 
         guard let central = centrals[centralId] else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristicTo: central not found",
+                                data: ["centralId": centralId],
+                                errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
@@ -188,6 +218,10 @@ class PeripheralManagerImpl: NSObject {
         if success {
             completion(.success(()))
         } else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristicTo: updateValue queue full",
+                                data: ["centralId": centralId,
+                                       "characteristicHandle": characteristicHandle],
+                                errorCode: "notify-queue-full")
             completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
     }
@@ -195,7 +229,14 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Request Responses
 
     func respondToReadRequest(requestId: Int, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "respondToReadRequest",
+                            data: ["requestId": requestId,
+                                   "status": String(describing: status),
+                                   "valueLength": value?.data.count ?? 0])
         guard let request = pendingReadRequests.removeValue(forKey: requestId) else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "respondToReadRequest: requestId not found",
+                                data: ["requestId": requestId],
+                                errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
@@ -209,7 +250,13 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func respondToWriteRequest(requestId: Int, status: GattStatusDto, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "respondToWriteRequest",
+                            data: ["requestId": requestId,
+                                   "status": String(describing: status)])
         guard let requests = pendingWriteRequests.removeValue(forKey: requestId), let firstRequest = requests.first else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "respondToWriteRequest: requestId not found",
+                                data: ["requestId": requestId],
+                                errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toServerPigeonError()))
             return
         }
@@ -221,6 +268,8 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Central Management
 
     func disconnectCentral(centralId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "disconnectCentral (iOS: untracking only)",
+                            data: ["centralId": centralId])
         // iOS doesn't provide a direct way to disconnect a central
         // The central must disconnect itself
         // We can only remove them from our tracking
@@ -236,6 +285,9 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func closeServer(completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "closeServer",
+                            data: ["serviceCount": services.count,
+                                   "centralCount": centrals.count])
         // Stop advertising
         peripheralManager.stopAdvertising()
 
@@ -279,6 +331,9 @@ class PeripheralManagerImpl: NSObject {
         centrals[centralId] = central
 
         if isNew {
+            BlueyLog.shared.log(.info, "bluey.ios.peripheral", "central connected (inferred)",
+                                data: ["centralId": centralId,
+                                       "mtu": central.maximumUpdateValueLength])
             let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
             flutterApi.onCentralConnected(central: centralDto) { _ in }
         }
@@ -288,11 +343,16 @@ class PeripheralManagerImpl: NSObject {
 
     func didUpdateState(peripheral: CBPeripheralManager) {
         let stateDto = peripheral.state.toDto()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "peripheralManagerDidUpdateState",
+                            data: ["state": String(describing: stateDto)])
         flutterApi.onStateChanged(state: stateDto) { _ in }
     }
 
     func didAddService(peripheral: CBPeripheralManager, service: CBService, error: Error?) {
         let serviceUuid = service.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didAddService",
+                            data: ["serviceUuid": serviceUuid,
+                                   "hasError": error != nil])
 
         guard let completion = addServiceCompletions.removeValue(forKey: serviceUuid) else {
             return
@@ -300,6 +360,10 @@ class PeripheralManagerImpl: NSObject {
         let populated = addServicePopulated.removeValue(forKey: serviceUuid)
 
         if let error = error {
+            BlueyLog.shared.log(.error, "bluey.ios.peripheral", "didAddService failed",
+                                data: ["serviceUuid": serviceUuid,
+                                       "error": String(describing: error)],
+                                errorCode: "add-service-failed")
             services.removeValue(forKey: serviceUuid)
             if let nsError = error as? NSError {
                 completion(.failure(nsError.toPigeonError()))
@@ -314,12 +378,17 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func didStartAdvertising(peripheral: CBPeripheralManager, error: Error?) {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "peripheralManagerDidStartAdvertising",
+                            data: ["hasError": error != nil])
         guard let completion = startAdvertisingCompletion else {
             return
         }
         startAdvertisingCompletion = nil
 
         if let error = error {
+            BlueyLog.shared.log(.error, "bluey.ios.peripheral", "didStartAdvertising failed",
+                                data: ["error": String(describing: error)],
+                                errorCode: "advertise-failed")
             if let nsError = error as? NSError {
                 completion(.failure(nsError.toPigeonError()))
             } else {
@@ -333,6 +402,9 @@ class PeripheralManagerImpl: NSObject {
     func didSubscribe(peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didSubscribeTo",
+                            data: ["centralId": centralId,
+                                   "characteristicUuid": charUuid])
 
         // Track the central and notify Flutter if this is the first time we see it
         trackCentralIfNeeded(central)
@@ -345,6 +417,9 @@ class PeripheralManagerImpl: NSObject {
     func didUnsubscribe(peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didUnsubscribeFrom",
+                            data: ["centralId": centralId,
+                                   "characteristicUuid": charUuid])
 
         // Remove subscription
         subscribedCentrals[charUuid]?.remove(centralId)
@@ -362,6 +437,10 @@ class PeripheralManagerImpl: NSObject {
     func didReceiveRead(peripheral: CBPeripheralManager, request: CBATTRequest) {
         let centralId = request.central.identifier.uuidString.lowercased()
         let charUuid = request.characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "didReceiveRead",
+                            data: ["centralId": centralId,
+                                   "characteristicUuid": charUuid,
+                                   "offset": request.offset])
 
         // Track the central and notify Flutter if this is the first time we see it
         trackCentralIfNeeded(request.central)
@@ -389,6 +468,9 @@ class PeripheralManagerImpl: NSObject {
         guard let firstRequest = requests.first else { return }
 
         let centralId = firstRequest.central.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "didReceiveWrite",
+                            data: ["centralId": centralId,
+                                   "requestCount": requests.count])
 
         // Track the central and notify Flutter if this is the first time we see it
         trackCentralIfNeeded(firstRequest.central)
@@ -419,6 +501,7 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func isReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "peripheralManagerIsReady toUpdateSubscribers")
         // The queue has space again for notifications
         // We could retry any failed notifications here
     }

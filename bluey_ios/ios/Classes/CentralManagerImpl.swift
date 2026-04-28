@@ -129,11 +129,14 @@ class CentralManagerImpl: NSObject {
     func startScan(config: ScanConfigDto, completion: @escaping (Result<Void, Error>) -> Void) {
         let serviceUUIDs: [CBUUID]? = config.serviceUuids.isEmpty ? nil : config.serviceUuids.map { $0.toCBUUID() }
         let options: [String: Any] = [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+        BlueyLog.shared.log(.info, "bluey.ios.central", "startScan",
+                            data: ["serviceUuidCount": config.serviceUuids.count])
         centralManager.scanForPeripherals(withServices: serviceUUIDs, options: options)
         completion(.success(()))
     }
 
     func stopScan(completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.central", "stopScan")
         centralManager.stopScan()
         flutterApi.onScanComplete { _ in }
         completion(.success(()))
@@ -142,7 +145,11 @@ class CentralManagerImpl: NSObject {
     // MARK: - Connection
 
     func connect(deviceId: String, config: ConnectConfigDto, completion: @escaping (Result<String, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.central", "connect",
+                            data: ["deviceId": deviceId])
         guard let peripheral = peripherals[deviceId] else {
+            BlueyLog.shared.log(.warn, "bluey.ios.central", "connect: peripheral not found",
+                                data: ["deviceId": deviceId], errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -179,7 +186,11 @@ class CentralManagerImpl: NSObject {
     }
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        BlueyLog.shared.log(.info, "bluey.ios.central", "disconnect",
+                            data: ["deviceId": deviceId])
         guard let peripheral = peripherals[deviceId] else {
+            BlueyLog.shared.log(.warn, "bluey.ios.central", "disconnect: peripheral not found",
+                                data: ["deviceId": deviceId], errorCode: "not-found")
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -379,11 +390,15 @@ class CentralManagerImpl: NSObject {
 
     func didUpdateState(central: CBCentralManager) {
         let stateDto = central.state.toDto()
+        BlueyLog.shared.log(.info, "bluey.ios.central", "centralManagerDidUpdateState",
+                            data: ["state": String(describing: stateDto)])
         flutterApi.onStateChanged(state: stateDto) { _ in }
     }
 
     func didDiscover(central: CBCentralManager, peripheral: CBPeripheral, advertisementData: [String: Any], rssi: NSNumber) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.trace, "bluey.ios.central", "didDiscover",
+                            data: ["deviceId": deviceId, "rssi": rssi.intValue])
 
         // Cache the peripheral
         if peripherals[deviceId] == nil {
@@ -397,6 +412,8 @@ class CentralManagerImpl: NSObject {
 
     func didConnect(central: CBCentralManager, peripheral: CBPeripheral) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.central", "didConnect",
+                            data: ["deviceId": deviceId])
 
         // Notify connection state change
         let event = ConnectionStateEventDto(deviceId: deviceId, state: .connected)
@@ -408,6 +425,10 @@ class CentralManagerImpl: NSObject {
 
     func didFailToConnect(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.warn, "bluey.ios.central", "didFailToConnect",
+                            data: ["deviceId": deviceId,
+                                   "error": error.map { String(describing: $0) } ?? "nil"],
+                            errorCode: "connect-failed")
 
         let err: Error = (error as? NSError)?.toPigeonError()
             ?? BlueyError.unknown.toClientPigeonError()
@@ -416,6 +437,9 @@ class CentralManagerImpl: NSObject {
 
     func didDisconnectPeripheral(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.central", "didDisconnectPeripheral",
+                            data: ["deviceId": deviceId,
+                                   "hasError": error != nil])
 
         // I088 — drop the per-device handle table. CB does not
         // guarantee object identity preservation across reconnect,
@@ -467,6 +491,10 @@ class CentralManagerImpl: NSObject {
 
     func didDiscoverServices(peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.central", "didDiscoverServices",
+                            data: ["deviceId": deviceId,
+                                   "serviceCount": peripheral.services?.count ?? 0,
+                                   "hasError": error != nil])
 
         // Check if we have a pending completion - if not, this might be a re-discovery
         guard let slot = discoverServicesSlots[deviceId], !slot.isEmpty else {
@@ -502,6 +530,11 @@ class CentralManagerImpl: NSObject {
     func didDiscoverCharacteristics(peripheral: CBPeripheral, service: CBService, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let serviceUuid = service.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.central", "didDiscoverCharacteristicsFor",
+                            data: ["deviceId": deviceId,
+                                   "serviceUuid": serviceUuid,
+                                   "characteristicCount": service.characteristics?.count ?? 0,
+                                   "hasError": error != nil])
 
         // Remove this service from pending list
         pendingServiceDiscovery[deviceId]?.remove(serviceUuid)
@@ -545,6 +578,11 @@ class CentralManagerImpl: NSObject {
     func didDiscoverDescriptors(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.central", "didDiscoverDescriptorsFor",
+                            data: ["deviceId": deviceId,
+                                   "characteristicUuid": charUuid,
+                                   "descriptorCount": characteristic.descriptors?.count ?? 0,
+                                   "hasError": error != nil])
 
         // Remove this characteristic from pending list
         pendingCharacteristicDiscovery[deviceId]?.remove(charUuid)
@@ -647,6 +685,11 @@ class CentralManagerImpl: NSObject {
     func didUpdateCharacteristicValue(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.trace, "bluey.ios.central", "didUpdateValueFor characteristic",
+                            data: ["deviceId": deviceId,
+                                   "characteristicUuid": charUuid,
+                                   "length": characteristic.value?.count ?? 0,
+                                   "hasError": error != nil])
 
         // Check if this was a read request (slot has pending entries)
         if let slot = readCharacteristicSlots[deviceId]?[charUuid], !slot.isEmpty {
@@ -674,6 +717,10 @@ class CentralManagerImpl: NSObject {
     func didWriteCharacteristicValue(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.trace, "bluey.ios.central", "didWriteValueFor characteristic",
+                            data: ["deviceId": deviceId,
+                                   "characteristicUuid": charUuid,
+                                   "hasError": error != nil])
 
         guard let slot = writeCharacteristicSlots[deviceId]?[charUuid] else {
             return
@@ -689,6 +736,11 @@ class CentralManagerImpl: NSObject {
     func didUpdateNotificationState(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
+        BlueyLog.shared.log(.debug, "bluey.ios.central", "didUpdateNotificationStateFor",
+                            data: ["deviceId": deviceId,
+                                   "characteristicUuid": charUuid,
+                                   "isNotifying": characteristic.isNotifying,
+                                   "hasError": error != nil])
 
         guard let slot = notifySlots[deviceId]?[charUuid] else {
             return
@@ -745,6 +797,9 @@ class CentralManagerImpl: NSObject {
 
     func didModifyServices(peripheral: CBPeripheral, invalidatedServices: [CBService]) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.info, "bluey.ios.central", "didModifyServices",
+                            data: ["deviceId": deviceId,
+                                   "invalidatedCount": invalidatedServices.count])
 
         // I088 — Service Changed invalidates the attribute layout;
         // drop minted handles before notifying Dart so any lookup
@@ -756,6 +811,10 @@ class CentralManagerImpl: NSObject {
 
     func didReadRSSI(peripheral: CBPeripheral, rssi: NSNumber, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
+        BlueyLog.shared.log(.trace, "bluey.ios.central", "didReadRSSI",
+                            data: ["deviceId": deviceId,
+                                   "rssi": rssi.intValue,
+                                   "hasError": error != nil])
 
         guard let slot = readRssiSlots[deviceId] else {
             return
@@ -771,6 +830,8 @@ class CentralManagerImpl: NSObject {
     // MARK: - Helpers
 
     private func clearPendingCompletions(for deviceId: String, error: Error) {
+        BlueyLog.shared.log(.debug, "bluey.ios.central", "clearPendingCompletions: drain all op-slots",
+                            data: ["deviceId": deviceId])
         // Drain all per-(device, key) slot maps — each OpSlot cancels its
         // own timers and fires all pending completions with the error.
         connectSlots.removeValue(forKey: deviceId)?.drainAll(error)
