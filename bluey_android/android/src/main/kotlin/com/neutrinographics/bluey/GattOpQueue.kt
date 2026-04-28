@@ -2,7 +2,6 @@ package com.neutrinographics.bluey
 
 import android.bluetooth.BluetoothGatt
 import android.os.Handler
-import android.util.Log
 
 /**
  * Per-connection serial GATT operation queue.
@@ -52,7 +51,7 @@ internal class GattOpQueue(
         try {
             op.complete(result)
         } catch (e: Throwable) {
-            Log.e(TAG, "GattOp.complete threw: $e", e)
+            BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.complete threw: $e")
         }
         // Guard: reentrant enqueue inside op.complete may have already set
         // current (started the next op). Only advance if still idle.
@@ -72,11 +71,11 @@ internal class GattOpQueue(
         pending.clear()
         inFlight?.let {
             try { it.complete(Result.failure(reason)) }
-            catch (e: Throwable) { Log.e(TAG, "GattOp.complete threw during drain: $e", e) }
+            catch (e: Throwable) { BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.complete threw during drain: $e") }
         }
         for (op in queued) {
             try { op.complete(Result.failure(reason)) }
-            catch (e: Throwable) { Log.e(TAG, "GattOp.complete threw during drain: $e", e) }
+            catch (e: Throwable) { BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.complete threw during drain: $e") }
         }
     }
 
@@ -100,7 +99,7 @@ internal class GattOpQueue(
                     )
                 )
             } catch (e: Throwable) {
-                Log.e(TAG, "GattOp.complete threw during timeout: $e", e)
+                BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.complete threw during timeout: $e")
             }
             // Guard: reentrant enqueue may have set current already
             if (current == null && pending.isNotEmpty()) startNext()
@@ -111,7 +110,7 @@ internal class GattOpQueue(
         val executeOutcome: Result<Boolean> = try {
             Result.success(op.execute(gatt))
         } catch (e: Throwable) {
-            Log.e(TAG, "GattOp.execute threw: $e", e)
+            BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.execute threw: $e")
             Result.failure(e)
         }
 
@@ -134,7 +133,7 @@ internal class GattOpQueue(
             try {
                 op.complete(Result.failure(syncFailure))
             } catch (e: Throwable) {
-                Log.e(TAG, "GattOp.complete threw during sync-failure: $e", e)
+                BlueyLog.log(LogLevelDto.ERROR, CONTEXT, "GattOp.complete threw during sync-failure: $e")
             }
             // Guard: reentrant enqueue may have set current already
             if (current == null && pending.isNotEmpty()) startNext()
@@ -142,6 +141,6 @@ internal class GattOpQueue(
     }
 
     companion object {
-        private const val TAG = "GattOpQueue"
+        private const val CONTEXT = "bluey.android.gatt_queue"
     }
 }

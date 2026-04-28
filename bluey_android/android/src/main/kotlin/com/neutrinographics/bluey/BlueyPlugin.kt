@@ -58,7 +58,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     // FlutterPlugin implementation
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        android.util.Log.d("BlueyPlugin", "onAttachedToEngine called")
+        BlueyLog.log(LogLevelDto.DEBUG, "bluey.android.plugin", "onAttachedToEngine")
         context = binding.applicationContext
 
         // Set up Pigeon APIs
@@ -152,12 +152,20 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
             override fun onActivityDestroyed(activity: Activity) {
-                android.util.Log.d(
-                    "BlueyPlugin",
-                    "onActivityDestroyed called for ${activity.javaClass.simpleName}, isOurActivity=${activity == this@BlueyPlugin.activity}, cleanupOnActivityDestroy=$cleanupOnActivityDestroy"
+                BlueyLog.log(
+                    LogLevelDto.DEBUG, "bluey.android.plugin",
+                    "onActivityDestroyed",
+                    data = mapOf(
+                        "activity" to activity.javaClass.simpleName,
+                        "isOurActivity" to (activity == this@BlueyPlugin.activity),
+                        "cleanupOnActivityDestroy" to cleanupOnActivityDestroy,
+                    ),
                 )
                 if (activity == this@BlueyPlugin.activity && cleanupOnActivityDestroy) {
-                    android.util.Log.d("BlueyPlugin", "Cleaning up BLE resources in onActivityDestroyed")
+                    BlueyLog.log(
+                        LogLevelDto.INFO, "bluey.android.plugin",
+                        "cleaning up BLE resources in onActivityDestroyed",
+                    )
                     advertiser?.cleanup()
                     gattServer?.cleanup()
                 }
@@ -165,14 +173,14 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         }
 
         application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks)
-        android.util.Log.d("BlueyPlugin", "Registered ActivityLifecycleCallbacks")
+        BlueyLog.log(LogLevelDto.DEBUG, "bluey.android.plugin", "registered ActivityLifecycleCallbacks")
     }
 
     private fun unregisterActivityLifecycleCallbacks() {
         val application = activity?.application ?: return
         activityLifecycleCallbacks?.let {
             application.unregisterActivityLifecycleCallbacks(it)
-            android.util.Log.d("BlueyPlugin", "Unregistered ActivityLifecycleCallbacks")
+            BlueyLog.log(LogLevelDto.DEBUG, "bluey.android.plugin", "unregistered ActivityLifecycleCallbacks")
         }
         activityLifecycleCallbacks = null
     }
@@ -204,14 +212,19 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         // This prevents zombie BLE connections when the app is closed
         // Note: onActivityDestroyed may have already done this cleanup, but it's safe to call twice
         if (cleanupOnActivityDestroy) {
-            android.util.Log.d(
-                "BlueyPlugin",
-                "Activity detached - cleaning up BLE resources (cleanupOnActivityDestroy=true)"
+            BlueyLog.log(
+                LogLevelDto.INFO, "bluey.android.plugin",
+                "activity detached, cleaning up BLE resources",
+                data = mapOf("cleanupOnActivityDestroy" to true),
             )
             advertiser?.cleanup()
             gattServer?.cleanup()
         } else {
-            android.util.Log.d("BlueyPlugin", "Activity detached - skipping cleanup (cleanupOnActivityDestroy=false)")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, "bluey.android.plugin",
+                "activity detached, skipping cleanup",
+                data = mapOf("cleanupOnActivityDestroy" to false),
+            )
         }
 
         activity = null
@@ -227,7 +240,11 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         try {
             cleanupOnActivityDestroy = config.cleanupOnActivityDestroy
             connectionManager?.configure(config)
-            android.util.Log.d("BlueyPlugin", "Configured: cleanupOnActivityDestroy=$cleanupOnActivityDestroy")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, "bluey.android.plugin",
+                "configured",
+                data = mapOf("cleanupOnActivityDestroy" to cleanupOnActivityDestroy),
+            )
             callback(Result.success(Unit))
         } catch (e: Throwable) {
             callback(Result.failure(e.toClientFlutterError()))
@@ -533,7 +550,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
     override fun startAdvertising(config: AdvertiseConfigDto, callback: (Result<Unit>) -> Unit) {
         try {
             // Log the GATT server state before advertising
-            android.util.Log.d("BlueyPlugin", "startAdvertising called - logging GATT server state:")
+            BlueyLog.log(LogLevelDto.DEBUG, "bluey.android.plugin", "startAdvertising called, logging GATT server state")
             gattServer?.logServerState()
 
             val adv = advertiser ?: throw BlueyAndroidError.NotInitialized("Advertiser")
@@ -640,7 +657,7 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
 
     override fun closeServer(callback: (Result<Unit>) -> Unit) {
         try {
-            android.util.Log.d("BlueyPlugin", "closeServer called")
+            BlueyLog.log(LogLevelDto.INFO, "bluey.android.plugin", "closeServer called")
             advertiser?.cleanup()
             gattServer?.cleanup()
             callback(Result.success(Unit))

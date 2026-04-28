@@ -16,7 +16,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import androidx.core.content.ContextCompat
 import java.util.UUID
 
@@ -37,7 +36,7 @@ class GattServer(
     private val handler = Handler(Looper.getMainLooper())
 
     init {
-        Log.d("GattServer", "GattServer instance created: $this")
+        BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "GattServer instance created")
     }
 
     // Track connected centrals
@@ -121,6 +120,7 @@ class GattServer(
 
     // CCCD UUID for notifications/indications
     companion object {
+        private const val GATT_SERVER_CONTEXT = "bluey.android.gatt_server"
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val DEFAULT_MTU = 23
 
@@ -139,9 +139,13 @@ class GattServer(
     }
 
     fun addService(service: LocalServiceDto, callback: (Result<LocalServiceDto>) -> Unit) {
-        Log.d("GattServer", "addService: ${service.uuid}")
+        BlueyLog.log(
+            LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+            "addService",
+            data = mapOf("serviceUuid" to service.uuid),
+        )
         if (!hasRequiredPermissions()) {
-            Log.d("GattServer", "addService: missing permissions")
+            BlueyLog.log(LogLevelDto.WARN, GATT_SERVER_CONTEXT, "addService: missing permissions")
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
             return
         }
@@ -149,7 +153,7 @@ class GattServer(
         ensureServerOpen()
         val server = gattServer
         if (server == null) {
-            Log.d("GattServer", "addService: server is null after ensureServerOpen")
+            BlueyLog.log(LogLevelDto.WARN, GATT_SERVER_CONTEXT, "addService: server is null after ensureServerOpen")
             callback(Result.failure(BlueyAndroidError.FailedToOpenGattServer))
             return
         }
@@ -172,17 +176,21 @@ class GattServer(
         pendingServiceDtos[key] = populated
 
         try {
-            Log.d("GattServer", "addService: calling server.addService")
+            BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "addService: calling server.addService")
             if (!server.addService(gattService)) {
-                Log.d("GattServer", "addService: server.addService returned false")
+                BlueyLog.log(LogLevelDto.WARN, GATT_SERVER_CONTEXT, "addService: server.addService returned false")
                 pendingServiceCallbacks.remove(key)
                 pendingServiceDtos.remove(key)
                 callback(Result.failure(BlueyAndroidError.FailedToAddService(service.uuid)))
             }
-            Log.d("GattServer", "addService: server.addService returned true, waiting for onServiceAdded")
+            BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "addService: queued, waiting for onServiceAdded")
             // Callback will be invoked in onServiceAdded
         } catch (e: SecurityException) {
-            Log.e("GattServer", "addService: SecurityException", e)
+            BlueyLog.log(
+                LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                "addService: SecurityException ${e.message}",
+                errorCode = "SECURITY_EXCEPTION",
+            )
             pendingServiceCallbacks.remove(key)
             pendingServiceDtos.remove(key)
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
@@ -516,29 +524,48 @@ class GattServer(
     }
 
     fun cleanup() {
-        Log.d("GattServer", "cleanup() called - disconnecting ${connectedCentrals.size} centrals")
+        BlueyLog.log(
+            LogLevelDto.INFO, GATT_SERVER_CONTEXT,
+            "cleanup",
+            data = mapOf("connectedCentrals" to connectedCentrals.size),
+        )
 
         // Disconnect all connected centrals before closing the server
         val server = gattServer
         if (server != null) {
             try {
                 for ((address, device) in connectedCentrals) {
-                    Log.d("GattServer", "Disconnecting central: $address")
+                    BlueyLog.log(
+                        LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                        "disconnecting central",
+                        data = mapOf("centralId" to address),
+                    )
                     try {
                         server.cancelConnection(device)
                     } catch (e: SecurityException) {
-                        Log.e("GattServer", "Failed to disconnect $address: ${e.message}")
+                        BlueyLog.log(
+                            LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                            "failed to disconnect central: ${e.message}",
+                            data = mapOf("centralId" to address),
+                            errorCode = "SECURITY_EXCEPTION",
+                        )
                     }
                 }
             } catch (e: Exception) {
-                Log.e("GattServer", "Error disconnecting centrals: ${e.message}")
+                BlueyLog.log(
+                    LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                    "error disconnecting centrals: ${e.message}",
+                )
             }
 
             try {
                 server.close()
-                Log.d("GattServer", "GATT server closed")
+                BlueyLog.log(LogLevelDto.INFO, GATT_SERVER_CONTEXT, "GATT server closed")
             } catch (e: Exception) {
-                Log.e("GattServer", "Error closing GATT server: ${e.message}")
+                BlueyLog.log(
+                    LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                    "error closing GATT server: ${e.message}",
+                )
             }
         }
 
@@ -576,84 +603,113 @@ class GattServer(
      * Useful for diagnosing connection callback issues.
      */
     fun logServerState() {
-        Log.d("GattServer", "=== GATT Server State ===")
-        Log.d("GattServer", "GattServer instance: $this")
-        Log.d("GattServer", "gattServer: $gattServer")
-        Log.d("GattServer", "gattServerCallback: $gattServerCallback")
-        Log.d("GattServer", "connectedCentrals: ${connectedCentrals.keys}")
-
         val server = gattServer
-        if (server != null) {
-            Log.d("GattServer", "Services count: ${server.services.size}")
-            server.services.forEach { service ->
-                Log.d("GattServer", "  Service: ${service.uuid}")
-            }
+        val servicesSummary = server?.services?.joinToString(",") { it.uuid.toString() } ?: ""
+        BlueyLog.log(
+            LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+            "GATT server state",
+            data = mapOf(
+                "open" to (server != null),
+                "connectedCentrals" to connectedCentrals.keys.toList(),
+                "servicesCount" to (server?.services?.size ?: 0),
+                "services" to servicesSummary,
+            ),
+        )
 
-            // Try to get connected devices via BluetoothManager
+        if (server != null) {
             try {
                 val connectedDevices =
                     bluetoothManager?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT_SERVER)
-                Log.d("GattServer", "BluetoothManager.getConnectedDevices(GATT_SERVER): $connectedDevices")
+                BlueyLog.log(
+                    LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                    "BluetoothManager.getConnectedDevices(GATT_SERVER)",
+                    data = mapOf("count" to (connectedDevices?.size ?: 0)),
+                )
             } catch (e: SecurityException) {
-                Log.d("GattServer", "Cannot get connected devices: ${e.message}")
+                BlueyLog.log(
+                    LogLevelDto.WARN, GATT_SERVER_CONTEXT,
+                    "cannot get connected devices: ${e.message}",
+                    errorCode = "SECURITY_EXCEPTION",
+                )
             }
         }
-        Log.d("GattServer", "=========================")
     }
 
     private fun ensureServerOpen() {
         if (gattServer != null) {
-            Log.d("GattServer", "ensureServerOpen: server already open")
+            BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "ensureServerOpen: server already open")
             return
         }
 
         if (!hasRequiredPermissions()) {
-            Log.d("GattServer", "ensureServerOpen: missing permissions")
+            BlueyLog.log(LogLevelDto.WARN, GATT_SERVER_CONTEXT, "ensureServerOpen: missing permissions")
             return
         }
 
         try {
-            Log.d("GattServer", "ensureServerOpen: opening GATT server with callback $gattServerCallback")
+            BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "ensureServerOpen: opening GATT server")
 
             // Try to open the GATT server, with retry on failure
             var server = bluetoothManager?.openGattServer(context, gattServerCallback)
 
             if (server == null) {
-                Log.w("GattServer", "ensureServerOpen: first attempt failed, retrying after delay...")
+                BlueyLog.log(
+                    LogLevelDto.WARN, GATT_SERVER_CONTEXT,
+                    "ensureServerOpen: first attempt failed, retrying after delay",
+                )
                 // Sometimes the Bluetooth stack needs a moment, especially after being enabled
                 Thread.sleep(100)
                 server = bluetoothManager?.openGattServer(context, gattServerCallback)
             }
 
             gattServer = server
-            Log.d("GattServer", "ensureServerOpen: server opened = ${gattServer != null}")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "ensureServerOpen complete",
+                data = mapOf("opened" to (gattServer != null)),
+            )
 
             if (gattServer == null) {
-                Log.e("GattServer", "ensureServerOpen: Failed to open GATT server - Bluetooth may not be fully ready")
+                BlueyLog.log(
+                    LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                    "ensureServerOpen: failed to open GATT server (Bluetooth may not be fully ready)",
+                )
             }
         } catch (e: SecurityException) {
-            Log.e("GattServer", "ensureServerOpen: SecurityException", e)
+            BlueyLog.log(
+                LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                "ensureServerOpen: SecurityException ${e.message}",
+                errorCode = "SECURITY_EXCEPTION",
+            )
         } catch (e: Exception) {
-            Log.e("GattServer", "ensureServerOpen: Exception", e)
+            BlueyLog.log(
+                LogLevelDto.ERROR, GATT_SERVER_CONTEXT,
+                "ensureServerOpen: Exception ${e.message}",
+            )
         }
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         init {
-            Log.d("GattServer", "BluetoothGattServerCallback created: $this")
+            BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "BluetoothGattServerCallback created")
         }
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             val deviceId = device.address
-            Log.d(
-                "GattServer",
-                "onConnectionStateChange: device=$deviceId status=$status newState=$newState"
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onConnectionStateChange",
+                data = mapOf("centralId" to deviceId, "status" to status, "newState" to newState),
             )
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     val isNew = connectedCentrals[deviceId] == null
-                    Log.d("GattServer", "Central connected: $deviceId (new=$isNew)")
+                    BlueyLog.log(
+                        LogLevelDto.INFO, GATT_SERVER_CONTEXT,
+                        "central connected",
+                        data = mapOf("centralId" to deviceId, "isNew" to isNew),
+                    )
                     connectedCentrals[deviceId] = device
                     centralMtus[deviceId] = DEFAULT_MTU
 
@@ -670,7 +726,11 @@ class GattServer(
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.d("GattServer", "Central disconnected: $deviceId")
+                    BlueyLog.log(
+                        LogLevelDto.INFO, GATT_SERVER_CONTEXT,
+                        "central disconnected",
+                        data = mapOf("centralId" to deviceId),
+                    )
                     connectedCentrals.remove(deviceId)
                     centralMtus.remove(deviceId)
 
@@ -708,9 +768,14 @@ class GattServer(
                     val drainedReads = pendingReadRequests.drainWhere { it.device.address == deviceId }
                     val drainedWrites = pendingWriteRequests.drainWhere { it.device.address == deviceId }
                     if (drainedReads.isNotEmpty() || drainedWrites.isNotEmpty()) {
-                        Log.d(
-                            "GattServer",
-                            "Drained ${drainedReads.size} read(s) and ${drainedWrites.size} write(s) on disconnect of $deviceId"
+                        BlueyLog.log(
+                            LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                            "drained pending ATT requests on disconnect",
+                            data = mapOf(
+                                "centralId" to deviceId,
+                                "reads" to drainedReads.size,
+                                "writes" to drainedWrites.size,
+                            ),
                         )
                     }
 
@@ -723,7 +788,11 @@ class GattServer(
         }
 
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
-            Log.d("GattServer", "onServiceAdded: status=$status service=${service.uuid}")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onServiceAdded",
+                data = mapOf("status" to status, "serviceUuid" to service.uuid.toString()),
+            )
             // Look up the caller by service UUID. Match the same lowercase
             // canonical form used as the key in addService.
             val key = service.uuid.toString().lowercase()
@@ -745,7 +814,15 @@ class GattServer(
             offset: Int,
             characteristic: BluetoothGattCharacteristic
         ) {
-            Log.d("GattServer", "onCharacteristicReadRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onCharacteristicReadRequest",
+                data = mapOf(
+                    "centralId" to device.address,
+                    "characteristicUuid" to characteristic.uuid.toString(),
+                    "requestId" to requestId,
+                ),
+            )
 
             // Stash pending entry BEFORE posting to Flutter so the main
             // thread can never see a respondToRead before the put has
@@ -786,7 +863,18 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
-            Log.d("GattServer", "onCharacteristicWriteRequest: device=${device.address} char=${characteristic.uuid} requestId=$requestId preparedWrite=$preparedWrite responseNeeded=$responseNeeded")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onCharacteristicWriteRequest",
+                data = mapOf(
+                    "centralId" to device.address,
+                    "characteristicUuid" to characteristic.uuid.toString(),
+                    "requestId" to requestId,
+                    "preparedWrite" to preparedWrite,
+                    "responseNeeded" to responseNeeded,
+                    "length" to value.size,
+                ),
+            )
 
             val charHandle = handleForCharacteristic(characteristic)
                 ?: characteristic.instanceId.toLong()
@@ -837,7 +925,11 @@ class GattServer(
             offset: Int,
             descriptor: BluetoothGattDescriptor
         ) {
-            Log.d("GattServer", "onDescriptorReadRequest: device=${device.address} desc=${descriptor.uuid}")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onDescriptorReadRequest",
+                data = mapOf("centralId" to device.address, "descriptorUuid" to descriptor.uuid.toString()),
+            )
             try {
                 gattServer?.sendResponse(
                     device,
@@ -860,7 +952,11 @@ class GattServer(
             offset: Int,
             value: ByteArray
         ) {
-            Log.d("GattServer", "onDescriptorWriteRequest: device=${device.address} desc=${descriptor.uuid}")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onDescriptorWriteRequest",
+                data = mapOf("centralId" to device.address, "descriptorUuid" to descriptor.uuid.toString()),
+            )
             // Check if this is a CCCD write (subscription change)
             if (descriptor.uuid == CCCD_UUID) {
                 val characteristicUuid = descriptor.characteristic.uuid.toString()
@@ -905,12 +1001,20 @@ class GattServer(
         }
 
         override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
-            Log.d("GattServer", "onMtuChanged: device=${device.address} mtu=$mtu")
+            BlueyLog.log(
+                LogLevelDto.INFO, GATT_SERVER_CONTEXT,
+                "onMtuChanged",
+                data = mapOf("centralId" to device.address, "mtu" to mtu),
+            )
             centralMtus[device.address] = mtu
         }
 
         override fun onNotificationSent(device: BluetoothDevice, status: Int) {
-            Log.d("GattServer", "onNotificationSent: device=${device.address} status=$status")
+            BlueyLog.log(
+                LogLevelDto.TRACE, GATT_SERVER_CONTEXT,
+                "onNotificationSent",
+                data = mapOf("centralId" to device.address, "status" to status),
+            )
             // I012: pop the FIFO head for this central and complete its
             // notify. Fires on a binder thread; marshal to main so the
             // pendingNotifications map is only mutated on the main looper
@@ -937,11 +1041,29 @@ class GattServer(
         }
 
         override fun onPhyUpdate(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {
-            Log.d("GattServer", "onPhyUpdate: device=${device.address} txPhy=$txPhy rxPhy=$rxPhy status=$status")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onPhyUpdate",
+                data = mapOf(
+                    "centralId" to device.address,
+                    "txPhy" to txPhy,
+                    "rxPhy" to rxPhy,
+                    "status" to status,
+                ),
+            )
         }
 
         override fun onPhyRead(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {
-            Log.d("GattServer", "onPhyRead: device=${device.address} txPhy=$txPhy rxPhy=$rxPhy status=$status")
+            BlueyLog.log(
+                LogLevelDto.DEBUG, GATT_SERVER_CONTEXT,
+                "onPhyRead",
+                data = mapOf(
+                    "centralId" to device.address,
+                    "txPhy" to txPhy,
+                    "rxPhy" to rxPhy,
+                    "status" to status,
+                ),
+            )
         }
     }
 

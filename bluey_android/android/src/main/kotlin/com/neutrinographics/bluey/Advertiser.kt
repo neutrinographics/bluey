@@ -14,7 +14,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import androidx.core.content.ContextCompat
-import android.util.Log
 import java.util.UUID
 
 /**
@@ -114,10 +113,15 @@ class Advertiser(
         // Create callback
         advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                Log.d("Advertiser", "Advertising started successfully. Settings: $settingsInEffect")
-                Log.d("Advertiser", "  connectable: ${settingsInEffect?.isConnectable}")
-                Log.d("Advertiser", "  mode: ${settingsInEffect?.mode}")
-                Log.d("Advertiser", "  txPowerLevel: ${settingsInEffect?.txPowerLevel}")
+                BlueyLog.log(
+                    LogLevelDto.INFO, ADVERTISER_CONTEXT,
+                    "advertising started",
+                    data = mapOf(
+                        "connectable" to (settingsInEffect?.isConnectable ?: false),
+                        "mode" to (settingsInEffect?.mode ?: -1),
+                        "txPowerLevel" to (settingsInEffect?.txPowerLevel ?: -1),
+                    ),
+                )
                 isAdvertising = true
                 callback(Result.success(Unit))
 
@@ -160,7 +164,11 @@ class Advertiser(
     }
 
     fun cleanup() {
-        Log.d("Advertiser", "cleanup() called, isAdvertising=$isAdvertising")
+        BlueyLog.log(
+            LogLevelDto.DEBUG, ADVERTISER_CONTEXT,
+            "cleanup",
+            data = mapOf("isAdvertising" to isAdvertising),
+        )
         stopAdvertisingInternal()
     }
 
@@ -170,22 +178,26 @@ class Advertiser(
         timeoutRunnable = null
 
         if (!isAdvertising) {
-            Log.d("Advertiser", "stopAdvertisingInternal: not advertising, skipping")
+            BlueyLog.log(LogLevelDto.DEBUG, ADVERTISER_CONTEXT, "stopAdvertisingInternal: not advertising, skipping")
             return
         }
 
         advertiseCallback?.let { cb ->
             try {
-                Log.d("Advertiser", "stopAdvertisingInternal: stopping advertising")
+                BlueyLog.log(LogLevelDto.DEBUG, ADVERTISER_CONTEXT, "stopAdvertisingInternal: stopping advertising")
                 advertiser?.stopAdvertising(cb)
             } catch (e: SecurityException) {
-                Log.e("Advertiser", "stopAdvertisingInternal: SecurityException", e)
+                BlueyLog.log(
+                    LogLevelDto.ERROR, ADVERTISER_CONTEXT,
+                    "stopAdvertisingInternal: SecurityException ${e.message}",
+                    errorCode = "SECURITY_EXCEPTION",
+                )
             }
         }
 
         isAdvertising = false
         advertiseCallback = null
-        Log.d("Advertiser", "stopAdvertisingInternal: advertising stopped")
+        BlueyLog.log(LogLevelDto.INFO, ADVERTISER_CONTEXT, "advertising stopped")
     }
 
     private fun normalizeUuid(uuid: String): String {
@@ -204,5 +216,9 @@ class Advertiser(
             ) == PackageManager.PERMISSION_GRANTED
         }
         return true
+    }
+
+    companion object {
+        private const val ADVERTISER_CONTEXT = "bluey.android.advertiser"
     }
 }
