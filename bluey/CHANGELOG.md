@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 **Breaking changes (I088, I089, I066, I300, I301)** — bundled major-version rewrite:
 
