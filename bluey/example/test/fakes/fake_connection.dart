@@ -29,6 +29,9 @@ class FakeConnection implements Connection {
   Stream<ConnectionState> get stateChanges => _stateController.stream;
 
   @override
+  Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
+
+  @override
   Mtu get mtu => Mtu.fromPlatform(_mtu);
 
   @override
