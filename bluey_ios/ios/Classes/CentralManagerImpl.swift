@@ -27,6 +27,14 @@ class CentralManagerImpl: NSObject {
     private var characteristics: [String: [String: CBCharacteristic]] = [:] // [deviceId: [charUuid: char]]
     private var descriptors: [String: [String: CBDescriptor]] = [:] // [deviceId: [descUuid: desc]]
 
+    // I088 — handle-identity tables. Populated alongside the
+    // UUID-keyed caches above when CB fires the discovery callbacks;
+    // the UUID-keyed maps remain in service for legacy code paths
+    // (D.8/D.13 retire them). See `CentralHandleStore` for the mint
+    // contract (per-device monotonic counter, shared between chars
+    // and descs in encounter order).
+    internal let handleStore = CentralHandleStore<CBCharacteristic, CBDescriptor>()
+
     // Pending completion slots — one FIFO per (device, key). Each OpSlot
     // owns its head-of-queue timer. See OpSlot.swift for semantics.
     private var connectSlots: [String: OpSlot<Void>] = [:]
@@ -472,6 +480,12 @@ class CentralManagerImpl: NSObject {
         characteristics.removeValue(forKey: deviceId)
         descriptors.removeValue(forKey: deviceId)
 
+        // I088 — drop the per-device handle table. CB does not
+        // guarantee object identity preservation across reconnect,
+        // so handles minted from the previous session must not
+        // outlive the link.
+        handleStore.clear(for: deviceId)
+
         // Clear pending discovery state
         pendingServiceDiscovery.removeValue(forKey: deviceId)
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
@@ -587,6 +601,18 @@ class CentralManagerImpl: NSObject {
             characteristics[deviceId, default: [:]][charUuid] = characteristic
             pendingCharacteristicDiscovery[deviceId, default: []].insert(charUuid)
 
+            // I088 — mint a per-device handle for this characteristic
+            // and store it. Subsequent DTO mapping looks up this
+            // handle by reference identity. Idempotency: only mint
+            // if we haven't already seen this exact characteristic
+            // object (CB returns the same reference across callbacks
+            // for the same attribute). This guards against multiple
+            // didDiscoverCharacteristicsFor for the same service —
+            // they're rare but possible after re-discovery races.
+            if handleStore.handleForCharacteristic(characteristic, deviceId: deviceId) == nil {
+                handleStore.recordCharacteristic(characteristic, for: deviceId)
+            }
+
             // Discover descriptors for each characteristic
             peripheral.discoverDescriptors(for: characteristic)
         }
@@ -605,6 +631,16 @@ class CentralManagerImpl: NSObject {
             for descriptor in cbDescriptors {
                 let descUuid = descriptor.uuid.uuidString.lowercased()
                 descriptors[deviceId, default: [:]][descUuid] = descriptor
+
+                // I088 — mint a handle for this descriptor from the
+                // same per-device counter as characteristics, so
+                // descriptor handles continue from where chars left
+                // off in encounter order. Idempotency same as for
+                // characteristics: skip if we've seen this exact
+                // descriptor object before.
+                if handleStore.handleForDescriptor(descriptor, deviceId: deviceId) == nil {
+                    handleStore.recordDescriptor(descriptor, for: deviceId)
+                }
             }
         }
 
@@ -626,15 +662,61 @@ class CentralManagerImpl: NSObject {
         pendingServiceDiscovery.removeValue(forKey: deviceId)
         pendingCharacteristicDiscovery.removeValue(forKey: deviceId)
 
-        // Build the final service DTOs with all discovered characteristics and descriptors
+        // Build the final service DTOs with all discovered characteristics and descriptors.
+        // I088 — DTO mapping reverse-looks-up minted handles from
+        // `handleStore` so each CharacteristicDto / DescriptorDto
+        // carries the handle Dart will address it by.
         let cbServices = peripheral.services ?? []
         var serviceDtos: [ServiceDto] = []
 
         for service in cbServices {
-            serviceDtos.append(service.toDto())
+            serviceDtos.append(mapServiceWithHandles(service: service, deviceId: deviceId))
         }
 
         discoverServicesSlots[deviceId]?.completeHead(.success(serviceDtos))
+    }
+
+    /// I088 — DTO mapping that emits minted handles. Mirrors
+    /// `CBService.toDto()` but uses `handleStore` for handle
+    /// reverse-lookup. We keep `toDto()` (handle-less) intact for
+    /// any callers that don't need handles; D.8/D.13 retire that
+    /// fallback path.
+    private func mapServiceWithHandles(service: CBService, deviceId: String) -> ServiceDto {
+        let uuid = service.uuid.uuidString.lowercased()
+        let chars = (service.characteristics ?? []).map { mapCharacteristicWithHandle(characteristic: $0, deviceId: deviceId) }
+        let included = (service.includedServices ?? []).map { mapServiceWithHandles(service: $0, deviceId: deviceId) }
+        return ServiceDto(
+            uuid: uuid,
+            isPrimary: service.isPrimary,
+            characteristics: chars,
+            includedServices: included
+        )
+    }
+
+    private func mapCharacteristicWithHandle(characteristic: CBCharacteristic, deviceId: String) -> CharacteristicDto {
+        let uuid = characteristic.uuid.uuidString.lowercased()
+        let props = characteristic.properties
+        let propertiesDto = CharacteristicPropertiesDto(
+            canRead: props.contains(.read),
+            canWrite: props.contains(.write),
+            canWriteWithoutResponse: props.contains(.writeWithoutResponse),
+            canNotify: props.contains(.notify),
+            canIndicate: props.contains(.indicate)
+        )
+        let descs = (characteristic.descriptors ?? []).map { mapDescriptorWithHandle(descriptor: $0, deviceId: deviceId) }
+        let handle = handleStore.handleForCharacteristic(characteristic, deviceId: deviceId).map { Int64($0) }
+        return CharacteristicDto(
+            uuid: uuid,
+            properties: propertiesDto,
+            descriptors: descs,
+            handle: handle
+        )
+    }
+
+    private func mapDescriptorWithHandle(descriptor: CBDescriptor, deviceId: String) -> DescriptorDto {
+        let uuid = descriptor.uuid.uuidString.lowercased()
+        let handle = handleStore.handleForDescriptor(descriptor, deviceId: deviceId).map { Int64($0) }
+        return DescriptorDto(uuid: uuid, handle: handle)
     }
 
     func didUpdateCharacteristicValue(peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
@@ -743,6 +825,11 @@ class CentralManagerImpl: NSObject {
         services.removeValue(forKey: deviceId)
         characteristics.removeValue(forKey: deviceId)
         descriptors.removeValue(forKey: deviceId)
+
+        // I088 — Service Changed invalidates the attribute layout;
+        // drop minted handles before notifying Dart so any lookup
+        // that races the change can't resolve to a stale entry.
+        handleStore.clear(for: deviceId)
 
         flutterApi.onServicesChanged(deviceId: deviceId) { _ in }
     }
