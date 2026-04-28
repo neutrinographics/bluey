@@ -515,39 +515,46 @@ This phase is sequenced platform-by-platform inside the additive period, then a 
 - Modify: `bluey_android/android/src/main/kotlin/com/neutrinographics/bluey/ConnectionManager.kt`
 - New: `bluey_android/android/src/test/kotlin/com/neutrinographics/bluey/HandleLookupTest.kt`
 
-- [ ] **D.3.1** — Failing JVM test: `HandleLookupTest.populates handle table at onServicesDiscovered`. Set up a mock `BluetoothGatt` with two services × two characteristics × one descriptor each; fire `onServicesDiscovered`; assert `characteristicByHandle[deviceId]` contains four entries with correct `getInstanceId()` keys.
-- [ ] **D.3.2** — Failing test: `HandleLookupTest.clears handle table on STATE_DISCONNECTED`.
-- [ ] **D.3.3** — Failing test: `ServiceChangedHandleTest.clears handle table on onServiceChanged before re-discovery`.
+**Note on descriptor handles (spec amendment, see design doc § "Android handle source"):** `BluetoothGattDescriptor.getInstanceId()` is `@hide` in AOSP and not part of the public Android SDK. We mint descriptor handles client-side using a per-device monotonic counter (mirrors iOS). Characteristics still use `BluetoothGattCharacteristic.getInstanceId()`, which is public.
+
+- [ ] **D.3.1** — Failing JVM test: `HandleLookupTest.populates handle table at onServicesDiscovered`. Set up a mock `BluetoothGatt` with two services × two characteristics × one descriptor each; mock `getInstanceId()` on each characteristic to return distinct ints. Fire `onServicesDiscovered`; assert `characteristicByHandle[deviceId]` contains four entries with the mocked `getInstanceId()` keys; assert `descriptorByHandle[deviceId]` contains four entries with minted handles 1..4 (assigned in iteration order).
+- [ ] **D.3.2** — Failing test: `HandleLookupTest.clears handle table on STATE_DISCONNECTED` (also clears `nextDescriptorHandle[deviceId]`).
+- [ ] **D.3.3** — Failing test: `ServiceChangedHandleTest.clears handle table on onServiceChanged before re-discovery` (also clears `nextDescriptorHandle[deviceId]`).
 - [ ] **D.3.4** — Add fields:
   ```kotlin
   private val characteristicByHandle:
       MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>> = mutableMapOf()
   private val descriptorByHandle:
       MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>> = mutableMapOf()
+  private val nextDescriptorHandle: MutableMap<String, Int> = mutableMapOf()
   ```
 - [ ] **D.3.5** — In `onServicesDiscovered`, after the existing rediscovery flow:
   ```kotlin
   handler.post {
     val charMap = mutableMapOf<Int, BluetoothGattCharacteristic>()
     val descMap = mutableMapOf<Int, BluetoothGattDescriptor>()
+    var nextDesc = 1
     for (service in gatt.services) {
       for (char in service.characteristics) {
         charMap[char.instanceId] = char
         for (desc in char.descriptors) {
-          descMap[desc.instanceId] = desc
+          descMap[nextDesc] = desc
+          nextDesc++
         }
       }
     }
     characteristicByHandle[deviceId] = charMap
     descriptorByHandle[deviceId] = descMap
+    nextDescriptorHandle[deviceId] = nextDesc
   }
   ```
 - [ ] **D.3.6** — In `STATE_DISCONNECTED`'s `handler.post` block, add:
   ```kotlin
   characteristicByHandle.remove(deviceId)
   descriptorByHandle.remove(deviceId)
+  nextDescriptorHandle.remove(deviceId)
   ```
-- [ ] **D.3.7** — In `onServiceChanged`'s `handler.post` block, add the same clears before triggering re-discovery.
+- [ ] **D.3.7** — In `onServiceChanged`'s `handler.post` block, add the same three clears before triggering re-discovery.
 - [ ] **D.3.8** — Run JVM tests → green.
 - [ ] **D.3.9** — Commit:
   ```
@@ -561,12 +568,12 @@ This phase is sequenced platform-by-platform inside the additive period, then a 
 - Modify: same `mapServices` / `mapCharacteristics` callers in `GattServer.kt` (or wherever the local server's `addService` callback lives).
 
 - [ ] **D.4.1** — In `mapCharacteristics`, set `handle = char.instanceId` in the `CharacteristicDto`.
-- [ ] **D.4.2** — In whatever helper maps descriptors, set `handle = desc.instanceId`.
-- [ ] **D.4.3** — In `GattServer`'s read/write request handlers, set `characteristicHandle = characteristic.instanceId` on `ReadRequestDto` / `WriteRequestDto`.
+- [ ] **D.4.2** — In whatever helper maps descriptors, set the `handle` field to the minted descriptor handle from `descriptorByHandle[deviceId]` populated in D.3 (i.e. reverse-lookup or pass the minted int through `mapServices` so each `DescriptorDto` carries the handle assigned during discovery). The wire format is `int`; the minted counter from D.3 is the source of truth.
+- [ ] **D.4.3** — In `GattServer`'s read/write request handlers, set `characteristicHandle = characteristic.instanceId` on `ReadRequestDto` / `WriteRequestDto`. (Server-side does not yet emit descriptor-handles — descriptors-on-server is a future concern.)
 - [ ] **D.4.4** — Run JVM tests + Dart tests for `bluey_android` → green.
 - [ ] **D.4.5** — Commit:
   ```
-  feat(bluey_android): emit getInstanceId() handle in discovery and request DTOs (I088)
+  feat(bluey_android): emit characteristic instanceId + minted descriptor handles in DTOs (I088)
   ```
 
 ## Task D.5: iOS — mint handles in CentralManager discovery callbacks; clear on disconnect / didModifyServices

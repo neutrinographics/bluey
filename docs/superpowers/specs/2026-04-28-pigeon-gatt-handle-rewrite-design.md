@@ -40,9 +40,9 @@ Three architectural shifts, plus a value-object pass:
 - Wire type stays `int` (Pigeon-portable). The Dart domain layer wraps in `AttributeHandle` immediately after Pigeon decode and unwraps just before encode; native sides operate on raw int. The wrapper type does not cross the wire.
 
 **Android handle source:**
-- `BluetoothGattCharacteristic.getInstanceId()` and `BluetoothGattDescriptor.getInstanceId()` for client-side.
-- For server-side (`GattServer.kt`), the same `getInstanceId()` works once a characteristic has been added to a service.
-- New per-device maps in `ConnectionManager.kt`: `characteristicByHandle: MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>` and `descriptorByHandle: MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>>`. Populated in `onServicesDiscovered`, cleared in `STATE_DISCONNECTED` and on Service Changed.
+- Characteristics: `BluetoothGattCharacteristic.getInstanceId()` (public Android SDK) for client-side. For server-side (`GattServer.kt`), the same `getInstanceId()` works once a characteristic has been added to a service.
+- Descriptors: **minted Dart-side counter** (mirrors iOS). `BluetoothGattDescriptor.getInstanceId()` exists in AOSP but is `@hide` and not part of the public Android SDK; reflection is too brittle (StrictMode + non-SDK interface restrictions on API 28+). Mint a per-device monotonic int starting at 1, exactly the way iOS does.
+- New per-device maps in `ConnectionManager.kt`: `characteristicByHandle: MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>` (handle = `getInstanceId()`) and `descriptorByHandle: MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>>` (handle = minted int). Plus `nextDescriptorHandle: MutableMap<String, Int>`. Populated in `onServicesDiscovered`, cleared in `STATE_DISCONNECTED` and on Service Changed.
 
 **iOS handle source:**
 - A monotonic int counter minted at `peripheral(_, didDiscoverCharacteristicsFor:)` and `peripheral(_, didDiscoverDescriptorsFor:)`.
@@ -108,9 +108,11 @@ Every attribute has an opaque `int handle` assigned by the platform side at disc
 
 ### Android handle source
 
-`BluetoothGattCharacteristic.getInstanceId()` and `BluetoothGattDescriptor.getInstanceId()` return implementation-defined ints that are unique within a connection and stable for its lifetime. They're invalidated on disconnect (the `BluetoothGattCharacteristic` references themselves become unusable). On Service Changed, the OS calls `onServiceChanged`; we re-discover and new instance IDs are issued.
+**Characteristics use `BluetoothGattCharacteristic.getInstanceId()`.** This is a public Android SDK method that returns an implementation-defined int unique within a connection and stable for its lifetime. Invalidated on disconnect (the `BluetoothGattCharacteristic` references themselves become unusable). On Service Changed, the OS calls `onServiceChanged`; we re-discover and new instance IDs are issued.
 
-For Android-server-side hosted attributes, the same `getInstanceId()` works after the characteristic has been added to a service (`BluetoothGattServer.addService`). The platform assigns the ID at add-time.
+For Android-server-side hosted characteristics, the same `getInstanceId()` works after the characteristic has been added to a service (`BluetoothGattServer.addService`). The platform assigns the ID at add-time.
+
+**Descriptors use a minted per-device counter (mirrors iOS).** `BluetoothGattDescriptor.getInstanceId()` exists in AOSP but is annotated `@hide` and not part of the public Android SDK. Calling it requires reflection, which trips Android's non-SDK interface restrictions (API 28+) and StrictMode warnings on some OEMs. Rather than depend on a fragile hidden API, we mint our own descriptor handles client-side, exactly the way iOS does for everything. Server-side descriptors (if ever exposed) would follow the same minted-counter approach.
 
 The handle table in `ConnectionManager.kt`:
 
@@ -121,11 +123,12 @@ private val characteristicByHandle:
 private val descriptorByHandle:
     MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>>
     = mutableMapOf()
+private val nextDescriptorHandle: MutableMap<String, Int> = mutableMapOf()
 ```
 
 (No service-handle map needed — Android characteristic ops take a `BluetoothGattCharacteristic` reference directly, which already carries its parent service.)
 
-Populated in `onServicesDiscovered` by walking `gatt.services` and calling `getInstanceId()` on each characteristic and descriptor; cleared in the `STATE_DISCONNECTED` branch of `onConnectionStateChange` (alongside the existing `connections.remove(deviceId)` cleanup).
+Populated in `onServicesDiscovered` by walking `gatt.services`: each characteristic's handle is `char.instanceId`; each descriptor's handle is the next minted int (per-device counter starting at 1). Cleared in the `STATE_DISCONNECTED` branch of `onConnectionStateChange` (alongside the existing `connections.remove(deviceId)` cleanup) — both maps and the `nextDescriptorHandle[deviceId]` entry.
 
 ### iOS handle source
 
@@ -172,6 +175,7 @@ Android: onServiceChanged(gatt) [binder thread]
       // Clear handle tables for this device:
       characteristicByHandle.remove(deviceId)
       descriptorByHandle.remove(deviceId)
+      nextDescriptorHandle.remove(deviceId)
       // Existing service-rediscovery path runs:
       gatt.discoverServices()
       // (When onServicesDiscovered fires later, maps are repopulated.)
@@ -454,13 +458,13 @@ class Mtu {
 #### Android native
 
 - `bluey_android/android/src/main/kotlin/com/neutrinographics/bluey/ConnectionManager.kt`:
-  - Add `characteristicByHandle: MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>` and `descriptorByHandle: MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>>` near the existing field declarations.
+  - Add `characteristicByHandle: MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>>`, `descriptorByHandle: MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>>`, and `nextDescriptorHandle: MutableMap<String, Int>` near the existing field declarations.
   - Replace `findCharacteristic(gatt, uuid)` (L853–863) with `characteristicByHandle[deviceId]?[handle]`.
   - Replace `findDescriptor(gatt, uuid)` (L865–877) with `descriptorByHandle[deviceId]?[handle]`.
-  - In `onServicesDiscovered` (after the existing rediscovery flow), populate the maps from `gatt.services` walk using `getInstanceId()`.
-  - In the `STATE_DISCONNECTED` branch of `onConnectionStateChange`, clear `characteristicByHandle.remove(deviceId)` and `descriptorByHandle.remove(deviceId)`.
-  - In `onServiceChanged`, clear maps before `gatt.discoverServices()`.
-  - `mapCharacteristics` / `mapServices` (L879–902) emit `getInstanceId()` as the `handle` field.
+  - In `onServicesDiscovered` (after the existing rediscovery flow), populate the maps from `gatt.services` walk: each characteristic's handle is `char.instanceId` (public Android SDK); each descriptor's handle is the next minted int from `nextDescriptorHandle[deviceId]` (per-device counter starting at 1, mirroring iOS — `BluetoothGattDescriptor.getInstanceId()` is `@hide` and not safely callable).
+  - In the `STATE_DISCONNECTED` branch of `onConnectionStateChange`, clear `characteristicByHandle.remove(deviceId)`, `descriptorByHandle.remove(deviceId)`, and `nextDescriptorHandle.remove(deviceId)`.
+  - In `onServiceChanged`, clear all three maps before `gatt.discoverServices()`.
+  - `mapCharacteristics` / `mapServices` (L879–902) emit `char.instanceId` as the characteristic `handle` field; descriptors emit the minted int.
   - `setNotification` (L360–416): use `characteristicByHandle` lookup instead of `findCharacteristic`. CCCD comes from `characteristic.getDescriptor(CCCD_UUID)` as before — already correctly scoped to the resolved characteristic.
 
 - `bluey_android/android/src/main/kotlin/com/neutrinographics/bluey/GattServer.kt` (or wherever the local server lives):
