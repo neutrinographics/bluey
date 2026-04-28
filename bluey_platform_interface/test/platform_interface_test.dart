@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey_platform_interface/src/platform_interface.dart';
 import 'package:bluey_platform_interface/src/capabilities.dart';
+import 'package:bluey_platform_interface/src/platform_log_event.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 /// Mock platform implementation for testing
@@ -224,6 +225,13 @@ final class MockBlueyPlatform extends BlueyPlatform
 
   @override
   Stream<String> get serviceChanges => throw UnimplementedError();
+
+  @override
+  Stream<PlatformLogEvent> get logEvents => throw UnimplementedError();
+
+  @override
+  Future<void> setLogLevel(PlatformLogLevel level) =>
+      throw UnimplementedError();
 }
 
 void main() {

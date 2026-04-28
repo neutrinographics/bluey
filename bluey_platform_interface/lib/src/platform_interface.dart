@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'capabilities.dart';
+import 'platform_log_event.dart';
 
 /// Value equality for lists (replaces flutter/foundation listEquals).
 bool _listEquals<T>(List<T>? a, List<T>? b) {
@@ -552,6 +553,27 @@ abstract base class BlueyPlatform extends PlatformInterface {
   ///
   /// After calling this, the server instance should not be reused.
   Future<void> closeServer();
+
+  // === Structured logging ===
+
+  /// Stream of structured log events emitted by the platform implementation.
+  ///
+  /// Native platforms (Android Kotlin, iOS Swift) emit log records via this
+  /// stream so the domain layer can merge them into a single
+  /// `Bluey.logEvents` view alongside Dart-side logs.
+  ///
+  /// Filtering is performed natively before marshalling: events whose
+  /// [PlatformLogEvent.level] is below the threshold passed to
+  /// [setLogLevel] are dropped on the platform side and never reach this
+  /// stream.
+  Stream<PlatformLogEvent> get logEvents;
+
+  /// Set the minimum severity level for events emitted on [logEvents].
+  ///
+  /// Implementations should forward this value to the native side so the
+  /// filter is applied before marshalling, avoiding cross-platform-channel
+  /// traffic for events that would be discarded anyway.
+  Future<void> setLogLevel(PlatformLogLevel level);
 }
 
 /// A notification from a characteristic.

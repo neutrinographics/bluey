@@ -8,3 +8,4 @@ library bluey_platform_interface;
 export 'src/capabilities.dart';
 export 'src/exceptions.dart';
 export 'src/platform_interface.dart';
+export 'src/platform_log_event.dart';
