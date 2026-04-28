@@ -4,8 +4,9 @@ title: Characteristic UUID lookup ignores service context
 category: bug
 severity: critical
 platform: android
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 historical_ref: BUGS-ANALYSIS-ANDROID-A1
 related: [I011, I016, I088]
 ---
@@ -30,3 +31,7 @@ Fix shape: add a `serviceUuid: String` parameter to every characteristic-targeti
 Alternative: use Android's `BluetoothGattCharacteristic.instanceId` (hash code) as the stable key, the way `bluetooth_low_energy_android` does. Higher-fidelity but requires lifetime tracking of the native instance.
 
 Related: I011 (same pattern for descriptors, which is where the bug actually bites in practice via CCCD); I016 (iOS server-side mirror); I088 (architectural rewrite of Pigeon GATT schema, which is the principled coherent fix).
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via I088 (Pigeon GATT schema now threads opaque platform-assigned `int handle` identity through every characteristic operation, replacing UUID-only lookup). See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

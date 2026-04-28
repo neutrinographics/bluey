@@ -4,8 +4,9 @@ title: Connection aggregate carries Peer-context state; bounded-context boundary
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I089]
 ---
 
@@ -96,3 +97,7 @@ External references:
 - Eric Evans, ibid., Chapter 5: "A Model Expressed in Software" — on aggregate roots and identity. The current `BlueyConnection` violates aggregate-identity stability by mutating from one kind to another via `upgrade()`.
 - Vaughn Vernon, *Implementing Domain-Driven Design* (2013), Chapter 2: "Domains, Subdomains, and Bounded Contexts" — Context Maps and acyclic upstream/downstream relationships.
 - Vaughn Vernon, ibid., Chapter 13: "Integrating Bounded Contexts" — the "Open Host Service" pattern.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via composition over upgrade-in-place: `Bluey.connect(device)` now returns a raw `Connection`; `Bluey.connectAsPeer(device)` returns `PeerConnection` (or throws `NotABlueyPeerException`); `Bluey.tryUpgrade(connection)` returns `PeerConnection?` for the rare post-connect upgrade path. `PeerConnection` composes `Connection` (`peer.connection` for raw GATT) and owns the `serverId` plus the lifecycle-protocol disconnect path. `Connection.isBlueyServer` / `serverId` / `upgrade()` removed. Bundled with I089 (platform-tagged extensions) and I301 (value objects) for one coherent major-version bump. See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

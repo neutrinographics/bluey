@@ -4,8 +4,9 @@ title: Cross-platform Connection interface declares platform-specific methods
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I030, I031, I032, I035, I045, I065, I089, I200]
 ---
 
@@ -97,3 +98,7 @@ External references:
 - Effective Dart, [Avoid defining unnecessary getters and setters](https://dart.dev/effective-dart/design#avoid-defining-unnecessary-getters-and-setters).
 - Apple Accessory Design Guidelines, R8 (BLE) — confirms iOS does not expose central-side bond/PHY/conn-param control.
 - `flutter_blue_plus` uses Boolean capability flags rather than typed extensions; it does not solve this problem cleanly. The proposed shape is novel within the Flutter BLE ecosystem.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via I089 (the `Connection` interface now declares only cross-platform members; bond/PHY/connection-parameters/connection-priority/refreshGattCache moved to `connection.android` of type `AndroidConnectionExtensions?`, with `connection.ios` reserved for symmetric future use). See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

@@ -4,8 +4,9 @@ title: ConnectionParameters and mtu use primitives where domain value objects wo
 category: limitation
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I089, I300]
 ---
 
@@ -128,3 +129,7 @@ External references:
 - Martin Fowler, [Primitive Obsession](https://refactoring.guru/smells/primitive-obsession).
 - Bluetooth Core Specification 5.4, Vol 6 (Low Energy Controller), Part B, §4.5.2: "LE Connection Parameters" — the canonical source for the spec ranges.
 - [Apple Accessory Design Guidelines](https://developer.apple.com/accessories/Accessory-Design-Guidelines.pdf) (R8 BLE), §3.6: connection parameter recommendations for iOS.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via value objects that enforce spec invariants at construction (`ConnectionInterval`, `PeripheralLatency`, `SupervisionTimeout`, `Mtu`), bundled with the I300 connection-bounded-context refinement so the wider `Connection`-aggregate restructure could absorb the type changes coherently. See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

@@ -4,8 +4,9 @@ title: Rewrite Pigeon GATT schema to thread service/characteristic context throu
 category: bug
 severity: critical
 platform: platform-interface
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I010, I011, I016]
 ---
 
@@ -79,3 +80,7 @@ External references:
 - Android [`BluetoothGattCharacteristic.getInstanceId()`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCharacteristic#getInstanceId()).
 - BLE Core Specification 5.4, Vol 3, Part G, §3.2.2: characteristic declaration uniqueness within a service.
 - [`bluetooth_low_energy_android`](https://github.com/yanshouwang/bluetooth_low_energy) reference impl — search for `instanceId` usage in their characteristic lookup.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite (Option B from the notes above): every GATT attribute is now identified on the wire by an opaque platform-assigned `int handle` wrapped in the `AttributeHandle` value object. Android characteristic handles come from `BluetoothGattCharacteristic.getInstanceId()`; descriptor handles, iOS characteristic handles, and iOS descriptor handles are minted client-side via a per-device monotonic counter. Handles are connection-scoped and invalidated on disconnect or Service Changed, surfacing stale-handle ops as `AttributeHandleInvalidatedException`. This bundle subsumes I010, I011, and I016. See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

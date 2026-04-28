@@ -92,9 +92,9 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 
 These rewrite portions of the public surface; plan as release events with a migration guide.
 
-11. **I088** — Pigeon GATT schema rewrite (handle-based identity). *Critical severity. ~5–7 days.* Drives I010 + I011 + I016 fixes. Highest-impact correctness fix in the backlog (data-routing on multi-service peripherals).
+11. ~~**I088** — Pigeon GATT schema rewrite (handle-based identity).~~ ([73656b4](#); bundle `929e869..73656b4`). Drove I010 + I011 + I016 fixes. Handle-based identity threaded through every Pigeon GATT op.
 12. **I099** — Typed error translation rewrite. *~2–3 days.* Drives I090 + I092. Replaces string-matching `_wrapError` with a typed catch ladder; preserves the I097 lifecycle-accounting hooks.
-13. **I089 + I300 + I301** — Connection bounded-context refinement. *~5–7 days.* Coherent DDD restructure: removes `Connection.isBlueyServer` / `serverId` (composition over upgrade-in-place), splits cross-platform vs platform-specific methods (`AndroidConnectionExtensions`), introduces value objects for connection parameters and MTU. Major-version bump. **Strongly consider bundling with I088** to consolidate breaking changes into one release.
+13. ~~**I089 + I300 + I301** — Connection bounded-context refinement.~~ ([73656b4](#); bundle `929e869..73656b4`). Bundled with I088 into one major-version-bump release: composition over upgrade-in-place (`PeerConnection`), platform-tagged extensions (`connection.android` / `connection.ios`), value objects for connection parameters and MTU. I066 closed in the same bundle.
 
 ### Tier 4 — Opportunistic (pick up when in nearby code)
 
@@ -130,7 +130,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I058](I058-server-advertising-mode-dropped.md) | `BlueyServer.startAdvertising` drops user-supplied advertising mode | medium |
 | [I059](I059-server-remove-service-fire-and-forget.md) | `BlueyServer.removeService` doesn't await the platform call | low |
 | [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
-| [I066](I066-connection-platform-specific-methods.md) | Cross-platform `Connection` interface declares platform-specific methods | high |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
 | [I069](I069-fake-platform-capabilities-hardcoded.md) | `FakeBlueyPlatform.capabilities` hardcoded; no test coverage of capability gating | medium |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
@@ -138,7 +137,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
-| [I089](I089-connection-platform-tagged-extensions.md) | Rewrite `Connection` to platform-tagged extensions (architectural; bundles I066) | high |
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 | [I099](I099-typed-error-translation-rewrite.md) | Replace string-matching error wrapping with typed catch ladder (architectural) | high |
@@ -147,8 +145,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I010](I010-characteristic-uuid-lookup-no-service-context.md) | Characteristic UUID lookup ignores service context | critical |
-| [I011](I011-descriptor-uuid-lookup-no-char-context.md) | Descriptor UUID lookup ignores characteristic context | critical |
 | [I013](I013-scan-failure-error-code-not-propagated.md) | Scan failure error code discarded | medium |
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
@@ -180,7 +176,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I016](I016-ios-server-characteristics-uuid-only.md) | iOS server `characteristics` dict keyed by UUID alone (mirror of I010) | high |
 | [I040](I040-ios-notification-retry-on-ready.md) | `isReadyToUpdateSubscribers` does not retry failed notifications | medium |
 | [I041](I041-ios-read-notification-race.md) | `didUpdateCharacteristicValue` conflates read response with notification | medium |
 | [I042](I042-ios-services-cache-dead.md) | `services` cache dict is dead storage | low |
@@ -207,18 +202,10 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
 
-### Open — platform-interface
-
-| ID | Title | Severity |
-|---|---|---|
-| [I088](I088-pigeon-gatt-schema-rewrite.md) | Rewrite Pigeon GATT schema to thread service/characteristic context (architectural; bundles I010/I011/I016) | critical |
-
 ### Open — DDD / architectural refinement
 
 | ID | Title | Severity |
 |---|---|---|
-| [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carries Peer-context state; bounded-context boundary inverted | high |
-| [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` use primitives where domain value objects would carry validation | low |
 | [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
 | [I303](I303-capabilities-platform-kind-flag.md) | iOS-detection heuristic on `Connection.ios` should be a precise capability flag | low |
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
@@ -255,6 +242,14 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I082](I082-notify-characteristic-unsynchronized-iteration.md) | Android `notifyCharacteristic` iterated subscriptions unsynchronized; defensive snapshot + `handler.post` for binder-thread mutations | `80ef2ed` |
 | [I080](I080-add-service-advertising-race.md) | `addService` races with `startAdvertising`; platform-side Map keyed by UUID + Dart-side `_pendingServiceAdds` awaited by `startAdvertising` | `da80f52` |
 | [I012](I012-notification-completion-not-tracked-per-central.md) | Server notification completion not tracked per central; `pendingNotifications` FIFO queue + `onNotificationSent` wiring + 5 s timeout + `STATE_DISCONNECTED` drain | `aa588f1` |
+| [I088](I088-pigeon-gatt-schema-rewrite.md) | Pigeon GATT schema rewrite: opaque `AttributeHandle` threaded through every characteristic/descriptor op; subsumes I010/I011/I016 | `73656b4` (bundle `929e869..73656b4`) |
+| [I010](I010-characteristic-uuid-lookup-no-service-context.md) | Characteristic UUID lookup ignored service context; resolved by I088 handle rewrite | `73656b4` (bundle `929e869..73656b4`) |
+| [I011](I011-descriptor-uuid-lookup-no-char-context.md) | Descriptor UUID lookup ignored characteristic context; resolved by I088 handle rewrite | `73656b4` (bundle `929e869..73656b4`) |
+| [I016](I016-ios-server-characteristics-uuid-only.md) | iOS server `characteristics` dict keyed by UUID alone; resolved by I088 handle rewrite (server-side mirror) | `73656b4` (bundle `929e869..73656b4`) |
+| [I089](I089-connection-platform-tagged-extensions.md) | `Connection` rewritten to platform-tagged extensions (`connection.android` / `connection.ios`); subsumes I066 | `73656b4` (bundle `929e869..73656b4`) |
+| [I066](I066-connection-platform-specific-methods.md) | Cross-platform `Connection` interface declared platform-specific methods; resolved by I089 platform-tagged extensions | `73656b4` (bundle `929e869..73656b4`) |
+| [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carried Peer-context state; resolved via composition (`PeerConnection` wraps `Connection`); `Bluey.connect` / `connectAsPeer` / `tryUpgrade` split | `73656b4` (bundle `929e869..73656b4`) |
+| [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` primitives replaced with value objects (`ConnectionInterval`, `PeripheralLatency`, `SupervisionTimeout`, `Mtu`) | `73656b4` (bundle `929e869..73656b4`) |
 
 ### Wontfix — documented platform limitations & superseded premises
 

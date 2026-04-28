@@ -4,8 +4,9 @@ title: iOS server `characteristics` dict keyed by UUID alone (mirror of I010)
 category: bug
 severity: high
 platform: ios
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I010, I011, I088]
 ---
 
@@ -30,3 +31,7 @@ In the interim, a defensive workaround on the iOS side: change `characteristics:
 External references:
 - BLE Core Specification 5.4, Vol 3, Part G, §3.1 — duplicate characteristic UUIDs across services are spec-allowed.
 - Apple [`CBMutableService.characteristics`](https://developer.apple.com/documentation/corebluetooth/cbmutableservice).
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via I088 (the iOS server-side hosted-characteristic table is now keyed by handle, mirroring the central-side rewrite; duplicate characteristic UUIDs across services no longer collide). See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

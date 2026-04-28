@@ -4,8 +4,9 @@ title: Rewrite Connection interface to use platform-tagged extensions for asymme
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 related: [I066, I030, I031, I032, I035, I045, I065, I200]
 ---
 
@@ -30,3 +31,7 @@ See I066 for the proposed shape. The rewrite touches:
 - All call sites in user code — breaking API change.
 
 **Spec hand-off.** Suggested spec name: `2026-XX-XX-platform-tagged-connection-extensions-design.md`.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite (this entry plus I066): `Connection` now declares only cross-platform members; Android-only features dispatch via `connection.android` of type `AndroidConnectionExtensions?`, with `connection.ios` reserved for symmetric future iOS extensions. The asymmetry is type-visible at every call site. Bundled with I088 (handle rewrite) and I300/I301 (connection-bounded-context refinement) into one major-version-bump release. See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.

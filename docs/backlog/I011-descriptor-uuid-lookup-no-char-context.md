@@ -4,8 +4,9 @@ title: Descriptor UUID lookup ignores characteristic context
 category: bug
 severity: critical
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-28
+fixed_in: 73656b4
 historical_ref: BUGS-ANALYSIS-#11, BUGS-ANALYSIS-ANDROID-A2
 related: [I010]
 ---
@@ -27,3 +28,7 @@ Same design bug as I010 (characteristic lookup): the lookup takes only a UUID, n
 Fix shape: thread `characteristicUuid` (and `serviceUuid`, per I010) into every descriptor Pigeon method — `readDescriptor`, `writeDescriptor`, and internally the CCCD write inside `setNotification`. The `setNotification` path is the highest-impact site because it's invoked on every notify subscribe/unsubscribe.
 
 This is the single highest-severity open bug on Android. Probably the right moment to also fix I010 in the same PR, since they share the Pigeon-schema change.
+
+## Resolution
+
+Fixed in the bundled handle-rewrite via I088 (descriptor handles are now minted client-side and threaded through every descriptor Pigeon op, including the CCCD write inside `setNotification`; UUID-only descriptor lookup is gone). See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design and `docs/superpowers/plans/2026-04-28-pigeon-gatt-handle-rewrite.md` for the execution sequence.
