@@ -82,6 +82,29 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
 - **Sealed classes** for exceptions and domain events (exhaustive pattern matching)
 
+### Handle-based attribute identity (post-I088)
+
+- Every GATT attribute (service / characteristic / descriptor) is identified on the wire by an opaque, platform-assigned `int handle`. UUIDs remain for navigation (`connection.service(uuid).characteristic(uuid)`) and display.
+- Android characteristic handles come from `BluetoothGattCharacteristic.getInstanceId()`. Android descriptor handles, iOS characteristic handles, and iOS descriptor handles are minted client-side via a per-device monotonic counter (because `BluetoothGattDescriptor.getInstanceId()` is `@hide` in AOSP and CoreBluetooth has no equivalent).
+- Handles are valid only within a single connection; invalidated on disconnect or Service Changed. Stale-handle ops surface as `AttributeHandleInvalidatedException`.
+- Dart-side wrapper: `AttributeHandle` value object (`value > 0`, equality-by-value). Wire-level int is unwrapped only at the Pigeon boundary.
+- User-facing ergonomic path: `connection.service(uuid).characteristic(uuid).read()`. Singular accessors throw `AmbiguousAttributeException(uuid, count)` on duplicate-UUID matches; the plural accessors `service.characteristics({UUID? uuid})` and `characteristic.descriptors({UUID? uuid})` are the disambiguation escape hatches and also expose `.handle` for direct addressing.
+
+See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for the full design.
+
+### Platform-tagged Connection extensions (post-I089/I066)
+
+- `Connection` declares only cross-platform members (state, services, mtu, rssi, disconnect).
+- Android-specific features (bond, PHY, connection parameters, connection priority, refreshGattCache) live on `connection.android` of type `AndroidConnectionExtensions?`. iOS-specific extensions reserved on `connection.ios` of type `IosConnectionExtensions?` (currently empty).
+- The asymmetry is type-visible at every call site: `connection.android?.bond()` evaluates to a no-op (null) on iOS and dispatches on Android.
+
+### Peer composition (post-I300)
+
+- `Bluey.connect(device)` returns a raw `Connection` — no peer-protocol attempt.
+- `Bluey.connectAsPeer(device)` returns `PeerConnection` (throws `NotABlueyPeerException` if the device doesn't expose the lifecycle control service).
+- `Bluey.tryUpgrade(connection)` returns `PeerConnection?` for the rare post-connect upgrade path.
+- `PeerConnection` is a composition wrapper: it holds a `Connection` (use `peer.connection` for raw GATT) plus a `serverId` and the lifecycle-protocol disconnect path.
+
 ### Ubiquitous Language (avoid platform-specific terms)
 
 | Use | Avoid |
@@ -92,6 +115,9 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 | `Connection` | (implicit GATT handle) |
 | `ServerId` | server UUID, peer ID |
 | `BlueyPeer` | peer device (in Bluey-specific contexts) |
+| `AttributeHandle` | raw int, "instance ID" |
+| `PeerConnection` | "upgraded connection", "peer connection wrapper" |
+| `AndroidConnectionExtensions` | "platform extension methods" |
 
 ## Testing
 
