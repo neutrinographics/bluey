@@ -4,6 +4,7 @@ import UIKit
 public class BlueyIosPlugin: NSObject, FlutterPlugin {
     private var centralManager: CentralManagerImpl?
     private var peripheralManager: PeripheralManagerImpl?
+    private var logFlutterApi: BlueyFlutterApi?
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let messenger = registrar.messenger()
@@ -12,6 +13,12 @@ public class BlueyIosPlugin: NSObject, FlutterPlugin {
         // Initialize managers
         instance.centralManager = CentralManagerImpl(messenger: messenger)
         instance.peripheralManager = PeripheralManagerImpl(messenger: messenger)
+
+        // Bind structured logger to the Pigeon FlutterApi so native log
+        // events are forwarded to Dart's logEvents stream (I307).
+        instance.logFlutterApi = BlueyFlutterApi(binaryMessenger: messenger)
+        BlueyLog.shared.bind(instance.logFlutterApi!)
+        BlueyLog.shared.log(.info, "bluey.ios.plugin", "plugin attached")
 
         // Set up the Host API
         let hostApi = BlueyHostApiImpl(
@@ -148,5 +155,12 @@ class BlueyHostApiImpl: BlueyHostApi {
 
     func closeServer(completion: @escaping (Result<Void, any Error>) -> Void) {
         peripheralManager.closeServer(completion: completion)
+    }
+
+    // MARK: - Logging (I307)
+
+    func setLogLevel(level: LogLevelDto, completion: @escaping (Result<Void, any Error>) -> Void) {
+        BlueyLog.shared.setLevel(level)
+        completion(.success(()))
     }
 }

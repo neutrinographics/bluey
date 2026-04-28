@@ -25,6 +25,13 @@ final class BlueyIos extends BlueyPlatform {
   final StreamController<String> _serviceChangesController =
       StreamController<String>.broadcast();
 
+  // I307 — minimal scaffolding so this class satisfies the
+  // BlueyPlatform contract introduced in B.0. Real wiring (forwarding
+  // _flutterApi.onLog → this stream, plumbing setLogLevel through the
+  // host API) lands in B.8.
+  final StreamController<PlatformLogEvent> _logEventsController =
+      StreamController<PlatformLogEvent>.broadcast();
+
   bool _isInitialized = false;
 
   BlueyIos() : super.impl();
@@ -457,6 +464,20 @@ final class BlueyIos extends BlueyPlatform {
     await _server.closeServer();
   }
 
+  // === Structured logging (I307) ===
+  //
+  // Minimal stub satisfying BlueyPlatform; full wiring (host-API call
+  // for setLogLevel, _flutterApi.onLog → _logEventsController bridge)
+  // lands in B.8.
+
+  @override
+  Stream<PlatformLogEvent> get logEvents => _logEventsController.stream;
+
+  @override
+  Future<void> setLogLevel(PlatformLogLevel level) async {
+    // B.8: forward to BlueyHostApi.setLogLevel.
+  }
+
   // === Mapping functions ===
 
   BluetoothState _mapBluetoothState(BluetoothStateDto dto) {
@@ -562,5 +583,12 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   @override
   void onServicesChanged(String deviceId) {
     onServicesChangedCallback?.call(deviceId);
+  }
+
+  // I307 — minimal stub; B.8 will route this to BlueyIos's
+  // _logEventsController so native log events reach Bluey.logEvents.
+  @override
+  void onLog(LogEventDto event) {
+    // No-op until B.8.
   }
 }
