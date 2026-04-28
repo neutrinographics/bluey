@@ -88,6 +88,7 @@ class Bluey {
   final BlueyLogger _logger = BlueyLogger();
 
   StreamSubscription? _stateSubscription;
+  StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
   final StreamController<BlueyException> _errorController =
@@ -109,6 +110,13 @@ class Bluey {
       _currentState = _mapState(state);
       _stateController.add(_currentState);
     }, onError: (error) => _stateController.addError(_wrapError(error)));
+
+    // Forward native log events into the unified logger stream so that
+    // `bluey.logEvents` is the single, merged surface for both Dart-side
+    // and platform-side records.
+    _platformLogSubscription = _platform.logEvents.listen(
+      _logger.injectFromPlatform,
+    );
   }
 
   /// Platform capabilities.
@@ -227,8 +235,14 @@ class Bluey {
   /// Sets the minimum severity threshold for [logEvents].
   ///
   /// Events strictly below [level] are dropped. Defaults to
-  /// [BlueyLogLevel.info].
-  void setLogLevel(BlueyLogLevel level) => _logger.setLevel(level);
+  /// [BlueyLogLevel.info]. Also forwards the threshold to the platform
+  /// implementation so native sides can drop events before marshalling.
+  void setLogLevel(BlueyLogLevel level) {
+    _logger.setLevel(level);
+    // Fire-and-forget: native filter updates eventually-consistently;
+    // events emitted in the meantime are filtered Dart-side anyway.
+    unawaited(_platform.setLogLevel(_mapLogLevelToPlatform(level)));
+  }
 
   /// Internal logger seam for tests.
   ///
@@ -693,6 +707,7 @@ class Bluey {
   /// can be created via [Bluey.shared].
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
+    await _platformLogSubscription?.cancel();
     await _stateController.close();
     await _errorController.close();
     await _eventBus.close();
@@ -703,6 +718,21 @@ class Bluey {
   }
 
   // === Private mapping methods ===
+
+  platform.PlatformLogLevel _mapLogLevelToPlatform(BlueyLogLevel level) {
+    switch (level) {
+      case BlueyLogLevel.trace:
+        return platform.PlatformLogLevel.trace;
+      case BlueyLogLevel.debug:
+        return platform.PlatformLogLevel.debug;
+      case BlueyLogLevel.info:
+        return platform.PlatformLogLevel.info;
+      case BlueyLogLevel.warn:
+        return platform.PlatformLogLevel.warn;
+      case BlueyLogLevel.error:
+        return platform.PlatformLogLevel.error;
+    }
+  }
 
   BluetoothState _mapState(platform.BluetoothState platformState) {
     switch (platformState) {
