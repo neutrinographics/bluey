@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
@@ -9,6 +8,7 @@ import '../event_bus.dart';
 import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import '../peer/server_id.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
@@ -20,7 +20,6 @@ import 'server.dart';
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
-  // ignore: unused_field
   final BlueyLogger _logger;
   final ServerId _serverId;
   late final LifecycleServer _lifecycle;
@@ -92,12 +91,25 @@ class BlueyServer implements Server {
     });
 
     _emitEvent(ServerStartedEvent(source: 'BlueyServer'));
-    dev.log('server initialized', name: 'bluey.server');
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'server initialized',
+      data: {'serverId': _serverId.toString()},
+    );
 
     _centralConnectionsSub = _platform.centralConnections.listen((
       platformCentral,
     ) {
-      dev.log('central connected: ${platformCentral.id}', name: 'bluey.server');
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.server',
+        'central connected',
+        data: {
+          'clientId': platformCentral.id,
+          'mtu': platformCentral.mtu,
+        },
+      );
       _emitEvent(
         ClientConnectedEvent(
           clientId: platformCentral.id,
@@ -167,6 +179,12 @@ class BlueyServer implements Server {
 
   @override
   Future<void> addService(HostedService service) async {
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'addService entered',
+      data: {'serviceUuid': service.uuid.toString()},
+    );
     // Wait for the eagerly-registered control service to finish before
     // adding app services — Android requires sequential addService calls.
     await _controlServiceReady;
@@ -180,10 +198,30 @@ class BlueyServer implements Server {
     try {
       final populated = await platformFuture;
       _recordLocalHandles(populated);
-      dev.log('service added: ${service.uuid}', name: 'bluey.server');
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.server',
+        'addService resolved',
+        data: {
+          'serviceUuid': service.uuid.toString(),
+          'charCount': populated.characteristics.length,
+        },
+      );
       _emitEvent(
         ServiceAddedEvent(serviceId: service.uuid, source: 'BlueyServer'),
       );
+    } catch (e) {
+      _logger.log(
+        BlueyLogLevel.error,
+        'bluey.server',
+        'addService failed',
+        data: {
+          'serviceUuid': service.uuid.toString(),
+          'exception': e.runtimeType.toString(),
+        },
+        errorCode: e.runtimeType.toString(),
+      );
+      rethrow;
     } finally {
       _pendingServiceAdds.remove(platformFuture);
     }
@@ -229,6 +267,15 @@ class BlueyServer implements Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
   }) async {
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'startAdvertising entered',
+      data: {
+        'name': name,
+        'serviceCount': services?.length ?? 0,
+      },
+    );
     // Ensure the eagerly-registered control service has completed before
     // advertising. The Future is cached and completes only once.
     await _controlServiceReady;
@@ -258,7 +305,15 @@ class BlueyServer implements Server {
 
     await _platform.startAdvertising(config);
     _isAdvertising = true;
-    dev.log('advertising started', name: 'bluey.server');
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'advertising started',
+      data: {
+        'name': name,
+        'serviceCount': services?.length ?? 0,
+      },
+    );
     _emitEvent(
       AdvertisingStartedEvent(
         name: name,
@@ -270,19 +325,41 @@ class BlueyServer implements Server {
 
   @override
   Future<void> stopAdvertising() async {
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'stopAdvertising invoked',
+    );
     await _platform.stopAdvertising();
     _isAdvertising = false;
-    dev.log('advertising stopped', name: 'bluey.server');
     _emitEvent(AdvertisingStoppedEvent(source: 'BlueyServer'));
   }
 
   @override
   Future<void> notify(UUID characteristic, {required Uint8List data}) async {
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.server',
+      'notify entered',
+      data: {
+        'characteristicUuid': characteristic.toString(),
+        'length': data.length,
+      },
+    );
     final handle = _resolveLocalHandle(characteristic);
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
     }
     await _platform.notifyCharacteristic(handle, data);
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.server',
+      'notify resolved',
+      data: {
+        'characteristicUuid': characteristic.toString(),
+        'characteristicHandle': handle,
+      },
+    );
     _emitEvent(
       NotificationSentEvent(
         characteristicId: characteristic,
@@ -499,10 +576,11 @@ class BlueyServer implements Server {
   // === Lifecycle management ===
 
   void _handleClientDisconnected(String clientId) {
-    dev.log(
-      'central disconnected: $clientId',
-      name: 'bluey.server',
-      level: 900, // WARNING
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.server',
+      'central disconnected',
+      data: {'clientId': clientId},
     );
     // Cancel any heartbeat timer for this client
     _lifecycle.cancelTimer(clientId);

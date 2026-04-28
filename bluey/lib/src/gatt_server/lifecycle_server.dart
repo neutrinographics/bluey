@@ -5,6 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import '../peer/server_id.dart';
 
 /// Server-side lifecycle management.
@@ -18,7 +19,6 @@ class LifecycleServer {
   final ServerId _serverId;
   final void Function(String clientId) onClientGone;
   final void Function(String clientId)? onHeartbeatReceived;
-  // ignore: unused_field
   final BlueyLogger _logger;
 
   bool _controlServiceAdded = false;
@@ -44,7 +44,22 @@ class LifecycleServer {
   /// callers can record its handles. Returns null when lifecycle is
   /// disabled or the service was already added.
   Future<platform.PlatformLocalService?> addControlServiceIfNeeded() async {
-    if (_interval == null || _controlServiceAdded) return null;
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.server.lifecycle',
+      'addControlServiceIfNeeded invoked',
+    );
+    if (_interval == null || _controlServiceAdded) {
+      _logger.log(
+        BlueyLogLevel.trace,
+        'bluey.server.lifecycle',
+        'addControlServiceIfNeeded skipped',
+        data: {
+          'reason': _interval == null ? 'disabled' : 'already-added',
+        },
+      );
+      return null;
+    }
     final populated =
         await _platform.addService(lifecycle.buildControlService());
     _controlServiceAdded = true;
@@ -76,9 +91,21 @@ class LifecycleServer {
 
     if (req.value.isNotEmpty && req.value[0] == lifecycle.disconnectValue[0]) {
       // Client is disconnecting cleanly
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.server.lifecycle',
+        'disconnect command received',
+        data: {'clientId': clientId},
+      );
       cancelTimer(clientId);
       onClientGone(clientId);
     } else {
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.server.lifecycle',
+        'heartbeat received',
+        data: {'clientId': clientId},
+      );
       // Heartbeat — reset the timer
       _resetTimer(clientId);
     }
@@ -133,7 +160,15 @@ class LifecycleServer {
   /// No-op if lifecycle is disabled (interval is null).
   void recordActivity(String clientId) {
     if (_interval == null) return;
-    if (!_clients.containsKey(clientId)) return;
+    if (!_clients.containsKey(clientId)) {
+      _logger.log(
+        BlueyLogLevel.trace,
+        'bluey.server.lifecycle',
+        'recordActivity ignored (untracked client)',
+        data: {'clientId': clientId},
+      );
+      return;
+    }
     _resetTimer(clientId);
   }
 
@@ -151,6 +186,15 @@ class LifecycleServer {
     if (_interval == null) return;
     final state = _clients[clientId];
     if (state == null) return;
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.server.lifecycle',
+      'requestStarted',
+      data: {
+        'clientId': clientId,
+        'requestId': requestId,
+      },
+    );
     state.pendingRequests.add(requestId);
     _resetTimer(clientId);
   }
@@ -167,6 +211,15 @@ class LifecycleServer {
     final state = _clients[clientId];
     if (state == null) return;
     if (!state.pendingRequests.remove(requestId)) return;
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.server.lifecycle',
+      'requestEnded',
+      data: {
+        'clientId': clientId,
+        'requestId': requestId,
+      },
+    );
     if (state.pendingRequests.isEmpty) {
       _resetTimer(clientId);
     }
@@ -194,6 +247,12 @@ class LifecycleServer {
     }
 
     state.timer = Timer(interval, () {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.server.lifecycle',
+        'client gone',
+        data: {'clientId': clientId},
+      );
       _clients.remove(clientId);
       onClientGone(clientId);
     });
