@@ -47,16 +47,28 @@ class LifecycleClient {
   /// [markUserOpEnded].
   int _pendingUserOps = 0;
 
+  /// Subscription to the connection's `servicesChanges` stream.
+  /// Refreshes [_heartbeatCharHandle] from the new tree on every
+  /// emission so heartbeats keep flowing after Service Changed
+  /// (re-discovery may mint fresh handles for the same chars on
+  /// iOS-client side, where handle stability across re-discovery is
+  /// not guaranteed).
+  StreamSubscription<List<RemoteService>>? _servicesChangesSub;
+
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
     required Duration peerSilenceTimeout,
     required this.onServerUnreachable,
     required BlueyLogger logger,
+    Stream<List<RemoteService>>? servicesChanges,
   })  : _platform = platformApi,
         _connectionId = connectionId,
         _peerSilenceTimeout = peerSilenceTimeout,
         _logger = logger {
+    if (servicesChanges != null) {
+      _servicesChangesSub = servicesChanges.listen(_refreshFromServices);
+    }
     _monitor = PeerSilenceMonitor(
       peerSilenceTimeout: peerSilenceTimeout,
       activityWindow: _defaultHeartbeatInterval,
@@ -92,6 +104,11 @@ class LifecycleClient {
   /// tracking an in-flight probe. Not intended for production use.
   @visibleForTesting
   bool get probeInFlightForTest => _monitor.probeInFlight;
+
+  /// Exposed for tests: the heartbeat-char handle currently in use.
+  /// Reset to null when the client is stopped.
+  @visibleForTesting
+  AttributeHandle? get heartbeatCharHandleForTest => _heartbeatCharHandle;
 
   /// Exposed for tests: the monitor's current activity window.
   /// Not intended for production use.
@@ -299,6 +316,42 @@ class LifecycleClient {
     _probeTimer = null;
     _heartbeatCharHandle = null;
     _monitor.stop();
+    _servicesChangesSub?.cancel();
+    _servicesChangesSub = null;
+  }
+
+  /// Re-acquire the heartbeat-char handle from a freshly-discovered
+  /// service tree. No-op if not running, if the new tree doesn't host
+  /// the control service, or if the heartbeat char isn't found.
+  ///
+  /// Service Changed re-discovery may mint a different handle for the
+  /// same conceptual char (iOS-client side does this; Android-client
+  /// side happens to keep `getInstanceId()` stable, so the handle is
+  /// usually the same — but the contract should hold both sides).
+  void _refreshFromServices(List<RemoteService> allServices) {
+    if (!_isRunning) return;
+    final controlService = allServices
+        .where((s) => lifecycle.isControlService(s.uuid.toString()))
+        .firstOrNull;
+    if (controlService == null) return;
+    final heartbeatChar = controlService.characteristics().where(
+          (c) =>
+              c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
+        ).firstOrNull;
+    if (heartbeatChar == null) return;
+    if (_heartbeatCharHandle == heartbeatChar.handle) return;
+    final previous = _heartbeatCharHandle;
+    _heartbeatCharHandle = heartbeatChar.handle;
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection.lifecycle',
+      'heartbeat-char handle refreshed',
+      data: {
+        'connectionId': _connectionId,
+        'previousHandle': previous?.value,
+        'newHandle': heartbeatChar.handle.value,
+      },
+    );
   }
 
   Duration get _defaultHeartbeatInterval => Duration(

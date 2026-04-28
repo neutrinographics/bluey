@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
@@ -326,6 +327,78 @@ void main() {
 
         client.stop();
       });
+    });
+
+    // Regression: when Service Changed fires and re-discovery mints a
+    // new heartbeat-char handle, the LifecycleClient must refresh its
+    // stored handle. iOS-client side mints fresh handles on
+    // re-discovery, so without this refresh subsequent heartbeats hit
+    // AttributeHandleInvalidated. Android-client side gets away with
+    // it because BluetoothGattCharacteristic.getInstanceId() is stable
+    // across re-discovery, but the contract should hold both sides.
+    test('refreshes heartbeat-char handle on servicesChanges emission',
+        () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: _deviceAddress,
+        serverId: serverId,
+        intervalValue: const Duration(seconds: 10),
+      );
+
+      await fakePlatform.connect(
+        _deviceAddress,
+        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+      );
+
+      final platformServices =
+          await fakePlatform.discoverServices(_deviceAddress);
+      final initialServices = platformServices
+          .map((ps) => _TestRemoteService(ps, fakePlatform, _deviceAddress))
+          .toList();
+
+      final servicesChangesController =
+          StreamController<List<RemoteService>>.broadcast();
+      addTearDown(servicesChangesController.close);
+
+      final client = LifecycleClient(
+        platformApi: fakePlatform,
+        connectionId: _deviceAddress,
+        peerSilenceTimeout: const Duration(seconds: 20),
+        onServerUnreachable: () {},
+        servicesChanges: servicesChangesController.stream,
+        logger: testLogger(),
+      );
+
+      client.start(allServices: List<RemoteService>.from(initialServices));
+      final initialHandle = client.heartbeatCharHandleForTest;
+      expect(initialHandle, isNotNull,
+          reason: 'heartbeat handle is set during start()');
+
+      // Build a fresh service tree where the heartbeat char carries a
+      // DIFFERENT handle (simulating an iOS-client-style re-mint).
+      final freshHeartbeatHandle =
+          AttributeHandle(initialHandle!.value + 1000);
+      final freshServices = <RemoteService>[
+        _RemappedRemoteService(
+          source: initialServices.first,
+          handleOverrides: {
+            UUID(lifecycle.heartbeatCharUuid): freshHeartbeatHandle,
+          },
+        ),
+      ];
+
+      // Push the new tree through servicesChanges.
+      servicesChangesController.add(freshServices);
+      await pumpEventQueue();
+
+      expect(client.heartbeatCharHandleForTest, equals(freshHeartbeatHandle),
+          reason: 'LifecycleClient should re-acquire the heartbeat handle '
+              'from the new tree');
+
+      client.stop();
     });
 
     // 6. start() falls back to default interval when interval read fails
@@ -1925,4 +1998,89 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
 
   @override
   List<RemoteDescriptor> descriptors({UUID? uuid}) => const [];
+}
+
+/// Wraps a [RemoteService] and overrides the [AttributeHandle] of
+/// specific characteristics by UUID. Used to simulate the iOS-client
+/// re-mint scenario where Service Changed produces fresh handles for
+/// the same conceptual chars.
+class _RemappedRemoteService implements RemoteService {
+  _RemappedRemoteService({
+    required RemoteService source,
+    required Map<UUID, AttributeHandle> handleOverrides,
+  })  : _source = source,
+        _overrides = handleOverrides;
+
+  final RemoteService _source;
+  final Map<UUID, AttributeHandle> _overrides;
+
+  @override
+  UUID get uuid => _source.uuid;
+
+  @override
+  bool get isPrimary => _source.isPrimary;
+
+  @override
+  List<RemoteService> get includedServices => _source.includedServices;
+
+  @override
+  List<RemoteCharacteristic> characteristics({UUID? uuid}) {
+    return _source.characteristics(uuid: uuid).map((c) {
+      final override = _overrides[c.uuid];
+      return override == null
+          ? c
+          : _RemappedRemoteCharacteristic(source: c, handle: override);
+    }).toList();
+  }
+
+  @override
+  RemoteCharacteristic characteristic(UUID uuid) {
+    final matches = characteristics(uuid: uuid);
+    if (matches.isEmpty) throw CharacteristicNotFoundException(uuid);
+    if (matches.length > 1) {
+      throw AmbiguousAttributeException(
+        uuid,
+        matches.length,
+        attributeKind: 'characteristic',
+      );
+    }
+    return matches.single;
+  }
+}
+
+class _RemappedRemoteCharacteristic implements RemoteCharacteristic {
+  _RemappedRemoteCharacteristic({
+    required RemoteCharacteristic source,
+    required AttributeHandle handle,
+  })  : _source = source,
+        _handle = handle;
+
+  final RemoteCharacteristic _source;
+  final AttributeHandle _handle;
+
+  @override
+  AttributeHandle get handle => _handle;
+
+  @override
+  UUID get uuid => _source.uuid;
+
+  @override
+  CharacteristicProperties get properties => _source.properties;
+
+  @override
+  Future<Uint8List> read() => _source.read();
+
+  @override
+  Future<void> write(Uint8List value, {bool withResponse = true}) =>
+      _source.write(value, withResponse: withResponse);
+
+  @override
+  Stream<Uint8List> get notifications => _source.notifications;
+
+  @override
+  RemoteDescriptor descriptor(UUID uuid) => _source.descriptor(uuid);
+
+  @override
+  List<RemoteDescriptor> descriptors({UUID? uuid}) =>
+      _source.descriptors(uuid: uuid);
 }

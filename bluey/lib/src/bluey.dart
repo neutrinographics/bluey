@@ -570,6 +570,7 @@ class Bluey {
           rawConnection.disconnect().catchError((_) {});
         },
         logger: _logger,
+        servicesChanges: rawConnection.servicesChanges,
       );
       lifecycleClient.start(allServices: services);
 

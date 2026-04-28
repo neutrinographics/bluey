@@ -106,6 +106,7 @@ class _BlueyPeer implements BlueyPeer {
           blueyConnection.disconnect().catchError((_) {});
         },
         logger: _logger,
+        servicesChanges: blueyConnection.servicesChanges,
       );
       lifecycleClient.start(allServices: allServices);
 
