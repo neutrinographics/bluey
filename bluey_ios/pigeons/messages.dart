@@ -94,8 +94,9 @@ class CharacteristicPropertiesDto {
 /// A descriptor on a remote device (DTO for platform channel).
 class DescriptorDto {
   final String uuid;
+  final int? handle;
 
-  DescriptorDto({required this.uuid});
+  DescriptorDto({required this.uuid, this.handle});
 }
 
 /// A characteristic on a remote device (DTO for platform channel).
@@ -103,11 +104,13 @@ class CharacteristicDto {
   final String uuid;
   final CharacteristicPropertiesDto properties;
   final List<DescriptorDto> descriptors;
+  final int? handle;
 
   CharacteristicDto({
     required this.uuid,
     required this.properties,
     required this.descriptors,
+    this.handle,
   });
 }
 
@@ -228,12 +231,14 @@ class ReadRequestDto {
   final String centralId;
   final String characteristicUuid;
   final int offset;
+  final int? characteristicHandle;
 
   ReadRequestDto({
     required this.requestId,
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
+    this.characteristicHandle,
   });
 }
 
@@ -245,6 +250,7 @@ class WriteRequestDto {
   final Uint8List value;
   final int offset;
   final bool responseNeeded;
+  final int? characteristicHandle;
 
   WriteRequestDto({
     required this.requestId,
@@ -253,6 +259,7 @@ class WriteRequestDto {
     required this.value,
     required this.offset,
     required this.responseNeeded,
+    this.characteristicHandle,
   });
 }
 

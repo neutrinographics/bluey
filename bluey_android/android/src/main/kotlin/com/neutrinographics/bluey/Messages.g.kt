@@ -541,18 +541,21 @@ data class CharacteristicPropertiesDto (
  * Generated class from Pigeon that represents data sent in messages.
  */
 data class DescriptorDto (
-  val uuid: String
+  val uuid: String,
+  val handle: Long? = null
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): DescriptorDto {
       val uuid = pigeonVar_list[0] as String
-      return DescriptorDto(uuid)
+      val handle = pigeonVar_list[1] as Long?
+      return DescriptorDto(uuid, handle)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       uuid,
+      handle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -563,12 +566,13 @@ data class DescriptorDto (
       return true
     }
     val other = other as DescriptorDto
-    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid)
+    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.handle, other.handle)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
     result = 31 * result + MessagesPigeonUtils.deepHash(this.uuid)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.handle)
     return result
   }
 }
@@ -581,7 +585,8 @@ data class DescriptorDto (
 data class CharacteristicDto (
   val uuid: String,
   val properties: CharacteristicPropertiesDto,
-  val descriptors: List<DescriptorDto>
+  val descriptors: List<DescriptorDto>,
+  val handle: Long? = null
 )
  {
   companion object {
@@ -589,7 +594,8 @@ data class CharacteristicDto (
       val uuid = pigeonVar_list[0] as String
       val properties = pigeonVar_list[1] as CharacteristicPropertiesDto
       val descriptors = pigeonVar_list[2] as List<DescriptorDto>
-      return CharacteristicDto(uuid, properties, descriptors)
+      val handle = pigeonVar_list[3] as Long?
+      return CharacteristicDto(uuid, properties, descriptors, handle)
     }
   }
   fun toList(): List<Any?> {
@@ -597,6 +603,7 @@ data class CharacteristicDto (
       uuid,
       properties,
       descriptors,
+      handle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -607,7 +614,7 @@ data class CharacteristicDto (
       return true
     }
     val other = other as CharacteristicDto
-    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.properties, other.properties) && MessagesPigeonUtils.deepEquals(this.descriptors, other.descriptors)
+    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid) && MessagesPigeonUtils.deepEquals(this.properties, other.properties) && MessagesPigeonUtils.deepEquals(this.descriptors, other.descriptors) && MessagesPigeonUtils.deepEquals(this.handle, other.handle)
   }
 
   override fun hashCode(): Int {
@@ -615,6 +622,7 @@ data class CharacteristicDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.uuid)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.properties)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.descriptors)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.handle)
     return result
   }
 }
@@ -1020,7 +1028,8 @@ data class ReadRequestDto (
   val requestId: Long,
   val centralId: String,
   val characteristicUuid: String,
-  val offset: Long
+  val offset: Long,
+  val characteristicHandle: Long? = null
 )
  {
   companion object {
@@ -1029,7 +1038,8 @@ data class ReadRequestDto (
       val centralId = pigeonVar_list[1] as String
       val characteristicUuid = pigeonVar_list[2] as String
       val offset = pigeonVar_list[3] as Long
-      return ReadRequestDto(requestId, centralId, characteristicUuid, offset)
+      val characteristicHandle = pigeonVar_list[4] as Long?
+      return ReadRequestDto(requestId, centralId, characteristicUuid, offset, characteristicHandle)
     }
   }
   fun toList(): List<Any?> {
@@ -1038,6 +1048,7 @@ data class ReadRequestDto (
       centralId,
       characteristicUuid,
       offset,
+      characteristicHandle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -1048,7 +1059,7 @@ data class ReadRequestDto (
       return true
     }
     val other = other as ReadRequestDto
-    return MessagesPigeonUtils.deepEquals(this.requestId, other.requestId) && MessagesPigeonUtils.deepEquals(this.centralId, other.centralId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.offset, other.offset)
+    return MessagesPigeonUtils.deepEquals(this.requestId, other.requestId) && MessagesPigeonUtils.deepEquals(this.centralId, other.centralId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.offset, other.offset) && MessagesPigeonUtils.deepEquals(this.characteristicHandle, other.characteristicHandle)
   }
 
   override fun hashCode(): Int {
@@ -1057,6 +1068,7 @@ data class ReadRequestDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.centralId)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristicUuid)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.offset)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristicHandle)
     return result
   }
 }
@@ -1072,7 +1084,8 @@ data class WriteRequestDto (
   val characteristicUuid: String,
   val value: ByteArray,
   val offset: Long,
-  val responseNeeded: Boolean
+  val responseNeeded: Boolean,
+  val characteristicHandle: Long? = null
 )
  {
   companion object {
@@ -1083,7 +1096,8 @@ data class WriteRequestDto (
       val value = pigeonVar_list[3] as ByteArray
       val offset = pigeonVar_list[4] as Long
       val responseNeeded = pigeonVar_list[5] as Boolean
-      return WriteRequestDto(requestId, centralId, characteristicUuid, value, offset, responseNeeded)
+      val characteristicHandle = pigeonVar_list[6] as Long?
+      return WriteRequestDto(requestId, centralId, characteristicUuid, value, offset, responseNeeded, characteristicHandle)
     }
   }
   fun toList(): List<Any?> {
@@ -1094,6 +1108,7 @@ data class WriteRequestDto (
       value,
       offset,
       responseNeeded,
+      characteristicHandle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -1104,7 +1119,7 @@ data class WriteRequestDto (
       return true
     }
     val other = other as WriteRequestDto
-    return MessagesPigeonUtils.deepEquals(this.requestId, other.requestId) && MessagesPigeonUtils.deepEquals(this.centralId, other.centralId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.value, other.value) && MessagesPigeonUtils.deepEquals(this.offset, other.offset) && MessagesPigeonUtils.deepEquals(this.responseNeeded, other.responseNeeded)
+    return MessagesPigeonUtils.deepEquals(this.requestId, other.requestId) && MessagesPigeonUtils.deepEquals(this.centralId, other.centralId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.value, other.value) && MessagesPigeonUtils.deepEquals(this.offset, other.offset) && MessagesPigeonUtils.deepEquals(this.responseNeeded, other.responseNeeded) && MessagesPigeonUtils.deepEquals(this.characteristicHandle, other.characteristicHandle)
   }
 
   override fun hashCode(): Int {
@@ -1115,6 +1130,7 @@ data class WriteRequestDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.value)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.offset)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.responseNeeded)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristicHandle)
     return result
   }
 }

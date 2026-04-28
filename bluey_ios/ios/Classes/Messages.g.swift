@@ -455,31 +455,36 @@ struct CharacteristicPropertiesDto: Hashable {
 /// Generated class from Pigeon that represents data sent in messages.
 struct DescriptorDto: Hashable {
   var uuid: String
+  var handle: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> DescriptorDto? {
     let uuid = pigeonVar_list[0] as! String
+    let handle: Int64? = nilOrValue(pigeonVar_list[1])
 
     return DescriptorDto(
-      uuid: uuid
+      uuid: uuid,
+      handle: handle
     )
   }
   func toList() -> [Any?] {
     return [
-      uuid
+      uuid,
+      handle,
     ]
   }
   static func == (lhs: DescriptorDto, rhs: DescriptorDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.uuid, rhs.uuid)
+    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.handle, rhs.handle)
   }
 
   func hash(into hasher: inout Hasher) {
     hasher.combine("DescriptorDto")
     deepHashMessages(value: uuid, hasher: &hasher)
+    deepHashMessages(value: handle, hasher: &hasher)
   }
 }
 
@@ -490,6 +495,7 @@ struct CharacteristicDto: Hashable {
   var uuid: String
   var properties: CharacteristicPropertiesDto
   var descriptors: [DescriptorDto]
+  var handle: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -497,11 +503,13 @@ struct CharacteristicDto: Hashable {
     let uuid = pigeonVar_list[0] as! String
     let properties = pigeonVar_list[1] as! CharacteristicPropertiesDto
     let descriptors = pigeonVar_list[2] as! [DescriptorDto]
+    let handle: Int64? = nilOrValue(pigeonVar_list[3])
 
     return CharacteristicDto(
       uuid: uuid,
       properties: properties,
-      descriptors: descriptors
+      descriptors: descriptors,
+      handle: handle
     )
   }
   func toList() -> [Any?] {
@@ -509,13 +517,14 @@ struct CharacteristicDto: Hashable {
       uuid,
       properties,
       descriptors,
+      handle,
     ]
   }
   static func == (lhs: CharacteristicDto, rhs: CharacteristicDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.properties, rhs.properties) && deepEqualsMessages(lhs.descriptors, rhs.descriptors)
+    return deepEqualsMessages(lhs.uuid, rhs.uuid) && deepEqualsMessages(lhs.properties, rhs.properties) && deepEqualsMessages(lhs.descriptors, rhs.descriptors) && deepEqualsMessages(lhs.handle, rhs.handle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -523,6 +532,7 @@ struct CharacteristicDto: Hashable {
     deepHashMessages(value: uuid, hasher: &hasher)
     deepHashMessages(value: properties, hasher: &hasher)
     deepHashMessages(value: descriptors, hasher: &hasher)
+    deepHashMessages(value: handle, hasher: &hasher)
   }
 }
 
@@ -895,6 +905,7 @@ struct ReadRequestDto: Hashable {
   var centralId: String
   var characteristicUuid: String
   var offset: Int64
+  var characteristicHandle: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -903,12 +914,14 @@ struct ReadRequestDto: Hashable {
     let centralId = pigeonVar_list[1] as! String
     let characteristicUuid = pigeonVar_list[2] as! String
     let offset = pigeonVar_list[3] as! Int64
+    let characteristicHandle: Int64? = nilOrValue(pigeonVar_list[4])
 
     return ReadRequestDto(
       requestId: requestId,
       centralId: centralId,
       characteristicUuid: characteristicUuid,
-      offset: offset
+      offset: offset,
+      characteristicHandle: characteristicHandle
     )
   }
   func toList() -> [Any?] {
@@ -917,13 +930,14 @@ struct ReadRequestDto: Hashable {
       centralId,
       characteristicUuid,
       offset,
+      characteristicHandle,
     ]
   }
   static func == (lhs: ReadRequestDto, rhs: ReadRequestDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.requestId, rhs.requestId) && deepEqualsMessages(lhs.centralId, rhs.centralId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.offset, rhs.offset)
+    return deepEqualsMessages(lhs.requestId, rhs.requestId) && deepEqualsMessages(lhs.centralId, rhs.centralId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.offset, rhs.offset) && deepEqualsMessages(lhs.characteristicHandle, rhs.characteristicHandle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -932,6 +946,7 @@ struct ReadRequestDto: Hashable {
     deepHashMessages(value: centralId, hasher: &hasher)
     deepHashMessages(value: characteristicUuid, hasher: &hasher)
     deepHashMessages(value: offset, hasher: &hasher)
+    deepHashMessages(value: characteristicHandle, hasher: &hasher)
   }
 }
 
@@ -945,6 +960,7 @@ struct WriteRequestDto: Hashable {
   var value: FlutterStandardTypedData
   var offset: Int64
   var responseNeeded: Bool
+  var characteristicHandle: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -955,6 +971,7 @@ struct WriteRequestDto: Hashable {
     let value = pigeonVar_list[3] as! FlutterStandardTypedData
     let offset = pigeonVar_list[4] as! Int64
     let responseNeeded = pigeonVar_list[5] as! Bool
+    let characteristicHandle: Int64? = nilOrValue(pigeonVar_list[6])
 
     return WriteRequestDto(
       requestId: requestId,
@@ -962,7 +979,8 @@ struct WriteRequestDto: Hashable {
       characteristicUuid: characteristicUuid,
       value: value,
       offset: offset,
-      responseNeeded: responseNeeded
+      responseNeeded: responseNeeded,
+      characteristicHandle: characteristicHandle
     )
   }
   func toList() -> [Any?] {
@@ -973,13 +991,14 @@ struct WriteRequestDto: Hashable {
       value,
       offset,
       responseNeeded,
+      characteristicHandle,
     ]
   }
   static func == (lhs: WriteRequestDto, rhs: WriteRequestDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.requestId, rhs.requestId) && deepEqualsMessages(lhs.centralId, rhs.centralId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.value, rhs.value) && deepEqualsMessages(lhs.offset, rhs.offset) && deepEqualsMessages(lhs.responseNeeded, rhs.responseNeeded)
+    return deepEqualsMessages(lhs.requestId, rhs.requestId) && deepEqualsMessages(lhs.centralId, rhs.centralId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.value, rhs.value) && deepEqualsMessages(lhs.offset, rhs.offset) && deepEqualsMessages(lhs.responseNeeded, rhs.responseNeeded) && deepEqualsMessages(lhs.characteristicHandle, rhs.characteristicHandle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -990,6 +1009,7 @@ struct WriteRequestDto: Hashable {
     deepHashMessages(value: value, hasher: &hasher)
     deepHashMessages(value: offset, hasher: &hasher)
     deepHashMessages(value: responseNeeded, hasher: &hasher)
+    deepHashMessages(value: characteristicHandle, hasher: &hasher)
   }
 }
 

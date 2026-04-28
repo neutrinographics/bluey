@@ -423,13 +423,17 @@ class CharacteristicPropertiesDto {
 class DescriptorDto {
   DescriptorDto({
     required this.uuid,
+    this.handle,
   });
 
   String uuid;
 
+  int? handle;
+
   List<Object?> _toList() {
     return <Object?>[
       uuid,
+      handle,
     ];
   }
 
@@ -440,6 +444,7 @@ class DescriptorDto {
     result as List<Object?>;
     return DescriptorDto(
       uuid: result[0]! as String,
+      handle: result[1] as int?,
     );
   }
 
@@ -452,7 +457,7 @@ class DescriptorDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid);
+    return _deepEquals(uuid, other.uuid) && _deepEquals(handle, other.handle);
   }
 
   @override
@@ -466,6 +471,7 @@ class CharacteristicDto {
     required this.uuid,
     required this.properties,
     required this.descriptors,
+    this.handle,
   });
 
   String uuid;
@@ -474,11 +480,14 @@ class CharacteristicDto {
 
   List<DescriptorDto> descriptors;
 
+  int? handle;
+
   List<Object?> _toList() {
     return <Object?>[
       uuid,
       properties,
       descriptors,
+      handle,
     ];
   }
 
@@ -491,6 +500,7 @@ class CharacteristicDto {
       uuid: result[0]! as String,
       properties: result[1]! as CharacteristicPropertiesDto,
       descriptors: (result[2]! as List<Object?>).cast<DescriptorDto>(),
+      handle: result[3] as int?,
     );
   }
 
@@ -503,7 +513,7 @@ class CharacteristicDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(descriptors, other.descriptors);
+    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(descriptors, other.descriptors) && _deepEquals(handle, other.handle);
   }
 
   @override
@@ -943,6 +953,7 @@ class ReadRequestDto {
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
+    this.characteristicHandle,
   });
 
   int requestId;
@@ -953,12 +964,15 @@ class ReadRequestDto {
 
   int offset;
 
+  int? characteristicHandle;
+
   List<Object?> _toList() {
     return <Object?>[
       requestId,
       centralId,
       characteristicUuid,
       offset,
+      characteristicHandle,
     ];
   }
 
@@ -972,6 +986,7 @@ class ReadRequestDto {
       centralId: result[1]! as String,
       characteristicUuid: result[2]! as String,
       offset: result[3]! as int,
+      characteristicHandle: result[4] as int?,
     );
   }
 
@@ -984,7 +999,7 @@ class ReadRequestDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(offset, other.offset);
+    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(offset, other.offset) && _deepEquals(characteristicHandle, other.characteristicHandle);
   }
 
   @override
@@ -1001,6 +1016,7 @@ class WriteRequestDto {
     required this.value,
     required this.offset,
     required this.responseNeeded,
+    this.characteristicHandle,
   });
 
   int requestId;
@@ -1015,6 +1031,8 @@ class WriteRequestDto {
 
   bool responseNeeded;
 
+  int? characteristicHandle;
+
   List<Object?> _toList() {
     return <Object?>[
       requestId,
@@ -1023,6 +1041,7 @@ class WriteRequestDto {
       value,
       offset,
       responseNeeded,
+      characteristicHandle,
     ];
   }
 
@@ -1038,6 +1057,7 @@ class WriteRequestDto {
       value: result[3]! as Uint8List,
       offset: result[4]! as int,
       responseNeeded: result[5]! as bool,
+      characteristicHandle: result[6] as int?,
     );
   }
 
@@ -1050,7 +1070,7 @@ class WriteRequestDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(value, other.value) && _deepEquals(offset, other.offset) && _deepEquals(responseNeeded, other.responseNeeded);
+    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(value, other.value) && _deepEquals(offset, other.offset) && _deepEquals(responseNeeded, other.responseNeeded) && _deepEquals(characteristicHandle, other.characteristicHandle);
   }
 
   @override
