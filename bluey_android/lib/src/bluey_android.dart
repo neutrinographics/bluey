@@ -24,6 +24,8 @@ final class BlueyAndroid extends BlueyPlatform {
       StreamController<BluetoothState>.broadcast();
   final StreamController<String> _serviceChangesController =
       StreamController<String>.broadcast();
+  final StreamController<PlatformLogEvent> _logEventsController =
+      StreamController<PlatformLogEvent>.broadcast();
 
   bool _isInitialized = false;
 
@@ -97,6 +99,10 @@ final class BlueyAndroid extends BlueyPlatform {
       characteristicUuid,
     ) {
       // Could expose this as a stream if needed
+    };
+
+    _flutterApi.onLogCallback = (event) {
+      _logEventsController.add(_mapLogEventDto(event));
     };
   }
 
@@ -486,6 +492,73 @@ final class BlueyAndroid extends BlueyPlatform {
     await _server.closeServer();
   }
 
+  // === Structured logging (I307) ===
+
+  @override
+  Stream<PlatformLogEvent> get logEvents {
+    _ensureInitialized();
+    return _logEventsController.stream;
+  }
+
+  @override
+  Future<void> setLogLevel(PlatformLogLevel level) async {
+    _ensureInitialized();
+    await _hostApi.setLogLevel(_mapLogLevelToDto(level));
+  }
+
+  PlatformLogEvent _mapLogEventDto(LogEventDto dto) {
+    return PlatformLogEvent(
+      timestamp:
+          DateTime.fromMicrosecondsSinceEpoch(dto.timestampMicros, isUtc: true)
+              .toLocal(),
+      level: _mapLogLevelFromDto(dto.level),
+      context: dto.context,
+      message: dto.message,
+      data: _mapLogData(dto.data),
+      errorCode: dto.errorCode,
+    );
+  }
+
+  Map<String, Object?> _mapLogData(Map<String?, Object?> data) {
+    final result = <String, Object?>{};
+    for (final entry in data.entries) {
+      final key = entry.key;
+      if (key == null) continue;
+      result[key] = entry.value;
+    }
+    return result;
+  }
+
+  PlatformLogLevel _mapLogLevelFromDto(LogLevelDto dto) {
+    switch (dto) {
+      case LogLevelDto.trace:
+        return PlatformLogLevel.trace;
+      case LogLevelDto.debug:
+        return PlatformLogLevel.debug;
+      case LogLevelDto.info:
+        return PlatformLogLevel.info;
+      case LogLevelDto.warn:
+        return PlatformLogLevel.warn;
+      case LogLevelDto.error:
+        return PlatformLogLevel.error;
+    }
+  }
+
+  LogLevelDto _mapLogLevelToDto(PlatformLogLevel level) {
+    switch (level) {
+      case PlatformLogLevel.trace:
+        return LogLevelDto.trace;
+      case PlatformLogLevel.debug:
+        return LogLevelDto.debug;
+      case PlatformLogLevel.info:
+        return LogLevelDto.info;
+      case PlatformLogLevel.warn:
+        return LogLevelDto.warn;
+      case PlatformLogLevel.error:
+        return LogLevelDto.error;
+    }
+  }
+
   // Mapping functions from DTOs to platform interface types
 
   BluetoothState _mapBluetoothState(BluetoothStateDto dto) {
@@ -521,6 +594,7 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   void Function(String, String)? onCharacteristicSubscribedCallback;
   void Function(String, String)? onCharacteristicUnsubscribedCallback;
   void Function(String)? onServicesChangedCallback;
+  void Function(LogEventDto)? onLogCallback;
 
   @override
   void onStateChanged(BluetoothStateDto state) {
@@ -590,5 +664,10 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   @override
   void onServicesChanged(String deviceId) {
     onServicesChangedCallback?.call(deviceId);
+  }
+
+  @override
+  void onLog(LogEventDto event) {
+    onLogCallback?.call(event);
   }
 }
