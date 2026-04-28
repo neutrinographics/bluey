@@ -489,6 +489,22 @@ class BlueyConnection implements Connection {
       },
     );
 
+    // Trace-level enumeration of every discovered service UUID. Useful
+    // for debugging UUID-canonicalization mismatches (e.g. peer-detection
+    // failing because the lifecycle control service UUID arrives in a
+    // different form than expected).
+    if (_cachedServices!.isNotEmpty) {
+      _logger.log(
+        BlueyLogLevel.trace,
+        'bluey.connection',
+        'services discovered',
+        data: {
+          'deviceId': deviceId.toString(),
+          'uuids': _cachedServices!.map((s) => s.uuid.toString()).toList(),
+        },
+      );
+    }
+
     // Services discovered → promote linked → ready.
     _setState(ConnectionState.ready);
 
