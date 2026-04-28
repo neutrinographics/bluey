@@ -273,6 +273,33 @@ class PeerNotFoundException extends BlueyException {
     : super('No peer with id $expected found within $timeout.');
 }
 
+/// The connected device is not a Bluey peer — it does not host the
+/// lifecycle control service required to participate in the peer
+/// protocol.
+///
+/// Thrown by `Bluey.connectAsPeer` when a connection completes but the
+/// remote device does not advertise the Bluey control service. The
+/// underlying GATT connection is closed before this exception is
+/// raised, so callers do not need to perform additional cleanup.
+class NotABlueyPeerException extends BlueyException {
+  /// Identifier of the device that connected but turned out not to be
+  /// a Bluey peer.
+  final UUID deviceId;
+
+  NotABlueyPeerException(this.deviceId)
+      : super(
+          'Device $deviceId is not a Bluey peer '
+          '(no lifecycle control service)',
+          action:
+              'Use Bluey.connect for non-Bluey devices, or '
+              'Bluey.tryUpgrade if you already hold a Connection.',
+        );
+
+  @override
+  String toString() => 'NotABlueyPeerException: device $deviceId is not a '
+      'Bluey peer (no lifecycle control service)';
+}
+
 /// The peer's [ServerId] did not match the expected value.
 class PeerIdentityMismatchException extends BlueyException {
   final ServerId expected;

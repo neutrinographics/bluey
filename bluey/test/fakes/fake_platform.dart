@@ -500,6 +500,10 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Gets the list of connected centrals.
   List<String> get connectedCentralIds => _connectedCentrals.keys.toList();
 
+  /// Gets the list of currently connected peripheral addresses
+  /// (the central-role view: devices we have outgoing connections to).
+  List<String> get connectedDeviceIds => _connections.keys.toList();
+
   /// Gets the local services.
   List<PlatformLocalService> get localServices =>
       List.unmodifiable(_localServices);

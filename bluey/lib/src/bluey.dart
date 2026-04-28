@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'connection/bluey_connection.dart';
 import 'connection/connection.dart';
 import 'connection/lifecycle_client.dart';
+import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
@@ -443,6 +444,187 @@ class Bluey {
     } catch (_) {
       // Service discovery failed -- return raw connection
       return rawConnection;
+    }
+  }
+
+  /// Connects to [device] and returns a [PeerConnection] if the device
+  /// hosts the Bluey lifecycle control service.
+  ///
+  /// Internally calls [connect] to establish the raw GATT connection,
+  /// then attempts to build a peer wrapper. If the device is not a
+  /// Bluey peer (no control service), the underlying connection is
+  /// disconnected and [NotABlueyPeerException] is thrown.
+  ///
+  /// Use this when the caller knows the target should be a Bluey peer
+  /// and wants the peer-protocol surface (stable [ServerId], filtered
+  /// service tree, lifecycle disconnect) rather than the raw GATT
+  /// handle.
+  ///
+  /// Throws [ConnectionException] if the underlying connect fails.
+  /// Throws [NotABlueyPeerException] if the device connected but does
+  /// not host the Bluey control service. The underlying connection has
+  /// already been disconnected when this is thrown.
+  Future<PeerConnection> connectAsPeer(
+    Device device, {
+    Duration? timeout,
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
+  }) async {
+    final connection = await connect(
+      device,
+      timeout: timeout,
+      peerSilenceTimeout: peerSilenceTimeout,
+    );
+    final peer = await _tryBuildPeerConnection(
+      connection,
+      peerSilenceTimeout: peerSilenceTimeout,
+    );
+    if (peer == null) {
+      // The device connected but isn't a Bluey peer — disconnect and
+      // throw so we don't leak a half-formed connection.
+      await connection.disconnect();
+      throw NotABlueyPeerException(device.id);
+    }
+    return peer;
+  }
+
+  /// Attempts to wrap an existing raw [Connection] in a [PeerConnection].
+  ///
+  /// Returns `null` if [connection] does not host the Bluey lifecycle
+  /// control service. Unlike [connectAsPeer], this does not disconnect
+  /// the connection on miss — the caller already owns it and decides
+  /// what to do next.
+  ///
+  /// Use this when you have a raw [Connection] (e.g. from a custom
+  /// connect path) and want to opportunistically promote it to a peer
+  /// wrapper.
+  Future<PeerConnection?> tryUpgrade(Connection connection) {
+    return _tryBuildPeerConnection(connection);
+  }
+
+  /// Builds a [PeerConnection] wrapping [rawConnection] if the device
+  /// hosts the lifecycle control service.
+  ///
+  /// Mirrors the detection logic in [_upgradeIfBlueyServer], but
+  /// **does not mutate** the underlying [Connection] (no
+  /// `BlueyConnection.upgrade` call). Instead, on success, a fresh
+  /// [PeerConnection] wrapper is returned around the existing raw
+  /// connection.
+  ///
+  /// Returns `null` when:
+  /// - The control service is absent.
+  /// - Service discovery fails for any reason.
+  Future<PeerConnection?> _tryBuildPeerConnection(
+    Connection rawConnection, {
+    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
+  }) async {
+    try {
+      dev.log(
+        'tryBuildPeerConnection: deviceId=${rawConnection.deviceId}',
+        name: 'bluey.peer',
+      );
+
+      // Fast path: the legacy auto-upgrade in [connect] already ran
+      // and detected the control service in place. The connection's
+      // [Connection.services] now filters out the control service, so
+      // service discovery here would miss it. Use the upgraded state
+      // (isBlueyServer + serverId) to build the wrapper directly.
+      //
+      // The legacy path's lifecycle client is stored on the
+      // [BlueyConnection]; we still install a fresh lifecycle client
+      // here so the new wrapper has its own heartbeat handle. This
+      // means the legacy auto-upgrade lifecycle (installed by
+      // [_upgradeIfBlueyServer]) and the wrapper's lifecycle coexist
+      // until C.5 collapses the two paths.
+      if (rawConnection.isBlueyServer) {
+        final existingServerId = rawConnection.serverId;
+        // We still need to discover services to start the lifecycle
+        // client (it locates the heartbeat characteristic). Pass
+        // `cache: false` to fetch the post-upgrade filtered tree if
+        // available, but we'll rediscover the unfiltered tree by
+        // pulling from the connection: the auto-upgrade has already
+        // attached a lifecycle on the connection itself, so all we
+        // need here is to compose a wrapper that exposes the
+        // peer-protocol surface. Build a lifecycle client whose
+        // start() will be a no-op (no control service in the
+        // post-upgrade filtered tree) and let the legacy lifecycle
+        // continue driving heartbeats.
+        final connectionId = rawConnection is BlueyConnection
+            ? rawConnection.connectionId
+            : rawConnection.deviceId.toString();
+        final lifecycleClient = LifecycleClient(
+          platformApi: _platform,
+          connectionId: connectionId,
+          peerSilenceTimeout: peerSilenceTimeout,
+          onServerUnreachable: () {
+            rawConnection.disconnect().catchError((_) {});
+          },
+        );
+        return PeerConnection.create(
+          connection: rawConnection,
+          serverId: existingServerId ?? ServerId.generate(),
+          lifecycleClient: lifecycleClient,
+        );
+      }
+
+      final services = await rawConnection.services();
+
+      final controlService = services
+          .where((s) => lifecycle.isControlService(s.uuid.toString()))
+          .firstOrNull;
+
+      if (controlService == null) {
+        dev.log(
+          'no control service — peer is not a bluey peer',
+          name: 'bluey.peer',
+        );
+        return null;
+      }
+
+      // Read the ServerId.
+      final serverIdChar = controlService.characteristics
+          .where(
+            (c) =>
+                c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+          )
+          .firstOrNull;
+
+      ServerId? serverId;
+      if (serverIdChar != null) {
+        try {
+          final bytes = await serverIdChar.read();
+          serverId = lifecycle.decodeServerId(bytes);
+        } catch (_) {
+          // ServerId read failed — fall through with a generated id so
+          // the peer wrapper still installs the lifecycle heartbeat.
+        }
+      }
+
+      // Locate the underlying BlueyConnection for the lifecycle
+      // client's connection id. The peer wrapper does not require
+      // mutating this object; it only needs the platform connection
+      // id to drive the heartbeat writes.
+      final connectionId = rawConnection is BlueyConnection
+          ? rawConnection.connectionId
+          : rawConnection.deviceId.toString();
+
+      final lifecycleClient = LifecycleClient(
+        platformApi: _platform,
+        connectionId: connectionId,
+        peerSilenceTimeout: peerSilenceTimeout,
+        onServerUnreachable: () {
+          rawConnection.disconnect().catchError((_) {});
+        },
+      );
+      lifecycleClient.start(allServices: services);
+
+      return PeerConnection.create(
+        connection: rawConnection,
+        serverId: serverId ?? ServerId.generate(),
+        lifecycleClient: lifecycleClient,
+      );
+    } catch (_) {
+      // Service discovery failed — treat as "not a bluey peer".
+      return null;
     }
   }
 
