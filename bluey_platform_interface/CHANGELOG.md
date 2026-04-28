@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+**Structured logging pipeline (I307):**
+
+- New abstract `Stream<PlatformLogEvent> get logEvents` and `Future<void> setLogLevel(PlatformLogLevel level)` on `BlueyPlatform`.
+- New types: `PlatformLogEvent`, `PlatformLogLevel`. Platform implementations forward native log events through this stream.
+
 ## 0.2.0
 
 **Breaking changes (I088, I089, I066, I300, I301)** — bundled major-version rewrite. Platform-interface changes only; consult `bluey/CHANGELOG.md` for the full domain-side surface.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+**Structured logging pipeline (I307):**
+
+- New `Bluey.logEvents: Stream<BlueyLogEvent>` — broadcast stream of domain-layer and native (Android/iOS) log events in arrival order.
+- New `Bluey.setLogLevel(BlueyLogLevel level)` — filters Dart-side and pushes the filter to native sides so no Pigeon traffic is incurred for filtered events. Default `info`.
+- New types: `BlueyLogEvent` (timestamp / level / context / message / data / errorCode), `BlueyLogLevel { trace, debug, info, warn, error }`.
+- All internal `dev.log` calls replaced; new emissions added at meaningful points (state transitions, op-queue events, lifecycle activity, errors).
+- Bootstrap caveat: events emitted during `Bluey()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
+
 ## 0.2.0
 
 **Breaking changes (I088, I089, I066, I300, I301)** — bundled major-version rewrite:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+**Structured logging pipeline (I307):**
+
+- New `BlueyLog` Swift singleton with native-side level filter + tee to `os_log` + Pigeon bridge to Dart.
+- New native logs at meaningful points (CB delegate callbacks, op-slot events, addService/advertising, request handling, state transitions). Closes the iOS observability gap (the iOS library previously had zero `NSLog`/`print` calls).
+- `setLogLevel` HostApi method honors the Dart-set level — no Pigeon traffic for filtered events.
+
 ## 0.2.0
 
 **Breaking changes (I088, I089, I066, I300, I301)** — bundled major-version rewrite. iOS-implementation changes; consult `bluey/CHANGELOG.md` for the full domain-side surface.
