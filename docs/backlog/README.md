@@ -220,6 +220,9 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carries Peer-context state; bounded-context boundary inverted | high |
 | [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` use primitives where domain value objects would carry validation | low |
 | [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
+| [I303](I303-capabilities-platform-kind-flag.md) | iOS-detection heuristic on `Connection.ios` should be a precise capability flag | low |
+| [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
+| [I305](I305-example-bluey-badge-via-tryupgrade.md) | Example app lost its BLUEY badge after C.6; re-introduce via `bluey.tryUpgrade` | low |
 
 ### Fixed — verified in HEAD
 
