@@ -45,5 +45,16 @@ void main() async {
     debugPrint('[Bluey] $event');
   });
 
+  // Subscribe to the unified log stream at the most granular level.
+  // Covers domain layer + Android + iOS native events in arrival order.
+  bluey.setLogLevel(BlueyLogLevel.trace);
+  bluey.logEvents.listen((e) {
+    final ts = e.timestamp.toIso8601String().substring(11, 23); // HH:mm:ss.SSS
+    final level = e.level.name.toUpperCase().padRight(5);
+    final data = e.data.isEmpty ? '' : ' ${e.data}';
+    final err = e.errorCode == null ? '' : ' err=${e.errorCode}';
+    debugPrint('$ts [$level] ${e.context}: ${e.message}$data$err');
+  });
+
   runApp(const BlueyExampleApp());
 }
