@@ -310,7 +310,7 @@ class ConnectionManager(
         queue.enqueue(
             DiscoverServicesOp(
                 callback = { result ->
-                    val mapped = result.map { mapServices(gatt.services) }
+                    val mapped = result.map { mapServices(deviceId, gatt.services) }
                     callback(mapped)
                 },
                 timeoutMs = discoverServicesTimeoutMs,
@@ -687,16 +687,15 @@ class ConnectionManager(
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 handler.post {
-                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
-                        Result.success(Unit)
-                    } else {
-                        Result.failure(statusFailedError("Service discovery", status))
-                    }
-                    queueFor(deviceId)?.onComplete(result)
-
-                    // I088 — populate handle lookup tables. Replace any
-                    // previous tables wholesale so a fresh discovery (e.g.
-                    // after onServiceChanged) starts from a clean slate.
+                    // I088 — populate handle lookup tables BEFORE firing
+                    // the queue's completion. The DiscoverServicesOp
+                    // callback runs inside `onComplete` and synchronously
+                    // calls `mapServices`, which reverse-looks-up
+                    // descriptor handles from `descriptorByHandle[deviceId]`.
+                    // If we populated AFTER `onComplete`, mapServices
+                    // would see an empty handle map. Replace any previous
+                    // tables wholesale so a fresh discovery (e.g. after
+                    // onServiceChanged) starts from a clean slate.
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         val charMap = mutableMapOf<Int, BluetoothGattCharacteristic>()
                         val descMap = mutableMapOf<Int, BluetoothGattDescriptor>()
@@ -714,6 +713,13 @@ class ConnectionManager(
                         descriptorByHandle[deviceId] = descMap
                         nextDescriptorHandle[deviceId] = nextDesc
                     }
+
+                    val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Result.success(Unit)
+                    } else {
+                        Result.failure(statusFailedError("Service discovery", status))
+                    }
+                    queueFor(deviceId)?.onComplete(result)
                 }
             }
 
@@ -928,18 +934,21 @@ class ConnectionManager(
         return null
     }
 
-    private fun mapServices(services: List<BluetoothGattService>): List<ServiceDto> {
+    private fun mapServices(deviceId: String, services: List<BluetoothGattService>): List<ServiceDto> {
         return services.map { service ->
             ServiceDto(
                 uuid = service.uuid.toString(),
                 isPrimary = service.type == BluetoothGattService.SERVICE_TYPE_PRIMARY,
-                characteristics = mapCharacteristics(service.characteristics),
-                includedServices = mapServices(service.includedServices ?: emptyList())
+                characteristics = mapCharacteristics(deviceId, service.characteristics),
+                includedServices = mapServices(deviceId, service.includedServices ?: emptyList())
             )
         }
     }
 
-    private fun mapCharacteristics(characteristics: List<BluetoothGattCharacteristic>?): List<CharacteristicDto> {
+    private fun mapCharacteristics(
+        deviceId: String,
+        characteristics: List<BluetoothGattCharacteristic>?,
+    ): List<CharacteristicDto> {
         return (characteristics ?: emptyList()).map { characteristic ->
             val props = characteristic.properties
             CharacteristicDto(
@@ -951,14 +960,31 @@ class ConnectionManager(
                     canNotify = (props and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0,
                     canIndicate = (props and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0
                 ),
-                descriptors = mapDescriptors(characteristic.descriptors)
+                descriptors = mapDescriptors(deviceId, characteristic.descriptors),
+                // I088 — emit the characteristic's public instanceId as
+                // the handle so Dart can address chars by handle without
+                // having to disambiguate UUID collisions across services.
+                handle = characteristic.instanceId.toLong(),
             )
         }
     }
 
-    private fun mapDescriptors(descriptors: List<BluetoothGattDescriptor>?): List<DescriptorDto> {
+    private fun mapDescriptors(
+        deviceId: String,
+        descriptors: List<BluetoothGattDescriptor>?,
+    ): List<DescriptorDto> {
+        // I088 — reverse-lookup each descriptor's minted handle from the
+        // table populated in `onServicesDiscovered` (BluetoothGattDescriptor
+        // has no public instanceId, so handles are minted client-side).
+        // Reference equality is correct: the same Java object that was
+        // stored at population time is the one being mapped here.
+        val descMap = descriptorByHandle[deviceId]
         return (descriptors ?: emptyList()).map { descriptor ->
-            DescriptorDto(uuid = descriptor.uuid.toString())
+            val handle = descMap?.entries?.firstOrNull { it.value === descriptor }?.key
+            DescriptorDto(
+                uuid = descriptor.uuid.toString(),
+                handle = handle?.toLong(),
+            )
         }
     }
 

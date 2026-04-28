@@ -765,6 +765,76 @@ class GattServerTest {
         assertTrue("B's write should succeed", bWriteResult?.isSuccess == true)
     }
 
+    /**
+     * D.4.3 — Server-side read requests forwarded to Dart must carry
+     * `characteristicHandle = characteristic.instanceId`. The Dart
+     * peer can then dispatch on the handle without having to track
+     * UUIDs (which aren't unique when the same characteristic UUID
+     * is hosted in multiple services).
+     */
+    @Test
+    fun `onCharacteristicReadRequest emits ReadRequestDto with characteristicHandle = instanceId`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockCharacteristic.instanceId } returns 4242
+
+        val requestSlot = slot<ReadRequestDto>()
+        every { mockFlutterApi.onReadRequest(capture(requestSlot), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicReadRequest(mockDevice, 1, 0, mockCharacteristic)
+
+        assertEquals(
+            "ReadRequestDto.characteristicHandle must carry the BluetoothGattCharacteristic.instanceId",
+            4242L,
+            requestSlot.captured.characteristicHandle,
+        )
+    }
+
+    @Test
+    fun `onCharacteristicWriteRequest emits WriteRequestDto with characteristicHandle = instanceId`() {
+        val service = LocalServiceDto(
+            uuid = "12345678-1234-1234-1234-123456789abc",
+            isPrimary = true,
+            characteristics = emptyList(),
+            includedServices = emptyList()
+        )
+        gattServer.addService(service) {}
+
+        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
+        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
+        val mockCharacteristic = mockk<android.bluetooth.BluetoothGattCharacteristic>(relaxed = true)
+        every { mockCharacteristic.uuid } returns java.util.UUID.fromString("abcd1234-1234-1234-1234-123456789abc")
+        every { mockCharacteristic.instanceId } returns 7777
+
+        val requestSlot = slot<WriteRequestDto>()
+        every { mockFlutterApi.onWriteRequest(capture(requestSlot), any()) } answers {
+            secondArg<(Result<Unit>) -> Unit>().invoke(Result.success(Unit))
+        }
+
+        capturedCallback!!.onCharacteristicWriteRequest(
+            mockDevice, 99, mockCharacteristic, false, true, 0, byteArrayOf(0x01),
+        )
+
+        assertEquals(
+            "WriteRequestDto.characteristicHandle must carry the BluetoothGattCharacteristic.instanceId",
+            7777L,
+            requestSlot.captured.characteristicHandle,
+        )
+    }
+
     @Test
     fun `cleanup() clears all pending requests`() {
         val service = LocalServiceDto(

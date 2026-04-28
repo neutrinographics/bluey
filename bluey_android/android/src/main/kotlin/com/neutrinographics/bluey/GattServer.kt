@@ -647,7 +647,12 @@ class GattServer(
                 requestId = requestId.toLong(),
                 centralId = device.address,
                 characteristicUuid = characteristic.uuid.toString(),
-                offset = offset.toLong()
+                offset = offset.toLong(),
+                // I088 — emit the characteristic's instanceId so the Dart
+                // peer can dispatch on handle (UUIDs aren't unique when
+                // the same characteristic UUID is hosted under multiple
+                // services).
+                characteristicHandle = characteristic.instanceId.toLong(),
             )
             // Must dispatch to main thread for Flutter platform channel.
             handler.post {
@@ -674,7 +679,10 @@ class GattServer(
                 characteristicUuid = characteristic.uuid.toString(),
                 value = value,
                 offset = offset.toLong(),
-                responseNeeded = responseNeeded
+                responseNeeded = responseNeeded,
+                // I088 — emit the characteristic's instanceId; see the
+                // matching comment in onCharacteristicReadRequest.
+                characteristicHandle = characteristic.instanceId.toLong(),
             )
 
             // Stash only for the "simple write with response" path. The

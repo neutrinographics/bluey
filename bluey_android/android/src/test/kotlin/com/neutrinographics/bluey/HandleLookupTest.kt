@@ -289,4 +289,93 @@ class HandleLookupTest {
             nextDescriptorHandle().containsKey(deviceAddress),
         )
     }
+
+    /**
+     * D.4 — DTOs emitted from `discoverServices` must carry handles.
+     * `CharacteristicDto.handle` is the public `instanceId`; each
+     * `DescriptorDto.handle` is the same minted int that
+     * `descriptorByHandle[deviceId]` resolves back to that descriptor —
+     * so a Dart caller can hold the int and Android can look up the
+     * BluetoothGattDescriptor by the same int.
+     */
+    @Test
+    fun `discoverServices emits CharacteristicDto with handle = instanceId`() {
+        establishConnection()
+        val topo = buildTopology()
+        every { mockGatt.discoverServices() } returns true
+
+        var emitted: List<ServiceDto>? = null
+        connectionManager.discoverServices(deviceAddress) { result ->
+            emitted = result.getOrNull()
+        }
+        capturedGattCallback!!.onServicesDiscovered(mockGatt, BluetoothGatt.GATT_SUCCESS)
+
+        assertNotNull("discoverServices callback must fire", emitted)
+        val services = emitted!!
+        assertEquals(2, services.size)
+
+        val charsByUuid = services.flatMap { it.characteristics }.associateBy { it.uuid }
+        assertEquals(
+            "char A1 must carry instanceId 100 as handle",
+            100L, charsByUuid[charA1Uuid.toString()]!!.handle,
+        )
+        assertEquals(
+            "char A2 must carry instanceId 101 as handle",
+            101L, charsByUuid[charA2Uuid.toString()]!!.handle,
+        )
+        assertEquals(
+            "char B1 must carry instanceId 200 as handle",
+            200L, charsByUuid[charB1Uuid.toString()]!!.handle,
+        )
+        assertEquals(
+            "char B2 must carry instanceId 201 as handle",
+            201L, charsByUuid[charB2Uuid.toString()]!!.handle,
+        )
+    }
+
+    @Test
+    fun `discoverServices emits DescriptorDto with handle matching descriptorByHandle map`() {
+        establishConnection()
+        val topo = buildTopology()
+        every { mockGatt.discoverServices() } returns true
+
+        var emitted: List<ServiceDto>? = null
+        connectionManager.discoverServices(deviceAddress) { result ->
+            emitted = result.getOrNull()
+        }
+        capturedGattCallback!!.onServicesDiscovered(mockGatt, BluetoothGatt.GATT_SUCCESS)
+
+        val services = emitted!!
+        // Collect every (BluetoothGattDescriptor, emitted handle) pair
+        // by zipping the topology in iteration order (A1, A2, B1, B2)
+        // with the DescriptorDtos in the corresponding emitted order.
+        val emittedDescByCharUuid = services.flatMap { svc ->
+            svc.characteristics.flatMap { ch -> ch.descriptors.map { ch.uuid to it } }
+        }
+        val handleByCharUuid = emittedDescByCharUuid.associate { (charUuid, dto) ->
+            charUuid to dto.handle
+        }
+
+        // Each emitted descriptor handle must round-trip through
+        // descriptorByHandle to the same descriptor the topology used.
+        val descMap = descriptorByHandle()[deviceAddress]!!
+        val expectedDescByCharUuid = mapOf(
+            charA1Uuid.toString() to topo.descA1,
+            charA2Uuid.toString() to topo.descA2,
+            charB1Uuid.toString() to topo.descB1,
+            charB2Uuid.toString() to topo.descB2,
+        )
+        for ((charUuid, expectedDesc) in expectedDescByCharUuid) {
+            val handle = handleByCharUuid[charUuid]
+            assertNotNull(
+                "DescriptorDto for $charUuid must carry a handle",
+                handle,
+            )
+            assertEquals(
+                "DescriptorDto handle for $charUuid must round-trip to its BluetoothGattDescriptor",
+                expectedDesc,
+                descMap[handle!!.toInt()],
+            )
+        }
+    }
 }
