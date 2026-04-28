@@ -83,10 +83,6 @@ class _SpyConnection implements Connection {
   // Members the view never touches — explicitly throw to catch
   // accidental dependence.
   @override
-  bool get isBlueyServer => throw UnimplementedError();
-  @override
-  ServerId? get serverId => throw UnimplementedError();
-  @override
   ConnectionState get state => throw UnimplementedError();
   @override
   Stream<ConnectionState> get stateChanges => throw UnimplementedError();

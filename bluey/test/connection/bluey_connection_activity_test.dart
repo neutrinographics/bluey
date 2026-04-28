@@ -326,13 +326,14 @@ void main() {
     test(
         'characteristic constructed before upgrade picks up lifecycle once '
         'installed', () async {
-      // Regression for I097: BlueyConnection._mapCharacteristic builds
-      // characteristics during the initial services() discovery, BEFORE
-      // _tryUpgrade installs the LifecycleClient. If the characteristic
-      // captured the (null) lifecycle by value at construction time, user
-      // ops on those cached characteristics would never feed the
-      // silence detector — the exact behaviour I097 was meant to fix.
-      // The lifecycleClient parameter is a getter for this reason.
+      // Regression for I097: a characteristic may be constructed before
+      // an external LifecycleClient is wired up (e.g. by a peer-protocol
+      // wrapper that installs activity feedback after service discovery).
+      // If the characteristic captured the (null) lifecycle by value at
+      // construction time, user ops on those cached characteristics
+      // would never feed the silence detector — the exact behaviour
+      // I097 was meant to fix. The `lifecycleClient` parameter is a
+      // getter for this reason.
       await setupWritablePeripheral();
 
       LifecycleClient? installedLifecycle;

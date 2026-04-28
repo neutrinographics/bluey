@@ -15,10 +15,14 @@ class BlueyConnectionRepository implements ConnectionRepository {
     Duration? timeout,
     ConnectionSettings settings = const ConnectionSettings(),
   }) async {
+    // Note: post-C.6 `Bluey.connect` no longer accepts a
+    // `peerSilenceTimeout` (the parameter only matters when wrapping a
+    // raw connection in a `PeerConnection`). The setting is currently
+    // unused here; restoring it requires switching to
+    // `Bluey.connectAsPeer` / `Bluey.tryUpgrade` (TODO post-C.7).
     return await _bluey.connect(
       device,
       timeout: timeout,
-      peerSilenceTimeout: settings.peerSilenceTimeout,
     );
   }
 

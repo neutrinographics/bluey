@@ -6,9 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
 
-/// Tests for the disconnect path on an upgraded Bluey peer connection.
-/// Specifically: the courtesy `sendDisconnectCommand` write must not be
-/// allowed to block the platform disconnect indefinitely (I074).
+/// Tests for the disconnect path on a peer connection. Specifically:
+/// the courtesy `sendDisconnectCommand` write must not be allowed to
+/// block the platform disconnect indefinitely (I074).
+///
+/// Post-C.6, `BlueyConnection.disconnect` no longer emits a courtesy
+/// disconnect-command write — that behavior moved to the peer-protocol
+/// surface (`PeerConnection.sendDisconnectCommand`). The I074 invariant
+/// is therefore exercised against the peer wrapper instead of the raw
+/// connection.
 void main() {
   late FakeBlueyPlatform fakePlatform;
 
@@ -17,47 +23,46 @@ void main() {
     platform.BlueyPlatform.instance = fakePlatform;
   });
 
-  group('BlueyConnection.disconnect on upgraded peer', () {
+  group('PeerConnection.sendDisconnectCommand', () {
     test(
-        'I074: disconnect proceeds even when the courtesy '
-        'sendDisconnectCommand write hangs', () async {
+        'I074: sendDisconnectCommand proceeds with platform disconnect even '
+        'when the courtesy lifecycle write hangs', () async {
       fakePlatform.simulateBlueyServer(
         address: TestDeviceIds.device1,
         serverId: ServerId.generate(),
       );
 
       final bluey = Bluey();
-      final conn = await bluey.connect(Device(
+      final peerConn = await bluey.connectAsPeer(Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: TestDeviceIds.device1,
         name: 'Test Device',
       ));
 
-      // Let the initial heartbeat + interval-read settle so subsequent
-      // writes are observable as the disconnect command.
+      // Let any initial heartbeat traffic settle so the next held write
+      // is unambiguously the disconnect-command write.
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      // Hold the next write — that will be the courtesy disconnect-command
-      // write fired from BlueyConnection.disconnect().
+      // Hold the next write — that will be the courtesy 0x00 emitted by
+      // the lifecycle client during sendDisconnectCommand.
       fakePlatform.holdNextWriteCharacteristic();
 
-      // The bug: BlueyConnection.disconnect awaits sendDisconnectCommand
-      // unconditionally; with a hung write, disconnect itself hangs for
-      // the platform's full per-op timeout (~10s). Bound the test wait
-      // at 3 seconds — well under that timeout, well over the 1s
-      // courtesy budget the fix introduces.
-      await conn.disconnect().timeout(
+      // sendDisconnectCommand must not block forever on a hung write.
+      // Bound the test wait at 3 seconds. The lifecycle-client
+      // sendDisconnectCommand swallows its own timeout, then proceeds to
+      // platform disconnect.
+      await peerConn.sendDisconnectCommand().timeout(
             const Duration(seconds: 3),
             onTimeout: () =>
-                fail('disconnect did not return within 3s; the '
-                    'courtesy sendDisconnectCommand write blocked it'),
+                fail('sendDisconnectCommand did not return within 3s; '
+                    'the courtesy lifecycle write blocked it'),
           );
 
       expect(
-        conn.state,
+        peerConn.connection.state,
         ConnectionState.disconnected,
-        reason: 'connection state must reach disconnected after the '
-            'platform-level disconnect runs',
+        reason: 'underlying connection must reach disconnected after '
+            'sendDisconnectCommand returns',
       );
 
       bluey.dispose();

@@ -112,7 +112,18 @@ class _BlueyPeerConnection implements PeerConnection {
   Future<void> sendDisconnectCommand() async {
     // Two-step: write 0x00 to the control characteristic via the lifecycle
     // client, then await the platform-level disconnect.
-    await _lifecycle.sendDisconnectCommand();
+    //
+    // The disconnect-command write is a courtesy hint to the server —
+    // bound it with a short timeout so an unresponsive peer (the typical
+    // disconnect scenario) doesn't block the platform disconnect for the
+    // full per-op timeout. See I074.
+    try {
+      await _lifecycle
+          .sendDisconnectCommand()
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
+      // Best-effort courtesy; proceed to platform disconnect regardless.
+    }
     await _connection.disconnect();
   }
 

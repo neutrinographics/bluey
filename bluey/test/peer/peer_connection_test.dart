@@ -65,10 +65,6 @@ class _SpyConnection implements Connection {
   // Members not exercised by C.1's PeerConnection — explicitly throw to
   // catch accidental dependence.
   @override
-  bool get isBlueyServer => throw UnimplementedError();
-  @override
-  ServerId? get serverId => throw UnimplementedError();
-  @override
   ConnectionState get state => throw UnimplementedError();
   @override
   Stream<ConnectionState> get stateChanges => throw UnimplementedError();
@@ -344,10 +340,6 @@ class _OrderingSpyConnection implements Connection {
   // Everything else is unused for the ordering test — throw if touched.
   @override
   UUID get deviceId => throw UnimplementedError();
-  @override
-  bool get isBlueyServer => throw UnimplementedError();
-  @override
-  ServerId? get serverId => throw UnimplementedError();
   @override
   ConnectionState get state => throw UnimplementedError();
   @override

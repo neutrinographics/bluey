@@ -298,13 +298,6 @@ class Bluey {
   ///
   /// [device] - The device to connect to.
   /// [timeout] - Optional connection timeout.
-  /// [peerSilenceTimeout] - How long after a peer-failure signal (heartbeat
-  ///   probe timeout or user-op timeout) without an intervening successful
-  ///   exchange before the peer is declared unreachable and a local
-  ///   disconnect is triggered. Only applies when the device is a Bluey
-  ///   server. Defaults to [lifecycle.defaultPeerSilenceTimeout] (30 s),
-  ///   chosen to exceed the typical OS link-supervision timeout (~20 s) so
-  ///   the OS path fires first on genuine link loss.
   ///
   /// Returns a raw [Connection]. This method does **not** auto-upgrade
   /// to the Bluey peer protocol even when the device hosts the control
@@ -316,7 +309,6 @@ class Bluey {
   Future<Connection> connect(
     Device device, {
     Duration? timeout,
-    Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
@@ -340,7 +332,6 @@ class Bluey {
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
-        peerSilenceTimeout: peerSilenceTimeout,
       );
 
       dev.log(
@@ -391,7 +382,6 @@ class Bluey {
     final connection = await connect(
       device,
       timeout: timeout,
-      peerSilenceTimeout: peerSilenceTimeout,
     );
     final peer = await _tryBuildPeerConnection(
       connection,
@@ -425,8 +415,7 @@ class Bluey {
   ///
   /// Discovers services on [rawConnection] and, if the Bluey lifecycle
   /// control service is present, builds a [PeerConnection] around it.
-  /// Does **not** mutate the underlying [Connection] (no
-  /// `BlueyConnection.upgrade` call). On success, a fresh
+  /// Does **not** mutate the underlying [Connection]. On success, a fresh
   /// [PeerConnection] wrapper is returned around the existing raw
   /// connection.
   ///
@@ -443,41 +432,7 @@ class Bluey {
         name: 'bluey.peer',
       );
 
-      // Fast path: the underlying [BlueyConnection] is already upgraded
-      // (e.g. via the late-upgrade triggered by [BlueyConnection.services]
-      // or by a service-change notification). The filtered services list
-      // would no longer expose the control service, so we can't rediscover
-      // it; reuse the existing upgraded state instead.
-      //
-      // Reuse the running LifecycleClient already attached to the
-      // [BlueyConnection]. A fresh, unstarted client here would leave
-      // [PeerConnection.sendDisconnectCommand] silently a no-op because
-      // [LifecycleClient.sendDisconnectCommand] short-circuits when its
-      // `_heartbeatCharUuid` is null (set only by `start()`).
-      PeerConnection? buildFromUpgraded() {
-        if (rawConnection is! BlueyConnection) return null;
-        if (!rawConnection.isBlueyServer) return null;
-        final existingLifecycle = rawConnection.lifecycleClient;
-        final existingServerId = rawConnection.serverId;
-        if (existingLifecycle == null || existingServerId == null) return null;
-        return PeerConnection.create(
-          connection: rawConnection,
-          serverId: existingServerId,
-          lifecycleClient: existingLifecycle,
-        );
-      }
-
-      final fastPath = buildFromUpgraded();
-      if (fastPath != null) return fastPath;
-
       final services = await rawConnection.services();
-
-      // [BlueyConnection.services] may have late-upgraded the connection
-      // in place if the control service was present. In that case, the
-      // returned services list has already filtered out the control
-      // service — re-check the upgraded state and use it.
-      final fastPathPostServices = buildFromUpgraded();
-      if (fastPathPostServices != null) return fastPathPostServices;
 
       final controlService = services
           .where((s) => lifecycle.isControlService(s.uuid.toString()))

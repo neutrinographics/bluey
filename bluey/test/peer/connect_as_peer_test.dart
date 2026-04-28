@@ -99,24 +99,24 @@ void main() {
                 w.value.first == 0x00,
           )
           .toList();
-      // We expect TWO 0x00 writes:
-      //   1. From the wrapper's LifecycleClient (the path under test).
-      //   2. From BlueyConnection.disconnect()'s own lifecycle send
-      //      (the legacy auto-upgrade lifecycle, which currently still
-      //      coexists until C.5 collapses the two paths).
-      // Pre-fix, the wrapper's LifecycleClient is a fresh, unstarted
-      // instance whose `_heartbeatCharUuid` is null, so its
-      // sendDisconnectCommand is a silent no-op — only the disconnect
-      // path's write is observed (count == 1).
+      // Post-C.6, only the wrapper's LifecycleClient writes the
+      // disconnect command. The legacy auto-upgrade lifecycle that used
+      // to live inside BlueyConnection (and would emit a second 0x00
+      // from `connection.disconnect()`) has been removed — BlueyConnection
+      // is now a pure GATT connection with no peer-protocol state.
+      //
+      // Pre-fix (still meaningful regression target): if the wrapper's
+      // LifecycleClient were a fresh, unstarted instance, its
+      // `_heartbeatCharUuid` would be null and `sendDisconnectCommand`
+      // would be a silent no-op — observed count would be 0.
       expect(
         newWrites.length,
-        equals(2),
+        equals(1),
         reason:
-            'Both the wrapper\'s LifecycleClient AND the connection\'s '
-            'own legacy LifecycleClient should write 0x00 to the '
-            'control characteristic. Observed 0x00 writes after '
-            'sendDisconnectCommand: ${newWrites.length} '
-            '(expected 2; 1 indicates the wrapper\'s lifecycle was a '
+            'The wrapper\'s LifecycleClient should write 0x00 to the '
+            'control characteristic exactly once. Observed 0x00 writes '
+            'after sendDisconnectCommand: ${newWrites.length} '
+            '(expected 1; 0 indicates the wrapper\'s lifecycle was a '
             'fresh, unstarted client — see C.4 follow-up).',
       );
     });

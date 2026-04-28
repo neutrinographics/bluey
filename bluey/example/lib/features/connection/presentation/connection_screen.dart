@@ -555,28 +555,10 @@ class _DeviceInfoCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (connection.isBlueyServer) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1D4ED8),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'BLUEY',
-                              style: GoogleFonts.manrope(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
+                        // TODO(C.7): re-introduce a BLUEY badge driven by
+                        // a separate `PeerConnection?` field on the
+                        // connection cubit (post-C.6 the raw `Connection`
+                        // no longer exposes `isBlueyServer`).
                       ],
                     ),
                   ],

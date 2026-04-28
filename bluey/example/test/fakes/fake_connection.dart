@@ -75,12 +75,6 @@ class FakeConnection implements Connection {
   UUID get deviceId => throw UnimplementedError();
 
   @override
-  bool get isBlueyServer => throw UnimplementedError();
-
-  @override
-  ServerId? get serverId => throw UnimplementedError();
-
-  @override
   Future<int> readRssi() => throw UnimplementedError();
 
   @override

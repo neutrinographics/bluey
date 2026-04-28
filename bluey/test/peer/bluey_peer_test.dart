@@ -57,18 +57,10 @@ void main() {
         final id = ServerId.generate();
         fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
 
-        // Note: this test actually exercises BlueyConnection's own
-        // `_peerSilenceTimeout` (the lifecycle installed by `_tryUpgrade`
-        // during `services()`), NOT the `createBlueyPeer` parameter.
-        // `BlueyPeer.connect` reinstalls a second LifecycleClient via
-        // `blueyConnection.upgrade(...)` but never starts it (the
-        // post-upgrade `services()` already filtered out the control
-        // service, so `LifecycleClient.start` finds no heartbeat char).
-        // The OLD lifecycle leaks per I071 and is the one that fires.
-        //
-        // Until I071 is fixed, the timeout that actually matters here is
-        // the BlueyConnection default — currently
-        // `lifecycle.defaultPeerSilenceTimeout` (30 s).
+        // Post-C.6 the LifecycleClient lives inside `_BlueyPeer.connect`'s
+        // wrapper (no longer attached to `BlueyConnection`). It is started
+        // with the configured `peerSilenceTimeout` and drives the
+        // unreachable-detection path that triggers the local disconnect.
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
           serverId: id,
