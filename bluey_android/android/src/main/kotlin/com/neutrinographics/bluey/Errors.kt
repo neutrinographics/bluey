@@ -32,6 +32,8 @@ internal fun Throwable.toClientFlutterError(): FlutterError = when (this) {
     is BlueyAndroidError.CharacteristicNotFound,
     is BlueyAndroidError.DescriptorNotFound ->
         FlutterError("gatt-disconnected", message, null)
+    is BlueyAndroidError.HandleInvalidated ->
+        FlutterError("gatt-handle-invalidated", message, null)
     is BlueyAndroidError.ConnectionTimeout ->
         FlutterError("gatt-timeout", message, null)
     is BlueyAndroidError.SetNotificationFailed ->

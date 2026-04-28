@@ -329,10 +329,16 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
-        if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
-            return
+        val characteristic = when (val result = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)) {
+            is LookupResult.Found -> result.value
+            is LookupResult.HandleInvalidated -> {
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
+                return
+            }
+            is LookupResult.NotFound -> {
+                callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
+                return
+            }
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
@@ -355,10 +361,16 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
-        if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
-            return
+        val characteristic = when (val result = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)) {
+            is LookupResult.Found -> result.value
+            is LookupResult.HandleInvalidated -> {
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
+                return
+            }
+            is LookupResult.NotFound -> {
+                callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
+                return
+            }
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
@@ -389,10 +401,16 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val characteristic = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)
-        if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
-            return
+        val characteristic = when (val result = lookupCharacteristic(deviceId, gatt, characteristicUuid, characteristicHandle)) {
+            is LookupResult.Found -> result.value
+            is LookupResult.HandleInvalidated -> {
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
+                return
+            }
+            is LookupResult.NotFound -> {
+                callback(Result.failure(BlueyAndroidError.CharacteristicNotFound(characteristicUuid)))
+                return
+            }
         }
 
         // Step 1 (inline, sync): enable local notifications + look up CCCD.
@@ -448,10 +466,16 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val descriptor = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)
-        if (descriptor == null) {
-            callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
-            return
+        val descriptor = when (val result = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)) {
+            is LookupResult.Found -> result.value
+            is LookupResult.HandleInvalidated -> {
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
+                return
+            }
+            is LookupResult.NotFound -> {
+                callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
+                return
+            }
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
@@ -474,10 +498,16 @@ class ConnectionManager(
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
-        val descriptor = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)
-        if (descriptor == null) {
-            callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
-            return
+        val descriptor = when (val result = lookupDescriptor(deviceId, gatt, descriptorUuid, descriptorHandle)) {
+            is LookupResult.Found -> result.value
+            is LookupResult.HandleInvalidated -> {
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
+                return
+            }
+            is LookupResult.NotFound -> {
+                callback(Result.failure(BlueyAndroidError.DescriptorNotFound(descriptorUuid)))
+                return
+            }
         }
         val queue = queueFor(deviceId)
         if (queue == null) {
@@ -916,51 +946,85 @@ class ConnectionManager(
     }
 
     /**
-     * I088 — handle-first lookup. Prefers the per-device
-     * `characteristicByHandle` table when [handle] is non-null;
-     * otherwise falls back to UUID-keyed traversal via [findCharacteristic].
-     * The handle table is populated in `onServicesDiscovered` from each
-     * characteristic's public `getInstanceId()` (Int), so the wire-level
-     * `Long?` is coerced down to an `Int` key for the lookup.
+     * I088 — result of a handle-first attribute lookup.
      *
-     * D.13 will make handles required and retire the UUID fallback.
+     * `Found` carries the resolved characteristic / descriptor reference.
+     *
+     * `HandleInvalidated` indicates the Dart side passed a non-null
+     * handle but the per-device handle table no longer recognises it
+     * (Service Changed cleared it; the caller is holding a stale
+     * reference from the prior discovery). The caller maps this to
+     * [BlueyAndroidError.HandleInvalidated] so the Dart adapter
+     * surfaces it as `AttributeHandleInvalidatedException`. Distinct
+     * from `NotFound`, which is the legacy null-handle / UUID-miss
+     * path.
+     *
+     * `NotFound` is the residual case: no handle was supplied and
+     * the UUID-keyed traversal also missed.
+     */
+    private sealed class LookupResult<out T> {
+        data class Found<T>(val value: T) : LookupResult<T>()
+        data class HandleInvalidated(val handle: Long, val uuid: String) :
+            LookupResult<Nothing>()
+        object NotFound : LookupResult<Nothing>()
+    }
+
+    /**
+     * I088 D.11 — handle-first lookup. Refines the D.8 behaviour:
+     *
+     *   * `handle != null` and present in the table → `Found`.
+     *   * `handle != null` but missing → `HandleInvalidated`. We do *not*
+     *     fall back to UUID in this case: the Dart side opted into
+     *     handle routing by passing a non-null handle, so a miss carries
+     *     the specific "Service Changed cleared the table" semantics
+     *     rather than a generic "couldn't find it". Falling back to UUID
+     *     here would mask that signal and silently route the op to a
+     *     potentially-different attribute under the same UUID.
+     *   * `handle == null` → UUID fallback, as before. Legacy path for
+     *     callers (e.g. tests) that still issue ops by UUID alone.
+     *
+     * D.13 will retire the UUID fallback entirely; handles will become
+     * required.
      */
     private fun lookupCharacteristic(
         deviceId: String,
         gatt: BluetoothGatt,
         uuid: String,
         handle: Long?,
-    ): BluetoothGattCharacteristic? {
+    ): LookupResult<BluetoothGattCharacteristic> {
         if (handle != null) {
             val match = characteristicByHandle[deviceId]?.get(handle.toInt())
-            if (match != null) {
-                return match
+            return if (match != null) {
+                LookupResult.Found(match)
+            } else {
+                LookupResult.HandleInvalidated(handle, uuid)
             }
-            // Handle present but not in the table — fall through to UUID
-            // lookup so a stale handle from a pre-Service-Changed cache
-            // still resolves rather than silently failing.
         }
-        return findCharacteristic(gatt, uuid)
+        return findCharacteristic(gatt, uuid)?.let { LookupResult.Found(it) }
+            ?: LookupResult.NotFound
     }
 
     /**
-     * I088 — handle-first lookup for descriptors. Mirrors
-     * [lookupCharacteristic]: prefer the per-device descriptor handle
-     * table when [handle] is non-null; fall back to UUID-keyed traversal.
+     * I088 D.11 — handle-first lookup for descriptors. Mirrors
+     * [lookupCharacteristic]: a non-null handle that misses the table
+     * surfaces `HandleInvalidated` instead of falling back to UUID.
      */
     private fun lookupDescriptor(
         deviceId: String,
         gatt: BluetoothGatt,
         uuid: String,
         handle: Long?,
-    ): BluetoothGattDescriptor? {
+    ): LookupResult<BluetoothGattDescriptor> {
         if (handle != null) {
             val match = descriptorByHandle[deviceId]?.get(handle.toInt())
-            if (match != null) {
-                return match
+            return if (match != null) {
+                LookupResult.Found(match)
+            } else {
+                LookupResult.HandleInvalidated(handle, uuid)
             }
         }
-        return findDescriptor(gatt, uuid)
+        return findDescriptor(gatt, uuid)?.let { LookupResult.Found(it) }
+            ?: LookupResult.NotFound
     }
 
     private fun findCharacteristic(gatt: BluetoothGatt, uuid: String): BluetoothGattCharacteristic? {

@@ -12,6 +12,9 @@ import 'messages.g.dart';
 ///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
 ///     the native status extracted from `details`.
 ///   * `'bluey-permission-denied'` → [PlatformPermissionDeniedException]
+///   * `'gatt-handle-invalidated'` → [GattOperationUnknownPlatformException]
+///     preserving the code so the domain layer can throw the typed
+///     `AttributeHandleInvalidatedException`.
 ///
 /// Other errors propagate unchanged.
 ///
@@ -36,6 +39,17 @@ Future<T> _translateGattPlatformError<T>(
       // the rare marshaling paths where it could come back null / non-int.
       final status = e.details is int ? e.details as int : -1;
       throw GattOperationStatusFailedException(operation, status);
+    }
+    if (e.code == 'gatt-handle-invalidated') {
+      // Surfaces from the native handle table when Dart passed a non-null
+      // handle that no longer resolves (Service Changed cleared it). The
+      // domain layer recognises this code in `_runGattOp` and throws
+      // `AttributeHandleInvalidatedException`.
+      throw GattOperationUnknownPlatformException(
+        operation,
+        code: 'gatt-handle-invalidated',
+        message: e.message,
+      );
     }
     if (e.code == 'bluey-permission-denied') {
       final permission = e.details is String ? e.details as String : 'unknown';

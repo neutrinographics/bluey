@@ -183,6 +183,11 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [readCharacteristic] in order.
   final List<ReadCharacteristicCall> readCharacteristicCalls = [];
 
+  /// Records every call to [discoverServices] by deviceId, in order.
+  /// Used by tests that need to assert re-discovery happened (e.g. after
+  /// a Service Changed event clears the cache).
+  final List<String> discoverServicesCalls = [];
+
   // === Test Helpers ===
 
   /// When true, writeCharacteristic calls will throw to simulate a dead server.
@@ -704,6 +709,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<List<PlatformService>> discoverServices(String deviceId) async {
+    discoverServicesCalls.add(deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');

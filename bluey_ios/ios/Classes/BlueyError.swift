@@ -10,6 +10,13 @@ enum BlueyError: Error {
     case notConnected
     case notFound
     case timeout
+    /// I088 D.11 — Dart passed a non-null `characteristicHandle` /
+    /// `descriptorHandle` but the per-device `CentralHandleStore` no
+    /// longer recognises it. Indicates Service Changed
+    /// (`peripheral(_, didModifyServices:)`) cleared the table and the
+    /// caller is holding a stale reference. Distinct from `notFound`,
+    /// which is the legacy null-handle / UUID-miss path.
+    case handleInvalidated
 }
 
 extension BlueyError: LocalizedError {
@@ -25,6 +32,8 @@ extension BlueyError: LocalizedError {
             return "Resource not found"
         case .timeout:
             return "Operation timed out"
+        case .handleInvalidated:
+            return "GATT attribute handle invalidated by Service Changed"
         }
     }
 }
@@ -53,6 +62,10 @@ extension BlueyError {
             return PigeonError(code: "bluey-unknown",
                                message: self.errorDescription,
                                details: nil)
+        case .handleInvalidated:
+            return PigeonError(code: "gatt-handle-invalidated",
+                               message: self.errorDescription,
+                               details: nil)
         }
     }
 
@@ -77,6 +90,13 @@ extension BlueyError {
                                message: self.errorDescription,
                                details: nil)
         case .unknown:
+            return PigeonError(code: "bluey-unknown",
+                               message: self.errorDescription,
+                               details: nil)
+        case .handleInvalidated:
+            // Server-side never emits handleInvalidated (the server's
+            // hosted attribute table is owned by us, not by a peer's
+            // Service Changed). Map defensively to bluey-unknown.
             return PigeonError(code: "bluey-unknown",
                                message: self.errorDescription,
                                details: nil)

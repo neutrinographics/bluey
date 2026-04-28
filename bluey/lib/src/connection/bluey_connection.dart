@@ -64,6 +64,13 @@ Future<T> _runGattOp<T>(
     throw GattOperationFailedException(operation, e.status);
   } on platform.GattOperationUnknownPlatformException catch (e) {
     lifecycleClient?.recordUserOpFailure(e);
+    // The native side emits `gatt-handle-invalidated` when an op carried
+    // a non-null handle that no longer resolves on the platform side
+    // (post-Service-Changed clear). Surface as the typed domain
+    // exception so callers can pattern-match cleanly and re-discover.
+    if (e.code == 'gatt-handle-invalidated') {
+      throw AttributeHandleInvalidatedException();
+    }
     throw BlueyPlatformException(
       e.message ?? 'unknown platform error (${e.code})',
       code: e.code,
@@ -186,9 +193,18 @@ class BlueyConnection implements Connection {
   StreamSubscription? _platformStateSubscription;
   StreamSubscription? _platformBondStateSubscription;
   StreamSubscription? _platformPhySubscription;
+  StreamSubscription? _platformServiceChangesSubscription;
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
+
+  // I088 D.11 — in-flight GATT-op aborters. Each call to a public GATT
+  // op on the connection / characteristic / descriptor surface
+  // registers a completer here for the lifetime of the underlying
+  // platform call. On Service Changed, every entry is failed with
+  // [AttributeHandleInvalidatedException] so callers stop waiting on
+  // futures whose handles are now stale and re-discover instead.
+  final Set<Completer<Object?>> _pendingGattOpAborters = {};
 
   /// Creates a new connection instance.
   ///
@@ -218,6 +234,19 @@ class BlueyConnection implements Connection {
             _stateController.addError(error);
           },
         );
+
+    // I088 D.11 — Service Changed invalidates the entire discovered
+    // attribute tree. Native sides have already cleared their handle
+    // tables by the time this event fires (D.3 Android, D.5 iOS). Here
+    // we mirror that on the Dart side: drop the cached services so the
+    // next `services()` call re-discovers, and abort every in-flight
+    // GATT op with a typed exception so callers stop waiting on
+    // futures whose handles are now stale.
+    _platformServiceChangesSubscription = _platform.serviceChanges
+        .where((id) => id == _connectionId)
+        .listen((_) {
+      _onServiceChanged();
+    });
 
     // Bond / PHY / connection-parameter subscriptions and initial fetches
     // are guarded by [Capabilities]. Platforms that don't support an
@@ -293,6 +322,43 @@ class BlueyConnection implements Connection {
     throw DisconnectedException(deviceId, DisconnectReason.unknown);
   }
 
+  /// I088 D.11 — wraps [body] so that a Service Changed event fired
+  /// while the call is in flight surfaces the typed
+  /// [AttributeHandleInvalidatedException] on the original future, even
+  /// if the platform layer never produces a response. The aborter token
+  /// is registered for the lifetime of the platform call; whichever of
+  /// (platform completion, abort) fires first wins.
+  Future<T> _trackInFlight<T>(Future<T> Function() body) {
+    final aborter = Completer<Object?>();
+    _pendingGattOpAborters.add(aborter);
+    body().then(
+      (value) {
+        if (!aborter.isCompleted) aborter.complete(value);
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!aborter.isCompleted) aborter.completeError(error, stack);
+      },
+    );
+    return aborter.future
+        .whenComplete(() => _pendingGattOpAborters.remove(aborter))
+        .then((value) => value as T);
+  }
+
+  /// Service Changed handler. Drops the cached service tree and aborts
+  /// every in-flight op. Idempotent: a second event with no in-flight
+  /// ops is a no-op.
+  void _onServiceChanged() {
+    _cachedServices = null;
+    if (_pendingGattOpAborters.isEmpty) return;
+    final aborters = _pendingGattOpAborters.toList(growable: false);
+    _pendingGattOpAborters.clear();
+    for (final aborter in aborters) {
+      if (!aborter.isCompleted) {
+        aborter.completeError(AttributeHandleInvalidatedException());
+      }
+    }
+  }
+
   /// Idempotent, non-regressing state transition. Skips the emit if the
   /// new state matches the current one. Also refuses to walk backwards
   /// from `ready` to `linked` if the platform happens to re-emit a
@@ -358,11 +424,11 @@ class BlueyConnection implements Connection {
       level: 500, // Level.FINE — per-op chatter; suppressed in default log views
     );
     final stopwatch = Stopwatch()..start();
-    final platformServices = await _runGattOp(
-      deviceId,
-      'discoverServices',
-      () => _platform.discoverServices(_connectionId),
-    );
+    final platformServices = await _trackInFlight(() => _runGattOp(
+          deviceId,
+          'discoverServices',
+          () => _platform.discoverServices(_connectionId),
+        ));
     _cachedServices =
         platformServices.map((ps) => _mapService(ps)).toList();
 
@@ -388,26 +454,26 @@ class BlueyConnection implements Connection {
   Future<Mtu> requestMtu(Mtu mtu) async {
     _ensureConnected();
     final requested = mtu.value;
-    _mtu = await _loggedGattOp(
-      deviceId: deviceId,
-      op: 'requestMtu',
-      startDetail: 'requested=$requested',
-      body: () => _platform.requestMtu(_connectionId, requested),
-      completeDetail: (negotiated) =>
-          'requested=$requested, negotiated=$negotiated',
-    );
+    _mtu = await _trackInFlight(() => _loggedGattOp(
+          deviceId: deviceId,
+          op: 'requestMtu',
+          startDetail: 'requested=$requested',
+          body: () => _platform.requestMtu(_connectionId, requested),
+          completeDetail: (negotiated) =>
+              'requested=$requested, negotiated=$negotiated',
+        ));
     return Mtu.fromPlatform(_mtu);
   }
 
   @override
   Future<int> readRssi() async {
     _ensureConnected();
-    return _loggedGattOp(
-      deviceId: deviceId,
-      op: 'readRssi',
-      body: () => _platform.readRssi(_connectionId),
-      completeDetail: (rssi) => 'rssi=${rssi}dBm',
-    );
+    return _trackInFlight(() => _loggedGattOp(
+          deviceId: deviceId,
+          op: 'readRssi',
+          body: () => _platform.readRssi(_connectionId),
+          completeDetail: (rssi) => 'rssi=${rssi}dBm',
+        ));
   }
 
   // === Platform-specific extensions ===
@@ -509,6 +575,7 @@ class BlueyConnection implements Connection {
     await _platformStateSubscription?.cancel();
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();
+    await _platformServiceChangesSubscription?.cancel();
     await _stateController.close();
     await _bondStateController.close();
     await _phyController.close();
@@ -625,6 +692,7 @@ class BlueyConnection implements Connection {
           .map((pd) => _mapDescriptor(pd, characteristicHandle))
           .toList(),
       ensureConnected: _ensureConnected,
+      trackInFlight: _trackInFlight,
     );
   }
 
@@ -648,6 +716,7 @@ class BlueyConnection implements Connection {
       handle: AttributeHandle(platformHandle),
       characteristicHandle: characteristicHandle,
       ensureConnected: _ensureConnected,
+      trackInFlight: _trackInFlight,
     );
   }
 }
@@ -720,6 +789,15 @@ class BlueyRemoteService implements RemoteService {
   }
 }
 
+/// Type signature of the in-flight aborter wrapper threaded from
+/// [BlueyConnection] into characteristics and descriptors. Wraps a
+/// platform-call body so a Service Changed event fired mid-flight
+/// causes the returned future to fail with
+/// [AttributeHandleInvalidatedException].
+typedef _TrackInFlight = Future<T> Function<T>(Future<T> Function() body);
+
+Future<T> _passthroughInFlight<T>(Future<T> Function() body) => body();
+
 /// Internal implementation of [RemoteCharacteristic].
 class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final platform.BlueyPlatform _platform;
@@ -727,6 +805,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final UUID _deviceId;
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
+  final _TrackInFlight _trackInFlight;
 
   @override
   final UUID uuid;
@@ -767,12 +846,14 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required List<RemoteDescriptor> descriptors,
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
+    _TrackInFlight? trackInFlight,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
        _descriptors = descriptors,
        _lifecycle = lifecycleClient ?? (() => null),
-       _ensureConnected = ensureConnected ?? (() {});
+       _ensureConnected = ensureConnected ?? (() {}),
+       _trackInFlight = trackInFlight ?? _passthroughInFlight;
 
   @override
   Future<Uint8List> read() async {
@@ -780,18 +861,18 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    return _loggedGattOp(
-      deviceId: _deviceId,
-      op: 'readCharacteristic',
-      startDetail: 'char=$uuid',
-      body: () => _platform.readCharacteristic(
-        _connectionId,
-        uuid.toString(),
-        characteristicHandle: handle.value,
-      ),
-      completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
-      lifecycleClient: _lifecycle(),
-    );
+    return _trackInFlight(() => _loggedGattOp(
+          deviceId: _deviceId,
+          op: 'readCharacteristic',
+          startDetail: 'char=$uuid',
+          body: () => _platform.readCharacteristic(
+            _connectionId,
+            uuid.toString(),
+            characteristicHandle: handle.value,
+          ),
+          completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
+          lifecycleClient: _lifecycle(),
+        ));
   }
 
   @override
@@ -803,20 +884,20 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    return _loggedGattOp<void>(
-      deviceId: _deviceId,
-      op: 'writeCharacteristic',
-      startDetail: 'char=$uuid, bytes=${value.length}',
-      body: () => _platform.writeCharacteristic(
-        _connectionId,
-        uuid.toString(),
-        value,
-        withResponse,
-        characteristicHandle: handle.value,
-      ),
-      completeDetail: (_) => 'char=$uuid',
-      lifecycleClient: _lifecycle(),
-    );
+    return _trackInFlight<void>(() => _loggedGattOp<void>(
+          deviceId: _deviceId,
+          op: 'writeCharacteristic',
+          startDetail: 'char=$uuid, bytes=${value.length}',
+          body: () => _platform.writeCharacteristic(
+            _connectionId,
+            uuid.toString(),
+            value,
+            withResponse,
+            characteristicHandle: handle.value,
+          ),
+          completeDetail: (_) => 'char=$uuid',
+          lifecycleClient: _lifecycle(),
+        ));
   }
 
   @override
@@ -947,6 +1028,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final UUID _deviceId;
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
+  final _TrackInFlight _trackInFlight;
 
   /// Handle of the parent characteristic. Threaded onto the wire
   /// alongside [handle] so native receivers can route descriptor ops
@@ -983,44 +1065,46 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     AttributeHandle? characteristicHandle,
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
+    _TrackInFlight? trackInFlight,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
        _characteristicHandle = characteristicHandle,
        _lifecycle = lifecycleClient ?? (() => null),
-       _ensureConnected = ensureConnected ?? (() {});
+       _ensureConnected = ensureConnected ?? (() {}),
+       _trackInFlight = trackInFlight ?? _passthroughInFlight;
 
   @override
   Future<Uint8List> read() async {
     _ensureConnected();
-    return _runGattOp(
-      _deviceId,
-      'readDescriptor',
-      () => _platform.readDescriptor(
-        _connectionId,
-        uuid.toString(),
-        characteristicHandle: _characteristicHandle?.value,
-        descriptorHandle: handle.value,
-      ),
-      lifecycleClient: _lifecycle(),
-    );
+    return _trackInFlight(() => _runGattOp(
+          _deviceId,
+          'readDescriptor',
+          () => _platform.readDescriptor(
+            _connectionId,
+            uuid.toString(),
+            characteristicHandle: _characteristicHandle?.value,
+            descriptorHandle: handle.value,
+          ),
+          lifecycleClient: _lifecycle(),
+        ));
   }
 
   @override
   Future<void> write(Uint8List value) async {
     _ensureConnected();
-    return _runGattOp(
-      _deviceId,
-      'writeDescriptor',
-      () => _platform.writeDescriptor(
-        _connectionId,
-        uuid.toString(),
-        value,
-        characteristicHandle: _characteristicHandle?.value,
-        descriptorHandle: handle.value,
-      ),
-      lifecycleClient: _lifecycle(),
-    );
+    return _trackInFlight<void>(() => _runGattOp(
+          _deviceId,
+          'writeDescriptor',
+          () => _platform.writeDescriptor(
+            _connectionId,
+            uuid.toString(),
+            value,
+            characteristicHandle: _characteristicHandle?.value,
+            descriptorHandle: handle.value,
+          ),
+          lifecycleClient: _lifecycle(),
+        ));
   }
 }
 

@@ -25,6 +25,22 @@ internal sealed class BlueyAndroidError(message: String) : Exception(message) {
     data class DescriptorNotFound(val uuid: String) :
         BlueyAndroidError("Descriptor not found: $uuid")
 
+    /**
+     * The Dart side issued a GATT op carrying a non-null `characteristicHandle`
+     * or `descriptorHandle`, but that handle is no longer in the per-device
+     * handle table. Indicates the peer fired Service Changed (so
+     * `onServiceChanged` cleared the table) and the caller is still holding
+     * a stale [BlueyRemoteCharacteristic] / [BlueyRemoteDescriptor] reference
+     * from the prior discovery. Surfaces as `gatt-handle-invalidated` so the
+     * Dart adapter can throw `AttributeHandleInvalidatedException` and prompt
+     * the caller to re-discover.
+     *
+     * Distinct from [CharacteristicNotFound] / [DescriptorNotFound], which
+     * fire when the handle was null and the UUID-fallback path also missed.
+     */
+    data class HandleInvalidated(val handle: Long, val uuid: String) :
+        BlueyAndroidError("GATT handle $handle (uuid=$uuid) not found in handle table")
+
     // --- Connect phase → gatt-timeout / bluey-unknown ---
 
     object ConnectionTimeout : BlueyAndroidError("Connection timeout")

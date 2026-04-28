@@ -19,6 +19,9 @@ import 'uuid_utils.dart';
 ///     (e.g. of `CBError` numeric codes) surfaces as the same typed
 ///     exception.
 ///   * `'bluey-unknown'` → [GattOperationUnknownPlatformException]
+///   * `'gatt-handle-invalidated'` → [GattOperationUnknownPlatformException]
+///     preserving the code so the domain layer translates it to the typed
+///     `AttributeHandleInvalidatedException`.
 ///
 /// Other errors propagate unchanged.
 ///
@@ -46,6 +49,13 @@ Future<T> _translateGattPlatformError<T>(
       throw GattOperationUnknownPlatformException(
         operation,
         code: 'bluey-unknown',
+        message: e.message,
+      );
+    }
+    if (e.code == 'gatt-handle-invalidated') {
+      throw GattOperationUnknownPlatformException(
+        operation,
+        code: 'gatt-handle-invalidated',
         message: e.message,
       );
     }

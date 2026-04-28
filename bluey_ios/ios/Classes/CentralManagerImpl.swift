@@ -235,7 +235,14 @@ class CentralManagerImpl: NSObject {
 
     func readCharacteristic(deviceId: String, characteristicUuid: String, characteristicHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
+        let characteristic: CBCharacteristic
+        switch lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) {
+        case .found(let c):
+            characteristic = c
+        case .handleInvalidated:
+            completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
+            return
+        case .notFound:
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -258,7 +265,14 @@ class CentralManagerImpl: NSObject {
 
     func writeCharacteristic(deviceId: String, characteristicUuid: String, value: FlutterStandardTypedData, withResponse: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
+        let characteristic: CBCharacteristic
+        switch lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) {
+        case .found(let c):
+            characteristic = c
+        case .handleInvalidated:
+            completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
+            return
+        case .notFound:
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -290,7 +304,14 @@ class CentralManagerImpl: NSObject {
 
     func setNotification(deviceId: String, characteristicUuid: String, enable: Bool, characteristicHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let charUuid = normalizeUuid(characteristicUuid)
-        guard let characteristic = lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) else {
+        let characteristic: CBCharacteristic
+        switch lookupCharacteristic(deviceId: deviceId, uuid: charUuid, handle: characteristicHandle) {
+        case .found(let c):
+            characteristic = c
+        case .handleInvalidated:
+            completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
+            return
+        case .notFound:
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -311,25 +332,52 @@ class CentralManagerImpl: NSObject {
         peripheral.setNotifyValue(enable, for: characteristic)
     }
 
-    /// I088 — handle-first lookup. Prefers the per-device
-    /// `handleStore.characteristicByHandle` table when [handle] is
-    /// non-null; otherwise falls back to UUID-keyed traversal via
-    /// [findCharacteristic]. Mirrors the Android side.
-    /// D.13 will make handles required and retire the UUID fallback.
-    private func lookupCharacteristic(deviceId: String, uuid: String, handle: Int64?) -> CBCharacteristic? {
-        if let h = handle, let match = handleStore.characteristicByHandle[deviceId]?[Int(h)] {
-            return match
-        }
-        return findCharacteristic(deviceId: deviceId, uuid: uuid)
+    /// I088 D.11 — outcome of a handle-first attribute lookup.
+    ///
+    /// `.handleInvalidated` indicates Dart passed a non-null handle but
+    /// the per-device `CentralHandleStore` no longer recognises it
+    /// (Service Changed cleared it). We deliberately do not fall back
+    /// to UUID in that case — falling back would silently route the op
+    /// to a different attribute under the same UUID. Mirrors the
+    /// Android `LookupResult` shape.
+    private enum LookupResult<T> {
+        case found(T)
+        case handleInvalidated
+        case notFound
     }
 
-    /// I088 — handle-first lookup for descriptors. Mirrors
-    /// [lookupCharacteristic].
-    private func lookupDescriptor(deviceId: String, uuid: String, handle: Int64?) -> CBDescriptor? {
-        if let h = handle, let match = handleStore.descriptorByHandle[deviceId]?[Int(h)] {
-            return match
+    /// I088 D.11 — handle-first lookup. Refines the D.8 behaviour:
+    /// a non-null handle that misses the table surfaces
+    /// `.handleInvalidated` instead of falling back to UUID, so the
+    /// Dart side can surface `AttributeHandleInvalidatedException` and
+    /// re-discover. UUID fallback only kicks in when handle is nil
+    /// (legacy callers; D.13 retires the fallback entirely).
+    private func lookupCharacteristic(deviceId: String, uuid: String, handle: Int64?) -> LookupResult<CBCharacteristic> {
+        if let h = handle {
+            if let match = handleStore.characteristicByHandle[deviceId]?[Int(h)] {
+                return .found(match)
+            }
+            return .handleInvalidated
         }
-        return findDescriptor(deviceId: deviceId, uuid: uuid)
+        if let match = findCharacteristic(deviceId: deviceId, uuid: uuid) {
+            return .found(match)
+        }
+        return .notFound
+    }
+
+    /// I088 D.11 — handle-first lookup for descriptors. Mirrors
+    /// [lookupCharacteristic].
+    private func lookupDescriptor(deviceId: String, uuid: String, handle: Int64?) -> LookupResult<CBDescriptor> {
+        if let h = handle {
+            if let match = handleStore.descriptorByHandle[deviceId]?[Int(h)] {
+                return .found(match)
+            }
+            return .handleInvalidated
+        }
+        if let match = findDescriptor(deviceId: deviceId, uuid: uuid) {
+            return .found(match)
+        }
+        return .notFound
     }
 
     /// Finds a characteristic by UUID, handling both short and full UUID formats.
@@ -361,7 +409,14 @@ class CentralManagerImpl: NSObject {
 
     func readDescriptor(deviceId: String, descriptorUuid: String, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
-        guard let descriptor = lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) else {
+        let descriptor: CBDescriptor
+        switch lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) {
+        case .found(let d):
+            descriptor = d
+        case .handleInvalidated:
+            completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
+            return
+        case .notFound:
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }
@@ -384,7 +439,14 @@ class CentralManagerImpl: NSObject {
 
     func writeDescriptor(deviceId: String, descriptorUuid: String, value: FlutterStandardTypedData, characteristicHandle: Int64?, descriptorHandle: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
         let descUuid = normalizeUuid(descriptorUuid)
-        guard let descriptor = lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) else {
+        let descriptor: CBDescriptor
+        switch lookupDescriptor(deviceId: deviceId, uuid: descUuid, handle: descriptorHandle) {
+        case .found(let d):
+            descriptor = d
+        case .handleInvalidated:
+            completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
+            return
+        case .notFound:
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
         }

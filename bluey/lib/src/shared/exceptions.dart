@@ -164,6 +164,48 @@ class AmbiguousAttributeException extends BlueyException {
   }
 }
 
+/// A GATT operation was issued with an attribute handle that the
+/// platform side no longer recognises because the peer fired a
+/// Service Changed event (Android `onServiceChanged`; iOS
+/// `peripheral(_, didModifyServices:)`) and the handle table that
+/// minted the handle has since been cleared.
+///
+/// The connection itself is still live — only the discovered service
+/// tree is stale. Recovery: call `connection.services()` again to
+/// re-discover and acquire fresh handles, then reissue the op against
+/// the new attribute references.
+///
+/// Distinct from [AttributeNotFoundException] (handle never existed
+/// or refers to a different connection) and [DisconnectedException]
+/// (the link itself is gone).
+class AttributeHandleInvalidatedException extends BlueyException {
+  AttributeHandleInvalidatedException()
+      : super(
+          'GATT attribute handle invalidated by Service Changed; '
+              're-discover services to obtain fresh handles.',
+          action: 'Call connection.services() to re-discover, then '
+              'reissue the op against the new attribute references.',
+        );
+}
+
+/// A GATT operation referenced an attribute handle the platform side
+/// could not resolve, but it was not invalidated by a Service Changed
+/// event. Indicates a programmer error — for example, passing a handle
+/// minted on connection A to an op issued on connection B, or holding
+/// an attribute reference past disconnect.
+///
+/// Distinct from [AttributeHandleInvalidatedException], which carries
+/// the specific "Service Changed cleared the handle table" semantics
+/// and points the caller at re-discovery as the recovery path.
+class AttributeNotFoundException extends BlueyException {
+  AttributeNotFoundException()
+      : super(
+          'GATT attribute handle not found on the platform side.',
+          action: 'Verify the handle was obtained from this connection '
+              'and has not outlived its parent service tree.',
+        );
+}
+
 /// GATT operation status codes.
 enum GattStatus {
   success,
