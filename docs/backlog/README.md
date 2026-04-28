@@ -160,6 +160,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I023](I023-gatt-server-notification-sent-no-tracking.md) | `onNotificationSent` not tracked for completion | medium |
 | [I024](I024-gatt-server-mtu-change-not-propagated.md) | Server-side MTU change not propagated to Dart | medium |
 | [I025](I025-gatt-server-phy-events-logging-only.md) | Server-side PHY update/read events are logging-only | low |
+| [I306](I306-android-server-no-disconnect-on-ios-client-cancel.md) | Android server doesn't observe iOS client disconnect (BLE-supervision-timeout latency or missing event) | medium |
 
 ### Open — Android connection-level stubs
 
