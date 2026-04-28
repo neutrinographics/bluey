@@ -140,7 +140,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
 | [I099](I099-typed-error-translation-rewrite.md) | Replace string-matching error wrapping with typed catch ladder (architectural) | high |
-| [I307](I307-structured-logging-pipeline.md) | Add a structured logging pipeline from domain through platform code | medium |
 
 ### Open — Android native
 
@@ -252,6 +251,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I066](I066-connection-platform-specific-methods.md) | Cross-platform `Connection` interface declared platform-specific methods; resolved by I089 platform-tagged extensions | `73656b4` (bundle `929e869..73656b4`) |
 | [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carried Peer-context state; resolved via composition (`PeerConnection` wraps `Connection`); `Bluey.connect` / `connectAsPeer` / `tryUpgrade` split | `73656b4` (bundle `929e869..73656b4`) |
 | [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` primitives replaced with value objects (`ConnectionInterval`, `PeripheralLatency`, `SupervisionTimeout`, `Mtu`) | `73656b4` (bundle `929e869..73656b4`) |
+| [I307](I307-structured-logging-pipeline.md) | Structured logging pipeline (domain + Android + iOS native) unified into `bluey.logEvents` with Dart-set level filter; released as 0.3.0 | `db5a999` (bundle `bd0b433..db5a999`) |
 
 ### Wontfix — documented platform limitations & superseded premises
 

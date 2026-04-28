@@ -4,7 +4,8 @@ title: Add a structured logging pipeline from domain through platform code
 category: unimplemented
 severity: medium
 platform: domain
-status: open
+status: fixed
+fixed_in: db5a999
 last_verified: 2026-04-28
 related: [I306]
 ---
@@ -79,3 +80,7 @@ Medium severity. Not a correctness bug; an infrastructure investment. Pays for i
 
 - I306 — discovered the need for unified logging during real-device manual verification of the handle rewrite.
 - The `dev.log` calls and `Log.d`/`NSLog` ad-hoc tracing scattered across the codebase are the existing "logs" that this pipeline would replace.
+
+## Resolution
+
+Fixed in `feat/structured-logging` across the range `bd0b433..db5a999` (final commit `db5a999`). Released as 0.3.0. The unified `Bluey.logEvents` stream covers domain layer + Android + iOS native events with a single Dart-set level filter that propagates to native sides (no Pigeon traffic for filtered events). See `docs/superpowers/plans/2026-04-28-structured-logging-pipeline.md` for the execution sequence.
