@@ -51,6 +51,30 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   BluetoothState _state = BluetoothState.on;
   final Capabilities _capabilities;
 
+  // === Structured logging (I307) ===
+  final StreamController<PlatformLogEvent> _logEventsController =
+      StreamController<PlatformLogEvent>.broadcast();
+  PlatformLogLevel? _lastSetLogLevel;
+
+  @override
+  Stream<PlatformLogEvent> get logEvents => _logEventsController.stream;
+
+  @override
+  Future<void> setLogLevel(PlatformLogLevel level) async {
+    _lastSetLogLevel = level;
+  }
+
+  /// The most recent value passed to [setLogLevel], or `null` if it has
+  /// never been called. Test seam for verifying domain-layer wiring.
+  PlatformLogLevel? get lastSetLogLevel => _lastSetLogLevel;
+
+  /// Pushes a synthetic native log [event] onto [logEvents]. Test seam
+  /// used to simulate native log emission without involving a real
+  /// platform implementation.
+  void emitLog(PlatformLogEvent event) {
+    _logEventsController.add(event);
+  }
+
   // === Simulated Peripherals (devices we can discover/connect to) ===
   //
   // Test fixtures supplied via [simulatePeripheral]. The shape stored
@@ -1545,6 +1569,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     await _centralDisconnectionController.close();
     await _readRequestController.close();
     await _writeRequestController.close();
+    await _logEventsController.close();
 
     for (final controller in _connectionStateControllers.values) {
       await controller.close();

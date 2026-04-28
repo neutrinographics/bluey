@@ -397,6 +397,13 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     // Mock implementation - nothing to do
   }
 
+  // Structured logging - stub implementations (I307)
+  @override
+  Stream<platform.PlatformLogEvent> get logEvents => Stream.empty();
+
+  @override
+  Future<void> setLogLevel(platform.PlatformLogLevel level) async {}
+
   // Test helpers
   void emitCentralConnected(platform.PlatformCentral central) {
     _centralConnectionsController.add(central);

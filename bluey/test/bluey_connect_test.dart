@@ -381,6 +381,13 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<void> closeServer() async {}
 
+  // Structured logging - stub implementations (I307)
+  @override
+  Stream<platform.PlatformLogEvent> get logEvents => Stream.empty();
+
+  @override
+  Future<void> setLogLevel(platform.PlatformLogLevel level) async {}
+
   void dispose() {
     _stateController.close();
     for (final controller in _connectionControllers.values) {
