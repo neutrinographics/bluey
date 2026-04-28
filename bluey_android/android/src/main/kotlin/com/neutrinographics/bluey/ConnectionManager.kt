@@ -60,6 +60,24 @@ class ConnectionManager(
     // STATE_DISCONNECTED never arrives within DISCONNECT_FALLBACK_MS.
     private val pendingDisconnectTimeouts = mutableMapOf<String, Runnable>()
 
+    // I088 — handle-identity lookup tables. Populated when
+    // onServicesDiscovered fires (after the existing rediscovery flow);
+    // cleared on STATE_DISCONNECTED and on onServiceChanged (before
+    // re-discovery is triggered) so stale handles can't outlive the
+    // attribute layout they reference.
+    //
+    // Characteristic handles use the public
+    // `BluetoothGattCharacteristic.getInstanceId()`. Descriptor handles
+    // are minted client-side from a per-device monotonic counter
+    // starting at 1, because `BluetoothGattDescriptor.getInstanceId()`
+    // is `@hide` in AOSP. iOS mints both kinds the same way; Android's
+    // descriptor minting mirrors that.
+    private val characteristicByHandle:
+        MutableMap<String, MutableMap<Int, BluetoothGattCharacteristic>> = mutableMapOf()
+    private val descriptorByHandle:
+        MutableMap<String, MutableMap<Int, BluetoothGattDescriptor>> = mutableMapOf()
+    private val nextDescriptorHandle: MutableMap<String, Int> = mutableMapOf()
+
     // CCCD UUID for enabling notifications/indications
     companion object {
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
@@ -652,6 +670,11 @@ class ConnectionManager(
                                 cb(Result.success(Unit))
                             }
                             connections.remove(deviceId)
+                            // I088 — drop the per-device handle lookup
+                            // tables; the attribute database is gone.
+                            characteristicByHandle.remove(deviceId)
+                            descriptorByHandle.remove(deviceId)
+                            nextDescriptorHandle.remove(deviceId)
                             try {
                                 gatt.close()
                             } catch (e: Exception) {
@@ -670,6 +693,27 @@ class ConnectionManager(
                         Result.failure(statusFailedError("Service discovery", status))
                     }
                     queueFor(deviceId)?.onComplete(result)
+
+                    // I088 — populate handle lookup tables. Replace any
+                    // previous tables wholesale so a fresh discovery (e.g.
+                    // after onServiceChanged) starts from a clean slate.
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        val charMap = mutableMapOf<Int, BluetoothGattCharacteristic>()
+                        val descMap = mutableMapOf<Int, BluetoothGattDescriptor>()
+                        var nextDesc = 1
+                        for (service in gatt.services) {
+                            for (char in service.characteristics) {
+                                charMap[char.instanceId] = char
+                                for (desc in char.descriptors) {
+                                    descMap[nextDesc] = desc
+                                    nextDesc++
+                                }
+                            }
+                        }
+                        characteristicByHandle[deviceId] = charMap
+                        descriptorByHandle[deviceId] = descMap
+                        nextDescriptorHandle[deviceId] = nextDesc
+                    }
                 }
             }
 
@@ -822,6 +866,14 @@ class ConnectionManager(
 
             override fun onServiceChanged(gatt: BluetoothGatt) {
                 handler.post {
+                    // I088 — clear stale handle tables before the platform
+                    // schedules re-discovery; the next onServicesDiscovered
+                    // will repopulate them. Without this clear, a write
+                    // racing the re-discovery could resolve a handle that
+                    // pointed at the previous attribute layout.
+                    characteristicByHandle.remove(deviceId)
+                    descriptorByHandle.remove(deviceId)
+                    nextDescriptorHandle.remove(deviceId)
                     flutterApi.onServicesChanged(deviceId) {}
                 }
             }
