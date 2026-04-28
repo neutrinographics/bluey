@@ -63,12 +63,27 @@ class _SpyConnection implements Connection {
     calls.add('disconnect');
   }
 
+  /// Broadcast controller backing [stateChanges]. Tests drive disconnect
+  /// scenarios via [simulateState].
+  final StreamController<ConnectionState> _stateController =
+      StreamController<ConnectionState>.broadcast();
+
+  /// Inject a state event onto [stateChanges] so subscribers fire.
+  /// Tests await `pumpEventQueue` after this call.
+  void simulateState(ConnectionState s) {
+    _stateController.add(s);
+  }
+
+  /// Close the controller — call from tearDown to avoid leaked
+  /// subscriptions across tests.
+  Future<void> dispose() => _stateController.close();
+
   // Members not exercised by C.1's PeerConnection — explicitly throw to
   // catch accidental dependence.
   @override
   ConnectionState get state => throw UnimplementedError();
   @override
-  Stream<ConnectionState> get stateChanges => throw UnimplementedError();
+  Stream<ConnectionState> get stateChanges => _stateController.stream;
   @override
   Mtu get mtu => throw UnimplementedError();
   @override
@@ -102,9 +117,18 @@ class _SpyLifecycleClient extends LifecycleClient {
 
   static void _noop() {}
 
+  /// Records calls to [stop] so tests can assert teardown.
+  bool stopCalled = false;
+
   @override
   Future<void> sendDisconnectCommand() async {
     callLog.add('lifecycle.sendDisconnectCommand');
+  }
+
+  @override
+  void stop() {
+    stopCalled = true;
+    callLog.add('lifecycle.stop');
   }
 }
 
@@ -304,6 +328,55 @@ void main() {
       expect(conn.calls, isEmpty);
     },
   );
+
+  // Regression: when the underlying Connection disconnects (via raw
+  // `connection.disconnect()`, supervision timeout, or any other path),
+  // the wrapped LifecycleClient must be stopped. Without this, callers
+  // that disconnect the raw connection without going through
+  // `peer.disconnect()` leak heartbeat traffic for ~30 seconds until
+  // the LifecycleClient's own peer-silence timeout fires.
+  test('stops LifecycleClient when underlying Connection disconnects',
+      () async {
+    final conn = _SpyConnection();
+    addTearDown(conn.dispose);
+    final lifecycle = _SpyLifecycleClient(callLog: []);
+
+    PeerConnection.create(
+      connection: conn,
+      serverId: serverId,
+      lifecycleClient: lifecycle,
+    );
+
+    expect(lifecycle.stopCalled, isFalse);
+
+    conn.simulateState(ConnectionState.disconnected);
+    await pumpEventQueue();
+
+    expect(lifecycle.stopCalled, isTrue,
+        reason: 'LifecycleClient.stop should fire on connection disconnect');
+  });
+
+  test('does NOT stop LifecycleClient on non-disconnected state changes',
+      () async {
+    final conn = _SpyConnection();
+    addTearDown(conn.dispose);
+    final lifecycle = _SpyLifecycleClient(callLog: []);
+
+    PeerConnection.create(
+      connection: conn,
+      serverId: serverId,
+      lifecycleClient: lifecycle,
+    );
+
+    conn.simulateState(ConnectionState.connecting);
+    conn.simulateState(ConnectionState.linked);
+    conn.simulateState(ConnectionState.ready);
+    conn.simulateState(ConnectionState.disconnecting);
+    await pumpEventQueue();
+
+    expect(lifecycle.stopCalled, isFalse,
+        reason: 'Only the disconnected state should trigger stop');
+  });
 }
 
 /// Minimal RemoteService stub for the control-service filtering tests.
@@ -347,7 +420,7 @@ class _OrderingSpyConnection implements Connection {
   @override
   ConnectionState get state => throw UnimplementedError();
   @override
-  Stream<ConnectionState> get stateChanges => throw UnimplementedError();
+  Stream<ConnectionState> get stateChanges => const Stream.empty();
   @override
   Mtu get mtu => throw UnimplementedError();
   @override

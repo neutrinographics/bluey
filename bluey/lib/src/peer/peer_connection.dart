@@ -1,4 +1,6 @@
-import '../connection/connection.dart' show Connection;
+import 'dart:async';
+
+import '../connection/connection.dart' show Connection, ConnectionState;
 import '../connection/lifecycle_client.dart';
 import '../gatt_client/gatt.dart' show RemoteService;
 import '../shared/uuid.dart';
@@ -81,12 +83,26 @@ class _BlueyPeerConnection implements PeerConnection {
   }) : _connection = connection,
        _serverId = serverId,
        _lifecycle = lifecycleClient,
-       _serviceView = PeerRemoteServiceView(connection);
+       _serviceView = PeerRemoteServiceView(connection) {
+    // Stop the LifecycleClient as soon as the underlying connection
+    // disconnects. Without this, callers that disconnect the raw
+    // `connection` directly (instead of going through `peer.disconnect()`)
+    // leak heartbeat traffic until the LifecycleClient's own peer-silence
+    // timeout fires (~30s).
+    _stateSub = _connection.stateChanges.listen((s) {
+      if (s == ConnectionState.disconnected) {
+        _lifecycle.stop();
+        _stateSub?.cancel();
+        _stateSub = null;
+      }
+    });
+  }
 
   final Connection _connection;
   final ServerId _serverId;
   final LifecycleClient _lifecycle;
   final PeerRemoteServiceView _serviceView;
+  StreamSubscription<ConnectionState>? _stateSub;
 
   @override
   Connection get connection => _connection;
