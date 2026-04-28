@@ -1,11 +1,14 @@
-import 'package:meta/meta.dart';
-
 import '../gatt_client/gatt.dart';
 import '../peer/server_id.dart';
 import '../shared/uuid.dart';
 import 'connection_state.dart';
+import 'value_objects/connection_parameters.dart';
 
 export 'connection_state.dart';
+export 'value_objects/connection_interval.dart';
+export 'value_objects/peripheral_latency.dart';
+export 'value_objects/supervision_timeout.dart';
+export 'value_objects/connection_parameters.dart' show ConnectionParameters;
 
 /// Bonding state of a device.
 ///
@@ -26,55 +29,6 @@ enum BondState {
   ///
   /// The bond persists across disconnections and app restarts.
   bonded,
-}
-
-/// BLE connection parameters.
-///
-/// These parameters control the timing and behavior of the connection,
-/// affecting latency, throughput, and power consumption.
-@immutable
-class ConnectionParameters {
-  /// Connection interval in milliseconds (7.5ms to 4000ms).
-  ///
-  /// The connection interval is the time between two connection events.
-  /// Smaller values provide lower latency but higher power consumption.
-  final double intervalMs;
-
-  /// Peripheral latency (0 to 499).
-  ///
-  /// The number of connection events the peripheral can skip if it has
-  /// no data to send. Higher values save power but increase latency for
-  /// peripheral-initiated communication.
-  final int latency;
-
-  /// Supervision timeout in milliseconds (100ms to 32000ms).
-  ///
-  /// The time after which the connection is considered lost if no valid
-  /// packets are received. Should be larger than (1 + latency) * intervalMs.
-  final int timeoutMs;
-
-  /// Creates connection parameters.
-  const ConnectionParameters({
-    required this.intervalMs,
-    required this.latency,
-    required this.timeoutMs,
-  });
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is ConnectionParameters &&
-        other.intervalMs == intervalMs &&
-        other.latency == latency &&
-        other.timeoutMs == timeoutMs;
-  }
-
-  @override
-  int get hashCode => Object.hash(intervalMs, latency, timeoutMs);
-
-  @override
-  String toString() =>
-      'ConnectionParameters(interval: ${intervalMs}ms, latency: $latency, timeout: ${timeoutMs}ms)';
 }
 
 /// BLE Physical Layer (PHY) options.

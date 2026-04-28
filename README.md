@@ -324,25 +324,25 @@ await connection.requestPhy(txPhy: Phy.leCoded, rxPhy: Phy.leCoded);
 ```dart
 // Check current connection parameters
 final params = connection.connectionParameters;
-print('Interval: ${params.intervalMs}ms');
-print('Latency: ${params.latency}');
-print('Timeout: ${params.timeoutMs}ms');
+print('Interval: ${params.interval.milliseconds}ms');
+print('Latency: ${params.latency.events}');
+print('Timeout: ${params.timeout.milliseconds}ms');
 
 // Request faster connection parameters (lower latency)
 await connection.requestConnectionParameters(
   ConnectionParameters(
-    intervalMs: 7.5,  // Minimum interval for low latency
-    latency: 0,       // No skipped events
-    timeoutMs: 4000,  // 4 second timeout
+    interval: ConnectionInterval(7.5),  // Minimum interval for low latency
+    latency: PeripheralLatency(0),      // No skipped events
+    timeout: SupervisionTimeout(4000),  // 4 second timeout
   ),
 );
 
 // Request power-saving parameters
 await connection.requestConnectionParameters(
   ConnectionParameters(
-    intervalMs: 100.0, // Longer interval saves power
-    latency: 4,        // Allow skipping 4 events
-    timeoutMs: 6000,   // Longer timeout
+    interval: ConnectionInterval(100), // Longer interval saves power
+    latency: PeripheralLatency(4),     // Allow skipping 4 events
+    timeout: SupervisionTimeout(6000), // Longer timeout
   ),
 );
 ```

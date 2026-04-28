@@ -120,9 +120,9 @@ void main() {
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // Defaults from BlueyConnection's initial state.
-      expect(conn.connectionParameters.intervalMs, 30.0);
-      expect(conn.connectionParameters.latency, 0);
-      expect(conn.connectionParameters.timeoutMs, 4000);
+      expect(conn.connectionParameters.interval.milliseconds, 30.0);
+      expect(conn.connectionParameters.latency.events, 0);
+      expect(conn.connectionParameters.timeout.milliseconds, 4000);
 
       await conn.disconnect();
       bluey.dispose();
@@ -156,7 +156,7 @@ void main() {
       expect(conn.bondState, BondState.none);
       expect(conn.txPhy, Phy.le1m);
       expect(conn.rxPhy, Phy.le1m);
-      expect(conn.connectionParameters.intervalMs, 30.0);
+      expect(conn.connectionParameters.interval.milliseconds, 30.0);
 
       await conn.disconnect();
       bluey.dispose();

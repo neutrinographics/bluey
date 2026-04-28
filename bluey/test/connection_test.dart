@@ -48,10 +48,10 @@ class MockConnection implements Connection {
     List<RemoteService>? services,
   }) : connectionParameters =
            connectionParameters ??
-           const ConnectionParameters(
-             intervalMs: 30.0,
-             latency: 0,
-             timeoutMs: 4000,
+           ConnectionParameters(
+             interval: ConnectionInterval(30),
+             latency: PeripheralLatency(0),
+             timeout: SupervisionTimeout(4000),
            ),
        _services = services ?? [];
 
@@ -391,23 +391,29 @@ void main() {
 
       test('connectionParameters has default values', () {
         final params = connection.connectionParameters;
-        expect(params.intervalMs, isA<double>());
-        expect(params.latency, isA<int>());
-        expect(params.timeoutMs, isA<int>());
+        expect(params.interval, isA<ConnectionInterval>());
+        expect(params.latency, isA<PeripheralLatency>());
+        expect(params.timeout, isA<SupervisionTimeout>());
       });
 
       test('requestConnectionParameters updates values', () async {
         final newParams = ConnectionParameters(
-          intervalMs: 15.0,
-          latency: 2,
-          timeoutMs: 5000,
+          interval: ConnectionInterval(15),
+          latency: PeripheralLatency(2),
+          timeout: SupervisionTimeout(5000),
         );
 
         await connection.requestConnectionParameters(newParams);
 
-        expect(connection.connectionParameters.intervalMs, equals(15.0));
-        expect(connection.connectionParameters.latency, equals(2));
-        expect(connection.connectionParameters.timeoutMs, equals(5000));
+        expect(
+          connection.connectionParameters.interval.milliseconds,
+          equals(15),
+        );
+        expect(connection.connectionParameters.latency.events, equals(2));
+        expect(
+          connection.connectionParameters.timeout.milliseconds,
+          equals(5000),
+        );
       });
     });
   });
@@ -418,44 +424,44 @@ void connectionParametersTests() {
   group('ConnectionParameters', () {
     test('can be created with values', () {
       final params = ConnectionParameters(
-        intervalMs: 7.5,
-        latency: 0,
-        timeoutMs: 4000,
+        interval: ConnectionInterval(7.5),
+        latency: PeripheralLatency(0),
+        timeout: SupervisionTimeout(4000),
       );
 
-      expect(params.intervalMs, equals(7.5));
-      expect(params.latency, equals(0));
-      expect(params.timeoutMs, equals(4000));
+      expect(params.interval.milliseconds, equals(7.5));
+      expect(params.latency.events, equals(0));
+      expect(params.timeout.milliseconds, equals(4000));
     });
 
     test('is immutable', () {
       final params = ConnectionParameters(
-        intervalMs: 15.0,
-        latency: 4,
-        timeoutMs: 6000,
+        interval: ConnectionInterval(15),
+        latency: PeripheralLatency(4),
+        timeout: SupervisionTimeout(6000),
       );
 
       // These should be final properties
-      expect(params.intervalMs, equals(15.0));
-      expect(params.latency, equals(4));
-      expect(params.timeoutMs, equals(6000));
+      expect(params.interval.milliseconds, equals(15));
+      expect(params.latency.events, equals(4));
+      expect(params.timeout.milliseconds, equals(6000));
     });
 
     test('equality based on values', () {
       final params1 = ConnectionParameters(
-        intervalMs: 15.0,
-        latency: 4,
-        timeoutMs: 6000,
+        interval: ConnectionInterval(15),
+        latency: PeripheralLatency(4),
+        timeout: SupervisionTimeout(6000),
       );
       final params2 = ConnectionParameters(
-        intervalMs: 15.0,
-        latency: 4,
-        timeoutMs: 6000,
+        interval: ConnectionInterval(15),
+        latency: PeripheralLatency(4),
+        timeout: SupervisionTimeout(6000),
       );
       final params3 = ConnectionParameters(
-        intervalMs: 30.0,
-        latency: 4,
-        timeoutMs: 6000,
+        interval: ConnectionInterval(30),
+        latency: PeripheralLatency(4),
+        timeout: SupervisionTimeout(6000),
       );
 
       expect(params1, equals(params2));

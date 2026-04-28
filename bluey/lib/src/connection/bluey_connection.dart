@@ -168,11 +168,14 @@ class BlueyConnection implements Connection {
   BondState _bondState = BondState.none;
   Phy _txPhy = Phy.le1m;
   Phy _rxPhy = Phy.le1m;
-  ConnectionParameters _connectionParameters = const ConnectionParameters(
-    intervalMs: 30.0, // Default 30ms interval
-    latency: 0,
-    timeoutMs: 4000, // Default 4s timeout
-  );
+  ConnectionParameters _connectionParameters = _defaultConnectionParameters();
+
+  static ConnectionParameters _defaultConnectionParameters() =>
+      ConnectionParameters(
+        interval: ConnectionInterval(30), // Default 30ms interval
+        latency: PeripheralLatency(0),
+        timeout: SupervisionTimeout(4000), // Default 4s timeout
+      );
 
   final StreamController<ConnectionState> _stateController =
       StreamController<ConnectionState>.broadcast();
@@ -554,9 +557,9 @@ class BlueyConnection implements Connection {
     await _platform.requestConnectionParameters(
       _connectionId,
       platform.PlatformConnectionParameters(
-        intervalMs: params.intervalMs,
-        latency: params.latency,
-        timeoutMs: params.timeoutMs,
+        intervalMs: params.interval.milliseconds,
+        latency: params.latency.events,
+        timeoutMs: params.timeout.milliseconds,
       ),
     );
     _connectionParameters = params;
@@ -705,9 +708,9 @@ class BlueyConnection implements Connection {
     platform.PlatformConnectionParameters params,
   ) {
     return ConnectionParameters(
-      intervalMs: params.intervalMs,
-      latency: params.latency,
-      timeoutMs: params.timeoutMs,
+      interval: ConnectionInterval(params.intervalMs),
+      latency: PeripheralLatency(params.latency),
+      timeout: SupervisionTimeout(params.timeoutMs),
     );
   }
 
