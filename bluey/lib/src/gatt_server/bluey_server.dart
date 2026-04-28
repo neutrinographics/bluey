@@ -8,6 +8,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../event_bus.dart';
 import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../log/bluey_logger.dart';
 import '../peer/server_id.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
@@ -19,6 +20,8 @@ import 'server.dart';
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
+  // ignore: unused_field
+  final BlueyLogger _logger;
   final ServerId _serverId;
   late final LifecycleServer _lifecycle;
   late final Future<platform.PlatformLocalService?> _controlServiceReady;
@@ -62,15 +65,18 @@ class BlueyServer implements Server {
   BlueyServer(
     this._platform,
     this._eventBus, {
+    required BlueyLogger logger,
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
     ServerId? identity,
-  }) : _serverId = identity ?? ServerId.generate() {
+  })  : _logger = logger,
+        _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
       interval: lifecycleInterval,
       serverId: _serverId,
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
+      logger: logger,
     );
     // Eagerly add the control service so it's available for incoming
     // connections even before startAdvertising() is called. A client may

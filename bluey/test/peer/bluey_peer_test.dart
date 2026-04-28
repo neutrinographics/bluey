@@ -7,6 +7,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -25,6 +26,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: id,
+        logger: testLogger(),
       );
       final peerConn = await peer.connect();
 
@@ -46,6 +48,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+        logger: testLogger(),
       );
 
       expect(
@@ -67,6 +70,7 @@ void main() {
           platformApi: fakePlatform,
           serverId: id,
           peerSilenceTimeout: const Duration(seconds: 8),
+          logger: testLogger(),
         );
 
         late PeerConnection peerConn;
@@ -103,6 +107,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: id,
+        logger: testLogger(),
       );
       expect(peer.serverId, equals(id));
     });
@@ -114,6 +119,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: id,
+        logger: testLogger(),
       );
 
       // Start first connect (will be in flight)

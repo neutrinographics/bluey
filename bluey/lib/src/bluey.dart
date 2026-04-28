@@ -365,6 +365,7 @@ class Bluey {
         platformInstance: _platform,
         connectionId: connectionId,
         deviceId: device.id,
+        logger: _logger,
       );
 
       dev.log(
@@ -511,6 +512,7 @@ class Bluey {
         onServerUnreachable: () {
           rawConnection.disconnect().catchError((_) {});
         },
+        logger: _logger,
       );
       lifecycleClient.start(allServices: services);
 
@@ -591,6 +593,7 @@ class Bluey {
       _eventBus,
       lifecycleInterval: lifecycleInterval,
       identity: identity,
+      logger: _logger,
     );
   }
 
@@ -612,6 +615,7 @@ class Bluey {
       platformApi: _platform,
       serverId: serverId,
       peerSilenceTimeout: peerSilenceTimeout,
+      logger: _logger,
     );
   }
 
@@ -625,12 +629,16 @@ class Bluey {
   Future<List<BlueyPeer>> discoverPeers({
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    final discovery = PeerDiscovery(platformApi: _platform);
+    final discovery = PeerDiscovery(
+      platformApi: _platform,
+      logger: _logger,
+    );
     final ids = await discovery.discover(timeout: timeout);
     return ids
         .map((id) => createBlueyPeer(
               platformApi: _platform,
               serverId: id,
+              logger: _logger,
             ))
         .toList(growable: false);
   }

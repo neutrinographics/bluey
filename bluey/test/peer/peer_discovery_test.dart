@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -17,7 +18,7 @@ void main() {
 
   group('PeerDiscovery.discover', () {
     test('returns empty when no Bluey servers advertising', () async {
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 200),
       );
@@ -30,7 +31,7 @@ void main() {
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id1);
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id2);
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );
@@ -42,7 +43,7 @@ void main() {
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id);
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );
@@ -55,7 +56,7 @@ void main() {
       final id = ServerId.generate();
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final connection = await discovery.connectTo(
         id,
         scanTimeout: const Duration(milliseconds: 500),
@@ -70,7 +71,7 @@ void main() {
 
     test('throws PeerNotFoundException when no match within timeout', () async {
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: ServerId.generate());
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final target = ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
 
       expect(
@@ -88,7 +89,7 @@ void main() {
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: wrongId);
       fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: target);
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final connection = await discovery.connectTo(
         target,
         scanTimeout: const Duration(milliseconds: 500),
@@ -169,7 +170,7 @@ void main() {
         characteristicValues: {},
       );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform);
+      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );

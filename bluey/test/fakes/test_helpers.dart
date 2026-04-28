@@ -1,7 +1,15 @@
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
+// ignore: implementation_imports
+import 'package:bluey/src/log/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+
+/// Returns a fresh [BlueyLogger] at the default level for tests that
+/// construct internal subsystems directly. Tests that don't care about
+/// logs use this; tests that do can construct their own logger and
+/// listen on `logger.events`.
+BlueyLogger testLogger() => BlueyLogger();
 
 /// Common UUIDs used in tests.
 class TestUuids {

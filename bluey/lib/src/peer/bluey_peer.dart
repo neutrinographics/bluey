@@ -7,6 +7,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../connection/bluey_connection.dart';
 import '../connection/lifecycle_client.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../log/bluey_logger.dart';
 import 'peer.dart';
 import 'peer_connection.dart';
 import 'peer_discovery.dart';
@@ -16,18 +17,21 @@ import 'server_id.dart';
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
   required ServerId serverId,
+  required BlueyLogger logger,
   Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
     serverId: serverId,
     peerSilenceTimeout: peerSilenceTimeout,
+    logger: logger,
   );
 }
 
 class _BlueyPeer implements BlueyPeer {
   final platform.BlueyPlatform _platform;
   final Duration _peerSilenceTimeout;
+  final BlueyLogger _logger;
 
   @override
   final ServerId serverId;
@@ -38,8 +42,10 @@ class _BlueyPeer implements BlueyPeer {
     required platform.BlueyPlatform platformApi,
     required this.serverId,
     required Duration peerSilenceTimeout,
+    required BlueyLogger logger,
   })  : _platform = platformApi,
-        _peerSilenceTimeout = peerSilenceTimeout;
+        _peerSilenceTimeout = peerSilenceTimeout,
+        _logger = logger;
 
   @override
   Future<PeerConnection> connect({
@@ -55,7 +61,10 @@ class _BlueyPeer implements BlueyPeer {
 
       dev.log('connect attempt: serverId=$serverId', name: 'bluey.peer');
 
-      final discovery = PeerDiscovery(platformApi: _platform);
+      final discovery = PeerDiscovery(
+        platformApi: _platform,
+        logger: _logger,
+      );
       final rawConnection = await discovery.connectTo(
         serverId,
         scanTimeout: effectiveScanTimeout,
@@ -77,6 +86,7 @@ class _BlueyPeer implements BlueyPeer {
         onServerUnreachable: () {
           blueyConnection.disconnect().catchError((_) {});
         },
+        logger: _logger,
       );
       lifecycleClient.start(allServices: allServices);
 

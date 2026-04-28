@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../log/bluey_logger.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -23,6 +24,8 @@ class LifecycleClient {
   final String _connectionId;
   final Duration _peerSilenceTimeout;
   final void Function() onServerUnreachable;
+  // ignore: unused_field
+  final BlueyLogger _logger;
 
   late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
@@ -50,9 +53,11 @@ class LifecycleClient {
     required String connectionId,
     required Duration peerSilenceTimeout,
     required this.onServerUnreachable,
+    required BlueyLogger logger,
   })  : _platform = platformApi,
         _connectionId = connectionId,
-        _peerSilenceTimeout = peerSilenceTimeout {
+        _peerSilenceTimeout = peerSilenceTimeout,
+        _logger = logger {
     _monitor = PeerSilenceMonitor(
       peerSilenceTimeout: peerSilenceTimeout,
       activityWindow: _defaultHeartbeatInterval,

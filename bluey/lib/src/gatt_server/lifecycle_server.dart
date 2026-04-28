@@ -4,6 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../lifecycle.dart' as lifecycle;
+import '../log/bluey_logger.dart';
 import '../peer/server_id.dart';
 
 /// Server-side lifecycle management.
@@ -17,6 +18,8 @@ class LifecycleServer {
   final ServerId _serverId;
   final void Function(String clientId) onClientGone;
   final void Function(String clientId)? onHeartbeatReceived;
+  // ignore: unused_field
+  final BlueyLogger _logger;
 
   bool _controlServiceAdded = false;
   final Map<String, _ClientLiveness> _clients = {};
@@ -26,10 +29,12 @@ class LifecycleServer {
     required Duration? interval,
     required ServerId serverId,
     required this.onClientGone,
+    required BlueyLogger logger,
     this.onHeartbeatReceived,
   })  : _platform = platformApi,
         _interval = interval,
-        _serverId = serverId;
+        _serverId = serverId,
+        _logger = logger;
 
   /// Whether lifecycle management is enabled (interval is non-null).
   bool get isEnabled => _interval != null;

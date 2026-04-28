@@ -82,6 +82,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
+        logger: testLogger(),
       )..debugStartForTest();
       return lc;
     }
@@ -255,6 +256,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
+        logger: testLogger(),
       )..debugStartForTest();
     }
 

@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
 import '../lifecycle.dart' as lifecycle;
+import '../log/bluey_logger.dart';
 import '../shared/device_id_coercion.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
@@ -19,10 +20,15 @@ import 'server_id.dart';
 /// public API.
 class PeerDiscovery {
   final platform.BlueyPlatform _platform;
+  // ignore: unused_field
+  final BlueyLogger _logger;
 
   /// Creates a [PeerDiscovery] backed by the given platform API.
-  PeerDiscovery({required platform.BlueyPlatform platformApi})
-      : _platform = platformApi;
+  PeerDiscovery({
+    required platform.BlueyPlatform platformApi,
+    required BlueyLogger logger,
+  })  : _platform = platformApi,
+        _logger = logger;
 
   /// Scans for Bluey servers, briefly connects to each to read its
   /// [ServerId], and returns a deduplicated list.
@@ -65,6 +71,7 @@ class PeerDiscovery {
             platformInstance: _platform,
             connectionId: address,
             deviceId: deviceIdToUuid(address),
+            logger: _logger,
           );
         }
         // Not a match — disconnect.

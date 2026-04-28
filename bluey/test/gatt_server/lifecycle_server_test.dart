@@ -8,6 +8,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 // Control service UUIDs (must match lifecycle.dart).
 const _heartbeatCharUuid = 'b1e70002-0000-1000-8000-00805f9b34fb';
@@ -66,6 +67,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: gone.add,
+        logger: testLogger(),
       );
 
       final req = _writeReq(
@@ -87,6 +89,7 @@ void main() {
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         final handled = server.handleWriteRequest(
@@ -113,6 +116,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: gone.add,
+        logger: testLogger(),
       );
 
       final handled = server.handleWriteRequest(
@@ -131,6 +135,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       server.handleWriteRequest(
@@ -159,6 +164,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       server.handleWriteRequest(
@@ -182,6 +188,7 @@ void main() {
         interval: const Duration(seconds: 15),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       final handled = server.handleReadRequest(
@@ -207,6 +214,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       final handled = server.handleReadRequest(
@@ -225,6 +233,7 @@ void main() {
         interval: null,
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       final handled = server.handleReadRequest(
@@ -248,6 +257,7 @@ void main() {
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         // Start a timer.
@@ -272,6 +282,7 @@ void main() {
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         // Start a timer via a heartbeat write.
@@ -297,6 +308,7 @@ void main() {
         serverId: ServerId.generate(),
         onClientGone: gone.add,
         onHeartbeatReceived: heartbeats.add,
+        logger: testLogger(),
       );
 
       server.handleWriteRequest(
@@ -319,6 +331,7 @@ void main() {
         serverId: ServerId.generate(),
         onClientGone: gone.add,
         onHeartbeatReceived: heartbeats.add,
+        logger: testLogger(),
       );
 
       server.handleWriteRequest(
@@ -341,6 +354,7 @@ void main() {
           interval: null,
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         final handled = server.handleWriteRequest(
@@ -364,6 +378,7 @@ void main() {
         interval: null,
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       await server.addControlServiceIfNeeded();
@@ -380,6 +395,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       await server.addControlServiceIfNeeded();
@@ -402,6 +418,7 @@ void main() {
         interval: const Duration(seconds: 5),
         serverId: id,
         onClientGone: (_) {},
+        logger: testLogger(),
       );
 
       final handled = server.handleReadRequest(PlatformReadRequest(
@@ -429,6 +446,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: (id) => events.add('gone:$id'),
+          logger: testLogger(),
         );
 
         const clientId = 'test-client';
@@ -471,6 +489,7 @@ void main() {
         interval: null,
         serverId: ServerId.generate(),
         onClientGone: (_) => fail('no client should expire'),
+        logger: testLogger(),
       );
 
       // Calling recordActivity when lifecycle is disabled should be safe
@@ -489,6 +508,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: (id) => events.add('gone:$id'),
+          logger: testLogger(),
         );
 
         // Client never sent a heartbeat — activity alone must not start
@@ -510,6 +530,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         // Track the client via a heartbeat write.
@@ -538,6 +559,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         server.handleWriteRequest(
@@ -572,6 +594,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         server.handleWriteRequest(
@@ -605,6 +628,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         server.handleWriteRequest(
@@ -635,6 +659,7 @@ void main() {
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
           onClientGone: gone.add,
+          logger: testLogger(),
         );
 
         // No prior heartbeat — client is untracked. requestStarted must

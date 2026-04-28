@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
+// ignore: implementation_imports
+import 'package:bluey/src/log/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
@@ -433,6 +435,7 @@ void main() {
         platformInstance: mockPlatform,
         connectionId: deviceId.toString(),
         deviceId: deviceId,
+        logger: BlueyLogger(),
       );
     });
 

@@ -9,6 +9,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 const _deviceAddress = 'AA:BB:CC:DD:EE:01';
 
@@ -48,6 +49,7 @@ Future<({
     connectionId: _deviceAddress,
     peerSilenceTimeout: peerSilenceTimeout,
     onServerUnreachable: onServerUnreachable,
+    logger: testLogger(),
   );
 
   return (
@@ -93,6 +95,7 @@ void main() {
         connectionId: _deviceAddress,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
+        logger: testLogger(),
       );
 
       client.start(allServices: List<RemoteService>.from(domainServices));
@@ -151,6 +154,7 @@ void main() {
           connectionId: _deviceAddress,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
+          logger: testLogger(),
         );
 
         client.start(allServices: List<RemoteService>.from(domainServices));
@@ -330,6 +334,7 @@ void main() {
           connectionId: _deviceAddress,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
+          logger: testLogger(),
         );
 
         client.start(allServices: List<RemoteService>.from(domainServices));
@@ -412,6 +417,7 @@ void main() {
             connectionId: _deviceAddress,
             peerSilenceTimeout: const Duration(seconds: 20),
             onServerUnreachable: () {},
+            logger: testLogger(),
           );
 
           client.start(
@@ -1426,6 +1432,7 @@ void main() {
         connectionId: _deviceAddress,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
+        logger: testLogger(),
       );
 
       client.start(

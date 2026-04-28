@@ -6,6 +6,7 @@ import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 /// Records calls made on the wrapped [Connection] so tests can assert
 /// delegation. Only stubs the methods the C.1 PeerConnection actually
@@ -90,7 +91,10 @@ class _SpyLifecycleClient extends LifecycleClient {
         connectionId: 'spy-connection-id',
         peerSilenceTimeout: const Duration(seconds: 30),
         onServerUnreachable: _noop,
+        logger: _spyLogger,
       );
+
+  static final _spyLogger = testLogger();
 
   /// Shared call-order log. The test passes the spy connection's `calls`
   /// list in so both collaborators record into the same buffer.

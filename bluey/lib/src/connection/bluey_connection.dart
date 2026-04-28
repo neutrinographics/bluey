@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
+import '../log/bluey_logger.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
@@ -154,6 +155,8 @@ Future<T> _loggedGattOp<T>({
 class BlueyConnection implements Connection {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
+  // ignore: unused_field
+  final BlueyLogger _logger;
 
   /// The platform-level connection identifier.
   ///
@@ -213,8 +216,10 @@ class BlueyConnection implements Connection {
     required platform.BlueyPlatform platformInstance,
     required String connectionId,
     required this.deviceId,
+    required BlueyLogger logger,
   }) : _platform = platformInstance,
-       _connectionId = connectionId {
+       _connectionId = connectionId,
+       _logger = logger {
     // Subscribe to platform connection state changes.
     //
     // The platform reports four states (connecting / connected /
