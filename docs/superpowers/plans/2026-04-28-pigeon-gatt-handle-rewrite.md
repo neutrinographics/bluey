@@ -256,7 +256,7 @@
 - New: `bluey/lib/src/connection/ios_connection_extensions.dart`
 - Modify: `bluey/lib/bluey.dart` (re-export both)
 
-- [ ] **B.1.1** — Write `AndroidConnectionExtensions` per spec (10 abstract members: bondState, bondStateChanges, bond, removeBond, txPhy, rxPhy, phyChanges, requestPhy, connectionParameters, requestConnectionParameters, requestConnectionPriority, refreshGattCache).
+- [ ] **B.1.1** — Write `AndroidConnectionExtensions` per spec. Declare exactly the 10 members that currently exist on the `Connection` interface: bondState, bondStateChanges, bond, removeBond, txPhy, rxPhy, phyChanges, requestPhy, connectionParameters, requestConnectionParameters. The spec's forward-looking `requestConnectionPriority` and `refreshGattCache` are NOT included — they don't exist on `Connection` today, and adding net-new API in a "relocate existing surface" task would be scope creep. They can be added later when their underlying platform plumbing lands (I033 et al).
 - [ ] **B.1.2** — Write `IosConnectionExtensions` (empty body, doc-comment "reserved for future iOS-specific features").
 - [ ] **B.1.3** — Re-export both from barrel.
 - [ ] **B.1.4** — Run `flutter analyze` → clean (no impl yet, just type declarations).
