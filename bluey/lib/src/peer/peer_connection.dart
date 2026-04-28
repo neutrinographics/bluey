@@ -42,21 +42,19 @@ abstract class PeerConnection {
 
   /// Service tree with the lifecycle control service hidden.
   ///
-  /// In C.1 this delegates directly to [Connection.services]; the
-  /// control-service filter is wired in C.3 via `PeerRemoteServiceView`.
+  /// The filter is applied via `PeerRemoteServiceView`; raw access
+  /// through [connection] returns the full tree (including the
+  /// lifecycle control service).
   Future<List<RemoteService>> services({bool cache = false});
 
   /// Lookup a service by UUID, scoped to the peer's user-facing tree
-  /// (excludes the lifecycle control service when C.3 lands).
-  ///
-  /// In C.1 this delegates directly to [Connection.service]; the
-  /// control-service filter is wired in C.3.
+  /// (excludes the lifecycle control service). Throws
+  /// `ServiceNotFoundException` for the lifecycle control service UUID.
   RemoteService service(UUID uuid);
 
   /// Whether the peer's user-facing tree contains the given service UUID.
-  ///
-  /// In C.1 this delegates directly to [Connection.hasService]; the
-  /// control-service filter is wired in C.3.
+  /// Returns `false` for the lifecycle control service even if the peer
+  /// hosts it.
   Future<bool> hasService(UUID uuid);
 
   /// Disconnect via the peer protocol.
