@@ -12,6 +12,7 @@ import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import 'connection.dart';
+import 'connection_parameters_mapper.dart';
 import 'lifecycle_client.dart';
 
 /// Runs a GATT op through the error-translation pipeline and routes
@@ -273,7 +274,7 @@ class BlueyConnection implements Connection {
 
     if (caps.canRequestConnectionParameters) {
       _platform.getConnectionParameters(_connectionId).then((params) {
-        _connectionParameters = _mapConnectionParameters(params);
+        _connectionParameters = connectionParametersFromPlatform(params);
       });
     }
 
@@ -556,11 +557,7 @@ class BlueyConnection implements Connection {
     _ensureConnected();
     await _platform.requestConnectionParameters(
       _connectionId,
-      platform.PlatformConnectionParameters(
-        intervalMs: params.interval.milliseconds,
-        latency: params.latency.events,
-        timeoutMs: params.timeout.milliseconds,
-      ),
+      connectionParametersToPlatform(params),
     );
     _connectionParameters = params;
   }
@@ -702,16 +699,6 @@ class BlueyConnection implements Connection {
       case Phy.leCoded:
         return platform.PlatformPhy.leCoded;
     }
-  }
-
-  ConnectionParameters _mapConnectionParameters(
-    platform.PlatformConnectionParameters params,
-  ) {
-    return ConnectionParameters(
-      interval: ConnectionInterval(params.intervalMs),
-      latency: PeripheralLatency(params.latency),
-      timeout: SupervisionTimeout(params.timeoutMs),
-    );
   }
 
   BlueyRemoteService _mapService(platform.PlatformService ps) {
