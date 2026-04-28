@@ -144,6 +144,15 @@ enum GattStatusDto {
   requestNotSupported,
 }
 
+/// Severity for a structured log event (DTO for platform channel).
+enum LogLevelDto {
+  trace,
+  debug,
+  info,
+  warn,
+  error,
+}
+
 /// Scan configuration (DTO for platform channel).
 class ScanConfigDto {
   ScanConfigDto({
@@ -1088,6 +1097,81 @@ class WriteRequestDto {
   int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
 }
 
+/// A structured log event emitted by the native platform implementation
+/// (DTO for platform channel).
+class LogEventDto {
+  LogEventDto({
+    required this.context,
+    required this.level,
+    required this.message,
+    required this.data,
+    this.errorCode,
+    required this.timestampMicros,
+  });
+
+  /// Coarse subsystem tag (e.g. `"connection"`, `"gatt_client"`).
+  String context;
+
+  /// Severity of the event.
+  LogLevelDto level;
+
+  /// Human-readable message.
+  String message;
+
+  /// Optional structured key/value context. Values are nullable to allow
+  /// callers to mix scalar types without forcing stringification at the
+  /// call site.
+  Map<String?, Object?> data;
+
+  /// Optional stable error code (e.g. `"GATT_133"`).
+  String? errorCode;
+
+  /// When the event was produced, as microseconds since Unix epoch.
+  int timestampMicros;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      context,
+      level,
+      message,
+      data,
+      errorCode,
+      timestampMicros,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static LogEventDto decode(Object result) {
+    result as List<Object?>;
+    return LogEventDto(
+      context: result[0]! as String,
+      level: result[1]! as LogLevelDto,
+      message: result[2]! as String,
+      data: (result[3]! as Map<Object?, Object?>).cast<String?, Object?>(),
+      errorCode: result[4] as String?,
+      timestampMicros: result[5]! as int,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! LogEventDto || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(context, other.context) && _deepEquals(level, other.level) && _deepEquals(message, other.message) && _deepEquals(data, other.data) && _deepEquals(errorCode, other.errorCode) && _deepEquals(timestampMicros, other.timestampMicros);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+}
+
 /// Configuration options for the Bluey plugin.
 /// Note: Most options are Android-specific and ignored on iOS.
 class BlueyConfigDto {
@@ -1181,59 +1265,65 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is GattStatusDto) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    }    else if (value is ScanConfigDto) {
+    }    else if (value is LogLevelDto) {
       buffer.putUint8(133);
-      writeValue(buffer, value.encode());
-    }    else if (value is ConnectConfigDto) {
+      writeValue(buffer, value.index);
+    }    else if (value is ScanConfigDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
-    }    else if (value is DeviceDto) {
+    }    else if (value is ConnectConfigDto) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
-    }    else if (value is ConnectionStateEventDto) {
+    }    else if (value is DeviceDto) {
       buffer.putUint8(136);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicPropertiesDto) {
+    }    else if (value is ConnectionStateEventDto) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    }    else if (value is DescriptorDto) {
+    }    else if (value is CharacteristicPropertiesDto) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicDto) {
+    }    else if (value is DescriptorDto) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    }    else if (value is ServiceDto) {
+    }    else if (value is CharacteristicDto) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    }    else if (value is NotificationEventDto) {
+    }    else if (value is ServiceDto) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    }    else if (value is MtuChangedEventDto) {
+    }    else if (value is NotificationEventDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalDescriptorDto) {
+    }    else if (value is MtuChangedEventDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalCharacteristicDto) {
+    }    else if (value is LocalDescriptorDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalServiceDto) {
+    }    else if (value is LocalCharacteristicDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    }    else if (value is AdvertiseConfigDto) {
+    }    else if (value is LocalServiceDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    }    else if (value is CentralDto) {
+    }    else if (value is AdvertiseConfigDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    }    else if (value is ReadRequestDto) {
+    }    else if (value is CentralDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    }    else if (value is WriteRequestDto) {
+    }    else if (value is ReadRequestDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    }    else if (value is BlueyConfigDto) {
+    }    else if (value is WriteRequestDto) {
       buffer.putUint8(150);
+      writeValue(buffer, value.encode());
+    }    else if (value is LogEventDto) {
+      buffer.putUint8(151);
+      writeValue(buffer, value.encode());
+    }    else if (value is BlueyConfigDto) {
+      buffer.putUint8(152);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1256,40 +1346,45 @@ class _PigeonCodec extends StandardMessageCodec {
         final value = readValue(buffer) as int?;
         return value == null ? null : GattStatusDto.values[value];
       case 133:
-        return ScanConfigDto.decode(readValue(buffer)!);
+        final value = readValue(buffer) as int?;
+        return value == null ? null : LogLevelDto.values[value];
       case 134:
-        return ConnectConfigDto.decode(readValue(buffer)!);
+        return ScanConfigDto.decode(readValue(buffer)!);
       case 135:
-        return DeviceDto.decode(readValue(buffer)!);
+        return ConnectConfigDto.decode(readValue(buffer)!);
       case 136:
-        return ConnectionStateEventDto.decode(readValue(buffer)!);
+        return DeviceDto.decode(readValue(buffer)!);
       case 137:
-        return CharacteristicPropertiesDto.decode(readValue(buffer)!);
+        return ConnectionStateEventDto.decode(readValue(buffer)!);
       case 138:
-        return DescriptorDto.decode(readValue(buffer)!);
+        return CharacteristicPropertiesDto.decode(readValue(buffer)!);
       case 139:
-        return CharacteristicDto.decode(readValue(buffer)!);
+        return DescriptorDto.decode(readValue(buffer)!);
       case 140:
-        return ServiceDto.decode(readValue(buffer)!);
+        return CharacteristicDto.decode(readValue(buffer)!);
       case 141:
-        return NotificationEventDto.decode(readValue(buffer)!);
+        return ServiceDto.decode(readValue(buffer)!);
       case 142:
-        return MtuChangedEventDto.decode(readValue(buffer)!);
+        return NotificationEventDto.decode(readValue(buffer)!);
       case 143:
-        return LocalDescriptorDto.decode(readValue(buffer)!);
+        return MtuChangedEventDto.decode(readValue(buffer)!);
       case 144:
-        return LocalCharacteristicDto.decode(readValue(buffer)!);
+        return LocalDescriptorDto.decode(readValue(buffer)!);
       case 145:
-        return LocalServiceDto.decode(readValue(buffer)!);
+        return LocalCharacteristicDto.decode(readValue(buffer)!);
       case 146:
-        return AdvertiseConfigDto.decode(readValue(buffer)!);
+        return LocalServiceDto.decode(readValue(buffer)!);
       case 147:
-        return CentralDto.decode(readValue(buffer)!);
+        return AdvertiseConfigDto.decode(readValue(buffer)!);
       case 148:
-        return ReadRequestDto.decode(readValue(buffer)!);
+        return CentralDto.decode(readValue(buffer)!);
       case 149:
-        return WriteRequestDto.decode(readValue(buffer)!);
+        return ReadRequestDto.decode(readValue(buffer)!);
       case 150:
+        return WriteRequestDto.decode(readValue(buffer)!);
+      case 151:
+        return LogEventDto.decode(readValue(buffer)!);
+      case 152:
         return BlueyConfigDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1819,6 +1914,28 @@ class BlueyHostApi {
     )
     ;
   }
+
+  /// Set the minimum severity level for native log events forwarded to Dart.
+  ///
+  /// Events strictly below [level] are dropped on the native side before
+  /// being marshalled across the platform channel.
+  Future<void> setLogLevel(LogLevelDto level) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.setLogLevel$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[level]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
+  }
 }
 
 /// Flutter API - called from platform to Dart.
@@ -1863,6 +1980,9 @@ abstract class BlueyFlutterApi {
 
   /// Remote device's GATT services changed (service added/removed on the server).
   void onServicesChanged(String deviceId);
+
+  /// A structured log event was emitted by the native platform.
+  void onLog(LogEventDto event);
 
   static void setUp(BlueyFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
@@ -2130,6 +2250,27 @@ abstract class BlueyFlutterApi {
           final String arg_deviceId = args[0]! as String;
           try {
             api.onServicesChanged(arg_deviceId);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onLog$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final LogEventDto arg_event = args[0]! as LogEventDto;
+          try {
+            api.onLog(arg_event);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

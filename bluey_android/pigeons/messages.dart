@@ -306,6 +306,42 @@ enum GattStatusDto {
   requestNotSupported,
 }
 
+/// Severity for a structured log event (DTO for platform channel).
+enum LogLevelDto { trace, debug, info, warn, error }
+
+/// A structured log event emitted by the native platform implementation
+/// (DTO for platform channel).
+class LogEventDto {
+  /// Coarse subsystem tag (e.g. `"connection"`, `"gatt_client"`).
+  final String context;
+
+  /// Severity of the event.
+  final LogLevelDto level;
+
+  /// Human-readable message.
+  final String message;
+
+  /// Optional structured key/value context. Values are nullable to allow
+  /// callers to mix scalar types without forcing stringification at the
+  /// call site.
+  final Map<String?, Object?> data;
+
+  /// Optional stable error code (e.g. `"GATT_133"`).
+  final String? errorCode;
+
+  /// When the event was produced, as microseconds since Unix epoch.
+  final int timestampMicros;
+
+  LogEventDto({
+    required this.context,
+    required this.level,
+    required this.message,
+    required this.data,
+    this.errorCode,
+    required this.timestampMicros,
+  });
+}
+
 /// Configuration options for the Bluey plugin.
 class BlueyConfigDto {
   /// Whether to automatically clean up BLE resources when the activity is destroyed.
@@ -491,6 +527,13 @@ abstract class BlueyHostApi {
   /// and properly terminate BLE connections.
   @async
   void closeServer();
+
+  /// Set the minimum severity level for native log events forwarded to Dart.
+  ///
+  /// Events strictly below [level] are dropped on the native side before
+  /// being marshalled across the platform channel.
+  @async
+  void setLogLevel(LogLevelDto level);
 }
 
 /// Flutter API - called from platform to Dart.
@@ -539,4 +582,7 @@ abstract class BlueyFlutterApi {
 
   /// Remote device's GATT services changed (service added/removed on the server).
   void onServicesChanged(String deviceId);
+
+  /// A structured log event was emitted by the native platform.
+  void onLog(LogEventDto event);
 }

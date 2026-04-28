@@ -215,6 +215,15 @@ enum GattStatusDto: Int {
   case requestNotSupported = 7
 }
 
+/// Severity for a structured log event (DTO for platform channel).
+enum LogLevelDto: Int {
+  case trace = 0
+  case debug = 1
+  case info = 2
+  case warn = 3
+  case error = 4
+}
+
 /// Scan configuration (DTO for platform channel).
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -1023,6 +1032,73 @@ struct WriteRequestDto: Hashable {
   }
 }
 
+/// A structured log event emitted by the native platform implementation
+/// (DTO for platform channel).
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct LogEventDto: Hashable {
+  /// Coarse subsystem tag (e.g. `"connection"`, `"gatt_client"`).
+  var context: String
+  /// Severity of the event.
+  var level: LogLevelDto
+  /// Human-readable message.
+  var message: String
+  /// Optional structured key/value context. Values are nullable to allow
+  /// callers to mix scalar types without forcing stringification at the
+  /// call site.
+  var data: [String?: Any?]
+  /// Optional stable error code (e.g. `"GATT_133"`).
+  var errorCode: String? = nil
+  /// When the event was produced, as microseconds since Unix epoch.
+  var timestampMicros: Int64
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> LogEventDto? {
+    let context = pigeonVar_list[0] as! String
+    let level = pigeonVar_list[1] as! LogLevelDto
+    let message = pigeonVar_list[2] as! String
+    let data = pigeonVar_list[3] as! [String?: Any?]
+    let errorCode: String? = nilOrValue(pigeonVar_list[4])
+    let timestampMicros = pigeonVar_list[5] as! Int64
+
+    return LogEventDto(
+      context: context,
+      level: level,
+      message: message,
+      data: data,
+      errorCode: errorCode,
+      timestampMicros: timestampMicros
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      context,
+      level,
+      message,
+      data,
+      errorCode,
+      timestampMicros,
+    ]
+  }
+  static func == (lhs: LogEventDto, rhs: LogEventDto) -> Bool {
+    if Swift.type(of: lhs) != Swift.type(of: rhs) {
+      return false
+    }
+    return deepEqualsMessages(lhs.context, rhs.context) && deepEqualsMessages(lhs.level, rhs.level) && deepEqualsMessages(lhs.message, rhs.message) && deepEqualsMessages(lhs.data, rhs.data) && deepEqualsMessages(lhs.errorCode, rhs.errorCode) && deepEqualsMessages(lhs.timestampMicros, rhs.timestampMicros)
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine("LogEventDto")
+    deepHashMessages(value: context, hasher: &hasher)
+    deepHashMessages(value: level, hasher: &hasher)
+    deepHashMessages(value: message, hasher: &hasher)
+    deepHashMessages(value: data, hasher: &hasher)
+    deepHashMessages(value: errorCode, hasher: &hasher)
+    deepHashMessages(value: timestampMicros, hasher: &hasher)
+  }
+}
+
 /// Configuration options for the Bluey plugin.
 /// Note: Most options are Android-specific and ignored on iOS.
 ///
@@ -1116,40 +1192,48 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
       }
       return nil
     case 133:
-      return ScanConfigDto.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return LogLevelDto(rawValue: enumResultAsInt)
+      }
+      return nil
     case 134:
-      return ConnectConfigDto.fromList(self.readValue() as! [Any?])
+      return ScanConfigDto.fromList(self.readValue() as! [Any?])
     case 135:
-      return DeviceDto.fromList(self.readValue() as! [Any?])
+      return ConnectConfigDto.fromList(self.readValue() as! [Any?])
     case 136:
-      return ConnectionStateEventDto.fromList(self.readValue() as! [Any?])
+      return DeviceDto.fromList(self.readValue() as! [Any?])
     case 137:
-      return CharacteristicPropertiesDto.fromList(self.readValue() as! [Any?])
+      return ConnectionStateEventDto.fromList(self.readValue() as! [Any?])
     case 138:
-      return DescriptorDto.fromList(self.readValue() as! [Any?])
+      return CharacteristicPropertiesDto.fromList(self.readValue() as! [Any?])
     case 139:
-      return CharacteristicDto.fromList(self.readValue() as! [Any?])
+      return DescriptorDto.fromList(self.readValue() as! [Any?])
     case 140:
-      return ServiceDto.fromList(self.readValue() as! [Any?])
+      return CharacteristicDto.fromList(self.readValue() as! [Any?])
     case 141:
-      return NotificationEventDto.fromList(self.readValue() as! [Any?])
+      return ServiceDto.fromList(self.readValue() as! [Any?])
     case 142:
-      return MtuChangedEventDto.fromList(self.readValue() as! [Any?])
+      return NotificationEventDto.fromList(self.readValue() as! [Any?])
     case 143:
-      return LocalDescriptorDto.fromList(self.readValue() as! [Any?])
+      return MtuChangedEventDto.fromList(self.readValue() as! [Any?])
     case 144:
-      return LocalCharacteristicDto.fromList(self.readValue() as! [Any?])
+      return LocalDescriptorDto.fromList(self.readValue() as! [Any?])
     case 145:
-      return LocalServiceDto.fromList(self.readValue() as! [Any?])
+      return LocalCharacteristicDto.fromList(self.readValue() as! [Any?])
     case 146:
-      return AdvertiseConfigDto.fromList(self.readValue() as! [Any?])
+      return LocalServiceDto.fromList(self.readValue() as! [Any?])
     case 147:
-      return CentralDto.fromList(self.readValue() as! [Any?])
+      return AdvertiseConfigDto.fromList(self.readValue() as! [Any?])
     case 148:
-      return ReadRequestDto.fromList(self.readValue() as! [Any?])
+      return CentralDto.fromList(self.readValue() as! [Any?])
     case 149:
-      return WriteRequestDto.fromList(self.readValue() as! [Any?])
+      return ReadRequestDto.fromList(self.readValue() as! [Any?])
     case 150:
+      return WriteRequestDto.fromList(self.readValue() as! [Any?])
+    case 151:
+      return LogEventDto.fromList(self.readValue() as! [Any?])
+    case 152:
       return BlueyConfigDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1171,59 +1255,65 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? GattStatusDto {
       super.writeByte(132)
       super.writeValue(value.rawValue)
-    } else if let value = value as? ScanConfigDto {
+    } else if let value = value as? LogLevelDto {
       super.writeByte(133)
-      super.writeValue(value.toList())
-    } else if let value = value as? ConnectConfigDto {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? ScanConfigDto {
       super.writeByte(134)
       super.writeValue(value.toList())
-    } else if let value = value as? DeviceDto {
+    } else if let value = value as? ConnectConfigDto {
       super.writeByte(135)
       super.writeValue(value.toList())
-    } else if let value = value as? ConnectionStateEventDto {
+    } else if let value = value as? DeviceDto {
       super.writeByte(136)
       super.writeValue(value.toList())
-    } else if let value = value as? CharacteristicPropertiesDto {
+    } else if let value = value as? ConnectionStateEventDto {
       super.writeByte(137)
       super.writeValue(value.toList())
-    } else if let value = value as? DescriptorDto {
+    } else if let value = value as? CharacteristicPropertiesDto {
       super.writeByte(138)
       super.writeValue(value.toList())
-    } else if let value = value as? CharacteristicDto {
+    } else if let value = value as? DescriptorDto {
       super.writeByte(139)
       super.writeValue(value.toList())
-    } else if let value = value as? ServiceDto {
+    } else if let value = value as? CharacteristicDto {
       super.writeByte(140)
       super.writeValue(value.toList())
-    } else if let value = value as? NotificationEventDto {
+    } else if let value = value as? ServiceDto {
       super.writeByte(141)
       super.writeValue(value.toList())
-    } else if let value = value as? MtuChangedEventDto {
+    } else if let value = value as? NotificationEventDto {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? LocalDescriptorDto {
+    } else if let value = value as? MtuChangedEventDto {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? LocalCharacteristicDto {
+    } else if let value = value as? LocalDescriptorDto {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? LocalServiceDto {
+    } else if let value = value as? LocalCharacteristicDto {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? AdvertiseConfigDto {
+    } else if let value = value as? LocalServiceDto {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? CentralDto {
+    } else if let value = value as? AdvertiseConfigDto {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? ReadRequestDto {
+    } else if let value = value as? CentralDto {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? WriteRequestDto {
+    } else if let value = value as? ReadRequestDto {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? BlueyConfigDto {
+    } else if let value = value as? WriteRequestDto {
       super.writeByte(150)
+      super.writeValue(value.toList())
+    } else if let value = value as? LogEventDto {
+      super.writeByte(151)
+      super.writeValue(value.toList())
+    } else if let value = value as? BlueyConfigDto {
+      super.writeByte(152)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1308,6 +1398,11 @@ protocol BlueyHostApi {
   func disconnectCentral(centralId: String, completion: @escaping (Result<Void, Error>) -> Void)
   /// Close the GATT server and disconnect all centrals.
   func closeServer(completion: @escaping (Result<Void, Error>) -> Void)
+  /// Set the minimum severity level for native log events forwarded to Dart.
+  ///
+  /// Events strictly below [level] are dropped on the native side before
+  /// being marshalled across the platform channel.
+  func setLogLevel(level: LogLevelDto, completion: @escaping (Result<Void, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1795,6 +1890,27 @@ class BlueyHostApiSetup {
     } else {
       closeServerChannel.setMessageHandler(nil)
     }
+    /// Set the minimum severity level for native log events forwarded to Dart.
+    ///
+    /// Events strictly below [level] are dropped on the native side before
+    /// being marshalled across the platform channel.
+    let setLogLevelChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.setLogLevel\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      setLogLevelChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let levelArg = args[0] as! LogLevelDto
+        api.setLogLevel(level: levelArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      setLogLevelChannel.setMessageHandler(nil)
+    }
   }
 }
 /// Flutter API - called from platform to Dart.
@@ -1827,6 +1943,8 @@ protocol BlueyFlutterApiProtocol {
   func onCharacteristicUnsubscribed(centralId centralIdArg: String, characteristicUuid characteristicUuidArg: String, completion: @escaping (Result<Void, PigeonError>) -> Void)
   /// Remote device's GATT services changed (service added/removed on the server).
   func onServicesChanged(deviceId deviceIdArg: String, completion: @escaping (Result<Void, PigeonError>) -> Void)
+  /// A structured log event was emitted by the native platform.
+  func onLog(event eventArg: LogEventDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
 }
 class BlueyFlutterApi: BlueyFlutterApiProtocol {
   private let binaryMessenger: FlutterBinaryMessenger
@@ -2071,6 +2189,25 @@ class BlueyFlutterApi: BlueyFlutterApiProtocol {
     let channelName: String = "dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onServicesChanged\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([deviceIdArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(()))
+      }
+    }
+  }
+  /// A structured log event was emitted by the native platform.
+  func onLog(event eventArg: LogEventDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onLog\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([eventArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
         completion(.failure(createConnectionError(withChannelName: channelName)))
         return

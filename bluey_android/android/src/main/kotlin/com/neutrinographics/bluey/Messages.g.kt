@@ -287,6 +287,21 @@ enum class GattStatusDto(val raw: Int) {
   }
 }
 
+/** Severity for a structured log event (DTO for platform channel). */
+enum class LogLevelDto(val raw: Int) {
+  TRACE(0),
+  DEBUG(1),
+  INFO(2),
+  WARN(3),
+  ERROR(4);
+
+  companion object {
+    fun ofRaw(raw: Int): LogLevelDto? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /**
  * Scan configuration (DTO for platform channel).
  *
@@ -1144,6 +1159,75 @@ data class WriteRequestDto (
 }
 
 /**
+ * A structured log event emitted by the native platform implementation
+ * (DTO for platform channel).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LogEventDto (
+  /** Coarse subsystem tag (e.g. `"connection"`, `"gatt_client"`). */
+  val context: String,
+  /** Severity of the event. */
+  val level: LogLevelDto,
+  /** Human-readable message. */
+  val message: String,
+  /**
+   * Optional structured key/value context. Values are nullable to allow
+   * callers to mix scalar types without forcing stringification at the
+   * call site.
+   */
+  val data: Map<String?, Any?>,
+  /** Optional stable error code (e.g. `"GATT_133"`). */
+  val errorCode: String? = null,
+  /** When the event was produced, as microseconds since Unix epoch. */
+  val timestampMicros: Long
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LogEventDto {
+      val context = pigeonVar_list[0] as String
+      val level = pigeonVar_list[1] as LogLevelDto
+      val message = pigeonVar_list[2] as String
+      val data = pigeonVar_list[3] as Map<String?, Any?>
+      val errorCode = pigeonVar_list[4] as String?
+      val timestampMicros = pigeonVar_list[5] as Long
+      return LogEventDto(context, level, message, data, errorCode, timestampMicros)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      context,
+      level,
+      message,
+      data,
+      errorCode,
+      timestampMicros,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as LogEventDto
+    return MessagesPigeonUtils.deepEquals(this.context, other.context) && MessagesPigeonUtils.deepEquals(this.level, other.level) && MessagesPigeonUtils.deepEquals(this.message, other.message) && MessagesPigeonUtils.deepEquals(this.data, other.data) && MessagesPigeonUtils.deepEquals(this.errorCode, other.errorCode) && MessagesPigeonUtils.deepEquals(this.timestampMicros, other.timestampMicros)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.context)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.level)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.message)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.data)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.errorCode)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.timestampMicros)
+    return result
+  }
+}
+
+/**
  * Configuration options for the Bluey plugin.
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -1248,91 +1332,101 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         }
       }
       134.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          ScanConfigDto.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          LogLevelDto.ofRaw(it.toInt())
         }
       }
       135.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectConfigDto.fromList(it)
+          ScanConfigDto.fromList(it)
         }
       }
       136.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DeviceDto.fromList(it)
+          ConnectConfigDto.fromList(it)
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ConnectionStateEventDto.fromList(it)
+          DeviceDto.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicPropertiesDto.fromList(it)
+          ConnectionStateEventDto.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DescriptorDto.fromList(it)
+          CharacteristicPropertiesDto.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CharacteristicDto.fromList(it)
+          DescriptorDto.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ServiceDto.fromList(it)
+          CharacteristicDto.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          NotificationEventDto.fromList(it)
+          ServiceDto.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MtuChangedEventDto.fromList(it)
+          NotificationEventDto.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalDescriptorDto.fromList(it)
+          MtuChangedEventDto.fromList(it)
         }
       }
       145.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalCharacteristicDto.fromList(it)
+          LocalDescriptorDto.fromList(it)
         }
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          LocalServiceDto.fromList(it)
+          LocalCharacteristicDto.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AdvertiseConfigDto.fromList(it)
+          LocalServiceDto.fromList(it)
         }
       }
       148.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          CentralDto.fromList(it)
+          AdvertiseConfigDto.fromList(it)
         }
       }
       149.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          ReadRequestDto.fromList(it)
+          CentralDto.fromList(it)
         }
       }
       150.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WriteRequestDto.fromList(it)
+          ReadRequestDto.fromList(it)
         }
       }
       151.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WriteRequestDto.fromList(it)
+        }
+      }
+      152.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          LogEventDto.fromList(it)
+        }
+      }
+      153.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           BlueyConfigDto.fromList(it)
         }
@@ -1362,76 +1456,84 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(133)
         writeValue(stream, value.raw.toLong())
       }
-      is ScanConfigDto -> {
+      is LogLevelDto -> {
         stream.write(134)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw.toLong())
       }
-      is ConnectConfigDto -> {
+      is ScanConfigDto -> {
         stream.write(135)
         writeValue(stream, value.toList())
       }
-      is DeviceDto -> {
+      is ConnectConfigDto -> {
         stream.write(136)
         writeValue(stream, value.toList())
       }
-      is ConnectionStateEventDto -> {
+      is DeviceDto -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is CharacteristicPropertiesDto -> {
+      is ConnectionStateEventDto -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is DescriptorDto -> {
+      is CharacteristicPropertiesDto -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is CharacteristicDto -> {
+      is DescriptorDto -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is ServiceDto -> {
+      is CharacteristicDto -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is NotificationEventDto -> {
+      is ServiceDto -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is MtuChangedEventDto -> {
+      is NotificationEventDto -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is LocalDescriptorDto -> {
+      is MtuChangedEventDto -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is LocalCharacteristicDto -> {
+      is LocalDescriptorDto -> {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is LocalServiceDto -> {
+      is LocalCharacteristicDto -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is AdvertiseConfigDto -> {
+      is LocalServiceDto -> {
         stream.write(147)
         writeValue(stream, value.toList())
       }
-      is CentralDto -> {
+      is AdvertiseConfigDto -> {
         stream.write(148)
         writeValue(stream, value.toList())
       }
-      is ReadRequestDto -> {
+      is CentralDto -> {
         stream.write(149)
         writeValue(stream, value.toList())
       }
-      is WriteRequestDto -> {
+      is ReadRequestDto -> {
         stream.write(150)
         writeValue(stream, value.toList())
       }
-      is BlueyConfigDto -> {
+      is WriteRequestDto -> {
         stream.write(151)
+        writeValue(stream, value.toList())
+      }
+      is LogEventDto -> {
+        stream.write(152)
+        writeValue(stream, value.toList())
+      }
+      is BlueyConfigDto -> {
+        stream.write(153)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1533,6 +1635,13 @@ interface BlueyHostApi {
    * and properly terminate BLE connections.
    */
   fun closeServer(callback: (Result<Unit>) -> Unit)
+  /**
+   * Set the minimum severity level for native log events forwarded to Dart.
+   *
+   * Events strictly below [level] are dropped on the native side before
+   * being marshalled across the platform channel.
+   */
+  fun setLogLevel(level: LogLevelDto, callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by BlueyHostApi. */
@@ -2071,6 +2180,25 @@ interface BlueyHostApi {
           channel.setMessageHandler(null)
         }
       }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.setLogLevel$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val levelArg = args[0] as LogLevelDto
+            api.setLogLevel(levelArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(MessagesPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
     }
   }
 }
@@ -2309,6 +2437,24 @@ class BlueyFlutterApi(private val binaryMessenger: BinaryMessenger, private val 
     val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onServicesChanged$separatedMessageChannelSuffix"
     val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
     channel.send(listOf(deviceIdArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(MessagesPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** A structured log event was emitted by the native platform. */
+  fun onLog(eventArg: LogEventDto, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onLog$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(eventArg)) {
       if (it is List<*>) {
         if (it.size > 1) {
           callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
