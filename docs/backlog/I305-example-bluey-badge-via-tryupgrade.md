@@ -4,7 +4,8 @@ title: Re-introduce BLUEY badge in example app's connection screen via `bluey.tr
 category: limitation
 severity: low
 platform: domain
-status: open
+status: fixed
+fixed_in: d29fe75
 last_verified: 2026-04-28
 related: [I300]
 ---
@@ -42,3 +43,8 @@ If the device is known to be a peer (e.g. from a peer-discovery scan), use `blue
 **Recommendation:** Option A. It mirrors the pre-rewrite UX (auto-detect peerness post-connect) without forcing the example app to discriminate between the two flows at connect time. Adds ~10 lines to the cubit.
 
 Cost-benefit: minor UX polish in the example app. Not blocking. Best done during Phase E doc/example cleanup or as a one-shot follow-up.
+
+## Resolution
+
+Fixed in `d29fe75` via Option A — opportunistic `bluey.tryUpgrade(connection)` in `ConnectionCubit.connect()`. The cubit's state gained a `PeerConnection? peer` field; the BLUEY badge renders when `state.isBlueyPeer`. The `PeerConnection`'s internal `LifecycleClient` starts heartbeats automatically on upgrade.
+

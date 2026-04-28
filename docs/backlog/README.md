@@ -210,7 +210,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
 | [I303](I303-capabilities-platform-kind-flag.md) | iOS-detection heuristic on `Connection.ios` should be a precise capability flag | low |
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
-| [I305](I305-example-bluey-badge-via-tryupgrade.md) | Example app lost its BLUEY badge after C.6; re-introduce via `bluey.tryUpgrade` | low |
 
 ### Fixed — verified in HEAD
 
@@ -230,6 +229,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I057](I057-mac-to-uuid-coercion-duplicated.md) | MAC-to-UUID coercion duplicated; extracted `deviceIdToUuid` helper | `510278e` |
 | [I067](I067-connection-state-linked-vs-ready.md) | `ConnectionState.connected` split into `linked` + `ready` (breaking) | `8b02ccf` |
 | [I100](I100-pending-callbacks-not-cleaned-on-disconnect.md) | Pending callbacks not cleaned on disconnect | `8d210c3` (Phase 2a) |
+| [I305](I305-example-bluey-badge-via-tryupgrade.md) | Example app lost its BLUEY badge after C.6; re-introduced via `bluey.tryUpgrade` | `d29fe75` |
 | [I101](I101-android-pending-callback-collision.md) | Android pending callback collision | `8d210c3` (Phase 2a) |
 | [I102](I102-connection-timeout-not-cancelled.md) | Connection timeout not cancelled on success | Phase 2a |
 | [I103](I103-scan-timeout-double-emit.md) | Scan timeout fires after manual stop | Scanner refactor |
