@@ -15,14 +15,14 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   bluey_platform_interface:
     dependency: transitive
     description:
       path: "../../bluey_platform_interface"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   boolean_selector:
     dependency: transitive
     description:

@@ -1,6 +1,6 @@
 name: bluey_platform_interface
 description: Platform interface for Bluey - defines the contract that platform implementations must follow
-version: 0.2.0
+version: 0.3.0
 publish_to: none
 
 environment:
