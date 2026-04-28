@@ -107,6 +107,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
         uuid: UUID(TestUuids.customChar1),
+        handle: AttributeHandle(1),
         properties: const CharacteristicProperties(
           canRead: false,
           canWrite: true,
@@ -149,6 +150,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
         uuid: UUID(TestUuids.customChar1),
+        handle: AttributeHandle(1),
         properties: const CharacteristicProperties(
           canRead: true,
           canWrite: false,
@@ -188,6 +190,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
         uuid: UUID(TestUuids.customChar1),
+        handle: AttributeHandle(1),
         properties: const CharacteristicProperties(
           canRead: false,
           canWrite: true,
@@ -217,6 +220,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
         uuid: UUID(TestUuids.customChar1),
+        handle: AttributeHandle(1),
         properties: const CharacteristicProperties(
           canRead: false,
           canWrite: true,
@@ -342,6 +346,7 @@ void main() {
         connectionId: TestDeviceIds.device1,
         deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
         uuid: UUID(TestUuids.customChar1),
+        handle: AttributeHandle(1),
         properties: const CharacteristicProperties(
           canRead: false,
           canWrite: true,

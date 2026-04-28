@@ -101,7 +101,34 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<List<platform.PlatformService>> discoverServices(
     String deviceId,
   ) async {
-    return mockServices;
+    return mockServices.map(_withMintedHandles).toList();
+  }
+
+  // Per-mock monotonic counter shared by chars + descs. Tests pass
+  // PlatformCharacteristic / PlatformDescriptor without handles for
+  // brevity; we mint them here so [BlueyConnection._mapCharacteristic]
+  // doesn't trip its non-null assertion.
+  int _nextHandle = 0;
+
+  platform.PlatformService _withMintedHandles(platform.PlatformService s) {
+    return platform.PlatformService(
+      uuid: s.uuid,
+      isPrimary: s.isPrimary,
+      characteristics: s.characteristics.map((c) {
+        return platform.PlatformCharacteristic(
+          uuid: c.uuid,
+          properties: c.properties,
+          descriptors: c.descriptors
+              .map((d) => platform.PlatformDescriptor(
+                    uuid: d.uuid,
+                    handle: d.handle ?? ++_nextHandle,
+                  ))
+              .toList(),
+          handle: c.handle ?? ++_nextHandle,
+        );
+      }).toList(),
+      includedServices: s.includedServices.map(_withMintedHandles).toList(),
+    );
   }
 
   @override

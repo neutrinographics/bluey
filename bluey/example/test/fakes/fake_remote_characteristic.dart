@@ -9,6 +9,8 @@ class FakeRemoteCharacteristic implements RemoteCharacteristic {
   @override
   final UUID uuid;
   @override
+  final AttributeHandle handle;
+  @override
   final CharacteristicProperties properties;
 
   /// Called for each write. Default: succeed with no side effects.
@@ -23,13 +25,14 @@ class FakeRemoteCharacteristic implements RemoteCharacteristic {
 
   FakeRemoteCharacteristic({
     required this.uuid,
+    AttributeHandle? handle,
     this.properties = const CharacteristicProperties(
       canRead: true,
       canWrite: true,
       canWriteWithoutResponse: true,
       canNotify: true,
     ),
-  });
+  }) : handle = handle ?? AttributeHandle(1);
 
   /// Inject a notification to subscribers.
   void emitNotification(Uint8List value) => _notif.add(value);

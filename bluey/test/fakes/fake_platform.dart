@@ -57,6 +57,26 @@ final class FakeBlueyPlatform extends BlueyPlatform {
   // === Connected Devices (as central) ===
   final Map<String, _ConnectedDevice> _connections = {};
 
+  // === Minted attribute handles ===
+  //
+  // The fake mirrors the iOS approach: a per-device monotonic counter
+  // starting at 1, drawn from a single pool shared by characteristics
+  // and descriptors. Handles are minted lazily on the first
+  // [discoverServices] call for a device and reused on later calls so
+  // they remain stable for the lifetime of the simulated connection.
+  // Cleared on [disconnect] / [simulateServiceChange] so a fresh
+  // discovery mints fresh handles, matching real-platform behaviour.
+  final Map<String, int> _nextHandle = {};
+  final Map<String, Map<String, int>> _charHandles = {};
+  final Map<String, Map<String, int>> _descriptorHandles = {};
+
+  /// Returns the minted handle for [characteristicUuid] on [deviceId],
+  /// or null if no discovery has happened yet (or the characteristic is
+  /// not present in the simulated peripheral). Test-only helper for
+  /// assertions that want to compare against the platform-side handle.
+  int? handleFor(String deviceId, String characteristicUuid) =>
+      _charHandles[deviceId]?[characteristicUuid.toLowerCase()];
+
   // === Server State (as peripheral) ===
   final List<PlatformLocalService> _localServices = [];
   bool _isAdvertising = false;
@@ -439,6 +459,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       _connections.remove(deviceId);
       connection.stateController.add(PlatformConnectionState.disconnected);
     }
+    _clearHandles(deviceId);
   }
 
   /// Simulates a notification from a connected peripheral.
@@ -488,6 +509,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
         }
       }
     }
+    _clearHandles(deviceId);
     _serviceChangesController.add(deviceId);
   }
 
@@ -606,6 +628,7 @@ final class FakeBlueyPlatform extends BlueyPlatform {
       _connectionStateControllers.remove(deviceId);
       _notificationControllers.remove(deviceId);
     }
+    _clearHandles(deviceId);
   }
 
   @override
@@ -620,7 +643,65 @@ final class FakeBlueyPlatform extends BlueyPlatform {
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
     }
-    return connection.peripheral.services;
+    return connection.peripheral.services
+        .map((s) => _withHandles(deviceId, s))
+        .toList();
+  }
+
+  PlatformService _withHandles(String deviceId, PlatformService service) {
+    return PlatformService(
+      uuid: service.uuid,
+      isPrimary: service.isPrimary,
+      characteristics: service.characteristics
+          .map((c) => _characteristicWithHandle(deviceId, c))
+          .toList(),
+      includedServices: service.includedServices
+          .map((s) => _withHandles(deviceId, s))
+          .toList(),
+    );
+  }
+
+  PlatformCharacteristic _characteristicWithHandle(
+    String deviceId,
+    PlatformCharacteristic c,
+  ) {
+    final charKey = c.uuid.toLowerCase();
+    final charHandles = _charHandles.putIfAbsent(deviceId, () => {});
+    final handle = charHandles.putIfAbsent(charKey, () => _mintHandle(deviceId));
+    return PlatformCharacteristic(
+      uuid: c.uuid,
+      properties: c.properties,
+      descriptors: c.descriptors
+          .map((d) => _descriptorWithHandle(deviceId, charKey, d))
+          .toList(),
+      handle: handle,
+    );
+  }
+
+  PlatformDescriptor _descriptorWithHandle(
+    String deviceId,
+    String charKey,
+    PlatformDescriptor d,
+  ) {
+    // Descriptor handles are minted per (device, char, desc) so the same
+    // descriptor UUID under two different characteristics gets distinct
+    // handles. The reverse-lookup map is keyed by `$charKey/$descUuid`.
+    final perDevice = _descriptorHandles.putIfAbsent(deviceId, () => {});
+    final key = '$charKey/${d.uuid.toLowerCase()}';
+    final handle = perDevice.putIfAbsent(key, () => _mintHandle(deviceId));
+    return PlatformDescriptor(uuid: d.uuid, handle: handle);
+  }
+
+  int _mintHandle(String deviceId) {
+    final next = (_nextHandle[deviceId] ?? 0) + 1;
+    _nextHandle[deviceId] = next;
+    return next;
+  }
+
+  void _clearHandles(String deviceId) {
+    _nextHandle.remove(deviceId);
+    _charHandles.remove(deviceId);
+    _descriptorHandles.remove(deviceId);
   }
 
   @override

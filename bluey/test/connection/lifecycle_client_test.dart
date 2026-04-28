@@ -1809,6 +1809,9 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
   UUID get uuid => UUID(_pc.uuid);
 
   @override
+  AttributeHandle get handle => AttributeHandle(_pc.handle ?? 1);
+
+  @override
   CharacteristicProperties get properties => CharacteristicProperties(
         canRead: _pc.properties.canRead,
         canWrite: _pc.properties.canWrite,

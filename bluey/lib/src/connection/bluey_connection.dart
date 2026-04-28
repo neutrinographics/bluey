@@ -14,6 +14,7 @@ import 'connection.dart';
 import 'connection_parameters_mapper.dart';
 import 'ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
+import 'value_objects/attribute_handle.dart';
 
 /// Runs a GATT op through the error-translation pipeline and routes
 /// lifecycle signals into [lifecycleClient]. Used by every public GATT
@@ -590,11 +591,20 @@ class BlueyConnection implements Connection {
     // Characteristics are constructed without a lifecycleClient — the
     // getter remains on `BlueyRemoteCharacteristic` for tests / future
     // consumers that wire activity feedback externally.
+    final platformHandle = pc.handle;
+    if (platformHandle == null) {
+      throw StateError(
+        'BlueyRemoteCharacteristic constructed without a handle. '
+        'This indicates a Bluey internal bug or stale platform implementation '
+        'that has not been updated to emit handles in CharacteristicDto.',
+      );
+    }
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pc.uuid),
+      handle: AttributeHandle(platformHandle),
       properties: CharacteristicProperties(
         canRead: pc.properties.canRead,
         canWrite: pc.properties.canWrite,
@@ -608,11 +618,20 @@ class BlueyConnection implements Connection {
   }
 
   BlueyRemoteDescriptor _mapDescriptor(platform.PlatformDescriptor pd) {
+    final platformHandle = pd.handle;
+    if (platformHandle == null) {
+      throw StateError(
+        'BlueyRemoteDescriptor constructed without a handle. '
+        'This indicates a Bluey internal bug or stale platform implementation '
+        'that has not been updated to emit handles in DescriptorDto.',
+      );
+    }
     return BlueyRemoteDescriptor(
       platform: _platform,
       connectionId: _connectionId,
       deviceId: deviceId,
       uuid: UUID(pd.uuid),
+      handle: AttributeHandle(platformHandle),
       ensureConnected: _ensureConnected,
     );
   }
@@ -682,6 +701,9 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final UUID uuid;
 
   @override
+  final AttributeHandle handle;
+
+  @override
   final CharacteristicProperties properties;
 
   @override
@@ -707,6 +729,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
+    required this.handle,
     required this.properties,
     required this.descriptors,
     LifecycleClient? Function()? lifecycleClient,
@@ -867,6 +890,9 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   @override
   final UUID uuid;
 
+  @override
+  final AttributeHandle handle;
+
   /// [lifecycleClient] is a getter rather than a value: descriptors are
   /// constructed during service discovery, before the connection
   /// upgrades to the Bluey lifecycle protocol. See
@@ -880,6 +906,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     required String connectionId,
     required UUID deviceId,
     required this.uuid,
+    required this.handle,
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
   }) : _platform = platform,

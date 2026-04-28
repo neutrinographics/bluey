@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../connection/value_objects/attribute_handle.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/uuid.dart';
 
@@ -33,6 +34,14 @@ abstract class RemoteDescriptor {
   /// The UUID of this descriptor.
   UUID get uuid;
 
+  /// The wire-level GATT handle for this descriptor.
+  ///
+  /// Stable for the lifetime of the owning [Connection]; invalidated only
+  /// when the peer signals Service Changed (Android) or
+  /// `didModifyServices` (iOS), at which point a fresh discovery mints
+  /// new handles.
+  AttributeHandle get handle;
+
   /// Read the current value of the descriptor.
   ///
   /// Throws [GattException] if the read fails.
@@ -52,6 +61,14 @@ abstract class RemoteDescriptor {
 abstract class RemoteCharacteristic {
   /// The UUID of this characteristic.
   UUID get uuid;
+
+  /// The wire-level GATT handle for this characteristic.
+  ///
+  /// Stable for the lifetime of the owning [Connection]; invalidated only
+  /// when the peer signals Service Changed (Android) or
+  /// `didModifyServices` (iOS), at which point a fresh discovery mints
+  /// new handles.
+  AttributeHandle get handle;
 
   /// The properties of this characteristic.
   ///

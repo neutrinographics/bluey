@@ -7,9 +7,13 @@ class MockRemoteDescriptor implements RemoteDescriptor {
   @override
   final UUID uuid;
 
+  @override
+  final AttributeHandle handle;
+
   Uint8List _value = Uint8List(0);
 
-  MockRemoteDescriptor(this.uuid);
+  MockRemoteDescriptor(this.uuid, {AttributeHandle? handle})
+      : handle = handle ?? AttributeHandle(1);
 
   @override
   Future<Uint8List> read() async => _value;
@@ -25,6 +29,9 @@ class MockRemoteCharacteristic implements RemoteCharacteristic {
   final UUID uuid;
 
   @override
+  final AttributeHandle handle;
+
+  @override
   final CharacteristicProperties properties;
 
   @override
@@ -36,7 +43,8 @@ class MockRemoteCharacteristic implements RemoteCharacteristic {
     required this.uuid,
     required this.properties,
     this.descriptors = const [],
-  });
+    AttributeHandle? handle,
+  }) : handle = handle ?? AttributeHandle(1);
 
   @override
   Future<Uint8List> read() async {
