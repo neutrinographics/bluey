@@ -3,9 +3,11 @@ import '../peer/server_id.dart';
 import '../shared/uuid.dart';
 import 'connection_state.dart';
 import 'value_objects/connection_parameters.dart';
+import 'value_objects/mtu.dart';
 
 export 'connection_state.dart';
 export 'value_objects/connection_interval.dart';
+export 'value_objects/mtu.dart';
 export 'value_objects/peripheral_latency.dart';
 export 'value_objects/supervision_timeout.dart';
 export 'value_objects/connection_parameters.dart' show ConnectionParameters;
@@ -113,8 +115,10 @@ abstract class Connection {
   /// Current MTU (Maximum Transmission Unit).
   ///
   /// The MTU determines the maximum size of data that can be sent in a
-  /// single write operation. The default is typically 23 bytes.
-  int get mtu;
+  /// single write operation. The default is typically 23 bytes. Wrapped
+  /// as an [Mtu] value object; access the wire-level integer via
+  /// [Mtu.value].
+  Mtu get mtu;
 
   /// Get a service by UUID.
   ///
@@ -143,10 +147,12 @@ abstract class Connection {
   ///
   /// Returns the negotiated MTU, which may be different from the requested
   /// value. The actual MTU depends on what both the device and the platform
-  /// support.
+  /// support. Both the parameter and the returned future are wrapped as
+  /// [Mtu] value objects; the wire-level integer is available via
+  /// [Mtu.value].
   ///
   /// Throws [DisconnectedException] if not connected.
-  Future<int> requestMtu(int mtu);
+  Future<Mtu> requestMtu(Mtu mtu);
 
   /// Read the current RSSI (signal strength).
   ///

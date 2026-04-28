@@ -53,7 +53,7 @@ void main() {
         fakePlatform.writeCharacteristicCalls.clear();
 
         // requestMtu — records activity on success.
-        conn.requestMtu(247);
+        conn.requestMtu(Mtu(247, capabilities: platform.Capabilities.android));
         async.flushMicrotasks();
 
         // Advance just under one activity window (4s of 5s). The deadline-

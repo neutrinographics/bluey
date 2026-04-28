@@ -167,7 +167,8 @@ class StressTestRunner {
                 .add(recordOp(() => stressChar.write(cmd, withResponse: true)));
             futures.add(recordOp(() => stressChar.read()));
             futures.add(recordOp(() => connection.services(cache: false)));
-            futures.add(recordOp(() => connection.requestMtu(247)));
+            futures.add(
+                recordOp(() => connection.requestMtu(Mtu.fromPlatform(247))));
           }
           await Future.wait(futures);
           stopwatch.stop();
@@ -356,7 +357,7 @@ class StressTestRunner {
     // Negotiate MTU.
     final mtuStart = stopwatch.elapsedMicroseconds;
     try {
-      await connection.requestMtu(config.requestedMtu);
+      await connection.requestMtu(Mtu.fromPlatform(config.requestedMtu));
       result = result.recordSuccess(
         latency: Duration(
           microseconds: stopwatch.elapsedMicroseconds - mtuStart,
@@ -529,7 +530,7 @@ class StressTestRunner {
     RemoteCharacteristic stressChar,
   ) async {
     try {
-      await connection.requestMtu(247);
+      await connection.requestMtu(Mtu.fromPlatform(247));
     } catch (_) {
       // Swallow — MTU upgrade is best-effort.
     }

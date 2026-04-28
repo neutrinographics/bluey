@@ -319,9 +319,11 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Request larger MTU
-        final negotiatedMtu = await connection.requestMtu(512);
-        expect(negotiatedMtu, equals(512));
-        expect(connection.mtu, equals(512));
+        final negotiatedMtu = await connection.requestMtu(
+          Mtu(512, capabilities: platform.Capabilities.android),
+        );
+        expect(negotiatedMtu, equals(Mtu.fromPlatform(512)));
+        expect(connection.mtu, equals(Mtu.fromPlatform(512)));
 
         // Now write large data (512 - 3 = 509 byte payload possible)
         final largeData = Uint8List.fromList(

@@ -780,10 +780,12 @@ void main() {
       test('requestMtu returns negotiated MTU from platform', () async {
         mockPlatform.mockMtu = 256;
 
-        final mtu = await connection.requestMtu(512);
+        final mtu = await connection.requestMtu(
+          Mtu(512, capabilities: platform.Capabilities.android),
+        );
 
-        expect(mtu, equals(256));
-        expect(connection.mtu, equals(256));
+        expect(mtu, equals(Mtu.fromPlatform(256)));
+        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
       });
     });
 

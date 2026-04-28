@@ -610,7 +610,7 @@ class _DeviceInfoCard extends StatelessWidget {
               _InfoPill(
                 icon: Icons.data_usage,
                 label: 'MTU',
-                value: '${connection.mtu}',
+                value: '${connection.mtu.value}',
               ),
             ],
           ),

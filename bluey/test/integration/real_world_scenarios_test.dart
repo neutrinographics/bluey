@@ -260,8 +260,10 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Request larger MTU for faster transfer
-        final mtu = await connection.requestMtu(256);
-        expect(mtu, equals(256));
+        final mtu = await connection.requestMtu(
+          Mtu(256, capabilities: platform.Capabilities.android),
+        );
+        expect(mtu, equals(Mtu.fromPlatform(256)));
 
         // Enable notifications on control point
         await fakePlatform.setNotification(

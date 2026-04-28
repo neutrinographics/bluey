@@ -84,7 +84,7 @@ void main() {
       await ctx.connection.disconnect();
 
       await expectLater(
-        ctx.connection.requestMtu(247),
+        ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android)),
         throwsA(isA<DisconnectedException>()),
       );
     });
@@ -173,7 +173,7 @@ void main() {
       await ctx.connection.disconnect();
 
       try {
-        await ctx.connection.requestMtu(247);
+        await ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android));
         fail('expected DisconnectedException');
       } on DisconnectedException catch (e) {
         expect(e.deviceId, ctx.connection.deviceId);
@@ -185,7 +185,7 @@ void main() {
       final ctx = await establishWithChar();
 
       // None of these should throw.
-      await ctx.connection.requestMtu(247);
+      await ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android));
       await ctx.char.read();
       await ctx.char.write(Uint8List.fromList([0x01]));
 

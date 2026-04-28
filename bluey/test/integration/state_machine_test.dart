@@ -446,11 +446,13 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Request MTU change
-        final newMtu = await connection.requestMtu(512);
+        final newMtu = await connection.requestMtu(
+          Mtu(512, capabilities: platform.Capabilities.android),
+        );
 
         // Connection should still be valid
         expect(connection.state, equals(ConnectionState.ready));
-        expect(newMtu, equals(512));
+        expect(newMtu, equals(Mtu.fromPlatform(512)));
 
         await connection.disconnect();
         await bluey.dispose();

@@ -365,7 +365,7 @@ class BlueyConnection implements Connection {
   Stream<ConnectionState> get stateChanges => _stateController.stream;
 
   @override
-  int get mtu => _mtu;
+  Mtu get mtu => Mtu.fromPlatform(_mtu);
 
   @override
   RemoteService service(UUID uuid) {
@@ -448,17 +448,19 @@ class BlueyConnection implements Connection {
   }
 
   @override
-  Future<int> requestMtu(int mtu) async {
+  Future<Mtu> requestMtu(Mtu mtu) async {
     _ensureConnected();
+    final requested = mtu.value;
     _mtu = await _loggedGattOp(
       deviceId: deviceId,
       op: 'requestMtu',
-      startDetail: 'requested=$mtu',
-      body: () => _platform.requestMtu(_connectionId, mtu),
-      completeDetail: (negotiated) => 'requested=$mtu, negotiated=$negotiated',
+      startDetail: 'requested=$requested',
+      body: () => _platform.requestMtu(_connectionId, requested),
+      completeDetail: (negotiated) =>
+          'requested=$requested, negotiated=$negotiated',
       lifecycleClient: _lifecycle,
     );
-    return _mtu;
+    return Mtu.fromPlatform(_mtu);
   }
 
   @override

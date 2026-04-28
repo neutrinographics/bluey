@@ -29,13 +29,13 @@ class FakeConnection implements Connection {
   Stream<ConnectionState> get stateChanges => _stateController.stream;
 
   @override
-  int get mtu => _mtu;
+  Mtu get mtu => Mtu.fromPlatform(_mtu);
 
   @override
-  Future<int> requestMtu(int mtu) async {
-    _mtuRequest = mtu;
-    _mtu = mtu;
-    return mtu;
+  Future<Mtu> requestMtu(Mtu mtu) async {
+    _mtuRequest = mtu.value;
+    _mtu = mtu.value;
+    return Mtu.fromPlatform(_mtu);
   }
 
   /// Records what mtu was most recently requested.

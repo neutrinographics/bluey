@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:bluey/bluey.dart';
+import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock implementation for testing the interface
@@ -17,7 +18,7 @@ class MockConnection implements Connection {
   ConnectionState state;
 
   @override
-  int mtu;
+  Mtu mtu;
 
   @override
   BondState bondState;
@@ -40,7 +41,7 @@ class MockConnection implements Connection {
   MockConnection({
     required this.deviceId,
     this.state = ConnectionState.ready,
-    this.mtu = 23,
+    Mtu? mtu,
     this.bondState = BondState.none,
     this.txPhy = Phy.le1m,
     this.rxPhy = Phy.le1m,
@@ -53,6 +54,7 @@ class MockConnection implements Connection {
              latency: PeripheralLatency(0),
              timeout: SupervisionTimeout(4000),
            ),
+       mtu = mtu ?? Mtu.fromPlatform(23),
        _services = services ?? [];
 
   @override
@@ -79,9 +81,10 @@ class MockConnection implements Connection {
   }
 
   @override
-  Future<int> requestMtu(int mtu) async {
+  Future<Mtu> requestMtu(Mtu mtu) async {
     // Simulate negotiation - might get less than requested
-    this.mtu = mtu > 512 ? 512 : mtu;
+    final negotiated = mtu.value > 512 ? 512 : mtu.value;
+    this.mtu = Mtu.fromPlatform(negotiated);
     return this.mtu;
   }
 
@@ -191,7 +194,7 @@ void main() {
       });
 
       test('has mtu', () {
-        expect(connection.mtu, equals(23));
+        expect(connection.mtu, equals(Mtu.fromPlatform(23)));
       });
 
       test('provides stateChanges stream', () {
@@ -267,14 +270,18 @@ void main() {
 
     group('MTU', () {
       test('requestMtu returns negotiated MTU', () async {
-        final negotiated = await connection.requestMtu(256);
-        expect(negotiated, equals(256));
-        expect(connection.mtu, equals(256));
+        final negotiated = await connection.requestMtu(
+          Mtu(256, capabilities: Capabilities.android),
+        );
+        expect(negotiated, equals(Mtu.fromPlatform(256)));
+        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
       });
 
       test('requestMtu may return less than requested', () async {
-        final negotiated = await connection.requestMtu(1024);
-        expect(negotiated, lessThanOrEqualTo(512));
+        final negotiated = await connection.requestMtu(
+          Mtu(517, capabilities: Capabilities.android),
+        );
+        expect(negotiated.value, lessThanOrEqualTo(512));
       });
     });
 

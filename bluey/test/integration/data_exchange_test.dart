@@ -420,10 +420,12 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final mtu = await connection.requestMtu(512);
+        final mtu = await connection.requestMtu(
+          Mtu(512, capabilities: platform.Capabilities.android),
+        );
 
         // Assert
-        expect(mtu, equals(512));
+        expect(mtu, equals(Mtu.fromPlatform(512)));
 
         await connection.disconnect();
         await bluey.dispose();
@@ -440,13 +442,15 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Initially default MTU
-        expect(connection.mtu, equals(23));
+        expect(connection.mtu, equals(Mtu.fromPlatform(23)));
 
         // Request larger MTU
-        await connection.requestMtu(256);
+        await connection.requestMtu(
+          Mtu(256, capabilities: platform.Capabilities.android),
+        );
 
         // Assert MTU property updated
-        expect(connection.mtu, equals(256));
+        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
 
         await connection.disconnect();
         await bluey.dispose();
