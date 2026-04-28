@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:bluey/bluey.dart';
-import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock implementation for testing the interface
@@ -132,6 +131,12 @@ class MockConnection implements Connection {
   Future<void> requestConnectionParameters(ConnectionParameters params) async {
     connectionParameters = params;
   }
+
+  @override
+  AndroidConnectionExtensions? get android => null;
+
+  @override
+  IosConnectionExtensions? get ios => null;
 
   void emitState(ConnectionState newState) {
     state = newState;

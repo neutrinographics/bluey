@@ -1,7 +1,9 @@
 import '../gatt_client/gatt.dart';
 import '../peer/server_id.dart';
 import '../shared/uuid.dart';
+import 'android_connection_extensions.dart';
 import 'connection_state.dart';
+import 'ios_connection_extensions.dart';
 import 'value_objects/connection_parameters.dart';
 import 'value_objects/mtu.dart';
 
@@ -165,6 +167,30 @@ abstract class Connection {
   ///
   /// After calling disconnect, this connection instance should not be used.
   Future<void> disconnect();
+
+  // === Platform-specific extensions ===
+
+  /// Android-specific extensions (bonding, PHY, connection parameters).
+  ///
+  /// Returns a non-null facade when the underlying platform's
+  /// [Capabilities] indicate at least one Android-only feature is
+  /// available (`canBond`, `canRequestPhy`, or
+  /// `canRequestConnectionParameters`). Returns `null` on platforms that
+  /// don't expose these APIs (notably iOS).
+  ///
+  /// Use the null-aware operator for safe access:
+  /// ```dart
+  /// await connection.android?.bond();
+  /// final phy = connection.android?.txPhy ?? Phy.le1m;
+  /// ```
+  AndroidConnectionExtensions? get android;
+
+  /// iOS-specific extensions.
+  ///
+  /// Returns a non-null facade on iOS-flavored capabilities (heuristic:
+  /// none of the Android-only flags are set). Currently exposes no
+  /// members; reserved for future iOS-specific features.
+  IosConnectionExtensions? get ios;
 
   // === Bonding ===
 

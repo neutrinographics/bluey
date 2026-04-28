@@ -114,6 +114,12 @@ class FakeConnection implements Connection {
   @override
   Future<void> requestConnectionParameters(ConnectionParameters params) =>
       throw UnimplementedError();
+
+  @override
+  AndroidConnectionExtensions? get android => null;
+
+  @override
+  IosConnectionExtensions? get ios => null;
 }
 
 class _FakeService implements RemoteService {

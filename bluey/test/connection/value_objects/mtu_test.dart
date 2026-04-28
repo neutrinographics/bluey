@@ -1,5 +1,4 @@
 import 'package:bluey/bluey.dart';
-import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

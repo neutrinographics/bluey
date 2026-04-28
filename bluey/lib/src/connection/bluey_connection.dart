@@ -11,8 +11,10 @@ import '../peer/server_id.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
+import 'android_connection_extensions.dart';
 import 'connection.dart';
 import 'connection_parameters_mapper.dart';
+import 'ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
 
 /// Runs a GATT op through the error-translation pipeline and routes
@@ -473,6 +475,35 @@ class BlueyConnection implements Connection {
       completeDetail: (rssi) => 'rssi=${rssi}dBm',
       lifecycleClient: _lifecycle,
     );
+  }
+
+  // === Platform-specific extensions ===
+
+  AndroidConnectionExtensions? _androidExtensions;
+
+  @override
+  AndroidConnectionExtensions? get android {
+    final caps = _platform.capabilities;
+    if (caps.canBond ||
+        caps.canRequestPhy ||
+        caps.canRequestConnectionParameters) {
+      return _androidExtensions ??= _AndroidConnectionExtensionsImpl(this);
+    }
+    return null;
+  }
+
+  @override
+  IosConnectionExtensions? get ios {
+    final caps = _platform.capabilities;
+    // Heuristic: a platform with NONE of the Android-only flags is
+    // treated as iOS-flavored. If [Capabilities] ever gains a dedicated
+    // `isIos` flag, this should be replaced with a precise check.
+    if (!caps.canBond &&
+        !caps.canRequestPhy &&
+        !caps.canRequestConnectionParameters) {
+      return _iosExtensions;
+    }
+    return null;
   }
 
   @override
@@ -1046,3 +1077,60 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     );
   }
 }
+
+/// Thin facade over a [BlueyConnection] that exposes the Android-only
+/// surface (bonding, PHY, connection parameters) without duplicating
+/// logic. Returned from `BlueyConnection.android` when the platform
+/// reports any of the Android-only capability flags. Created at most
+/// once per connection and lazy-cached.
+///
+/// Each member delegates straight back to the corresponding member on
+/// the wrapping [BlueyConnection]; the existing methods on
+/// [BlueyConnection] continue to coexist (B.3 will remove them from the
+/// [Connection] interface).
+class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
+  final BlueyConnection _conn;
+
+  _AndroidConnectionExtensionsImpl(this._conn);
+
+  @override
+  BondState get bondState => _conn.bondState;
+
+  @override
+  Stream<BondState> get bondStateChanges => _conn.bondStateChanges;
+
+  @override
+  Future<void> bond() => _conn.bond();
+
+  @override
+  Future<void> removeBond() => _conn.removeBond();
+
+  @override
+  Phy get txPhy => _conn.txPhy;
+
+  @override
+  Phy get rxPhy => _conn.rxPhy;
+
+  @override
+  Stream<({Phy tx, Phy rx})> get phyChanges => _conn.phyChanges;
+
+  @override
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) =>
+      _conn.requestPhy(txPhy: txPhy, rxPhy: rxPhy);
+
+  @override
+  ConnectionParameters get connectionParameters => _conn.connectionParameters;
+
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) =>
+      _conn.requestConnectionParameters(params);
+}
+
+/// Empty const singleton implementing [IosConnectionExtensions]. Reserved
+/// for future iOS-specific features; see [IosConnectionExtensions] for
+/// the rationale.
+class _IosConnectionExtensionsImpl implements IosConnectionExtensions {
+  const _IosConnectionExtensionsImpl();
+}
+
+const _iosExtensions = _IosConnectionExtensionsImpl();
