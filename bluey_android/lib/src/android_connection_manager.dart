@@ -351,10 +351,11 @@ class AndroidConnectionManager {
         canIndicate: dto.properties.canIndicate,
       ),
       descriptors: dto.descriptors.map(_mapDescriptor).toList(),
+      handle: dto.handle,
     );
   }
 
   PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
-    return PlatformDescriptor(uuid: dto.uuid);
+    return PlatformDescriptor(uuid: dto.uuid, handle: dto.handle);
   }
 }

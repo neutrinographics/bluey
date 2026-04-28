@@ -180,6 +180,7 @@ class IosServer {
         centralId: request.centralId,
         characteristicUuid: expandUuid(request.characteristicUuid),
         offset: request.offset,
+        characteristicHandle: request.characteristicHandle,
       ),
     );
   }
@@ -196,6 +197,7 @@ class IosServer {
         value: request.value,
         offset: request.offset,
         responseNeeded: request.responseNeeded,
+        characteristicHandle: request.characteristicHandle,
       ),
     );
   }

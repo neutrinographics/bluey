@@ -209,6 +209,7 @@ class AndroidServer {
         centralId: request.centralId,
         characteristicUuid: request.characteristicUuid,
         offset: request.offset,
+        characteristicHandle: request.characteristicHandle,
       ),
     );
   }
@@ -223,6 +224,7 @@ class AndroidServer {
         value: request.value,
         offset: request.offset,
         responseNeeded: request.responseNeeded,
+        characteristicHandle: request.characteristicHandle,
       ),
     );
   }

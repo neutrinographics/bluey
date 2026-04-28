@@ -126,8 +126,9 @@ class PlatformCharacteristicProperties {
 @immutable
 class PlatformDescriptor {
   final String uuid;
+  final int? handle;
 
-  const PlatformDescriptor({required this.uuid});
+  const PlatformDescriptor({required this.uuid, this.handle});
 }
 
 /// A characteristic from the platform layer.
@@ -136,11 +137,13 @@ class PlatformCharacteristic {
   final String uuid;
   final PlatformCharacteristicProperties properties;
   final List<PlatformDescriptor> descriptors;
+  final int? handle;
 
   const PlatformCharacteristic({
     required this.uuid,
     required this.properties,
     required this.descriptors,
+    this.handle,
   });
 }
 
@@ -673,12 +676,14 @@ class PlatformReadRequest {
   final String centralId;
   final String characteristicUuid;
   final int offset;
+  final int? characteristicHandle;
 
   const PlatformReadRequest({
     required this.requestId,
     required this.centralId,
     required this.characteristicUuid,
     required this.offset,
+    this.characteristicHandle,
   });
 }
 
@@ -691,6 +696,7 @@ class PlatformWriteRequest {
   final Uint8List value;
   final int offset;
   final bool responseNeeded;
+  final int? characteristicHandle;
 
   const PlatformWriteRequest({
     required this.requestId,
@@ -699,6 +705,7 @@ class PlatformWriteRequest {
     required this.value,
     required this.offset,
     required this.responseNeeded,
+    this.characteristicHandle,
   });
 }
 
