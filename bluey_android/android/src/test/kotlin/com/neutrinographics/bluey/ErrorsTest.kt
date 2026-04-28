@@ -1,7 +1,6 @@
 package com.neutrinographics.bluey
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class ErrorsTest {
@@ -17,18 +16,6 @@ class ErrorsTest {
     @Test
     fun `NoQueueForConnection to gatt-disconnected (client)`() {
         val e = BlueyAndroidError.NoQueueForConnection.toClientFlutterError()
-        assertEquals("gatt-disconnected", e.code)
-    }
-
-    @Test
-    fun `CharacteristicNotFound to gatt-disconnected (client)`() {
-        val e = BlueyAndroidError.CharacteristicNotFound("abc").toClientFlutterError()
-        assertEquals("gatt-disconnected", e.code)
-    }
-
-    @Test
-    fun `DescriptorNotFound to gatt-disconnected (client)`() {
-        val e = BlueyAndroidError.DescriptorNotFound("abc").toClientFlutterError()
         assertEquals("gatt-disconnected", e.code)
     }
 
@@ -73,13 +60,6 @@ class ErrorsTest {
     // --- Server-side mappings ---
 
     @Test
-    fun `CharacteristicNotFound to gatt-status-failed 0x0A (server)`() {
-        val e = BlueyAndroidError.CharacteristicNotFound("abc").toServerFlutterError()
-        assertEquals("gatt-status-failed", e.code)
-        assertEquals(0x0A, e.details)
-    }
-
-    @Test
     fun `CentralNotFound to gatt-status-failed 0x0A (server)`() {
         val e = BlueyAndroidError.CentralNotFound("central-1").toServerFlutterError()
         assertEquals("gatt-status-failed", e.code)
@@ -110,18 +90,6 @@ class ErrorsTest {
         val e = BlueyAndroidError.PermissionDenied("BLUETOOTH_ADVERTISE").toServerFlutterError()
         assertEquals("bluey-permission-denied", e.code)
         assertEquals("BLUETOOTH_ADVERTISE", e.details)
-    }
-
-    // --- Regression guard for context-sensitive mapping ---
-
-    @Test
-    fun `CharacteristicNotFound server-side does NOT map to gatt-disconnected`() {
-        val e = BlueyAndroidError.CharacteristicNotFound("abc").toServerFlutterError()
-        assertNotEquals(
-            "Server-side notFound must not look like a disconnect",
-            "gatt-disconnected",
-            e.code
-        )
     }
 
     // --- Catch-all for random Throwables ---

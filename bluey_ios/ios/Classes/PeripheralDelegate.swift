@@ -11,10 +11,6 @@ class PeripheralDelegate: NSObject, CBPeripheralDelegate {
         manager?.didDiscoverServices(peripheral: peripheral, error: error)
     }
 
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverIncludedServicesFor service: CBService, error: Error?) {
-        manager?.didDiscoverIncludedServices(peripheral: peripheral, service: service, error: error)
-    }
-
     // MARK: - Characteristic Discovery
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {

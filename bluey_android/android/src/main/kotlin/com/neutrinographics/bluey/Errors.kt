@@ -7,11 +7,6 @@ package com.neutrinographics.bluey
  * `ConnectionManager` / `Scanner` (client-role); use the *server* variant
  * at call sites dispatched through `GattServer` / `Advertiser` (server-role).
  *
- * The context split matters for [BlueyAndroidError.CharacteristicNotFound]:
- * client-side means the peer's cached service layout was invalidated (akin
- * to a disconnect), server-side means the user's hosted service didn't
- * register that attribute (a programming error, not a disconnect).
- *
  * An already-translated [FlutterError] passes through unchanged — the
  * inner layers (`GattOpQueue`, `ConnectionManager.statusFailedError`) emit
  * their own `gatt-*` codes and we must NOT overwrite them with
@@ -28,9 +23,7 @@ internal fun Throwable.toClientFlutterError(): FlutterError = when (this) {
     is BlueyAndroidError.PermissionDenied ->
         FlutterError("bluey-permission-denied", message, permission)
     is BlueyAndroidError.DeviceNotConnected,
-    is BlueyAndroidError.NoQueueForConnection,
-    is BlueyAndroidError.CharacteristicNotFound,
-    is BlueyAndroidError.DescriptorNotFound ->
+    is BlueyAndroidError.NoQueueForConnection ->
         FlutterError("gatt-disconnected", message, null)
     is BlueyAndroidError.HandleInvalidated ->
         FlutterError("gatt-handle-invalidated", message, null)
@@ -48,7 +41,6 @@ internal fun Throwable.toServerFlutterError(): FlutterError = when (this) {
     is FlutterError -> this
     is BlueyAndroidError.PermissionDenied ->
         FlutterError("bluey-permission-denied", message, permission)
-    is BlueyAndroidError.CharacteristicNotFound,
     is BlueyAndroidError.CentralNotFound,
     is BlueyAndroidError.NoPendingRequest ->
         FlutterError("gatt-status-failed", message, 0x0A)

@@ -84,35 +84,6 @@ class BlueyPluginTest {
         assertEquals("bluey-unknown", failure.code)
     }
 
-    @Test
-    fun `server-role addService with CharacteristicNotFound delivers gatt-status-failed 0x0A FlutterError`() {
-        // Inject a mock GattServer whose addService throws CharacteristicNotFound.
-        // On the server dispatch path BlueyPlugin calls toServerFlutterError(), which
-        // maps CharacteristicNotFound → FlutterError("gatt-status-failed", ..., 0x0A).
-        // This is the critical regression guard: the SAME sealed case produces a
-        // DIFFERENT code on the server path vs the client path (where it would be
-        // "gatt-disconnected").
-        val mockGattServer = mockk<GattServer>(relaxed = true)
-        every { mockGattServer.addService(any(), any()) } throws
-            BlueyAndroidError.CharacteristicNotFound("abc")
-        setPrivateField(plugin, "gattServer", mockGattServer)
-
-        val service = LocalServiceDto(
-            uuid = "0000180D-0000-1000-8000-00805F9B34FB",
-            isPrimary = true,
-            characteristics = emptyList(),
-            includedServices = emptyList()
-        )
-
-        val captured = mutableListOf<Result<LocalServiceDto>>()
-        plugin.addService(service) { captured += it }
-
-        assertEquals(1, captured.size)
-        val failure = captured.single().exceptionOrNull() as FlutterError
-        assertEquals("gatt-status-failed", failure.code)
-        assertEquals(0x0A, failure.details)
-    }
-
     private fun setPrivateField(obj: Any, name: String, value: Any?) {
         val field = obj.javaClass.getDeclaredField(name)
         field.isAccessible = true

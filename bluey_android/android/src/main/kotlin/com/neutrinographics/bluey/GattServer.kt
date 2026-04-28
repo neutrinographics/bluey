@@ -287,7 +287,7 @@ class GattServer(
 
         val characteristic = characteristicByHandle[characteristicHandle]
         if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
+            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle)))
             return
         }
         val normalizedUuid = characteristic.uuid.toString().lowercase()
@@ -384,7 +384,7 @@ class GattServer(
 
         val characteristic = characteristicByHandle[characteristicHandle]
         if (characteristic == null) {
-            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
+            callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle)))
             return
         }
 

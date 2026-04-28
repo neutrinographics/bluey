@@ -331,11 +331,7 @@ class ConnectionManager(
         val characteristic = when (val result = lookupCharacteristic(deviceId, characteristicHandle)) {
             is LookupResult.Found -> result.value
             is LookupResult.HandleInvalidated -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
-                return
-            }
-            is LookupResult.NotFound -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle)))
                 return
             }
         }
@@ -362,11 +358,7 @@ class ConnectionManager(
         val characteristic = when (val result = lookupCharacteristic(deviceId, characteristicHandle)) {
             is LookupResult.Found -> result.value
             is LookupResult.HandleInvalidated -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
-                return
-            }
-            is LookupResult.NotFound -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle)))
                 return
             }
         }
@@ -401,11 +393,7 @@ class ConnectionManager(
         val characteristic = when (val result = lookupCharacteristic(deviceId, characteristicHandle)) {
             is LookupResult.Found -> result.value
             is LookupResult.HandleInvalidated -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
-                return
-            }
-            is LookupResult.NotFound -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(characteristicHandle, "")))
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle)))
                 return
             }
         }
@@ -465,11 +453,7 @@ class ConnectionManager(
         val descriptor = when (val result = lookupDescriptor(deviceId, descriptorHandle)) {
             is LookupResult.Found -> result.value
             is LookupResult.HandleInvalidated -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
-                return
-            }
-            is LookupResult.NotFound -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(descriptorHandle, "")))
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle)))
                 return
             }
         }
@@ -496,11 +480,7 @@ class ConnectionManager(
         val descriptor = when (val result = lookupDescriptor(deviceId, descriptorHandle)) {
             is LookupResult.Found -> result.value
             is LookupResult.HandleInvalidated -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle, result.uuid)))
-                return
-            }
-            is LookupResult.NotFound -> {
-                callback(Result.failure(BlueyAndroidError.HandleInvalidated(descriptorHandle, "")))
+                callback(Result.failure(BlueyAndroidError.HandleInvalidated(result.handle)))
                 return
             }
         }
@@ -945,23 +925,17 @@ class ConnectionManager(
      *
      * `Found` carries the resolved characteristic / descriptor reference.
      *
-     * `HandleInvalidated` indicates the Dart side passed a non-null
-     * handle but the per-device handle table no longer recognises it
-     * (Service Changed cleared it; the caller is holding a stale
-     * reference from the prior discovery). The caller maps this to
-     * [BlueyAndroidError.HandleInvalidated] so the Dart adapter
-     * surfaces it as `AttributeHandleInvalidatedException`. Distinct
-     * from `NotFound`, which is the legacy null-handle / UUID-miss
-     * path.
-     *
-     * `NotFound` is the residual case: no handle was supplied and
-     * the UUID-keyed traversal also missed.
+     * `HandleInvalidated` indicates the per-device handle table no
+     * longer recognises the handle (Service Changed cleared it; the
+     * caller is holding a stale reference from the prior discovery).
+     * The caller maps this to [BlueyAndroidError.HandleInvalidated]
+     * so the Dart adapter surfaces it as
+     * `AttributeHandleInvalidatedException`.
      */
     private sealed class LookupResult<out T> {
         data class Found<T>(val value: T) : LookupResult<T>()
-        data class HandleInvalidated(val handle: Long, val uuid: String) :
+        data class HandleInvalidated(val handle: Long) :
             LookupResult<Nothing>()
-        object NotFound : LookupResult<Nothing>()
     }
 
     /**
@@ -978,7 +952,7 @@ class ConnectionManager(
         return if (match != null) {
             LookupResult.Found(match)
         } else {
-            LookupResult.HandleInvalidated(handle, "")
+            LookupResult.HandleInvalidated(handle)
         }
     }
 
@@ -994,7 +968,7 @@ class ConnectionManager(
         return if (match != null) {
             LookupResult.Found(match)
         } else {
-            LookupResult.HandleInvalidated(handle, "")
+            LookupResult.HandleInvalidated(handle)
         }
     }
 

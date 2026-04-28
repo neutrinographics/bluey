@@ -22,17 +22,9 @@ class CentralManagerImpl: NSObject {
     // Cached peripherals by UUID
     private var peripherals: [String: CBPeripheral] = [:]
 
-    // GATT caches
-    private var services: [String: [String: CBService]] = [:] // [deviceId: [serviceUuid: service]]
-    private var characteristics: [String: [String: CBCharacteristic]] = [:] // [deviceId: [charUuid: char]]
-    private var descriptors: [String: [String: CBDescriptor]] = [:] // [deviceId: [descUuid: desc]]
-
-    // I088 — handle-identity tables. Populated alongside the
-    // UUID-keyed caches above when CB fires the discovery callbacks;
-    // the UUID-keyed maps remain in service for legacy code paths
-    // (D.8/D.13 retire them). See `CentralHandleStore` for the mint
-    // contract (per-device monotonic counter, shared between chars
-    // and descs in encounter order).
+    // I088 — handle-identity tables. See `CentralHandleStore` for the
+    // mint contract (per-device monotonic counter, shared between
+    // chars and descs in encounter order).
     internal let handleStore = CentralHandleStore<CBCharacteristic, CBDescriptor>()
 
     // Pending completion slots — one FIFO per (device, key). Each OpSlot
@@ -425,11 +417,6 @@ class CentralManagerImpl: NSObject {
     func didDisconnectPeripheral(central: CBCentralManager, peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
 
-        // Clear caches
-        services.removeValue(forKey: deviceId)
-        characteristics.removeValue(forKey: deviceId)
-        descriptors.removeValue(forKey: deviceId)
-
         // I088 — drop the per-device handle table. CB does not
         // guarantee object identity preservation across reconnect,
         // so handles minted from the previous session must not
@@ -503,7 +490,6 @@ class CentralManagerImpl: NSObject {
         var pendingServices = Set<String>()
         for service in cbServices {
             let serviceUuid = service.uuid.uuidString.lowercased()
-            services[deviceId, default: [:]][serviceUuid] = service
             pendingServices.insert(serviceUuid)
 
             // Start discovering characteristics for each service
@@ -511,17 +497,6 @@ class CentralManagerImpl: NSObject {
         }
 
         pendingServiceDiscovery[deviceId] = pendingServices
-    }
-
-    func didDiscoverIncludedServices(peripheral: CBPeripheral, service: CBService, error: Error?) {
-        // Store included services in cache
-        let deviceId = peripheral.identifier.uuidString.lowercased()
-        if let includedServices = service.includedServices {
-            for included in includedServices {
-                let uuid = included.uuid.uuidString.lowercased()
-                services[deviceId, default: [:]][uuid] = included
-            }
-        }
     }
 
     func didDiscoverCharacteristics(peripheral: CBPeripheral, service: CBService, error: Error?) {
@@ -548,7 +523,6 @@ class CentralManagerImpl: NSObject {
         // Track which characteristics need descriptor discovery
         for characteristic in cbCharacteristics {
             let charUuid = characteristic.uuid.uuidString.lowercased()
-            characteristics[deviceId, default: [:]][charUuid] = characteristic
             pendingCharacteristicDiscovery[deviceId, default: []].insert(charUuid)
 
             // I088 — mint a per-device handle for this characteristic
@@ -575,13 +549,11 @@ class CentralManagerImpl: NSObject {
         // Remove this characteristic from pending list
         pendingCharacteristicDiscovery[deviceId]?.remove(charUuid)
 
-        // Cache descriptors (even if error, they may be partially discovered)
+        // Mint handles for descriptors (even if error, they may be
+        // partially discovered).
         if error == nil {
             let cbDescriptors = characteristic.descriptors ?? []
             for descriptor in cbDescriptors {
-                let descUuid = descriptor.uuid.uuidString.lowercased()
-                descriptors[deviceId, default: [:]][descUuid] = descriptor
-
                 // I088 — mint a handle for this descriptor from the
                 // same per-device counter as characteristics, so
                 // descriptor handles continue from where chars left
@@ -773,11 +745,6 @@ class CentralManagerImpl: NSObject {
 
     func didModifyServices(peripheral: CBPeripheral, invalidatedServices: [CBService]) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
-
-        // Clear cached services for this device so the next discovery is fresh
-        services.removeValue(forKey: deviceId)
-        characteristics.removeValue(forKey: deviceId)
-        descriptors.removeValue(forKey: deviceId)
 
         // I088 — Service Changed invalidates the attribute layout;
         // drop minted handles before notifying Dart so any lookup
