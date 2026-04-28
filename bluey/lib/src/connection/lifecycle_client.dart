@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -8,6 +7,7 @@ import 'package:meta/meta.dart';
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
+import '../log/log_level.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -24,7 +24,6 @@ class LifecycleClient {
   final String _connectionId;
   final Duration _peerSilenceTimeout;
   final void Function() onServerUnreachable;
-  // ignore: unused_field
   final BlueyLogger _logger;
 
   late final PeerSilenceMonitor _monitor;
@@ -62,6 +61,18 @@ class LifecycleClient {
       peerSilenceTimeout: peerSilenceTimeout,
       activityWindow: _defaultHeartbeatInterval,
       onSilent: () {
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey.connection.lifecycle',
+          'peer silence timeout fired',
+          data: {'connectionId': _connectionId},
+        );
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey.connection.lifecycle',
+          'onServerUnreachable invoked',
+          data: {'connectionId': _connectionId},
+        );
         // Single-fire from monitor; we still need to clean up our
         // own state and signal upward.
         stop();
@@ -126,7 +137,15 @@ class LifecycleClient {
   /// notification subscriptions from dirtying monitor state after
   /// [stop] has been called.
   void recordActivity() {
-    if (!isRunning) return;
+    if (!isRunning) {
+      _logger.log(
+        BlueyLogLevel.trace,
+        'bluey.connection.lifecycle',
+        'recordActivity skipped (untracked)',
+        data: {'connectionId': _connectionId},
+      );
+      return;
+    }
     _monitor.recordActivity();
     // Deadline shifted — supersede the pending timer.
     _scheduleProbe();
@@ -169,6 +188,12 @@ class LifecycleClient {
   /// control service or its heartbeat characteristic is absent, the
   /// method returns silently without starting heartbeats.
   void start({required List<RemoteService> allServices}) {
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.connection.lifecycle',
+      'start invoked',
+      data: {'connectionId': _connectionId},
+    );
     if (_isRunning) return;
 
     final controlService = allServices
@@ -187,8 +212,15 @@ class LifecycleClient {
     _isRunning = true;
     _monitor.start();
     _heartbeatCharHandle = heartbeatChar.handle;
-    dev.log('heartbeat started: handle=${_heartbeatCharHandle?.value}',
-        name: 'bluey.lifecycle');
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection.lifecycle',
+      'heartbeat started',
+      data: {
+        'connectionId': _connectionId,
+        'characteristicHandle': _heartbeatCharHandle?.value,
+      },
+    );
 
     try {
       // Send the first heartbeat immediately so the server (especially
@@ -230,6 +262,16 @@ class LifecycleClient {
     final charHandle = _heartbeatCharHandle;
     if (charHandle == null) return;
 
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection.lifecycle',
+      'disconnect command sent',
+      data: {
+        'connectionId': _connectionId,
+        'characteristicHandle': charHandle.value,
+      },
+    );
+
     try {
       await _platform.writeCharacteristic(
         _connectionId,
@@ -246,6 +288,12 @@ class LifecycleClient {
   /// the death watch via [PeerSilenceMonitor.stop] so the monitor does
   /// not fire after teardown.
   void stop() {
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.connection.lifecycle',
+      'stop invoked',
+      data: {'connectionId': _connectionId},
+    );
     _isRunning = false;
     _probeTimer?.cancel();
     _probeTimer = null;
@@ -258,7 +306,15 @@ class LifecycleClient {
   );
 
   void _beginHeartbeat(Duration interval) {
-    dev.log('heartbeat interval set: ${interval.inMilliseconds}ms', name: 'bluey.lifecycle');
+    _logger.log(
+      BlueyLogLevel.info,
+      'bluey.connection.lifecycle',
+      'heartbeat interval set',
+      data: {
+        'connectionId': _connectionId,
+        'intervalMs': interval.inMilliseconds,
+      },
+    );
     // Update the monitor in place so a probe in flight from the initial
     // synchronous send keeps its markProbeInFlight flag intact.
     _monitor.updateActivityWindow(interval);
@@ -311,6 +367,15 @@ class LifecycleClient {
     final charHandle = _heartbeatCharHandle;
     if (charHandle == null) return;
 
+    _logger.log(
+      BlueyLogLevel.debug,
+      'bluey.connection.lifecycle',
+      'heartbeat sent',
+      data: {
+        'connectionId': _connectionId,
+        'characteristicHandle': charHandle.value,
+      },
+    );
     _monitor.markProbeInFlight();
     _platform
         .writeCharacteristic(
@@ -321,6 +386,12 @@ class LifecycleClient {
         )
         .then((_) {
       if (!_isRunning) return;
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.connection.lifecycle',
+        'heartbeat-response received',
+        data: {'connectionId': _connectionId},
+      );
       _monitor.recordProbeSuccess();
       // Success refreshed lastActivity → monitor deadline is now
       // exactly activityWindow from now. No explicit override.
@@ -332,14 +403,29 @@ class LifecycleClient {
         // full activityWindow (the monitor deadline has already elapsed
         // by the time we got here, so without the explicit delay we'd
         // hammer the peer with immediate retries).
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey.connection.lifecycle',
+          'heartbeat transient failure',
+          data: {
+            'connectionId': _connectionId,
+            'exception': error.runtimeType.toString(),
+          },
+          errorCode: error.runtimeType.toString(),
+        );
         _monitor.cancelProbe();
         _scheduleProbe(after: _monitor.activityWindow);
         return;
       }
-      dev.log(
-        'heartbeat failed (counted): ${error.runtimeType}',
-        name: 'bluey.lifecycle',
-        level: 900, // WARNING
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.connection.lifecycle',
+        'heartbeat failed (counted)',
+        data: {
+          'connectionId': _connectionId,
+          'exception': error.runtimeType.toString(),
+        },
+        errorCode: error.runtimeType.toString(),
       );
       // Release the in-flight flag: the probe write is done (with a dead-peer
       // error), so the next probe can be dispatched normally.
