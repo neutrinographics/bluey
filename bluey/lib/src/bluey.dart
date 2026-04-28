@@ -529,41 +529,25 @@ class Bluey {
       // service discovery here would miss it. Use the upgraded state
       // (isBlueyServer + serverId) to build the wrapper directly.
       //
-      // The legacy path's lifecycle client is stored on the
-      // [BlueyConnection]; we still install a fresh lifecycle client
-      // here so the new wrapper has its own heartbeat handle. This
-      // means the legacy auto-upgrade lifecycle (installed by
-      // [_upgradeIfBlueyServer]) and the wrapper's lifecycle coexist
-      // until C.5 collapses the two paths.
-      if (rawConnection.isBlueyServer) {
+      // Reuse the running LifecycleClient that's already attached to
+      // the [BlueyConnection]. A fresh, unstarted client here would
+      // leave [PeerConnection.sendDisconnectCommand] silently a no-op
+      // because [LifecycleClient.sendDisconnectCommand] short-circuits
+      // when its `_heartbeatCharUuid` is null (set only by `start()`).
+      // By reusing the legacy client, the wrapper's peer-protocol ops
+      // reach the peer through the same client that's already driving
+      // heartbeats. The legacy auto-upgrade and peer wrapper coexist
+      // through this shared client until C.5 collapses the two paths.
+      if (rawConnection is BlueyConnection && rawConnection.isBlueyServer) {
+        final existingLifecycle = rawConnection.lifecycleClient;
         final existingServerId = rawConnection.serverId;
-        // We still need to discover services to start the lifecycle
-        // client (it locates the heartbeat characteristic). Pass
-        // `cache: false` to fetch the post-upgrade filtered tree if
-        // available, but we'll rediscover the unfiltered tree by
-        // pulling from the connection: the auto-upgrade has already
-        // attached a lifecycle on the connection itself, so all we
-        // need here is to compose a wrapper that exposes the
-        // peer-protocol surface. Build a lifecycle client whose
-        // start() will be a no-op (no control service in the
-        // post-upgrade filtered tree) and let the legacy lifecycle
-        // continue driving heartbeats.
-        final connectionId = rawConnection is BlueyConnection
-            ? rawConnection.connectionId
-            : rawConnection.deviceId.toString();
-        final lifecycleClient = LifecycleClient(
-          platformApi: _platform,
-          connectionId: connectionId,
-          peerSilenceTimeout: peerSilenceTimeout,
-          onServerUnreachable: () {
-            rawConnection.disconnect().catchError((_) {});
-          },
-        );
-        return PeerConnection.create(
-          connection: rawConnection,
-          serverId: existingServerId ?? ServerId.generate(),
-          lifecycleClient: lifecycleClient,
-        );
+        if (existingLifecycle != null && existingServerId != null) {
+          return PeerConnection.create(
+            connection: rawConnection,
+            serverId: existingServerId,
+            lifecycleClient: existingLifecycle,
+          );
+        }
       }
 
       final services = await rawConnection.services();

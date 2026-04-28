@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:meta/meta.dart';
 
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -161,6 +162,15 @@ class BlueyConnection implements Connection {
 
   @override
   ServerId? get serverId => _serverId;
+
+  /// The active lifecycle client, or null if this connection is not a
+  /// Bluey peer.
+  ///
+  /// Exposed for internal use by [Bluey._tryBuildPeerConnection], which
+  /// reuses the active client when wrapping an already-upgraded connection
+  /// in a [PeerConnection]. Not part of the public [Connection] contract.
+  @internal
+  LifecycleClient? get lifecycleClient => _lifecycle;
 
   // Start as `linked` since we're constructed after a successful platform
   // connect — the link is up but services have not yet been discovered.
