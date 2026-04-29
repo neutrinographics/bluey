@@ -7,6 +7,10 @@
 - New `Server.peerConnections: Stream<PeerClient>` — emits a `PeerClient` the first time a connected central sends a lifecycle heartbeat write. Mirrors the connection-side `tryUpgrade` semantics: identification is per-session; reconnect-then-heartbeat re-identifies. Consumers that only care about Bluey peers can subscribe here and ignore `connections`.
 - New `PeerClient` type — composition wrapper around `Client` (server-side analog of `PeerConnection`).
 
+**Client-side peer watch:**
+
+- New `Bluey.watchPeer(Connection): Stream<PeerConnection?>` — emits the initial `tryUpgrade` result, then re-attempts on every `connection.servicesChanges` emission until upgrade succeeds. Completes after the first non-null peer (the resulting `PeerConnection` handles in-place handle refresh internally) or when the connection disconnects. Resilient to stale GATT caches, where a freshly-launched server's lifecycle service isn't visible to the central until a Service Changed indication lands. `tryUpgrade` remains the one-shot snapshot; its docstring now points at `watchPeer` for the streaming case.
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

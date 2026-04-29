@@ -477,6 +477,15 @@ class Bluey {
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer
   /// wrapper.
+  ///
+  /// **One-shot snapshot.** This method evaluates the connection's
+  /// current service tree exactly once. On real devices the central may
+  /// hold a stale GATT cache that hides the lifecycle service until the
+  /// peer pushes a Service Changed indication — calls landing inside
+  /// that window will return `null` even though the peer is fully
+  /// available a moment later. Callers that want to track peer status
+  /// across the connection's lifetime should use [watchPeer], which
+  /// retries the upgrade on each Service Changed re-discovery.
   Future<PeerConnection?> tryUpgrade(Connection connection) async {
     _logger.log(
       BlueyLogLevel.debug,
@@ -495,6 +504,92 @@ class Bluey {
       },
     );
     return result;
+  }
+
+  /// Watches [connection] for peer status, retrying [tryUpgrade] on
+  /// each Service Changed re-discovery until the upgrade succeeds.
+  ///
+  /// Emits the result of [tryUpgrade] on subscription (which may be
+  /// `null`). If `null`, listens to `connection.servicesChanges` and
+  /// re-attempts the upgrade on every emission, yielding each result.
+  /// Once a non-null [PeerConnection] has been emitted, the stream
+  /// completes — the resulting peer's own lifecycle protocol handles
+  /// in-place handle refresh on subsequent Service Changed events, and
+  /// re-running [tryUpgrade] would orphan a fresh `LifecycleClient`.
+  ///
+  /// The stream also completes when [connection] transitions to
+  /// [ConnectionState.disconnected], so subscribers do not leak past
+  /// the connection's lifetime.
+  ///
+  /// Use this in preference to [tryUpgrade] when the central may have a
+  /// stale GATT cache (a real-device hazard with cold-launched servers
+  /// that finish registering their lifecycle service after the central
+  /// completes initial discovery): the stale cache hides the lifecycle
+  /// service from the first [tryUpgrade], but Service Changed
+  /// eventually surfaces it and a subsequent retry succeeds.
+  ///
+  /// Single-subscription. Each call returns a fresh stream with its own
+  /// listeners; multiple watchers should each call [watchPeer].
+  Stream<PeerConnection?> watchPeer(Connection connection) {
+    late StreamController<PeerConnection?> controller;
+    StreamSubscription<dynamic>? servicesSub;
+    StreamSubscription<ConnectionState>? stateSub;
+    var resolved = false;
+    var busy = false;
+    var pendingRetry = false;
+
+    Future<void> attempt() async {
+      if (resolved) return;
+      if (busy) {
+        // A service-changed event landed while a previous attempt was
+        // still in flight — note it so we re-attempt once busy clears,
+        // rather than dropping the signal.
+        pendingRetry = true;
+        return;
+      }
+      busy = true;
+      try {
+        do {
+          pendingRetry = false;
+          final peer = await tryUpgrade(connection);
+          if (resolved || controller.isClosed) return;
+          if (peer != null) {
+            resolved = true;
+            controller.add(peer);
+            await controller.close();
+            return;
+          }
+          controller.add(null);
+        } while (pendingRetry);
+      } finally {
+        busy = false;
+      }
+    }
+
+    controller = StreamController<PeerConnection?>(
+      onListen: () async {
+        await attempt();
+        if (resolved || controller.isClosed) return;
+        servicesSub = connection.servicesChanges.listen((_) {
+          attempt();
+        });
+        stateSub = connection.stateChanges.listen((s) {
+          if (s == ConnectionState.disconnected &&
+              !resolved &&
+              !controller.isClosed) {
+            resolved = true;
+            controller.close();
+          }
+        });
+      },
+      onCancel: () async {
+        resolved = true;
+        await servicesSub?.cancel();
+        await stateSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// Builds a [PeerConnection] wrapping [rawConnection] if the device
