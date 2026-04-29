@@ -189,6 +189,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
+| [I310](I310-ios-unsupported-error-falls-through-as-platform-exception.md) | iOS adapter throws Dart `UnsupportedError` for capability-gated ops; surfaces as `BlueyPlatformException` with null code | medium |
 
 ### Open — cross-platform unimplemented features
 
