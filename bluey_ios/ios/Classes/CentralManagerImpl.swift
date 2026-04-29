@@ -195,6 +195,20 @@ class CentralManagerImpl: NSObject {
             return
         }
 
+        // I044: short-circuit when the peripheral is already disconnected.
+        // `cancelPeripheralConnection` is a no-op in that state, so
+        // `didDisconnectPeripheral` would not fire and the OpSlot would
+        // wait the full 30 s timeout before returning failure. Domain-
+        // layer cleanup paths that defensively call `disconnect()` would
+        // hang for 30 s per already-disconnected call.
+        if peripheral.state == .disconnected {
+            BlueyLog.shared.log(.debug, "bluey.ios.central",
+                                "disconnect: already disconnected, returning success",
+                                data: ["deviceId": deviceId])
+            completion(.success(()))
+            return
+        }
+
         let slot = disconnectSlots[deviceId] ?? OpSlot<Void>()
         disconnectSlots[deviceId] = slot
         slot.enqueue(
