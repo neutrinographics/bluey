@@ -58,12 +58,15 @@ Prose sections (in this order, any may be omitted if empty):
 
 ## Suggested order of attack
 
-Ordered by impact per hour, refreshed 2026-04-26 after the deep-review + DDD-followup imports. The backlog now bundles many previously-separate fixes into a few coherent rewrite specs (I088, I098, I099, I089/I300/I301), which changes the right unit of work. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
+Ordered by impact per hour, refreshed 2026-04-29 after Tier 3 was cleared and the iOS-cluster sweep closed I044 + I045. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
+
+### Where we are
+
+Tiers 1–3 are cleared. The remaining backlog is Tier 4: opportunistic bundles, plus a long tail of low-severity stubs and limitations. The next coherent project of architectural significance is the **capabilities-matrix bundle**, which subsumes several open entries and is the recommended fix path for I310. Everything else is genuinely opportunistic — pick up when in nearby code or when a concrete consumer needs it.
 
 ### Tier 1 — Quick wins (sub-day each) — DONE
 
 Tier 1 cleared. Done in this cycle:
-~~I074~~ ([f13f2ef](#)),
 ~~I017~~ ([a352c17](#)),
 ~~I035 Stage A~~ ([cb1b24f](#)),
 ~~I009~~ ([a6bd217](#)),
@@ -100,18 +103,33 @@ These rewrite portions of the public surface; plan as release events with a migr
 
 ### Tier 4 — Opportunistic (pick up when in nearby code)
 
-Bundles flagged where natural; everything else can land as one-offs.
+Ordered by recommended sequence. Bundles preferred where the underlying concerns share architecture; one-offs land as small commits. Everything below is genuinely optional — there is no current production blocker in this list.
 
-- **iOS one-offs** — ~~I044~~ ([683a1eb](#)) and ~~I045~~ ([d015870](#)) closed in 2026-04-29 cluster sweep. Remaining: I046 (max-write-length plumbing — actually cross-platform, bundle with I034), I047 (batched ATT write response — needs real-hardware repro before fixing per the entry), I048 (state restoration — multi-day plugin/AppDelegate work; not a one-off).
-- **Server-API polish** (I058 + I059) — advertising mode dropped + `removeService` fire-and-forget. *Bundle, ~1–2 hours.*
-- **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. *Bundle, ~1–2 hours.*
-- **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. *Bundle.*
-- **Capabilities matrix** (I053 + I065 + I069) — expand the matrix, make it load-bearing in production code, parameterize the test fake. *Bundle.*
-- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md, document the Domain ↔ Platform-Interface vocabulary translation. *~1 hour.* Best done alongside I300.
-- **iOS 091/093** — unmapped `CBATTError` codes / `notFound` mapping. Small NSError mapping cleanups.
-- **I306** — non-Bluey iOS-client disconnect on Android-server. Peer-protocol case closed (`3041eca`); only raw-GATT iOS interop remains. Pick up only if a concrete consumer needs sub-supervision-timeout disconnect detection for non-peer iOS centrals.
+#### Recommended next bundle — Capabilities matrix (multi-day, Tier-3-shaped)
 
-Everything else (the remaining 30+ open entries, mostly low-severity stubs and limitations) proceeds opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
+**I053 + I065 + I069 + I303 + I310 + I045-followup.** Expand the `Capabilities` matrix to cover every BLE-feature dimension (I053), make it load-bearing — domain-layer methods consult it before crossing the platform-interface seam (I065), parameterize `FakeBlueyPlatform` so tests can simulate any platform shape (I069), replace the iOS-detection heuristic with a precise platform-kind flag (I303), throw a typed `UnsupportedOperationException` when a capability flag is false instead of letting `UnsupportedError` fall through to `BlueyPlatformException(null)` (I310), and add the `canForceDisconnectRemoteCentral: false` flag so consumers can gate `Server.disconnectCentral` without try/catch (the I045 follow-up). I310 explicitly recommends this bundle as its preferred fix path. Estimate: 2–3 days. Worth a spec, similar to the I099 rewrite.
+
+#### Smaller bundles (1–2 hours each)
+
+- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour. Best done alongside the capabilities bundle since both touch the bounded-context seam.
+- **Server-API polish** (I058 + I059) — advertising mode dropped + `removeService` fire-and-forget. ~1–2 hours.
+- **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. ~1–2 hours.
+- **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. Bundle.
+- **iOS NSError mapping cleanups** (I091 + I093) — unmapped `CBATTError` codes / `notFound` mapping. I091 was implicated in the `bluey-unknown` results from the 2026-04-29 stress-test session.
+
+#### Remaining iOS one-offs
+
+- **I046** — max-write-length plumbing. *Cross-platform; bundle with I034 (Android twin), not a true iOS one-off despite the cluster heading.*
+- **I047** — batched ATT write response. *Needs real-hardware repro before any fix per the entry's verification plan; can't safely guess at the right behavior.*
+- **I048** — iOS state restoration. *Multi-day plugin/AppDelegate/Info.plist work; not a one-off despite the cluster heading.*
+
+#### Pure follow-ups (pick up only when concrete need surfaces)
+
+- **I306** — non-Bluey iOS-client disconnect on Android-server. Peer-protocol case closed (`3041eca`); only raw-GATT iOS interop remains.
+- **I308 + I309** — DDD seam refinement. Domain layer catches Flutter's `PlatformException` directly (I308) and imports `bluey_platform_interface` types directly (I309) instead of going through abstract repositories. Low severity; takes a multi-day refactor to address properly. Pick up only if a non-Flutter Dart consumer of the domain layer materializes.
+- **I304** — peer-builder helper extraction. Low.
+
+Everything else (the remaining 25+ open entries, mostly low-severity stubs and limitations on the index below) proceeds opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
 
 ---
 
@@ -179,8 +197,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I041](I041-ios-read-notification-race.md) | `didUpdateCharacteristicValue` conflates read response with notification | medium |
 | [I042](I042-ios-services-cache-dead.md) | `services` cache dict is dead storage | low |
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
-| [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | Disconnect of already-disconnected peripheral waits for timeout | low |
-| [I045](I045-ios-disconnect-central-noop.md) | `disconnectCentral` returns success without disconnecting the central | medium |
 | [I046](I046-ios-max-write-length-not-exposed.md) | `getMaximumWriteLength` implemented but not exposed via Pigeon | medium |
 | [I047](I047-ios-pending-write-requests-batch.md) | `respondToWriteRequest` only responds to first of batched ATT requests | medium |
 | [I048](I048-ios-no-state-restoration.md) | iOS managers initialized without restore identifier; state restoration disabled | medium |
@@ -258,6 +274,8 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I099](I099-typed-error-translation-rewrite.md) | Typed-error-translation rewrite; new `withErrorTranslation` helper; `Bluey.errorStream` removed (breaking) | `6427cc8` (bundle `0a72a42..6427cc8`) |
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` could hang the disconnect path; 1 s timeout in `PeerConnection.disconnect`; `BlueyConnection.disconnect` no longer carries lifecycle | `3041eca` (premise gone post-I300 `ccb5dc6`) |
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `BlueyConnection.upgrade()` double-upgrade leak; `upgrade()` removed entirely by I300 | `ccb5dc6` |
+| [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | iOS disconnect of an already-disconnected peripheral waited the full 30 s timeout; now short-circuits | `683a1eb` |
+| [I045](I045-ios-disconnect-central-noop.md) | iOS `disconnectCentral` lied about success while the BLE link stayed up; now throws (breaking) | `d015870` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
