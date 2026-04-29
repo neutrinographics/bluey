@@ -93,8 +93,10 @@ I035 Stage B (Pigeon plumbing for bond/PHY/conn-priority) remains open as a mult
 These rewrite portions of the public surface; plan as release events with a migration guide.
 
 11. ~~**I088** — Pigeon GATT schema rewrite (handle-based identity).~~ ([73656b4](#); bundle `929e869..73656b4`). Drove I010 + I011 + I016 fixes. Handle-based identity threaded through every Pigeon GATT op.
-12. **I099** — Typed error translation rewrite. *~2–3 days.* Drives I090 + I092. Replaces string-matching `_wrapError` with a typed catch ladder; preserves the I097 lifecycle-accounting hooks.
+12. ~~**I099** — Typed error translation rewrite.~~ ([6427cc8](#); bundle `0a72a42..6427cc8`). Drove I090 + I092. New `withErrorTranslation` helper consolidates the anti-corruption layer; `Bluey.errorStream` removed (breaking). 23 new tests.
 13. ~~**I089 + I300 + I301** — Connection bounded-context refinement.~~ ([73656b4](#); bundle `929e869..73656b4`). Bundled with I088 into one major-version-bump release: composition over upgrade-in-place (`PeerConnection`), platform-tagged extensions (`connection.android` / `connection.ios`), value objects for connection parameters and MTU. I066 closed in the same bundle.
+
+**Tier 3 cleared.**
 
 ### Tier 4 — Opportunistic (pick up when in nearby code)
 
@@ -138,9 +140,6 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
-| [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` bypass error translation | high |
-| [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions | medium |
-| [I099](I099-typed-error-translation-rewrite.md) | Replace string-matching error wrapping with typed catch ladder (architectural) | high |
 
 ### Open — Android native
 
@@ -255,6 +254,9 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I300](I300-connection-peer-bounded-context.md) | Connection aggregate carried Peer-context state; resolved via composition (`PeerConnection` wraps `Connection`); `Bluey.connect` / `connectAsPeer` / `tryUpgrade` split | `73656b4` (bundle `929e869..73656b4`) |
 | [I301](I301-connection-params-mtu-primitive-obsession.md) | `ConnectionParameters` and `mtu` primitives replaced with value objects (`ConnectionInterval`, `PeripheralLatency`, `SupervisionTimeout`, `Mtu`) | `73656b4` (bundle `929e869..73656b4`) |
 | [I307](I307-structured-logging-pipeline.md) | Structured logging pipeline (domain + Android + iOS native) unified into `bluey.logEvents` with Dart-set level filter; released as 0.3.0 | `db5a999` (bundle `bd0b433..db5a999`) |
+| [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` / extension-method bypass; resolved by I099 typed-translation rewrite | `5d4ba85` (bundle `0a72a42..6427cc8`) |
+| [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions; resolved by I099 | `8fd3428` (bundle `0a72a42..6427cc8`) |
+| [I099](I099-typed-error-translation-rewrite.md) | Typed-error-translation rewrite; new `withErrorTranslation` helper; `Bluey.errorStream` removed (breaking) | `6427cc8` (bundle `0a72a42..6427cc8`) |
 
 ### Wontfix — documented platform limitations & superseded premises
 

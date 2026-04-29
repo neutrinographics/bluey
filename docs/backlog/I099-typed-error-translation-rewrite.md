@@ -4,10 +4,13 @@ title: Replace string-matching error wrapping with typed catch ladder throughout
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-29
+fixed_in: 6427cc8
 related: [I090, I092]
 ---
+
+> **Fixed 2026-04-29** across 5 commits (`0a72a42..6427cc8`) per the spec at `docs/superpowers/specs/2026-04-29-typed-error-translation-rewrite-design.md`. New helper `bluey/lib/src/shared/error_translation.dart` provides `translatePlatformException` (pure) + `withErrorTranslation` (Future sugar with optional LifecycleClient accounting). All `_wrapError` sites in `Bluey` migrated; `BlueyConnection.disconnect/bond/removeBond/requestPhy/requestConnectionParameters` no longer bypass translation; scanner `onError` translates platform errors. `Bluey.errorStream` removed (breaking). 23 new tests; 812 bluey tests pass.
 
 ## Symptom
 

@@ -4,10 +4,13 @@ title: Scan errors not translated to domain exceptions
 category: bug
 severity: medium
 platform: both
-status: open
-last_verified: 2026-04-23
-related: [I013]
+status: fixed
+last_verified: 2026-04-29
+fixed_in: 8fd3428
+related: [I013, I099]
 ---
+
+> **Fixed 2026-04-29** as part of the I099 typed-error-translation rewrite. `BlueyScanner.scan`'s `onError` handler now calls `translatePlatformException` (the pure form, since stream onError is sync) before forwarding on the domain stream's error channel. Subscribers pattern-matching on `BlueyException` see the typed contract on scan errors for the first time.
 
 ## Symptom
 

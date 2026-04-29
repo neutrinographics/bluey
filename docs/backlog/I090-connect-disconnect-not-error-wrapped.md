@@ -4,10 +4,13 @@ title: "`Bluey.connect()` and `BlueyConnection.disconnect()` bypass error transl
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-29
+fixed_in: 5d4ba85
 related: [I092, I099]
 ---
+
+> **Fixed 2026-04-29** as part of the I099 typed-error-translation rewrite. `Bluey.connect` migrated in `219ed8c` (commit 2 of the bundle); `BlueyConnection.disconnect/bond/removeBond/requestPhy/requestConnectionParameters` migrated in `5d4ba85` (commit 3). All five extension-method bypasses now route through the shared `withErrorTranslation` helper.
 
 ## Symptom
 
