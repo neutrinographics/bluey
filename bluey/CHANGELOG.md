@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+**Server-side peer identification:**
+
+- New `Server.peerConnections: Stream<PeerClient>` — emits a `PeerClient` the first time a connected central sends a lifecycle heartbeat write. Mirrors the connection-side `tryUpgrade` semantics: identification is per-session; reconnect-then-heartbeat re-identifies. Consumers that only care about Bluey peers can subscribe here and ignore `connections`.
+- New `PeerClient` type — composition wrapper around `Client` (server-side analog of `PeerConnection`).
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

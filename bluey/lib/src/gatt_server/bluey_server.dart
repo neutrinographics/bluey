@@ -9,6 +9,7 @@ import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
+import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
@@ -44,8 +45,17 @@ class BlueyServer implements Server {
 
   final StreamController<Client> _connectionsController =
       StreamController<Client>.broadcast();
+  final StreamController<PeerClient> _peerConnectionsController =
+      StreamController<PeerClient>.broadcast();
   final StreamController<String> _disconnectionsController =
       StreamController<String>.broadcast();
+
+  /// Set of clientIds that have been identified as Bluey peers (i.e.
+  /// have sent at least one lifecycle heartbeat in the current
+  /// session). Used to fire [PeerClient] emissions exactly once per
+  /// identification — not once per heartbeat. Cleared on disconnect so
+  /// a reconnect-then-heartbeat re-identifies.
+  final Set<String> _identifiedPeerClientIds = {};
 
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
@@ -170,6 +180,9 @@ class BlueyServer implements Server {
 
   @override
   Stream<Client> get connections => _connectionsController.stream;
+
+  @override
+  Stream<PeerClient> get peerConnections => _peerConnectionsController.stream;
 
   @override
   Stream<String> get disconnections => _disconnectionsController.stream;
@@ -542,6 +555,7 @@ class BlueyServer implements Server {
     await _platformReadRequestsSub?.cancel();
     await _platformWriteRequestsSub?.cancel();
     await _connectionsController.close();
+    await _peerConnectionsController.close();
     await _disconnectionsController.close();
     await _filteredReadRequestsController.close();
     await _filteredWriteRequestsController.close();
@@ -556,21 +570,38 @@ class BlueyServer implements Server {
   /// connections, iOS has no connection callback at all). A control service
   /// write proves the client is connected.
   void _trackClientIfNeeded(String clientId) {
-    if (_connectedClients.containsKey(clientId)) return;
+    final wasNew = !_connectedClients.containsKey(clientId);
+    if (wasNew) {
+      _emitEvent(
+        ClientConnectedEvent(
+          clientId: clientId,
+          source: 'BlueyServer',
+        ),
+      );
+      final client = BlueyClient(
+        platform: _platform,
+        id: clientId,
+        mtu: 23, // Default MTU — actual MTU is unknown without platform event
+      );
+      _connectedClients[clientId] = client;
+      _connectionsController.add(client);
+    }
 
-    _emitEvent(
-      ClientConnectedEvent(
-        clientId: clientId,
-        source: 'BlueyServer',
-      ),
-    );
-    final client = BlueyClient(
-      platform: _platform,
-      id: clientId,
-      mtu: 23, // Default MTU — actual MTU is unknown without platform event
-    );
-    _connectedClients[clientId] = client;
-    _connectionsController.add(client);
+    // Peer identification: this hook fires on every lifecycle heartbeat
+    // write, but [PeerClient] is emitted exactly once per identification.
+    // Subsequent heartbeats from the same client are no-ops here. The
+    // identification set is cleared in [_handleClientDisconnected] so a
+    // reconnect-then-heartbeat re-identifies.
+    if (_identifiedPeerClientIds.add(clientId)) {
+      final client = _connectedClients[clientId]!;
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.server',
+        'central identified as Bluey peer',
+        data: {'clientId': clientId},
+      );
+      _peerConnectionsController.add(PeerClient.create(client: client));
+    }
   }
 
   // === Lifecycle management ===
@@ -591,6 +622,11 @@ class BlueyServer implements Server {
         ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
     }
+
+    // Clear peer identification — a reconnect-then-heartbeat must
+    // re-identify, mirroring the connection-side semantics where
+    // `tryUpgrade` is per-connection.
+    _identifiedPeerClientIds.remove(clientId);
 
     // Always emit on the disconnections stream -- even for untracked clients
     // (e.g., stale connections from before a server restart).

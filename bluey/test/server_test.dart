@@ -313,6 +313,9 @@ class MockServer implements Server {
   Stream<Client> get connections => _connectionsController.stream;
 
   @override
+  Stream<PeerClient> get peerConnections => const Stream.empty();
+
+  @override
   Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override

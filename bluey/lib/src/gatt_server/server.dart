@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
@@ -65,8 +66,22 @@ abstract class Server {
 
   /// Stream of connected client devices.
   ///
-  /// Emits when a client connects to this peripheral.
+  /// Emits when a client connects to this peripheral. Emits for every
+  /// central that connects, regardless of whether it speaks the Bluey
+  /// lifecycle protocol.
   Stream<Client> get connections;
+
+  /// Stream of clients that have identified themselves as Bluey peers.
+  ///
+  /// Emits a [PeerClient] the first time a connected central sends a
+  /// lifecycle heartbeat write — signaling that the central speaks the
+  /// Bluey protocol. Does not re-emit on subsequent heartbeats from the
+  /// same client. On disconnect the identification resets; a
+  /// reconnect-then-heartbeat produces a fresh emission.
+  ///
+  /// Consumers that only care about Bluey peers can subscribe here and
+  /// ignore [connections]; raw / non-Bluey centrals are never emitted.
+  Stream<PeerClient> get peerConnections;
 
   /// Stream of disconnected client device IDs.
   ///

@@ -711,6 +711,183 @@ void main() {
       });
     });
 
+    group('Peer Identification', () {
+      // The server emits a PeerClient on `peerConnections` the first
+      // time a connected central sends a lifecycle heartbeat write —
+      // signaling "this central speaks the Bluey protocol."
+      // Symmetric with the connection-side `tryUpgrade` path.
+
+      test('peerConnections emits when central first sends a heartbeat',
+          () async {
+        final server = bluey.server()!;
+
+        final peers = <PeerClient>[];
+        final sub = server.peerConnections.listen(peers.add);
+        addTearDown(sub.cancel);
+
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        // Connection alone doesn't identify as peer.
+        expect(peers, isEmpty);
+
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 1,
+            centralId: 'central-1',
+            characteristicUuid: lifecycle.heartbeatCharUuid,
+            value: lifecycle.heartbeatValue,
+            offset: 0,
+            responseNeeded: false,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(peers, hasLength(1),
+            reason: 'first heartbeat from a central should produce '
+                'one PeerClient emission');
+        expect(peers.single.client.mtu, equals(247));
+      });
+
+      test('peerConnections does NOT re-emit on subsequent heartbeats',
+          () async {
+        final server = bluey.server()!;
+
+        final peers = <PeerClient>[];
+        final sub = server.peerConnections.listen(peers.add);
+        addTearDown(sub.cancel);
+
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        for (var i = 0; i < 5; i++) {
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
+              requestId: i,
+              centralId: 'central-1',
+              characteristicUuid: lifecycle.heartbeatCharUuid,
+              value: lifecycle.heartbeatValue,
+              offset: 0,
+              responseNeeded: false,
+              characteristicHandle: 0,
+            ),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+
+        expect(peers, hasLength(1),
+            reason: 'identification fires once per identification, '
+                'not per heartbeat');
+      });
+
+      test('peerConnections does NOT emit for non-Bluey centrals',
+          () async {
+        final server = bluey.server()!;
+
+        final peers = <PeerClient>[];
+        final sub = server.peerConnections.listen(peers.add);
+        addTearDown(sub.cancel);
+
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'raw-central', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(peers, isEmpty,
+            reason: 'a central that never heartbeats is not a peer');
+      });
+
+      test('peerConnections re-emits on reconnect after disconnect',
+          () async {
+        final server = bluey.server()!;
+
+        final peers = <PeerClient>[];
+        final sub = server.peerConnections.listen(peers.add);
+        addTearDown(sub.cancel);
+
+        // First session.
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 1,
+            centralId: 'central-1',
+            characteristicUuid: lifecycle.heartbeatCharUuid,
+            value: lifecycle.heartbeatValue,
+            offset: 0,
+            responseNeeded: false,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        expect(peers, hasLength(1));
+
+        mockPlatform.emitCentralDisconnected('central-1');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        // Reconnect + heartbeat — fresh identification expected.
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 2,
+            centralId: 'central-1',
+            characteristicUuid: lifecycle.heartbeatCharUuid,
+            value: lifecycle.heartbeatValue,
+            offset: 0,
+            responseNeeded: false,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(peers, hasLength(2),
+            reason: 'reconnect-then-heartbeat re-identifies the peer');
+      });
+
+      test('peerConnections is a broadcast stream', () async {
+        final server = bluey.server()!;
+
+        final a = <PeerClient>[];
+        final b = <PeerClient>[];
+        final subA = server.peerConnections.listen(a.add);
+        final subB = server.peerConnections.listen(b.add);
+        addTearDown(() async {
+          await subA.cancel();
+          await subB.cancel();
+        });
+
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 247),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 1,
+            centralId: 'central-1',
+            characteristicUuid: lifecycle.heartbeatCharUuid,
+            value: lifecycle.heartbeatValue,
+            offset: 0,
+            responseNeeded: false,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(a, hasLength(1));
+        expect(b, hasLength(1));
+      });
+    });
+
     group('Notifications', () {
       // BlueyServer post-D.13 resolves UUID -> handle from the
       // populated PlatformLocalService returned by addService. Each
