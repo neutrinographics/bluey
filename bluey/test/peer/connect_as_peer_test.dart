@@ -69,26 +69,24 @@ void main() {
       await peerConn.disconnect();
     });
 
-    test('sendDisconnectCommand writes 0x00 to the lifecycle control '
-        'characteristic via the wrapper\'s LifecycleClient before the '
-        'underlying disconnect runs (regression: fast path must reuse the '
-        'running LifecycleClient, not construct a fresh unstarted one)',
+    test('disconnect() writes 0x00 to the lifecycle control characteristic '
+        'before tearing down the connection — peers should not need a '
+        'separate fast-path method (sendDisconnectCommand was the old name)',
         () async {
       final id = ServerId.generate();
-      const address = 'AA:BB:CC:DD:EE:0A';
+      const address = 'AA:BB:CC:DD:EE:0C';
       fakePlatform.simulateBlueyServer(address: address, serverId: id);
 
       final device = deviceFromAddress(address);
       final peerConn = await bluey.connectAsPeer(device);
 
-      // Snapshot the writes BEFORE sendDisconnectCommand so we don't
-      // confuse pre-existing heartbeat writes (which the running
-      // LifecycleClient emits) with the disconnect-command write.
+      // Snapshot writes before disconnect so we can ignore pre-existing
+      // heartbeat traffic.
       final before = fakePlatform.writeCharacteristicCalls.length;
 
-      await peerConn.sendDisconnectCommand();
+      await peerConn.disconnect();
 
-      final newWrites = fakePlatform.writeCharacteristicCalls
+      final disconnectWrites = fakePlatform.writeCharacteristicCalls
           .skip(before)
           .where(
             (w) =>
@@ -99,25 +97,12 @@ void main() {
                 w.value.first == 0x00,
           )
           .toList();
-      // Post-C.6, only the wrapper's LifecycleClient writes the
-      // disconnect command. The legacy auto-upgrade lifecycle that used
-      // to live inside BlueyConnection (and would emit a second 0x00
-      // from `connection.disconnect()`) has been removed — BlueyConnection
-      // is now a pure GATT connection with no peer-protocol state.
-      //
-      // Pre-fix (still meaningful regression target): if the wrapper's
-      // LifecycleClient were a fresh, unstarted instance, its
-      // `_heartbeatCharUuid` would be null and `sendDisconnectCommand`
-      // would be a silent no-op — observed count would be 0.
       expect(
-        newWrites.length,
+        disconnectWrites.length,
         equals(1),
-        reason:
-            'The wrapper\'s LifecycleClient should write 0x00 to the '
-            'control characteristic exactly once. Observed 0x00 writes '
-            'after sendDisconnectCommand: ${newWrites.length} '
-            '(expected 1; 0 indicates the wrapper\'s lifecycle was a '
-            'fresh, unstarted client — see C.4 follow-up).',
+        reason: 'peer.disconnect() must write 0x00 via the lifecycle '
+            'protocol before the platform disconnect — fast server-side '
+            'detection without waiting for heartbeat-silence timeout',
       );
     });
 

@@ -61,15 +61,18 @@ abstract class PeerConnection {
 
   /// Disconnect via the peer protocol.
   ///
-  /// Writes `0x00` to the lifecycle control characteristic, then awaits
-  /// the platform-level disconnect. Lower-level alternative:
-  /// [disconnect] (or `connection.disconnect()`).
-  Future<void> sendDisconnectCommand();
-
-  /// GATT-level disconnect — equivalent to `connection.disconnect()`.
+  /// Writes `0x00` to the lifecycle control characteristic as a
+  /// courtesy hint to the server (so the server fires its
+  /// disconnect-detection path immediately rather than waiting for
+  /// heartbeat-silence timeout), then awaits the platform-level
+  /// disconnect.
   ///
-  /// Convenience for callers that want to disconnect without going
-  /// through the peer protocol.
+  /// The courtesy write is bounded with a short timeout — an
+  /// unresponsive peer (the typical disconnect scenario) does not
+  /// block the platform disconnect (I074).
+  ///
+  /// Callers who want a raw GATT disconnect with no peer-protocol
+  /// involvement can call `peer.connection.disconnect()` directly.
   Future<void> disconnect();
 }
 
@@ -125,14 +128,14 @@ class _BlueyPeerConnection implements PeerConnection {
   Future<bool> hasService(UUID uuid) => _serviceView.hasService(uuid);
 
   @override
-  Future<void> sendDisconnectCommand() async {
-    // Two-step: write 0x00 to the control characteristic via the lifecycle
-    // client, then await the platform-level disconnect.
+  Future<void> disconnect() async {
+    // Two-step: write 0x00 to the control characteristic via the
+    // lifecycle client (courtesy hint for fast server-side detection),
+    // then await the platform-level disconnect.
     //
-    // The disconnect-command write is a courtesy hint to the server —
-    // bound it with a short timeout so an unresponsive peer (the typical
-    // disconnect scenario) doesn't block the platform disconnect for the
-    // full per-op timeout. See I074.
+    // The disconnect-command write is bounded with a short timeout so
+    // an unresponsive peer (the typical disconnect scenario) doesn't
+    // block the platform disconnect for the full per-op timeout (I074).
     try {
       await _lifecycle
           .sendDisconnectCommand()
@@ -142,7 +145,4 @@ class _BlueyPeerConnection implements PeerConnection {
     }
     await _connection.disconnect();
   }
-
-  @override
-  Future<void> disconnect() => _connection.disconnect();
 }

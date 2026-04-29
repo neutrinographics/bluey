@@ -11,6 +11,11 @@
 
 - New `Bluey.watchPeer(Connection): Stream<PeerConnection?>` — emits the initial `tryUpgrade` result, then re-attempts on every `connection.servicesChanges` emission until upgrade succeeds. Completes after the first non-null peer (the resulting `PeerConnection` handles in-place handle refresh internally) or when the connection disconnects. Resilient to stale GATT caches, where a freshly-launched server's lifecycle service isn't visible to the central until a Service Changed indication lands. `tryUpgrade` remains the one-shot snapshot; its docstring now points at `watchPeer` for the streaming case.
 
+**PeerConnection.disconnect — fast server-side detection by default (breaking):**
+
+- `PeerConnection.disconnect()` now writes `0x00` to the lifecycle control characteristic before the platform disconnect, so the server fires its disconnect-detection path immediately instead of waiting for heartbeat-silence timeout. The courtesy write is bounded with a 1 s timeout (preserves I074: an unresponsive peer doesn't stall the disconnect).
+- `PeerConnection.sendDisconnectCommand()` is **removed**. The fast-path semantics are now the default behavior of `disconnect()`. Callers who need a raw GATT disconnect with no peer-protocol involvement should call `peer.connection.disconnect()` directly.
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

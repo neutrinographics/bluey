@@ -7,14 +7,13 @@ import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
 
 /// Tests for the disconnect path on a peer connection. Specifically:
-/// the courtesy `sendDisconnectCommand` write must not be allowed to
-/// block the platform disconnect indefinitely (I074).
+/// the courtesy lifecycle write must not be allowed to block the
+/// platform disconnect indefinitely (I074).
 ///
-/// Post-C.6, `BlueyConnection.disconnect` no longer emits a courtesy
-/// disconnect-command write — that behavior moved to the peer-protocol
-/// surface (`PeerConnection.sendDisconnectCommand`). The I074 invariant
-/// is therefore exercised against the peer wrapper instead of the raw
-/// connection.
+/// `BlueyConnection.disconnect` is purely raw GATT — the courtesy
+/// disconnect-command write lives on the peer-protocol surface
+/// (`PeerConnection.disconnect`). The I074 invariant is therefore
+/// exercised against the peer wrapper instead of the raw connection.
 void main() {
   late FakeBlueyPlatform fakePlatform;
 
@@ -23,9 +22,9 @@ void main() {
     platform.BlueyPlatform.instance = fakePlatform;
   });
 
-  group('PeerConnection.sendDisconnectCommand', () {
+  group('PeerConnection.disconnect', () {
     test(
-        'I074: sendDisconnectCommand proceeds with platform disconnect even '
+        'I074: disconnect proceeds with platform disconnect even '
         'when the courtesy lifecycle write hangs', () async {
       fakePlatform.simulateBlueyServer(
         address: TestDeviceIds.device1,
@@ -43,18 +42,18 @@ void main() {
       // is unambiguously the disconnect-command write.
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      // Hold the next write — that will be the courtesy 0x00 emitted by
-      // the lifecycle client during sendDisconnectCommand.
+      // Hold the next write — that will be the courtesy 0x00 emitted
+      // during disconnect.
       fakePlatform.holdNextWriteCharacteristic();
 
-      // sendDisconnectCommand must not block forever on a hung write.
-      // Bound the test wait at 3 seconds. The lifecycle-client
-      // sendDisconnectCommand swallows its own timeout, then proceeds to
-      // platform disconnect.
-      await peerConn.sendDisconnectCommand().timeout(
+      // disconnect must not block forever on a hung write. Bound the
+      // test wait at 3 seconds. The lifecycle-client disconnect-command
+      // call swallows its own timeout, then proceeds to platform
+      // disconnect.
+      await peerConn.disconnect().timeout(
             const Duration(seconds: 3),
             onTimeout: () =>
-                fail('sendDisconnectCommand did not return within 3s; '
+                fail('peer.disconnect() did not return within 3s; '
                     'the courtesy lifecycle write blocked it'),
           );
 
@@ -62,7 +61,7 @@ void main() {
         peerConn.connection.state,
         ConnectionState.disconnected,
         reason: 'underlying connection must reach disconnected after '
-            'sendDisconnectCommand returns',
+            'peer.disconnect() returns',
       );
 
       bluey.dispose();

@@ -286,23 +286,10 @@ void main() {
     });
   });
 
-  test('disconnect() delegates to wrapped Connection.disconnect()', () async {
-    final conn = _SpyConnection();
-    final lifecycle = _SpyLifecycleClient(callLog: []);
-
-    final peerConn = PeerConnection.create(
-      connection: conn,
-      serverId: serverId,
-      lifecycleClient: lifecycle,
-    );
-
-    await peerConn.disconnect();
-
-    expect(conn.calls, equals(['disconnect']));
-  });
-
   test(
-    'sendDisconnectCommand() calls lifecycle.sendDisconnectCommand THEN connection.disconnect (in order)',
+    'disconnect() calls lifecycle.sendDisconnectCommand THEN '
+    'connection.disconnect (in order) — peers always go through the '
+    'lifecycle protocol; raw escape hatch is peer.connection.disconnect()',
     () async {
       final callLog = <String>[];
       final conn = _SpyConnection();
@@ -316,7 +303,7 @@ void main() {
         lifecycleClient: lifecycle,
       );
 
-      await peerConn.sendDisconnectCommand();
+      await peerConn.disconnect();
 
       expect(
         callLog,
