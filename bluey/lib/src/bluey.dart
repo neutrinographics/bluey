@@ -91,8 +91,6 @@ class Bluey {
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-  final StreamController<BlueyException> _errorController =
-      StreamController<BlueyException>.broadcast();
 
   BluetoothState _currentState = BluetoothState.unknown;
 
@@ -198,13 +196,6 @@ class Bluey {
   ///
   /// Emits whenever Bluetooth is enabled, disabled, or permissions change.
   Stream<BluetoothState> get stateStream => _stateController.stream;
-
-  /// Stream of errors from Bluey operations.
-  ///
-  /// Subscribe to this stream to receive notifications about errors
-  /// that occur during BLE operations. This is useful for logging
-  /// or displaying error messages to the user.
-  Stream<BlueyException> get errorStream => _errorController.stream;
 
   /// Stream of diagnostic events from Bluey.
   ///
@@ -803,7 +794,6 @@ class Bluey {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
-    await _errorController.close();
     await _eventBus.close();
     await _logger.dispose();
     if (_shared == this) {

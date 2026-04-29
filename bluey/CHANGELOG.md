@@ -16,6 +16,14 @@
 - `PeerConnection.disconnect()` now writes `0x00` to the lifecycle control characteristic before the platform disconnect, so the server fires its disconnect-detection path immediately instead of waiting for heartbeat-silence timeout. The courtesy write is bounded with a 1 s timeout (preserves I074: an unresponsive peer doesn't stall the disconnect).
 - `PeerConnection.sendDisconnectCommand()` is **removed**. The fast-path semantics are now the default behavior of `disconnect()`. Callers who need a raw GATT disconnect with no peer-protocol involvement should call `peer.connection.disconnect()` directly.
 
+**Typed error translation (I099 + I090 + I092):**
+
+- `Bluey.errorStream` is **removed (breaking)**. It was populated by the legacy string-matching `_wrapError` path and offered no information that isn't already available either through the typed exception thrown at the failing call site or through `bluey.logEvents`. Callers that subscribed to it should pattern-match on the typed `BlueyException` thrown from the failing call, or filter `bluey.logEvents` to `level >= warn` for an observability sink.
+- New `bluey/lib/src/shared/error_translation.dart` houses the anti-corruption layer: a pure `translatePlatformException(Object) → BlueyException` plus a Future sugar `withErrorTranslation<T>(...)` with optional `LifecycleClient` accounting (preserves I097's user-op activity hooks). Replaces the prior split between `_runGattOp`'s typed catch ladder and `Bluey._wrapError`'s string-matching fallback.
+- Every `_wrapError` call site (`configure`, `state`, `requestEnable`, `authorize`, `openSettings`, `connect`, `bondedDevices`, plus the state-stream `onError` translator) now routes through the typed helper. Pattern-matching on `BlueyException` subtypes is reliable on these paths for the first time. Behavioral note: a few sites previously yielded `BluetoothUnavailableException` / `ConnectionException` via lucky keyword matches in the platform's free-text error messages; post-fix they yield more accurate `BlueyPlatformException` / `GattTimeoutException` / etc. preserving the wire-level codes.
+- Connection extension methods (`disconnect`, `connection.android?.bond` / `removeBond` / `requestPhy` / `requestConnectionParameters`) previously bypassed translation entirely — raw `PlatformException` / typed platform-interface exceptions could leak unwrapped to callers. Closes I090.
+- Scanner `onError` translates platform errors before forwarding on the scan stream's error channel. Subscribers that ignored `onError` are unaffected; subscribers that pattern-matched on the raw error channel will need to update — but they were broken anyway. Closes I092.
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

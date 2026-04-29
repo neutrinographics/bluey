@@ -35,11 +35,10 @@ void main() async {
   // Initialize dependency injection
   await setupServiceLocator();
 
-  // Set up Bluey error and event logging
+  // Set up Bluey event logging. Errors no longer have a dedicated stream;
+  // they surface as typed BlueyException at the call sites that throw them
+  // and as warn/error entries on bluey.logEvents (see below).
   final bluey = getIt<Bluey>();
-  bluey.errorStream.listen((error) {
-    debugPrint('[Bluey Error] ${error.message}');
-  });
   debugPrint('[Bluey] Subscribing to event stream');
   bluey.events.listen((event) {
     debugPrint('[Bluey] $event');
