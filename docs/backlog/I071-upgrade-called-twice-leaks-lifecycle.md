@@ -4,10 +4,17 @@ title: "`BlueyConnection.upgrade()` called twice leaks the previous lifecycle"
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
-related: [I070]
+status: fixed
+last_verified: 2026-04-29
+fixed_in: ccb5dc6
+related: [I070, I300]
 ---
+
+> **Fixed (superseded by I300).** `BlueyConnection.upgrade()` no longer exists. The I300 connection / peer bounded-context refinement (`ccb5dc6`) removed `upgrade()`, `isBlueyServer`, `serverId`, the control-service filter, and late-upgrade entirely from `BlueyConnection`. Peer-protocol concerns now live exclusively in `PeerConnection` (composition wrapper); a peer wrapper is constructed once with a fresh `LifecycleClient` and never mutated in place. Double-upgrade is impossible by construction.
+>
+> The 2026-04-26 note about `bluey_peer_test.dart` exercising a leaked OLD lifecycle is now stale: post-I300, `BlueyPeer.connect` (`bluey/lib/src/peer/bluey_peer.dart`) constructs exactly one `LifecycleClient` and hands it to `PeerConnection.create`. There is no second one to leak.
+>
+> Follow-up cleanup (out of scope for this entry): the test's lifecycle-timeline comments still reference the pre-I300 "OLD lifecycle's death watch" framing. Worth a comment-only refresh next time the file is touched, but the test itself is correct.
 
 ## Symptom
 

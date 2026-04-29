@@ -135,9 +135,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
 | [I069](I069-fake-platform-capabilities-hardcoded.md) | `FakeBlueyPlatform.capabilities` hardcoded; no test coverage of capability gating | medium |
-| [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `upgrade()` called twice leaks previous lifecycle client | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
-| [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` can hang entire disconnect path | high |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
 
@@ -258,6 +256,8 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I090](I090-connect-disconnect-not-error-wrapped.md) | `connect()` / `disconnect()` / extension-method bypass; resolved by I099 typed-translation rewrite | `5d4ba85` (bundle `0a72a42..6427cc8`) |
 | [I092](I092-scan-errors-not-translated.md) | Scan errors not translated to domain exceptions; resolved by I099 | `8fd3428` (bundle `0a72a42..6427cc8`) |
 | [I099](I099-typed-error-translation-rewrite.md) | Typed-error-translation rewrite; new `withErrorTranslation` helper; `Bluey.errorStream` removed (breaking) | `6427cc8` (bundle `0a72a42..6427cc8`) |
+| [I074](I074-send-disconnect-command-can-hang.md) | `sendDisconnectCommand()` could hang the disconnect path; 1 s timeout in `PeerConnection.disconnect`; `BlueyConnection.disconnect` no longer carries lifecycle | `3041eca` (premise gone post-I300 `ccb5dc6`) |
+| [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `BlueyConnection.upgrade()` double-upgrade leak; `upgrade()` removed entirely by I300 | `ccb5dc6` |
 
 ### Wontfix — documented platform limitations & superseded premises
 

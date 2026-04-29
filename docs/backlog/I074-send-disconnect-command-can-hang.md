@@ -4,9 +4,24 @@ title: "`sendDisconnectCommand()` can hang the entire `disconnect()` path"
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-29
+fixed_in: 3041eca
 ---
+
+> **Fixed.** The original premise — `BlueyConnection.disconnect()` blocking on `_lifecycle!.sendDisconnectCommand()` — is gone post-I300 (`ccb5dc6`): peer-protocol concerns moved out of `BlueyConnection` entirely. The fast-path now lives on `PeerConnection.disconnect()` (renamed from `sendDisconnectCommand` in `3041eca`) and is bounded by a 1-second timeout exactly as the original fix sketch prescribed:
+>
+> ```dart
+> // bluey/lib/src/peer/peer_connection.dart
+> try {
+>   await _lifecycle.sendDisconnectCommand().timeout(const Duration(seconds: 1));
+> } catch (_) {
+>   // Best-effort courtesy; proceed to platform disconnect regardless.
+> }
+> await _connection.disconnect();
+> ```
+>
+> Verified at `bluey/lib/src/peer/peer_connection.dart:131-147`. The I074 invariant test in `bluey/test/connection/bluey_connection_disconnect_test.dart` continues to assert: even with the courtesy lifecycle write held indefinitely, `peer.disconnect()` returns within 3 seconds and the underlying connection reaches `disconnected`.
 
 ## Symptom
 
