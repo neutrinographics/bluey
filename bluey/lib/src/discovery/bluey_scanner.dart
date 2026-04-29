@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../event_bus.dart';
 import '../events.dart';
+import '../shared/error_translation.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'advertisement.dart';
@@ -56,7 +57,10 @@ class BlueyScanner implements Scanner {
       },
       onError: (Object error) {
         _timeoutTimer?.cancel();
-        controller.addError(error);
+        controller.addError(translatePlatformException(
+          error,
+          operation: 'scan',
+        ));
         _finishScan(controller);
       },
     );
