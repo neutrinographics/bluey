@@ -211,6 +211,8 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
 | [I303](I303-capabilities-platform-kind-flag.md) | iOS-detection heuristic on `Connection.ios` should be a precise capability flag | low |
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
+| [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
+| [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
 
 ### Fixed — verified in HEAD
 
