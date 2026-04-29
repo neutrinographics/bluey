@@ -555,7 +555,11 @@ class BlueyConnection implements Connection {
 
     _setState(ConnectionState.disconnecting);
 
-    await _platform.disconnect(_connectionId);
+    await withErrorTranslation(
+      () => _platform.disconnect(_connectionId),
+      operation: 'disconnect',
+      deviceId: deviceId,
+    );
 
     _setState(ConnectionState.disconnected);
 
@@ -577,12 +581,20 @@ class BlueyConnection implements Connection {
 
   Future<void> _bondImpl() async {
     _ensureConnected();
-    await _platform.bond(_connectionId);
+    await withErrorTranslation(
+      () => _platform.bond(_connectionId),
+      operation: 'bond',
+      deviceId: deviceId,
+    );
   }
 
   Future<void> _removeBondImpl() async {
     _ensureConnected();
-    await _platform.removeBond(_connectionId);
+    await withErrorTranslation(
+      () => _platform.removeBond(_connectionId),
+      operation: 'removeBond',
+      deviceId: deviceId,
+    );
   }
 
   // === PHY (private; exposed via connection.android?.X) ===
@@ -595,10 +607,14 @@ class BlueyConnection implements Connection {
 
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureConnected();
-    await _platform.requestPhy(
-      _connectionId,
-      txPhy != null ? _mapPhyToPlatform(txPhy) : null,
-      rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
+    await withErrorTranslation(
+      () => _platform.requestPhy(
+        _connectionId,
+        txPhy != null ? _mapPhyToPlatform(txPhy) : null,
+        rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
+      ),
+      operation: 'requestPhy',
+      deviceId: deviceId,
     );
   }
 
@@ -610,9 +626,13 @@ class BlueyConnection implements Connection {
     ConnectionParameters params,
   ) async {
     _ensureConnected();
-    await _platform.requestConnectionParameters(
-      _connectionId,
-      connectionParametersToPlatform(params),
+    await withErrorTranslation(
+      () => _platform.requestConnectionParameters(
+        _connectionId,
+        connectionParametersToPlatform(params),
+      ),
+      operation: 'requestConnectionParameters',
+      deviceId: deviceId,
     );
     _connectionParameters = params;
   }
