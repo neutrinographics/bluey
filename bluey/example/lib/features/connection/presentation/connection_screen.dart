@@ -15,7 +15,7 @@ import '../../../shared/stress_protocol.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
-import '../application/try_upgrade.dart';
+import '../application/watch_peer.dart';
 import 'connection_cubit.dart';
 import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
@@ -53,7 +53,7 @@ class ConnectionScreen extends StatelessWidget {
             connectToDevice: getIt<ConnectToDevice>(),
             disconnectDevice: getIt<DisconnectDevice>(),
             getServices: getIt<GetServices>(),
-            tryUpgrade: getIt<TryUpgrade>(),
+            watchPeer: getIt<WatchPeer>(),
             settingsCubit: getIt<ConnectionSettingsCubit>(),
           )..connect(),
       child: const _ConnectionView(),

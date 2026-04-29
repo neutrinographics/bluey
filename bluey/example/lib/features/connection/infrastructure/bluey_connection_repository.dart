@@ -22,8 +22,8 @@ class BlueyConnectionRepository implements ConnectionRepository {
   }
 
   @override
-  Future<PeerConnection?> tryUpgrade(Connection connection) async {
-    return await _bluey.tryUpgrade(connection);
+  Stream<PeerConnection?> watchPeer(Connection connection) {
+    return _bluey.watchPeer(connection);
   }
 
   @override

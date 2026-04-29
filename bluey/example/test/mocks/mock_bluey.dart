@@ -5,6 +5,8 @@ class MockBluey extends Mock implements Bluey {}
 
 class MockConnection extends Mock implements Connection {}
 
+class MockPeerConnection extends Mock implements PeerConnection {}
+
 class MockRemoteService extends Mock implements RemoteService {}
 
 class MockRemoteCharacteristic extends Mock implements RemoteCharacteristic {}

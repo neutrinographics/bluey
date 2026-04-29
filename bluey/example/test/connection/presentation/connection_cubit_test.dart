@@ -15,7 +15,7 @@ void main() {
   late MockConnectToDevice mockConnectToDevice;
   late MockDisconnectDevice mockDisconnectDevice;
   late MockGetServices mockGetServices;
-  late MockTryUpgrade mockTryUpgrade;
+  late MockWatchPeer mockWatchPeer;
   late Device testDevice;
 
   setUpAll(() {
@@ -28,8 +28,9 @@ void main() {
     mockConnectToDevice = MockConnectToDevice();
     mockDisconnectDevice = MockDisconnectDevice();
     mockGetServices = MockGetServices();
-    mockTryUpgrade = MockTryUpgrade();
-    when(() => mockTryUpgrade(any())).thenAnswer((_) async => null);
+    mockWatchPeer = MockWatchPeer();
+    when(() => mockWatchPeer(any()))
+        .thenAnswer((_) => const Stream.empty());
 
     testDevice = Device(
       id: UUID('00000000-0000-0000-0000-000000000001'),
@@ -44,7 +45,7 @@ void main() {
       connectToDevice: mockConnectToDevice,
       disconnectDevice: mockDisconnectDevice,
       getServices: mockGetServices,
-      tryUpgrade: mockTryUpgrade,
+      watchPeer: mockWatchPeer,
       settingsCubit: settingsCubit ?? ConnectionSettingsCubit(),
     );
   }
@@ -101,6 +102,42 @@ void main() {
                 .having((s) => s.services?.length, 'services.length', 1)
                 .having((s) => s.isDiscovering, 'isDiscovering', false),
           ],
+    );
+
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'state.peer is populated when watchPeer emits a non-null peer '
+      '(stale-cache resilience: badge appears once Service Changed '
+      'surfaces the lifecycle service, not just on initial discovery)',
+      setUp: () {
+        final mockConnection = MockConnection();
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
+        when(() => mockConnection.stateChanges)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
+
+        final mockPeer = MockPeerConnection();
+
+        when(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
+            .thenAnswer((_) async => mockConnection);
+        when(() => mockGetServices(any())).thenAnswer((_) async => []);
+        // Initial null (the bug case), then a peer surfaces — exactly
+        // the shape `Bluey.watchPeer` produces after a Service-Changed
+        // re-discovery completes the GATT cache.
+        when(() => mockWatchPeer(any())).thenAnswer((_) async* {
+          yield null;
+          yield mockPeer;
+        });
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.connect();
+        // Allow the peer stream to deliver both emissions.
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(cubit.state.peer, isNotNull);
+        expect(cubit.state.isBlueyPeer, isTrue);
+      },
     );
 
     blocTest<ConnectionCubit, ConnectionScreenState>(

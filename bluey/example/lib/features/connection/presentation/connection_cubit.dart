@@ -6,7 +6,7 @@ import 'package:bluey/bluey.dart';
 import '../application/connect_to_device.dart';
 import '../application/disconnect_device.dart';
 import '../application/get_services.dart';
-import '../application/try_upgrade.dart';
+import '../application/watch_peer.dart';
 import '../domain/connection_settings.dart';
 import 'connection_settings_cubit.dart';
 import 'connection_state.dart';
@@ -16,10 +16,11 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   final ConnectToDevice _connectToDevice;
   final DisconnectDevice _disconnectDevice;
   final GetServices _getServices;
-  final TryUpgrade _tryUpgrade;
+  final WatchPeer _watchPeer;
 
   StreamSubscription<ConnectionState>? _stateSubscription;
   StreamSubscription<ConnectionSettings>? _settingsSubscription;
+  StreamSubscription<PeerConnection?>? _peerSubscription;
   ConnectionSettings _settings;
 
   /// Set during a user-initiated reconnect (tolerance change). The
@@ -33,12 +34,12 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required ConnectToDevice connectToDevice,
     required DisconnectDevice disconnectDevice,
     required GetServices getServices,
-    required TryUpgrade tryUpgrade,
+    required WatchPeer watchPeer,
     required ConnectionSettingsCubit settingsCubit,
   })  : _connectToDevice = connectToDevice,
         _disconnectDevice = disconnectDevice,
         _getServices = getServices,
-        _tryUpgrade = tryUpgrade,
+        _watchPeer = watchPeer,
         _settings = settingsCubit.state,
         super(ConnectionScreenState(device: device)) {
     _settingsSubscription =
@@ -52,6 +53,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
       _suppressDisconnectDialog = true;
       await _stateSubscription?.cancel();
       _stateSubscription = null;
+      await _peerSubscription?.cancel();
+      _peerSubscription = null;
       try {
         await _disconnectDevice(state.connection!);
       } catch (_) {
@@ -116,17 +119,20 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         ),
       );
 
-      // Opportunistically upgrade to a PeerConnection if the remote
-      // exposes the Bluey lifecycle service. This starts a
-      // LifecycleClient internally — heartbeats begin flowing.
-      // For non-peer devices, peer is null and the badge / heartbeat
-      // path stays dormant.
-      try {
-        final peer = await _tryUpgrade(connection);
-        if (peer != null) emit(state.copyWith(peer: peer));
-      } catch (_) {
-        // Best-effort; raw connection still works for non-peer devices.
-      }
+      // Watch peer status across the connection's lifetime. The stream
+      // emits the initial tryUpgrade result (possibly null), then
+      // re-attempts on each Service Changed re-discovery — protects the
+      // badge against stale GATT caches, where the lifecycle service
+      // isn't visible until the peer pushes a Service Changed.
+      _peerSubscription?.cancel();
+      _peerSubscription = _watchPeer(connection).listen(
+        (peer) {
+          if (peer != null) emit(state.copyWith(peer: peer));
+        },
+        onError: (_) {
+          // Best-effort; raw connection still works for non-peer devices.
+        },
+      );
 
       // Load services after connecting
       await loadServices();
@@ -156,6 +162,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     // doesn't trigger the "Device disconnected" error path.
     await _stateSubscription?.cancel();
     _stateSubscription = null;
+    await _peerSubscription?.cancel();
+    _peerSubscription = null;
 
     try {
       await _disconnectDevice(connection);
@@ -194,6 +202,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   Future<void> close() {
     _settingsSubscription?.cancel();
     _stateSubscription?.cancel();
+    _peerSubscription?.cancel();
     state.connection?.disconnect();
     return super.close();
   }
