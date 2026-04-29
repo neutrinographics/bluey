@@ -28,6 +28,7 @@ import 'package:bluey_example/features/server/application/check_server_support.d
 import 'package:bluey_example/features/server/application/set_server_identity.dart';
 import 'package:bluey_example/features/server/application/reset_server.dart';
 import 'package:bluey_example/features/server/application/observe_connections.dart';
+import 'package:bluey_example/features/server/application/observe_peer_connections.dart';
 import 'package:bluey_example/features/server/application/disconnect_client.dart';
 import 'package:bluey_example/features/server/application/dispose_server.dart';
 import 'package:bluey_example/features/server/application/get_connected_clients.dart';
@@ -84,6 +85,9 @@ class MockResetServer extends Mock implements ResetServer {}
 class MockServerIdentityStorage extends Mock implements ServerIdentityStorage {}
 
 class MockObserveConnections extends Mock implements ObserveConnections {}
+
+class MockObservePeerConnections extends Mock
+    implements ObservePeerConnections {}
 
 class MockDisconnectClient extends Mock implements DisconnectClient {}
 

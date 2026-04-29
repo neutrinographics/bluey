@@ -12,6 +12,7 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
+import '../application/observe_peer_connections.dart';
 import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
@@ -51,6 +52,9 @@ void registerServerDependencies(GetIt getIt) {
   );
   getIt.registerFactory<ObserveConnections>(
     () => ObserveConnections(getIt<ServerRepository>()),
+  );
+  getIt.registerFactory<ObservePeerConnections>(
+    () => ObservePeerConnections(getIt<ServerRepository>()),
   );
   getIt.registerFactory<DisconnectClient>(
     () => DisconnectClient(getIt<ServerRepository>()),

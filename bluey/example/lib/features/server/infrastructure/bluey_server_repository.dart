@@ -72,6 +72,15 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
+  Stream<PeerClient> get peerConnections {
+    final server = getServer();
+    if (server == null) {
+      return const Stream.empty();
+    }
+    return server.peerConnections;
+  }
+
+  @override
   Stream<String> get disconnections {
     final server = getServer();
     if (server == null) {

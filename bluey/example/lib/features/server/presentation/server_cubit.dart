@@ -13,6 +13,7 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
+import '../application/observe_peer_connections.dart';
 import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
@@ -34,6 +35,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final AddService _addService;
   final SendNotification _sendNotification;
   final ObserveConnections _observeConnections;
+  final ObservePeerConnections _observePeerConnections;
   final DisconnectClient _disconnectClient;
   final DisposeServer _disposeServer;
   final GetConnectedClients _getConnectedClients;
@@ -46,6 +48,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final StressServiceHandler _stressHandler = StressServiceHandler();
 
   StreamSubscription<Client>? _connectionSubscription;
+  StreamSubscription<PeerClient>? _peerConnectionSubscription;
   StreamSubscription<String>? _disconnectionSubscription;
   StreamSubscription<ReadRequest>? _readRequestSubscription;
   StreamSubscription<WriteRequest>? _writeRequestSubscription;
@@ -67,6 +70,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required AddService addService,
     required SendNotification sendNotification,
     required ObserveConnections observeConnections,
+    required ObservePeerConnections observePeerConnections,
     required DisconnectClient disconnectClient,
     required DisposeServer disposeServer,
     required GetConnectedClients getConnectedClients,
@@ -83,6 +87,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _addService = addService,
        _sendNotification = sendNotification,
        _observeConnections = observeConnections,
+       _observePeerConnections = observePeerConnections,
        _disconnectClient = disconnectClient,
        _disposeServer = disposeServer,
        _getConnectedClients = getConnectedClients,
@@ -129,7 +134,26 @@ class ServerCubit extends Cubit<ServerScreenState> {
     // Listen for central disconnections and refresh the list.
     _disconnectionSubscription = _observeDisconnections().listen((clientId) {
       _refreshConnectedClients();
+      // Clear the peer-identification flag for this client so the
+      // BLUEY badge disappears immediately on disconnect (and a
+      // reconnect-then-heartbeat re-identifies cleanly).
+      final updated = Set<UUID>.from(state.blueyPeerClientIds)
+        ..removeWhere((id) => id.toString() == clientId);
+      if (updated.length != state.blueyPeerClientIds.length) {
+        emit(state.copyWith(blueyPeerClientIds: updated));
+      }
       _addLog('Connection', 'Client disconnected: ${clientId.substring(0, 8)}');
+    });
+
+    // Listen for clients identifying as Bluey peers (first heartbeat).
+    _peerConnectionSubscription = _observePeerConnections().listen((peer) {
+      final updated = Set<UUID>.from(state.blueyPeerClientIds)
+        ..add(peer.client.id);
+      emit(state.copyWith(blueyPeerClientIds: updated));
+      _addLog(
+        'Connection',
+        'Bluey peer identified: ${_shortId(peer.client.id)}',
+      );
     });
 
     // Listen for read requests and respond with the current value.
@@ -329,6 +353,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   Future<void> resetIdentity() async {
     // Cancel existing subscriptions before disposing the server.
     await _connectionSubscription?.cancel();
+    await _peerConnectionSubscription?.cancel();
     await _disconnectionSubscription?.cancel();
     await _readRequestSubscription?.cancel();
     await _writeRequestSubscription?.cancel();
@@ -340,6 +365,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
         serverId: newId,
         isAdvertising: false,
         connectedClients: [],
+        blueyPeerClientIds: const {},
       ),
     );
     _addLog('Server', 'Identity reset: ${newId.value.substring(0, 8)}...');
@@ -367,6 +393,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   @override
   Future<void> close() {
     _connectionSubscription?.cancel();
+    _peerConnectionSubscription?.cancel();
     _disconnectionSubscription?.cancel();
     _readRequestSubscription?.cancel();
     _writeRequestSubscription?.cancel();

@@ -35,6 +35,10 @@ abstract class ServerRepository {
   /// Stream of client device connections.
   Stream<Client> get connections;
 
+  /// Stream of clients identified as Bluey peers (those that have sent
+  /// at least one lifecycle heartbeat).
+  Stream<PeerClient> get peerConnections;
+
   /// Stream of client device disconnections (emits central ID).
   Stream<String> get disconnections;
 

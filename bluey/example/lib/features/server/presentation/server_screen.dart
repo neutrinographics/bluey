@@ -15,6 +15,7 @@ import '../application/stop_advertising.dart';
 import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
+import '../application/observe_peer_connections.dart';
 import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
@@ -74,6 +75,7 @@ class ServerScreen extends StatelessWidget {
             addService: getIt<AddService>(),
             sendNotification: getIt<SendNotification>(),
             observeConnections: getIt<ObserveConnections>(),
+            observePeerConnections: getIt<ObservePeerConnections>(),
             disconnectClient: getIt<DisconnectClient>(),
             disposeServer: getIt<DisposeServer>(),
             getConnectedClients: getIt<GetConnectedClients>(),
@@ -186,7 +188,10 @@ class _ServerContent extends StatelessWidget {
         _ActiveClientsCard(count: state.connectedClients.length),
         const SizedBox(height: 40),
         if (state.connectedClients.isNotEmpty) ...[
-          _ConnectedClientsSection(clients: state.connectedClients),
+          _ConnectedClientsSection(
+            clients: state.connectedClients,
+            blueyPeerClientIds: state.blueyPeerClientIds,
+          ),
           const SizedBox(height: 40),
         ],
         _LogSection(log: state.log),
@@ -483,8 +488,12 @@ class _ActiveClientsCard extends StatelessWidget {
 
 class _ConnectedClientsSection extends StatelessWidget {
   final List<Client> clients;
+  final Set<UUID> blueyPeerClientIds;
 
-  const _ConnectedClientsSection({required this.clients});
+  const _ConnectedClientsSection({
+    required this.clients,
+    required this.blueyPeerClientIds,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -507,7 +516,10 @@ class _ConnectedClientsSection extends StatelessWidget {
         ...clients.map(
           (client) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _ClientCard(client: client),
+            child: _ClientCard(
+              client: client,
+              isBlueyPeer: blueyPeerClientIds.contains(client.id),
+            ),
           ),
         ),
       ],
@@ -519,8 +531,9 @@ class _ConnectedClientsSection extends StatelessWidget {
 
 class _ClientCard extends StatelessWidget {
   final Client client;
+  final bool isBlueyPeer;
 
-  const _ClientCard({required this.client});
+  const _ClientCard({required this.client, required this.isBlueyPeer});
 
   @override
   Widget build(BuildContext context) {
@@ -551,24 +564,49 @@ class _ClientCard extends StatelessWidget {
                   color: _kTextDark.withValues(alpha: 0.7),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isHighMtu ? Colors.transparent : _kPillBg,
-                  borderRadius: BorderRadius.circular(9999),
-                ),
-                child: Text(
-                  'MTU ${client.mtu}',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: isHighMtu ? _kGreenDark : _kTextMedium,
-                    letterSpacing: 1,
+              Row(
+                children: [
+                  if (isBlueyPeer) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'BLUEY',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isHighMtu ? Colors.transparent : _kPillBg,
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                    child: Text(
+                      'MTU ${client.mtu}',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: isHighMtu ? _kGreenDark : _kTextMedium,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),

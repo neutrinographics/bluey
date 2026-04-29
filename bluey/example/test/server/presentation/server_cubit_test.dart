@@ -22,6 +22,7 @@ void main() {
   late MockAddService mockAddService;
   late MockSendNotification mockSendNotification;
   late MockObserveConnections mockObserveConnections;
+  late MockObservePeerConnections mockObservePeerConnections;
   late MockDisconnectClient mockDisconnectClient;
   late MockDisposeServer mockDisposeServer;
   late MockGetConnectedClients mockGetConnectedClients;
@@ -53,6 +54,9 @@ void main() {
     mockAddService = MockAddService();
     mockSendNotification = MockSendNotification();
     mockObserveConnections = MockObserveConnections();
+    mockObservePeerConnections = MockObservePeerConnections();
+    when(() => mockObservePeerConnections())
+        .thenAnswer((_) => const Stream.empty());
     mockDisconnectClient = MockDisconnectClient();
     mockDisposeServer = MockDisposeServer();
     mockGetConnectedClients = MockGetConnectedClients();
@@ -96,6 +100,7 @@ void main() {
       addService: mockAddService,
       sendNotification: mockSendNotification,
       observeConnections: mockObserveConnections,
+      observePeerConnections: mockObservePeerConnections,
       disconnectClient: mockDisconnectClient,
       disposeServer: mockDisposeServer,
       getConnectedClients: mockGetConnectedClients,
