@@ -28,7 +28,7 @@ import 'package:flutter/services.dart' show PlatformException;
 /// // Now scanning will discover this device
 /// final devices = await platform.scan(config).toList();
 /// ```
-final class FakeBlueyPlatform extends BlueyPlatform {
+base class FakeBlueyPlatform extends BlueyPlatform {
   /// Creates a fake platform.
   ///
   /// [capabilities] lets tests override the simulated capability matrix,

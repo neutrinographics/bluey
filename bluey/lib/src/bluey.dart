@@ -25,9 +25,9 @@ import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
 import 'shared/device_id_coercion.dart';
+import 'shared/error_translation.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
-import 'shared/uuid.dart';
 
 export 'events.dart';
 export 'discovery/scanner.dart';
@@ -109,7 +109,8 @@ class Bluey {
     _stateSubscription = _platform.stateStream.listen((state) {
       _currentState = _mapState(state);
       _stateController.add(_currentState);
-    }, onError: (error) => _stateController.addError(_wrapError(error)));
+    }, onError: (error) => _stateController.addError(
+        translatePlatformException(error, operation: 'stateStream')));
 
     // Forward native log events into the unified logger stream so that
     // `bluey.logEvents` is the single, merged surface for both Dart-side
@@ -169,9 +170,9 @@ class Bluey {
   Future<void> configure({
     bool cleanupOnActivityDestroy = true,
     GattTimeouts gattTimeouts = const GattTimeouts(),
-  }) async {
-    try {
-      await _platform.configure(
+  }) {
+    return withErrorTranslation(
+      () => _platform.configure(
         platform.BlueyConfig(
           cleanupOnActivityDestroy: cleanupOnActivityDestroy,
           discoverServicesTimeoutMs: gattTimeouts.discoverServices.inMilliseconds,
@@ -182,10 +183,9 @@ class Bluey {
           requestMtuTimeoutMs: gattTimeouts.requestMtu.inMilliseconds,
           readRssiTimeoutMs: gattTimeouts.readRssi.inMilliseconds,
         ),
-      );
-    } catch (e) {
-      throw _wrapError(e);
-    }
+      ),
+      operation: 'configure',
+    );
   }
 
   /// Current Bluetooth state synchronously.
@@ -254,13 +254,11 @@ class Bluey {
   BlueyLogger get logger => _logger;
 
   /// Get current Bluetooth state.
-  Future<BluetoothState> get state async {
-    try {
-      final platformState = await _platform.getState();
-      return _mapState(platformState);
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Future<BluetoothState> get state {
+    return withErrorTranslation(
+      () async => _mapState(await _platform.getState()),
+      operation: 'getState',
+    );
   }
 
   /// Ensure Bluetooth is ready to use.
@@ -291,12 +289,11 @@ class Bluey {
   ///
   /// Returns true if Bluetooth was enabled, false if user declined.
   /// On some platforms, this opens settings instead of showing a prompt.
-  Future<bool> requestEnable() async {
-    try {
-      return await _platform.requestEnable();
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Future<bool> requestEnable() {
+    return withErrorTranslation(
+      () => _platform.requestEnable(),
+      operation: 'requestEnable',
+    );
   }
 
   /// Request Bluetooth permissions from the user.
@@ -305,21 +302,19 @@ class Bluey {
   /// On Android 12+, this requests BLUETOOTH_SCAN and BLUETOOTH_CONNECT.
   /// On older Android versions, this requests BLUETOOTH, BLUETOOTH_ADMIN,
   /// and ACCESS_FINE_LOCATION.
-  Future<bool> authorize() async {
-    try {
-      return await _platform.authorize();
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Future<bool> authorize() {
+    return withErrorTranslation(
+      () => _platform.authorize(),
+      operation: 'authorize',
+    );
   }
 
   /// Open system Bluetooth settings.
-  Future<void> openSettings() async {
-    try {
-      await _platform.openSettings();
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Future<void> openSettings() {
+    return withErrorTranslation(
+      () => _platform.openSettings(),
+      operation: 'openSettings',
+    );
   }
 
   /// Create a Scanner for discovering nearby BLE devices.
@@ -382,7 +377,11 @@ class Bluey {
 
     try {
       // Use address for the actual connection (MAC address on Android)
-      final connectionId = await _platform.connect(device.address, config);
+      final connectionId = await withErrorTranslation(
+        () => _platform.connect(device.address, config),
+        operation: 'connect',
+        deviceId: device.id,
+      );
 
       _emitEvent(ConnectedEvent(deviceId: device.id));
 
@@ -418,7 +417,7 @@ class Bluey {
           error: e,
         ),
       );
-      throw _wrapError(e);
+      rethrow;
     }
   }
 
@@ -693,13 +692,12 @@ class Bluey {
   ///   print('Bonded: ${device.name}');
   /// }
   /// ```
-  Future<List<Device>> get bondedDevices async {
-    try {
-      final platformDevices = await _platform.getBondedDevices();
-      return platformDevices.map(_mapDevice).toList();
-    } catch (e) {
-      throw _wrapError(e);
-    }
+  Future<List<Device>> get bondedDevices {
+    return withErrorTranslation(
+      () async =>
+          (await _platform.getBondedDevices()).map(_mapDevice).toList(),
+      operation: 'getBondedDevices',
+    );
   }
 
   /// Maps a platform device to a domain Device (identity only).
@@ -848,45 +846,5 @@ class Bluey {
   /// Emits an event to the event bus.
   void _emitEvent(BlueyEvent event) {
     _eventBus.emit(event);
-  }
-
-  /// Wraps platform errors in domain exceptions and emits to error stream.
-  BlueyException _wrapError(Object error) {
-    if (error is BlueyException) {
-      _errorController.add(error);
-      return error;
-    }
-
-    // Convert common platform errors to domain exceptions
-    final message = error.toString().toLowerCase();
-
-    BlueyException exception;
-
-    if (message.contains('permission') || message.contains('unauthorized')) {
-      exception = PermissionDeniedException(['Bluetooth']);
-    } else if (message.contains('disabled') ||
-        message.contains('bluetooth is off')) {
-      exception = const BluetoothDisabledException();
-    } else if (message.contains('unavailable') ||
-        message.contains('unsupported')) {
-      exception = const BluetoothUnavailableException();
-    } else if (message.contains('timeout') && message.contains('connect')) {
-      exception = ConnectionException(
-        UUID.short(0x0000), // Unknown device
-        ConnectionFailureReason.timeout,
-      );
-    } else if (message.contains('not connected') ||
-        message.contains('device not found')) {
-      exception = ConnectionException(
-        UUID.short(0x0000),
-        ConnectionFailureReason.deviceNotFound,
-      );
-    } else {
-      // Generic fallback - preserve the original error message
-      exception = BlueyPlatformException(error.toString(), cause: error);
-    }
-
-    _errorController.add(exception);
-    return exception;
   }
 }
