@@ -98,7 +98,9 @@ When the app moves to the background:
 
 iOS does not provide a direct way to disconnect a connected client from the peripheral side. `CBPeripheralManager` has no `cancelConnection` or equivalent method.
 
-**Our approach:** When `disconnectCentral` is called, we remove the client from our internal tracking and subscription lists, but the underlying BLE connection may persist until the client disconnects or the link times out.
+**Our approach (post-I045):** `disconnectCentral` throws `BlueyPlatformException` (translated from `gatt-status-failed` with REQUEST_NOT_SUPPORTED) instead of silently untracking and returning success. Lying to the caller masks the platform limitation and leads to "ghost peer" bugs where the central keeps reading/writing/subscribing after the server believes it gone.
+
+Bluey peers (clients that speak the lifecycle protocol) can write `0x00` to the heartbeat characteristic as a cooperative disconnect signal — that path lives on the *client* side via `PeerConnection.disconnect()` and is fully effective. There is no server-initiated equivalent on iOS. Pre-I045 callers that depended on the silent untrack should either: (a) catch the throw and use `removeService` / `stopAdvertising` for global teardown, or (b) negotiate a client-driven disconnect via the lifecycle protocol.
 
 ## Permissions
 
