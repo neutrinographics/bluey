@@ -102,7 +102,7 @@ These rewrite portions of the public surface; plan as release events with a migr
 
 Bundles flagged where natural; everything else can land as one-offs.
 
-- **iOS one-offs** — I044 (disconnect-of-disconnected waits timeout), I045 (lying `disconnectCentral`), I046 (max-write-length plumbing), I047 (batched ATT write response), I048 (state restoration). Each independent.
+- **iOS one-offs** — ~~I044~~ ([683a1eb](#)) and ~~I045~~ ([d015870](#)) closed in 2026-04-29 cluster sweep. Remaining: I046 (max-write-length plumbing — actually cross-platform, bundle with I034), I047 (batched ATT write response — needs real-hardware repro before fixing per the entry), I048 (state restoration — multi-day plugin/AppDelegate work; not a one-off).
 - **Server-API polish** (I058 + I059) — advertising mode dropped + `removeService` fire-and-forget. *Bundle, ~1–2 hours.*
 - **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. *Bundle, ~1–2 hours.*
 - **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. *Bundle.*
