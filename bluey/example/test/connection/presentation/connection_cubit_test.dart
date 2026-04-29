@@ -116,6 +116,7 @@ void main() {
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         final mockPeer = MockPeerConnection();
+        when(() => mockPeer.disconnect()).thenAnswer((_) async {});
 
         when(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
             .thenAnswer((_) async => mockConnection);

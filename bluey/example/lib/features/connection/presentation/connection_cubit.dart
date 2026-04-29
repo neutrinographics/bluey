@@ -56,13 +56,27 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
       await _peerSubscription?.cancel();
       _peerSubscription = null;
       try {
-        await _disconnectDevice(state.connection!);
+        await _gracefulDisconnect(state.connection!);
       } catch (_) {
         // best-effort; even if disconnect throws we still want to reconnect
       }
       emit(state.withoutConnection());
       _suppressDisconnectDialog = false;
       await connect();
+    }
+  }
+
+  /// Routes through `peer.disconnect()` when a peer is established —
+  /// the peer protocol writes a 0x00 courtesy hint to the lifecycle
+  /// service, allowing the remote server to drop us immediately
+  /// instead of waiting for a heartbeat-silence timeout. Falls back to
+  /// the raw GATT disconnect for non-peer connections.
+  Future<void> _gracefulDisconnect(Connection connection) async {
+    final peer = state.peer;
+    if (peer != null) {
+      await peer.disconnect();
+    } else {
+      await _disconnectDevice(connection);
     }
   }
 
@@ -166,7 +180,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     _peerSubscription = null;
 
     try {
-      await _disconnectDevice(connection);
+      await _gracefulDisconnect(connection);
       emit(state.withoutConnection());
     } catch (e) {
       emit(state.copyWith(error: 'Failed to disconnect: $e'));
@@ -203,7 +217,14 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     _settingsSubscription?.cancel();
     _stateSubscription?.cancel();
     _peerSubscription?.cancel();
-    state.connection?.disconnect();
+    // Fire-and-forget: route through the peer protocol if a peer is
+    // established so the server cleans up immediately.
+    final peer = state.peer;
+    if (peer != null) {
+      peer.disconnect();
+    } else {
+      state.connection?.disconnect();
+    }
     return super.close();
   }
 }
