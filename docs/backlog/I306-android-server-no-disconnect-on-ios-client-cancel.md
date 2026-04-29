@@ -1,19 +1,27 @@
 ---
 id: I306
-title: Android server doesn't observe iOS client disconnect (BLE supervision-timeout latency or missing event)
+title: Android server doesn't observe non-Bluey iOS client disconnect (BLE supervision-timeout latency)
 category: bug
-severity: medium
+severity: low
 platform: android
 status: open
-last_verified: 2026-04-28
+last_verified: 2026-04-29
 related: []
 ---
 
+## Scope (post-2026-04-29)
+
+The Bluey↔Bluey case is now closed: `PeerConnection.disconnect()` writes a `0x00` lifecycle courtesy hint to the server, which fires `onClientGone` immediately via `LifecycleServer.handleWriteRequest` — bypassing the platform-callback dependency entirely. This works in both directions (Android-server + iOS-client and iOS-server + Android-client). Verified on real devices.
+
+The remaining open scope is **non-peer iOS centrals connecting to an Android server as raw GATT clients** — they have no lifecycle service to write to, so the server still depends on Android's `BluetoothGattServerCallback.onConnectionStateChange` firing for `STATE_DISCONNECTED`. Some Android stacks delay or never fire that callback when iOS issues a soft disconnect, leaving the server with a stale "connected" state until link-supervision timeout (4–10 s, sometimes longer on OEM stacks).
+
+This narrows the original premise: most production Bluey servers connect to Bluey peers, and Bluey peers now disconnect cleanly. Only raw-GATT iOS interop is affected.
+
 ## Symptom
 
-When the Android role is GATT server (peripheral) and the iOS role is GATT client (central), an iOS-side `connection.disconnect()` does not promptly surface as a disconnect event on the Android server. The Android server UI continues to show the central as connected, even though the BLE radio link has been torn down.
+When the Android role is GATT server (peripheral) and a **non-Bluey** iOS app is the GATT client, an iOS-side `connection.disconnect()` does not promptly surface as a disconnect event on the Android server. The Android server UI continues to show the central as connected, even though the BLE radio link has been torn down. Eventually the Android stack fires `onConnectionStateChange(STATE_DISCONNECTED)` via supervision timeout — typically several seconds, sometimes longer.
 
-In the reverse direction (iOS server + Android client), the analogous Android-side disconnect IS eventually observed by the iOS server, "after a while" — consistent with BLE link-supervision-timeout-driven detection (typically 4–10 s).
+In the reverse direction (iOS server + non-Bluey Android client), the analogous Android-side disconnect IS eventually observed by the iOS server "after a while" — same supervision-timeout pattern.
 
 ## Status on main vs feat/handle-identity-rewrite
 
@@ -34,15 +42,14 @@ The disconnect path on `GattServer.kt` did NOT change in the handle-identity rew
 
 ## Notes
 
-Workaround until fixed: rely on application-level keepalive (heartbeat) over the lifecycle-control service to detect peer-gone. The BlueyServer's `_handleClientDisconnected` is invoked via `onClientGone` from the lifecycle layer when heartbeats stop, independent of the platform disconnect callback. Bluey-aware peers (those that speak the lifecycle protocol) already get this for free; non-Bluey iOS centrals don't.
+For non-Bluey iOS centrals (raw GATT, no lifecycle service), there's no application-layer keepalive to lean on. Options if/when this becomes worth fixing:
 
-If we want to fix this for non-Bluey iOS centrals, options:
 - **Watchdog timer.** Track each connected central and start a timer (e.g. 30 s) on connect. Reset on any GATT activity. On expiry, manually call `BluetoothGattServer.cancelConnection(device)` and synthesize an `onCentralDisconnected` event. Aggressive but works around stack flakiness.
 - **Read-RSSI polling.** Periodically attempt a low-impact GATT op against each central; if the op fails with a disconnect-like error, force the disconnect path. More radio-traffic-heavy.
 - **Document the limitation.** Make non-Bluey iOS-central + Android-server an explicit edge case: app developers should plan for the latency.
 
-Cost-benefit: medium severity. Read/write functionality works, just the explicit "disconnect" event is delayed or missing. Most production Bluey servers will use Bluey peers (which have the lifecycle heartbeat path), so this only bites for raw-GATT iOS-central interop. Worth filing for a future fix, not blocking the bundled-rewrite merge.
+Cost-benefit: now **low severity**. The peer-protocol fast path (post-`3041eca`) covers the common case (Bluey↔Bluey) in both directions. Read/write functionality on non-peer iOS centrals still works during the connected window; only the explicit "disconnect" event is delayed by supervision timeout (typically 4–10 s, OEM-dependent). Punted to opportunistic — pick up only if a concrete consumer needs raw-GATT iOS-central interop with sub-second disconnect detection.
 
 ## Verification plan
 
-When picked up: reproduce on a real iOS device + real Android device, with the Android server example app foregrounded and the iOS client example app tapping Disconnect. Time-stamp the iOS disconnect tap and compare to the Android-side `onCentralDisconnected` log line. Test across multiple Android OEMs (Samsung, Pixel, etc.) — disconnect-detection behavior varies.
+When picked up: reproduce on a real iOS device + real Android device with a **non-Bluey** iOS client (one that does NOT subscribe to or write the lifecycle service). Use a generic BLE explorer app on iOS (e.g. LightBlue, nRF Connect). Time-stamp the iOS disconnect action and compare to the Android-side `onCentralDisconnected` log line. Test across multiple Android OEMs (Samsung, Pixel, etc.) — disconnect-detection behavior varies.

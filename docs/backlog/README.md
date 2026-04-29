@@ -107,6 +107,7 @@ Bundles flagged where natural; everything else can land as one-offs.
 - **Capabilities matrix** (I053 + I065 + I069) — expand the matrix, make it load-bearing in production code, parameterize the test fake. *Bundle.*
 - **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md, document the Domain ↔ Platform-Interface vocabulary translation. *~1 hour.* Best done alongside I300.
 - **iOS 091/093** — unmapped `CBATTError` codes / `notFound` mapping. Small NSError mapping cleanups.
+- **I306** — non-Bluey iOS-client disconnect on Android-server. Peer-protocol case closed (`3041eca`); only raw-GATT iOS interop remains. Pick up only if a concrete consumer needs sub-supervision-timeout disconnect detection for non-peer iOS centrals.
 
 Everything else (the remaining 30+ open entries, mostly low-severity stubs and limitations) proceeds opportunistically — pick up related entries when you're already in the code for a higher-priority fix.
 
@@ -160,7 +161,7 @@ Everything else (the remaining 30+ open entries, mostly low-severity stubs and l
 | [I023](I023-gatt-server-notification-sent-no-tracking.md) | `onNotificationSent` not tracked for completion | medium |
 | [I024](I024-gatt-server-mtu-change-not-propagated.md) | Server-side MTU change not propagated to Dart | medium |
 | [I025](I025-gatt-server-phy-events-logging-only.md) | Server-side PHY update/read events are logging-only | low |
-| [I306](I306-android-server-no-disconnect-on-ios-client-cancel.md) | Android server doesn't observe iOS client disconnect (BLE-supervision-timeout latency or missing event) | medium |
+| [I306](I306-android-server-no-disconnect-on-ios-client-cancel.md) | Android server doesn't observe non-Bluey iOS client disconnect (peer-protocol case fixed; raw-GATT case remains, supervision-timeout-bound) | low |
 
 ### Open — Android connection-level stubs
 
