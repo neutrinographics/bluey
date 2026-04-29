@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
-import 'package:flutter/services.dart' show PlatformException;
 
 import '../gatt_client/gatt.dart';
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../shared/characteristic_properties.dart';
+import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import 'android_connection_extensions.dart';
@@ -17,82 +17,23 @@ import 'ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
 import 'value_objects/attribute_handle.dart';
 
-/// Runs a GATT op through the error-translation pipeline and routes
-/// lifecycle signals into [lifecycleClient]. Used by every public GATT
-/// op on [BlueyConnection] / [BlueyRemoteCharacteristic] /
-/// [BlueyRemoteDescriptor] so user-op accounting and activity signals
-/// flow uniformly through one place.
-///
-/// Lifecycle hooks (all no-ops if [lifecycleClient] is null):
-///   * [LifecycleClient.markUserOpStarted] before [body] is awaited.
-///   * [LifecycleClient.recordActivity] on success.
-///   * [LifecycleClient.recordUserOpFailure] on any caught platform
-///     exception, with the *original* (untranslated) exception so the
-///     timeout predicate inside [LifecycleClient] can match it.
-///   * [LifecycleClient.markUserOpEnded] in `finally`.
-///
-/// Catches internal platform-interface exceptions and rethrows them
-/// as the user-facing [BlueyException] sealed hierarchy:
-///
-///   * [platform.GattOperationTimeoutException] → [GattTimeoutException]
-///   * [platform.GattOperationDisconnectedException] →
-///     [DisconnectedException] with [DisconnectReason.linkLoss]
-///   * [platform.GattOperationStatusFailedException] →
-///     [GattOperationFailedException] carrying the native status
-///   * [platform.GattOperationUnknownPlatformException] →
-///     [BlueyPlatformException] preserving the wire-level code
-///   * [platform.PlatformPermissionDeniedException] →
-///     [PermissionDeniedException] wrapping the single denied permission
+/// Thin wrapper over [withErrorTranslation] preserved for call-site
+/// readability — every public GATT op on [BlueyConnection] /
+/// [BlueyRemoteCharacteristic] / [BlueyRemoteDescriptor] flows through
+/// this so the lifecycle accounting and exception translation stay in
+/// one place. See [withErrorTranslation] for the full hook contract.
 Future<T> _runGattOp<T>(
   UUID deviceId,
   String operation,
   Future<T> Function() body, {
   LifecycleClient? lifecycleClient,
-}) async {
-  lifecycleClient?.markUserOpStarted();
-  try {
-    final result = await body();
-    lifecycleClient?.recordActivity();
-    return result;
-  } on platform.GattOperationTimeoutException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    throw GattTimeoutException(operation);
-  } on platform.GattOperationDisconnectedException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    throw DisconnectedException(deviceId, DisconnectReason.linkLoss);
-  } on platform.GattOperationStatusFailedException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    throw GattOperationFailedException(operation, e.status);
-  } on platform.GattOperationUnknownPlatformException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    // The native side emits `gatt-handle-invalidated` when an op carried
-    // a non-null handle that no longer resolves on the platform side
-    // (post-Service-Changed clear). Surface as the typed domain
-    // exception so callers can pattern-match cleanly and re-discover.
-    if (e.code == 'gatt-handle-invalidated') {
-      throw AttributeHandleInvalidatedException();
-    }
-    throw BlueyPlatformException(
-      e.message ?? 'unknown platform error (${e.code})',
-      code: e.code,
-      cause: e,
-    );
-  } on platform.PlatformPermissionDeniedException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    throw PermissionDeniedException([e.permission]);
-  } on PlatformException catch (e) {
-    lifecycleClient?.recordUserOpFailure(e);
-    // Defensive backstop: any PlatformException that wasn't translated by
-    // the platform adapter (e.g. a new native error code we haven't yet
-    // mapped) gets wrapped so user code only ever catches BlueyException.
-    throw BlueyPlatformException(
-      e.message ?? 'platform error (${e.code})',
-      code: e.code,
-      cause: e,
-    );
-  } finally {
-    lifecycleClient?.markUserOpEnded();
-  }
+}) {
+  return withErrorTranslation(
+    body,
+    operation: operation,
+    deviceId: deviceId,
+    lifecycleClient: lifecycleClient,
+  );
 }
 
 /// Wraps [_runGattOp] with start / complete / failed log lines and a
