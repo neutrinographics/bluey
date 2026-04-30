@@ -127,9 +127,12 @@ class Capabilities {
     canAdvertise: true,
     canRequestMtu: true,
     maxMtu: 517,
+    canScanInBackground: true,
+    canAdvertiseInBackground: true,
     canBond: true,
     canRequestPhy: true,
     canRequestConnectionParameters: true,
+    canRequestEnable: true,
     canAdvertiseManufacturerData: true,
   );
 
@@ -153,6 +156,7 @@ class Capabilities {
     canAdvertise: true,
     canRequestMtu: true,
     maxMtu: 517,
+    canRequestEnable: true,
   );
 
   @override
