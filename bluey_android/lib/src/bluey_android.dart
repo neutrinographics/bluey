@@ -481,12 +481,6 @@ final class BlueyAndroid extends BlueyPlatform {
   }
 
   @override
-  Future<void> disconnectCentral(String centralId) async {
-    _ensureInitialized();
-    await _server.disconnectCentral(centralId);
-  }
-
-  @override
   Future<void> closeServer() async {
     _ensureInitialized();
     await _server.closeServer();

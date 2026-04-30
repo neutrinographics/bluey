@@ -318,17 +318,6 @@ void main() {
       });
     });
 
-    group('disconnectCentral', () {
-      test('delegates to hostApi', () async {
-        when(() => mockHostApi.disconnectCentral(any()))
-            .thenAnswer((_) async {});
-
-        await server.disconnectCentral('central-1');
-
-        verify(() => mockHostApi.disconnectCentral('central-1')).called(1);
-      });
-    });
-
     group('closeServer', () {
       test('delegates to hostApi', () async {
         when(() => mockHostApi.closeServer()).thenAnswer((_) async {});

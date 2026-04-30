@@ -1946,25 +1946,6 @@ class BlueyHostApi {
     ;
   }
 
-  /// Disconnect a central from the server.
-  Future<void> disconnectCentral(String centralId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.disconnectCentral$pigeonVar_messageChannelSuffix';
-    final pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId]);
-    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
-
-    _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
-  }
-
   /// Close the GATT server and disconnect all centrals.
   /// Call this when the server is no longer needed to release resources
   /// and properly terminate BLE connections.
