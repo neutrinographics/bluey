@@ -60,4 +60,30 @@ void main() {
       r.bluey.dispose();
     });
   });
+
+  group('BlueyConnection.requestMtu gating', () {
+    test('throws UnsupportedOperationException when canRequestMtu=false', () async {
+      final r = await connectWith(platform.Capabilities.iOS);
+      expect(
+        () => r.conn.requestMtu(
+          Mtu(247, capabilities: platform.Capabilities.android),
+        ),
+        throwsA(isA<UnsupportedOperationException>()
+            .having((e) => e.operation, 'operation', 'requestMtu')
+            .having((e) => e.platform, 'platform', 'ios')),
+      );
+      await r.conn.disconnect();
+      r.bluey.dispose();
+    });
+
+    test('succeeds when canRequestMtu=true', () async {
+      final r = await connectWith(platform.Capabilities.android);
+      final negotiated = await r.conn.requestMtu(
+        Mtu(247, capabilities: platform.Capabilities.android),
+      );
+      expect(negotiated.value, greaterThan(0));
+      await r.conn.disconnect();
+      r.bluey.dispose();
+    });
+  });
 }

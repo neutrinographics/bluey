@@ -290,6 +290,21 @@ class BlueyConnection implements Connection {
     throw DisconnectedException(deviceId, DisconnectReason.unknown);
   }
 
+  /// Throws [UnsupportedOperationException] when [flag] is false.
+  ///
+  /// Used to gate cross-platform methods whose underlying platform call
+  /// may not be supported. Callers compose this with [_ensureConnected]
+  /// — capability check fires first since "this op never works" is a
+  /// stronger statement than "you are not currently connected."
+  void _requireCapability(bool flag, String op) {
+    if (!flag) {
+      throw UnsupportedOperationException(
+        op,
+        _platform.capabilities.platformKind.name,
+      );
+    }
+  }
+
   /// I088 D.11 — wraps [body] so that a Service Changed event fired
   /// while the call is in flight surfaces the typed
   /// [AttributeHandleInvalidatedException] on the original future, even
@@ -483,6 +498,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<Mtu> requestMtu(Mtu mtu) async {
+    _requireCapability(_platform.capabilities.canRequestMtu, 'requestMtu');
     _ensureConnected();
     final requested = mtu.value;
     _mtu = await _trackInFlight(() => _loggedGattOp(
