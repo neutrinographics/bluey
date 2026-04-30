@@ -23,7 +23,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   _connectionControllers = {};
 
   @override
-  platform.Capabilities get capabilities => platform.Capabilities.android;
+  platform.Capabilities get capabilities => platform.Capabilities.fake;
 
   @override
   Future<void> configure(platform.BlueyConfig config) async {}
@@ -466,7 +466,7 @@ void main() {
 
     group('capabilities', () {
       test('returns platform capabilities', () {
-        expect(bluey.capabilities, equals(platform.Capabilities.android));
+        expect(bluey.capabilities, equals(platform.Capabilities.fake));
       });
     });
 

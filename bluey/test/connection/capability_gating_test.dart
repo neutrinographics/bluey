@@ -217,6 +217,40 @@ void main() {
     });
   });
 
+  group('Bluey.bondedDevices — canBond gate', () {
+    test('throws UnsupportedOperationException when canBond=false (iOS)',
+        () async {
+      final fakePlatform = FakeBlueyPlatform(
+        capabilities: platform.Capabilities.iOS,
+      );
+      platform.BlueyPlatform.instance = fakePlatform;
+      final bluey = Bluey();
+      expect(
+        () => bluey.bondedDevices,
+        throwsA(isA<UnsupportedOperationException>()
+            .having((e) => e.operation, 'operation', 'bondedDevices')
+            .having((e) => e.platform, 'platform', 'ios')),
+      );
+      bluey.dispose();
+    });
+
+    test('succeeds (returns a list) when canBond=true (Android)', () async {
+      final fakePlatform = FakeBlueyPlatform(
+        capabilities: platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
+          canScan: true,
+          canConnect: true,
+          canBond: true,
+        ),
+      );
+      platform.BlueyPlatform.instance = fakePlatform;
+      final bluey = Bluey();
+      final devices = await bluey.bondedDevices;
+      expect(devices, isA<List<Device>>());
+      bluey.dispose();
+    });
+  });
+
   group('Server.startAdvertising — manufacturer data gate', () {
     Future<({Server server, Bluey bluey})> serverWith(
       platform.Capabilities caps,

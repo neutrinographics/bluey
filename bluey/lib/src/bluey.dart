@@ -684,11 +684,26 @@ class Bluey {
   /// }
   /// ```
   Future<List<Device>> get bondedDevices {
+    _requireCapability(_platform.capabilities.canBond, 'bondedDevices');
     return withErrorTranslation(
       () async =>
           (await _platform.getBondedDevices()).map(_mapDevice).toList(),
       operation: 'getBondedDevices',
     );
+  }
+
+  /// Throws [UnsupportedOperationException] when [flag] is false.
+  ///
+  /// Used to gate methods on [Bluey] whose underlying platform call may
+  /// not be supported on the current platform. Mirrors the helper of the
+  /// same name on [BlueyConnection] / [BlueyServer].
+  void _requireCapability(bool flag, String op) {
+    if (!flag) {
+      throw UnsupportedOperationException(
+        op,
+        _platform.capabilities.platformKind.name,
+      );
+    }
   }
 
   /// Maps a platform device to a domain Device (identity only).

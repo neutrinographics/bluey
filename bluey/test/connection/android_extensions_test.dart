@@ -7,16 +7,23 @@ import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
 
 /// Tests for the [Connection.android] / [Connection.ios] accessors that
-/// gate platform-specific extensions by [Capabilities] (B.2 / I089).
+/// gate platform-specific extensions by [Capabilities.platformKind]
+/// (I089 / Task 3 of the capabilities-matrix bundle).
 ///
-/// The accessors return non-null only on the matching capability profile:
-///   * `connection.android` — non-null when at least one of `canBond`,
-///     `canRequestPhy`, or `canRequestConnectionParameters` is true.
-///   * `connection.ios` — non-null when ALL three of those flags are
-///     false (heuristic: "no Android-only features" means iOS-flavored).
+/// The accessors dispatch on `capabilities.platformKind`:
+///   * `connection.android` — non-null when `platformKind == android`.
+///   * `connection.ios`     — non-null when `platformKind == ios`.
 ///
-/// Both accessors return null on the opposite profile, and lazy-cache the
-/// underlying impl so repeated reads return the same instance.
+/// The opposite-side accessor is null in each case, and `platformKind`
+/// values of `fake` / `other` expose neither extension. Both accessors
+/// lazy-cache the underlying impl so repeated reads return the same
+/// instance.
+///
+/// The capability-flag-level gating of the methods *on* `connection.android`
+/// (e.g. `bond()` requires `canBond`) is covered in
+/// `capability_gating_test.dart`; this file focuses on the accessor
+/// dispatch and the "still wired up" smoke tests for an Android-flavored
+/// connection.
 void main() {
   Device deviceFor(String address) => Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
@@ -24,9 +31,10 @@ void main() {
         name: 'Test Device',
       );
 
-  /// Capabilities profile where at least one Android-only flag is true.
-  /// `Capabilities.android` itself currently has all three false (post-I035
-  /// Stage A), so we construct an explicit profile here.
+  /// Android-flavored profile: `platformKind == android` plus every
+  /// Android-specific feature flag enabled, so the methods on
+  /// `connection.android` are reachable without tripping the
+  /// per-capability gates.
   const androidFlavored = platform.Capabilities(
     platformKind: platform.PlatformKind.android,
     canScan: true,
@@ -37,8 +45,8 @@ void main() {
     canRequestConnectionParameters: true,
   );
 
-  /// Capabilities profile with all three Android-only flags false. This is
-  /// the iOS-flavored profile under the B.2 heuristic.
+  /// iOS-flavored profile: `platformKind == ios`, with the
+  /// Android-specific flags off (matching the real iOS implementation).
   const iosFlavored = platform.Capabilities(
     platformKind: platform.PlatformKind.ios,
     canScan: true,
@@ -50,9 +58,7 @@ void main() {
   );
 
   group('Connection.android accessor', () {
-    test(
-        'is non-null when at least one of canBond / canRequestPhy / '
-        'canRequestConnectionParameters is true', () async {
+    test('is non-null when platformKind == android', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -67,7 +73,7 @@ void main() {
       bluey.dispose();
     });
 
-    test('is null when all three Android-only flags are false', () async {
+    test('is null when platformKind == ios', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: iosFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -119,8 +125,8 @@ void main() {
     });
 
     test(
-        'android?.bond() short-circuits to null on iOS-flavored caps and '
-        'never reaches the platform', () async {
+        'android?.bond() short-circuits to null when platformKind == ios '
+        'and never reaches the platform', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: iosFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -167,7 +173,7 @@ void main() {
   });
 
   group('Connection.ios accessor', () {
-    test('is non-null when all three Android-only flags are false', () async {
+    test('is non-null when platformKind == ios', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: iosFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -182,7 +188,7 @@ void main() {
       bluey.dispose();
     });
 
-    test('is null when any Android-only flag is true', () async {
+    test('is null when platformKind == android', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
