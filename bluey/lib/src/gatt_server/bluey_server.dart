@@ -254,6 +254,19 @@ class BlueyServer implements Server {
     }
   }
 
+  /// Throws [UnsupportedOperationException] tagged with this server's
+  /// platform name when [flag] is false. Used by capability-gated
+  /// methods (e.g. `startAdvertising` with manufacturer data) to fail
+  /// loudly on platforms that silently ignore the option.
+  void _requireCapability(bool flag, String op) {
+    if (!flag) {
+      throw UnsupportedOperationException(
+        op,
+        _platform.capabilities.platformKind.name,
+      );
+    }
+  }
+
   /// Resolves [characteristic] to a platform handle. Falls back to a
   /// scan across every recorded service when the caller hasn't passed a
   /// service UUID — `notify(charUuid)` in the public API only carries
@@ -289,6 +302,12 @@ class BlueyServer implements Server {
         'serviceCount': services?.length ?? 0,
       },
     );
+    if (manufacturerData != null) {
+      _requireCapability(
+        _platform.capabilities.canAdvertiseManufacturerData,
+        'startAdvertising(manufacturerData)',
+      );
+    }
     // Ensure the eagerly-registered control service has completed before
     // advertising. The Future is cached and completes only once.
     await _controlServiceReady;

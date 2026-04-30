@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart' as platform;
 import 'package:flutter_test/flutter_test.dart';
@@ -212,6 +214,57 @@ void main() {
         await r.conn.disconnect();
         r.bluey.dispose();
       });
+    });
+  });
+
+  group('Server.startAdvertising — manufacturer data gate', () {
+    Future<({Server server, Bluey bluey})> serverWith(
+      platform.Capabilities caps,
+    ) async {
+      final fakePlatform = FakeBlueyPlatform(capabilities: caps);
+      platform.BlueyPlatform.instance = fakePlatform;
+      final bluey = Bluey();
+      final server = bluey.server()!;
+      return (server: server, bluey: bluey);
+    }
+
+    test('throws when manufacturerData supplied and flag is false', () async {
+      final r = await serverWith(platform.Capabilities.iOS);
+      expect(
+        () => r.server.startAdvertising(
+          name: 'Test',
+          manufacturerData: ManufacturerData(
+            0xFFFF,
+            Uint8List.fromList([1, 2, 3]),
+          ),
+        ),
+        throwsA(isA<UnsupportedOperationException>()
+            .having(
+              (e) => e.operation,
+              'operation',
+              'startAdvertising(manufacturerData)',
+            )
+            .having((e) => e.platform, 'platform', 'ios')),
+      );
+      r.bluey.dispose();
+    });
+
+    test('succeeds when manufacturerData omitted and flag is false', () async {
+      final r = await serverWith(platform.Capabilities.iOS);
+      await r.server.startAdvertising(name: 'Test');
+      r.bluey.dispose();
+    });
+
+    test('succeeds when manufacturerData supplied and flag is true', () async {
+      final r = await serverWith(platform.Capabilities.android);
+      await r.server.startAdvertising(
+        name: 'Test',
+        manufacturerData: ManufacturerData(
+          0xFFFF,
+          Uint8List.fromList([1, 2, 3]),
+        ),
+      );
+      r.bluey.dispose();
     });
   });
 }
