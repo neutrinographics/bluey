@@ -5,6 +5,7 @@ void main() {
   group('Capabilities', () {
     test('creates with all fields', () {
       const capabilities = Capabilities(
+        platformKind: PlatformKind.fake,
         canScan: true,
         canConnect: true,
         canAdvertise: true,
@@ -32,7 +33,7 @@ void main() {
     });
 
     test('creates with defaults', () {
-      const capabilities = Capabilities();
+      const capabilities = Capabilities(platformKind: PlatformKind.fake);
 
       expect(capabilities.canScan, isTrue);
       expect(capabilities.canConnect, isTrue);
@@ -99,6 +100,59 @@ void main() {
 
       expect(cap1, equals(cap2));
       expect(cap1.hashCode, equals(cap2.hashCode));
+    });
+  });
+
+  group('PlatformKind discriminator', () {
+    test('Capabilities.android has platformKind=android', () {
+      expect(Capabilities.android.platformKind, PlatformKind.android);
+    });
+
+    test('Capabilities.iOS has platformKind=ios', () {
+      expect(Capabilities.iOS.platformKind, PlatformKind.ios);
+    });
+
+    test('Capabilities.fake has platformKind=fake', () {
+      expect(Capabilities.fake.platformKind, PlatformKind.fake);
+    });
+
+    test('macOS / windows / linux presets have platformKind=other', () {
+      expect(Capabilities.macOS.platformKind, PlatformKind.other);
+      expect(Capabilities.windows.platformKind, PlatformKind.other);
+      expect(Capabilities.linux.platformKind, PlatformKind.other);
+    });
+
+    test('two Capabilities differing only in platformKind are not equal', () {
+      const a = Capabilities(platformKind: PlatformKind.android);
+      const b = Capabilities(platformKind: PlatformKind.ios);
+      expect(a == b, isFalse);
+    });
+  });
+
+  group('canAdvertiseManufacturerData', () {
+    test('Capabilities.android sets canAdvertiseManufacturerData=true', () {
+      expect(Capabilities.android.canAdvertiseManufacturerData, isTrue);
+    });
+
+    test('Capabilities.iOS sets canAdvertiseManufacturerData=false', () {
+      expect(Capabilities.iOS.canAdvertiseManufacturerData, isFalse);
+    });
+
+    test('default constructor sets canAdvertiseManufacturerData=false', () {
+      const c = Capabilities(platformKind: PlatformKind.other);
+      expect(c.canAdvertiseManufacturerData, isFalse);
+    });
+
+    test('two Capabilities differing only in canAdvertiseManufacturerData are not equal', () {
+      const a = Capabilities(
+        platformKind: PlatformKind.other,
+        canAdvertiseManufacturerData: true,
+      );
+      const b = Capabilities(
+        platformKind: PlatformKind.other,
+        canAdvertiseManufacturerData: false,
+      );
+      expect(a == b, isFalse);
     });
   });
 }
