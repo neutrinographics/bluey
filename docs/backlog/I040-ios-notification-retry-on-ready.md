@@ -5,7 +5,8 @@ category: no-op
 severity: medium
 platform: ios
 status: open
-last_verified: 2026-04-26
+last_verified: 2026-04-30
+related: [I311]
 ---
 
 ## Symptom
@@ -47,3 +48,22 @@ External references:
 - Apple [`peripheralManager(_:isReadyToUpdateSubscribers:)`](https://developer.apple.com/documentation/corebluetooth/cbperipheralmanagerdelegate/peripheralmanagerisready(toupdatesubscribers:)).
 - Apple [`peripheralManager.updateValue(_:for:onSubscribedCentrals:)`](https://developer.apple.com/documentation/corebluetooth/cbperipheralmanager/updatevalue(_:for:onsubscribedcentrals:)) — return value documentation.
 - WWDC 2017 Session 712, [What's New in Core Bluetooth](https://developer.apple.com/videos/play/wwdc2017/712/) — covers `canSendWriteWithoutResponse` and the analogous flow-control story on the central side; the peripheral side mirrors it.
+
+## Reproduction (2026-04-30)
+
+Confirmed reproducing during the example app's notification-throughput stress
+test with iOS-as-server / Android-as-client. The Android client sends a
+`BurstMeCommand` to the iOS server's stress characteristic; the iOS server
+loops `count` times calling `server.notify(...)`. Under load, iOS's TX queue
+fills, `peripheralManager.updateValue(...)` returns `false`, and the iOS
+plugin emits `BlueyError.unknown.toServerPigeonError()` from
+`PeripheralManagerImpl.swift:192` (`notifyCharacteristic`) and `:225`
+(`notifyCharacteristicTo`).
+
+The example app's `StressServiceHandler.onWrite` re-raises through
+`server_cubit.dart:194`, surfaced as
+`Write handler error: PlatformException(bluey-unknown, ...)`.
+
+The wrapper-type half of the symptom (raw `PlatformException` instead of a
+typed `BlueyPlatformException`) is tracked separately as I311 — server-side
+methods bypass the I099 typed-translation helper.

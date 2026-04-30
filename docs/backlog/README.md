@@ -227,6 +227,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
+| [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify`, `indicate`, `respondTo*`) bypass the I099 typed-translation helper | medium |
 
 ### Fixed — verified in HEAD
 
