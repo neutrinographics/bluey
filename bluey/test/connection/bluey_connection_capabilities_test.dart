@@ -175,19 +175,38 @@ void main() {
     });
 
     test(
-        'connecting on an Android-shaped platform '
-        '(canBond / canRequestPhy / canRequestConnectionParameters all false) '
-        'completes successfully — this is what unblocks Android client '
-        'manual testing under I035 Stage A', () async {
+        'connecting on a real Android-Stage-A platform '
+        '(platformKind=android with canBond / canRequestPhy / '
+        'canRequestConnectionParameters all false) completes successfully '
+        'and exposes a non-null connection.android — the I035 Stage A '
+        'regression guard', () async {
+      // Mirrors today's Capabilities.android preset: an Android device
+      // running pre-Stage-B Bluey. The bond/PHY/conn-param flags are all
+      // off because the underlying platform-interface methods throw
+      // UnimplementedError (I035 Stage A). The domain layer must skip
+      // those subscriptions during connection setup; otherwise the fake's
+      // matching throw would crash the constructor.
+      //
+      // Distinct from the iOS-flavored variant (Capabilities.iOS, also
+      // all three flags false) covered in capability_gating_test.dart:
+      // there `connection.android` is null because platformKind!=android;
+      // here it must be non-null because platformKind=android, even
+      // though every Android extension member would throw if invoked
+      // (I303 bug fix — connection.android is no longer gated on the
+      // presence of Stage B flags).
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
-          platformKind: platform.PlatformKind.ios,
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
+          canRequestMtu: true,
+          maxMtu: 517,
           canBond: false,
           canRequestPhy: false,
           canRequestConnectionParameters: false,
+          canRequestEnable: true,
+          canAdvertiseManufacturerData: true,
         ),
       );
       platform.BlueyPlatform.instance = fakePlatform;
@@ -200,12 +219,27 @@ void main() {
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
-      // All Android-only flags are false, so this is iOS-flavored under
-      // the B.2 heuristic and `conn.android` is null. The bond / PHY /
-      // conn-params surface is unreachable, which is correct for a
-      // capability-gated platform. The key assertion is that connect
-      // completed without throwing, which it did.
-      expect(conn.android, isNull);
+      // Connect completed without throwing — the construction-time skip
+      // is in place. Post-I303, connection.android is non-null because
+      // platformKind=android.
+      expect(conn.android, isNotNull);
+
+      // Every gated extension member throws at the call site (these
+      // assertions duplicate per-member coverage in
+      // capability_gating_test.dart but make this regression guard
+      // self-contained).
+      expect(
+        () => conn.android!.bondState,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.txPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.connectionParameters,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
