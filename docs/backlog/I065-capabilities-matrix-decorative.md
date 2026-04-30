@@ -4,8 +4,9 @@ title: Capabilities matrix is decorative; no production code consults it
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-30
+fixed_in: e177f1d
 related: [I053, I035, I066]
 ---
 
@@ -58,3 +59,11 @@ Three-part fix:
 Without (3), the matrix is documentation only. With (3), the matrix becomes load-bearing and consumers can rely on it.
 
 Partial overlap with I053 (capabilities matrix incomplete); may consolidate.
+
+## Resolution
+
+Resolved 2026-04-30. `_requireCapability(flag, op)` helper added to
+`BlueyConnection`, `BlueyServer`, and `_AndroidConnectionExtensionsImpl`;
+every cross-platform method whose underlying call may not be supported
+gates on the relevant flag. Capability checks fire before connection
+checks. Test coverage at `bluey/test/connection/capability_gating_test.dart`.

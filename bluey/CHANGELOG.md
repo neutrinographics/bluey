@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.0
+
+**Breaking changes:**
+
+- `Capabilities` constructor now requires a `platformKind: PlatformKind`
+  argument (`enum PlatformKind { android, ios, fake, other }`). Use the
+  presets (`Capabilities.android`, `.iOS`, `.fake`, etc.) where possible.
+- `Client.disconnect()` removed. Server consumers needing to force-disconnect
+  a connected client must close the entire server. Cooperative
+  disconnect via the lifecycle protocol remains future work.
+- `BlueyConnection.requestMtu` now throws `UnsupportedOperationException`
+  on iOS (was: `BlueyPlatformException` with null code). Check
+  `bluey.capabilities.canRequestMtu` before calling.
+- Every member of `connection.android` (`bond`, `bondState`, `requestPhy`,
+  etc.) now throws `UnsupportedOperationException` when its corresponding
+  capability flag is `false`. With the current `Capabilities.android`
+  preset (Android Stage B unimplemented), every member throws — flip the
+  per-feature flags to `true` as I035 Stage B lands.
+- `Server.startAdvertising(manufacturerData: …)` now throws on iOS
+  (the manufacturer data was previously silently dropped — see I204).
+- `connection.android` and `connection.ios` getters now dispatch on
+  `Capabilities.platformKind` instead of inferring from the absence of
+  Android-only flags. Bug fix on Android: `connection.android` returns
+  non-null on real Android devices regardless of which Stage B flags
+  have landed.
+
+**New:**
+
+- `PlatformKind` enum and `Capabilities.platformKind` discriminator.
+- `Capabilities.canAdvertiseManufacturerData` flag.
+- `Capabilities.fake` preset for tests.
+
 ## Unreleased
 
 **Server-side peer identification:**

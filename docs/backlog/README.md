@@ -58,11 +58,11 @@ Prose sections (in this order, any may be omitted if empty):
 
 ## Suggested order of attack
 
-Ordered by impact per hour, refreshed 2026-04-29 after Tier 3 was cleared and the iOS-cluster sweep closed I044 + I045. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
+Ordered by impact per hour, refreshed 2026-04-30 after the capabilities-matrix bundle closed I053 + I065 + I069 + I303 + I310 + I045-followup. Treat as a recommendation, not a commitment — re-evaluate when circumstances change (user-visible bug reports, prioritized features, release targets, etc.).
 
 ### Where we are
 
-Tiers 1–3 are cleared. The remaining backlog is Tier 4: opportunistic bundles, plus a long tail of low-severity stubs and limitations. The next coherent project of architectural significance is the **capabilities-matrix bundle**, which subsumes several open entries and is the recommended fix path for I310. Everything else is genuinely opportunistic — pick up when in nearby code or when a concrete consumer needs it.
+Tiers 1–3 are cleared and the Tier 4 capabilities-matrix bundle landed 2026-04-30 (`ec40c41..e177f1d`), closing I053 + I065 + I069 + I303 + I310 + the I045 follow-up. The remaining backlog is the long tail of Tier 4: smaller opportunistic bundles plus low-severity stubs and limitations. Everything below is genuinely opportunistic — pick up when in nearby code or when a concrete consumer needs it.
 
 ### Tier 1 — Quick wins (sub-day each) — DONE
 
@@ -105,13 +105,13 @@ These rewrite portions of the public surface; plan as release events with a migr
 
 Ordered by recommended sequence. Bundles preferred where the underlying concerns share architecture; one-offs land as small commits. Everything below is genuinely optional — there is no current production blocker in this list.
 
-#### Recommended next bundle — Capabilities matrix (multi-day, Tier-3-shaped)
+#### Capabilities matrix — DONE
 
-**I053 + I065 + I069 + I303 + I310 + I045-followup.** Expand the `Capabilities` matrix to cover every BLE-feature dimension (I053), make it load-bearing — domain-layer methods consult it before crossing the platform-interface seam (I065), parameterize `FakeBlueyPlatform` so tests can simulate any platform shape (I069), replace the iOS-detection heuristic with a precise platform-kind flag (I303), throw a typed `UnsupportedOperationException` when a capability flag is false instead of letting `UnsupportedError` fall through to `BlueyPlatformException(null)` (I310), and add the `canForceDisconnectRemoteCentral: false` flag so consumers can gate `Server.disconnectCentral` without try/catch (the I045 follow-up). I310 explicitly recommends this bundle as its preferred fix path. Estimate: 2–3 days. Worth a spec, similar to the I099 rewrite.
+**DONE — bundle `ec40c41..e177f1d`.** I053 + I065 + I069 + I303 + I310 + I045-followup closed in one multi-day pass: matrix expanded with `PlatformKind` + `canAdvertiseManufacturerData`, every cross-platform method now consults `Capabilities` before crossing the platform-interface seam, `FakeBlueyPlatform` parameterized for capability-gated tests, `Connection.android` / `Connection.ios` dispatch on `platformKind`, iOS `UnsupportedError` paths replaced by domain-layer gating, and `Client.disconnect` / `BlueyPlatform.disconnectCentral` removed entirely (the I045 follow-up — neither platform can honestly support force-disconnect). Spec at `docs/superpowers/specs/2026-04-30-capabilities-matrix-load-bearing-design.md`.
 
 #### Smaller bundles (1–2 hours each)
 
-- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour. Best done alongside the capabilities bundle since both touch the bounded-context seam.
+- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour.
 - **Server-API polish** (I058 + I059) — advertising mode dropped + `removeService` fire-and-forget. ~1–2 hours.
 - **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. ~1–2 hours.
 - **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. Bundle.
@@ -150,9 +150,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses platform default timeout | medium |
 | [I058](I058-server-advertising-mode-dropped.md) | `BlueyServer.startAdvertising` drops user-supplied advertising mode | medium |
 | [I059](I059-server-remove-service-fire-and-forget.md) | `BlueyServer.removeService` doesn't await the platform call | low |
-| [I065](I065-capabilities-matrix-decorative.md) | `Capabilities` matrix is decorative; no production code consults it | medium |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
-| [I069](I069-fake-platform-capabilities-hardcoded.md) | `FakeBlueyPlatform.capabilities` hardcoded; no test coverage of capability gating | medium |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
@@ -203,7 +201,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
-| [I310](I310-ios-unsupported-error-falls-through-as-platform-exception.md) | iOS adapter throws Dart `UnsupportedError` for capability-gated ops; surfaces as `BlueyPlatformException` with null code | medium |
 
 ### Open — cross-platform unimplemented features
 
@@ -212,7 +209,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I050](I050-prepared-write-flow-unimplemented.md) | Prepared-write (long-write) flow unimplemented | medium |
 | [I051](I051-advertising-options-not-exposed.md) | Advertising options not exposed (TX power, mode, connectable) | medium |
 | [I052](I052-scan-options-not-exposed.md) | Scan options not exposed (mode, RSSI filter, duplicates) | medium |
-| [I053](I053-capabilities-matrix-incomplete.md) | `Capabilities` matrix incomplete | medium |
 | [I084](I084-reconnect-loses-subscriptions.md) | Reconnected central loses subscriptions silently | medium |
 | [I086](I086-remove-service-race-with-notify.md) | `removeService` races with in-flight notify fanout (iOS only; Android done in `80ef2ed`) | medium |
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
@@ -223,7 +219,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | ID | Title | Severity |
 |---|---|---|
 | [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
-| [I303](I303-capabilities-platform-kind-flag.md) | iOS-detection heuristic on `Connection.ios` should be a precise capability flag | low |
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
@@ -276,6 +271,11 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I071](I071-upgrade-called-twice-leaks-lifecycle.md) | `BlueyConnection.upgrade()` double-upgrade leak; `upgrade()` removed entirely by I300 | `ccb5dc6` |
 | [I044](I044-ios-disconnect-on-disconnected-waits-timeout.md) | iOS disconnect of an already-disconnected peripheral waited the full 30 s timeout; now short-circuits | `683a1eb` |
 | [I045](I045-ios-disconnect-central-noop.md) | iOS `disconnectCentral` lied about success while the BLE link stayed up; now throws (breaking) | `d015870` |
+| [I053](I053-capabilities-matrix-incomplete.md) | `Capabilities` matrix expanded with `PlatformKind` + `canAdvertiseManufacturerData`; remaining flags consulted in domain layer | `e177f1d` (bundle `ec40c41..e177f1d`) |
+| [I065](I065-capabilities-matrix-decorative.md) | Capabilities matrix is now load-bearing: `_requireCapability` helper gates every cross-platform method on its flag before crossing the platform-interface seam | `e177f1d` (bundle `ec40c41..e177f1d`) |
+| [I069](I069-fake-platform-capabilities-hardcoded.md) | Test-side coverage of capability gating: `bluey/test/connection/capability_gating_test.dart` exercises every gated method via custom-`Capabilities` `FakeBlueyPlatform` | `e177f1d` (bundle `ec40c41..e177f1d`) |
+| [I303](I303-capabilities-platform-kind-flag.md) | `Connection.android` / `Connection.ios` getters dispatch on `Capabilities.platformKind` instead of the absent-Android-flags heuristic | `e177f1d` (bundle `ec40c41..e177f1d`) |
+| [I310](I310-ios-unsupported-error-falls-through-as-platform-exception.md) | Domain-layer capability gating prevents iOS-flavored capabilities from reaching the adapter's `UnsupportedError` throws; throws kept as defense-in-depth | `e177f1d` (bundle `ec40c41..e177f1d`) |
 
 ### Wontfix — documented platform limitations & superseded premises
 
