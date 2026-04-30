@@ -33,6 +33,7 @@ void main() {
         'BondState.none with a non-broken bondStateChanges stream', () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -72,6 +73,7 @@ void main() {
         () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -109,6 +111,7 @@ void main() {
         'not throw and yields default ConnectionParameters', () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -147,6 +150,7 @@ void main() {
         'manual testing under I035 Stage A', () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.ios,
           canScan: true,
           canConnect: true,
           canAdvertise: true,

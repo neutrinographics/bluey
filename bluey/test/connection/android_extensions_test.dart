@@ -28,6 +28,7 @@ void main() {
   /// `Capabilities.android` itself currently has all three false (post-I035
   /// Stage A), so we construct an explicit profile here.
   const androidFlavored = platform.Capabilities(
+    platformKind: platform.PlatformKind.android,
     canScan: true,
     canConnect: true,
     canAdvertise: true,
@@ -39,6 +40,7 @@ void main() {
   /// Capabilities profile with all three Android-only flags false. This is
   /// the iOS-flavored profile under the B.2 heuristic.
   const iosFlavored = platform.Capabilities(
+    platformKind: platform.PlatformKind.ios,
     canScan: true,
     canConnect: true,
     canAdvertise: true,

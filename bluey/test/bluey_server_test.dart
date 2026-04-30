@@ -1761,6 +1761,7 @@ void main() {
 final class _NonAdvertisingPlatform extends MockBlueyPlatform {
   @override
   platform.Capabilities get capabilities => const platform.Capabilities(
+    platformKind: platform.PlatformKind.fake,
     canScan: true,
     canConnect: true,
     canAdvertise: false,
