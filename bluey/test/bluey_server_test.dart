@@ -26,7 +26,6 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   final List<IndicateToCall> indicateToCalls = [];
   final List<RespondToReadCall> respondToReadCalls = [];
   final List<RespondToWriteCall> respondToWriteCalls = [];
-  final List<String> disconnectedClients = [];
 
   // I079: when set, the next respondToWriteRequest call throws this error
   // before recording the call. Used to verify that requestCompleted has
@@ -385,11 +384,6 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     respondToWriteCalls.add(
       RespondToWriteCall(requestId: requestId, status: status),
     );
-  }
-
-  @override
-  Future<void> disconnectCentral(String centralId) async {
-    disconnectedClients.add(centralId);
   }
 
   @override
@@ -1004,23 +998,6 @@ void main() {
           equals('central-1'),
         );
         expect(mockPlatform.indicateToCalls.first.value, equals(data));
-      });
-    });
-
-    group('Central disconnect', () {
-      test('central.disconnect() disconnects the central', () async {
-        final server = bluey.server()!;
-
-        server.connections.listen((_) {});
-        mockPlatform.emitCentralConnected(
-          const platform.PlatformCentral(id: 'central-1', mtu: 512),
-        );
-        await Future.delayed(Duration(milliseconds: 10));
-
-        final central = server.connectedClients.first;
-        await central.disconnect();
-
-        expect(mockPlatform.disconnectedClients, contains('central-1'));
       });
     });
 

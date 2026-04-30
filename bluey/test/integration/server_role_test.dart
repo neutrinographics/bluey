@@ -361,36 +361,6 @@ void main() {
         await bluey.dispose();
       });
 
-      test('disconnects a specific central', () async {
-        final bluey = Bluey();
-        final server = bluey.server()!;
-
-        await server.startAdvertising(name: 'Test Device');
-
-        fakePlatform.simulateCentralConnection(
-          centralId: 'AA:BB:CC:DD:EE:01',
-          mtu: 23,
-        );
-        fakePlatform.simulateCentralConnection(
-          centralId: 'AA:BB:CC:DD:EE:02',
-          mtu: 23,
-        );
-        await Future.delayed(Duration.zero);
-
-        expect(server.connectedClients, hasLength(2));
-
-        // Act: Disconnect one central
-        final centralToDisconnect = server.connectedClients.first;
-        await centralToDisconnect.disconnect();
-
-        await Future.delayed(Duration.zero);
-
-        // Assert: Only one central remains
-        expect(server.connectedClients, hasLength(1));
-
-        await server.dispose();
-        await bluey.dispose();
-      });
     });
 
     group('Notifications', () {

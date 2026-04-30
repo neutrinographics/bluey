@@ -274,9 +274,6 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   ) async {}
 
   @override
-  Future<void> disconnectCentral(String centralId) async {}
-
-  @override
   Future<void> closeServer() async {}
 
   // Structured logging - stub implementations (I307)

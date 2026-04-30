@@ -128,7 +128,6 @@ class BlueyServer implements Server {
         ),
       );
       final client = BlueyClient(
-        platform: _platform,
         id: platformCentral.id,
         mtu: platformCentral.mtu,
       );
@@ -598,7 +597,6 @@ class BlueyServer implements Server {
         ),
       );
       final client = BlueyClient(
-        platform: _platform,
         id: clientId,
         mtu: 23, // Default MTU — actual MTU is unknown without platform event
       );
@@ -747,17 +745,12 @@ class BlueyServer implements Server {
 
 /// Concrete implementation of [Client].
 class BlueyClient implements Client {
-  final platform.BlueyPlatform _platform;
   final String _platformId;
   final int _mtu;
 
-  BlueyClient({
-    required platform.BlueyPlatform platform,
-    required String id,
-    required int mtu,
-  }) : _platform = platform,
-       _platformId = id,
-       _mtu = mtu;
+  BlueyClient({required String id, required int mtu})
+    : _platformId = id,
+      _mtu = mtu;
 
   @override
   UUID get id {
@@ -779,9 +772,4 @@ class BlueyClient implements Client {
 
   @override
   int get mtu => _mtu;
-
-  @override
-  Future<void> disconnect() async {
-    await _platform.disconnectCentral(_platformId);
-  }
 }

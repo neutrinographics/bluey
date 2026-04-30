@@ -542,9 +542,6 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Respond to a write request.
   Future<void> respondToWriteRequest(int requestId, PlatformGattStatus status);
 
-  /// Disconnect a central from the server.
-  Future<void> disconnectCentral(String centralId);
-
   /// Close the GATT server and disconnect all centrals.
   ///
   /// Call this when the server is no longer needed to release resources

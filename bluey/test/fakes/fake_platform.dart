@@ -1546,11 +1546,6 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   @override
-  Future<void> disconnectCentral(String centralId) async {
-    simulateCentralDisconnection(centralId);
-  }
-
-  @override
   Future<void> closeServer() async {
     await stopAdvertising();
     for (final centralId in _connectedCentrals.keys.toList()) {
