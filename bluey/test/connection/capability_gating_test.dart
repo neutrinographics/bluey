@@ -66,9 +66,13 @@ void main() {
   group('BlueyConnection.requestMtu gating', () {
     test('throws UnsupportedOperationException when canRequestMtu=false', () async {
       final r = await connectWith(platform.Capabilities.iOS);
-      expect(
-        () => r.conn.requestMtu(
-          Mtu(247, capabilities: platform.Capabilities.android),
+      // requestMtu is `async`, so the gate's synchronous throw surfaces
+      // as a Future rejection. Use expectLater to await the assertion.
+      // 185 is iOS's maxMtu, so Mtu's pre-validation passes; the gate
+      // fires before the value is consumed by the platform.
+      await expectLater(
+        r.conn.requestMtu(
+          Mtu(185, capabilities: platform.Capabilities.iOS),
         ),
         throwsA(isA<UnsupportedOperationException>()
             .having((e) => e.operation, 'operation', 'requestMtu')
@@ -264,8 +268,11 @@ void main() {
 
     test('throws when manufacturerData supplied and flag is false', () async {
       final r = await serverWith(platform.Capabilities.iOS);
-      expect(
-        () => r.server.startAdvertising(
+      // startAdvertising is `async` (it awaits _controlServiceReady), so
+      // the gate's synchronous throw surfaces as a Future rejection.
+      // Use expectLater to await the assertion.
+      await expectLater(
+        r.server.startAdvertising(
           name: 'Test',
           manufacturerData: ManufacturerData(
             0xFFFF,
