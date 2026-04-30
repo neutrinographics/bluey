@@ -54,14 +54,18 @@ void main() {
 
       // canRequestPhy/canRequestConnectionParameters are still true, so
       // `conn.android` is non-null. Bond state is exposed via the
-      // android extension only (post-B.3, I089).
+      // android extension only (post-B.3, I089). Post-Task-5: reading
+      // bondState / bondStateChanges on a canBond=false platform throws
+      // UnsupportedOperationException at the call site (capability gate).
       expect(conn.android, isNotNull);
-      expect(conn.android?.bondState, BondState.none);
-
-      // The stream must exist and be subscribable; on a canBond=false
-      // platform there are simply no events to deliver.
-      final sub = conn.android!.bondStateChanges.listen((_) {});
-      await sub.cancel();
+      expect(
+        () => conn.android!.bondState,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.bondStateChanges,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
@@ -94,13 +98,22 @@ void main() {
 
       // canBond/canRequestConnectionParameters are still true, so
       // `conn.android` is non-null. PHY is exposed via the android
-      // extension only (post-B.3, I089).
+      // extension only (post-B.3, I089). Post-Task-5: reading txPhy /
+      // rxPhy / phyChanges on a canRequestPhy=false platform throws
+      // UnsupportedOperationException at the call site (capability gate).
       expect(conn.android, isNotNull);
-      expect(conn.android?.txPhy, Phy.le1m);
-      expect(conn.android?.rxPhy, Phy.le1m);
-
-      final sub = conn.android!.phyChanges.listen((_) {});
-      await sub.cancel();
+      expect(
+        () => conn.android!.txPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.rxPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.phyChanges,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
@@ -132,12 +145,15 @@ void main() {
 
       // canBond/canRequestPhy are still true, so `conn.android` is
       // non-null. Connection parameters are exposed via the android
-      // extension only (post-B.3, I089).
+      // extension only (post-B.3, I089). Post-Task-5: reading
+      // connectionParameters on a canRequestConnectionParameters=false
+      // platform throws UnsupportedOperationException at the call site
+      // (capability gate).
       expect(conn.android, isNotNull);
-      // Defaults from BlueyConnection's initial state.
-      expect(conn.android?.connectionParameters.interval.milliseconds, 30.0);
-      expect(conn.android?.connectionParameters.latency.events, 0);
-      expect(conn.android?.connectionParameters.timeout.milliseconds, 4000);
+      expect(
+        () => conn.android!.connectionParameters,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();

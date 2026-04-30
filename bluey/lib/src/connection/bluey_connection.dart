@@ -1185,38 +1185,89 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   _AndroidConnectionExtensionsImpl(this._conn);
 
-  @override
-  BondState get bondState => _conn._bondStateValue;
+  void _requireCapability(bool flag, String op) {
+    if (!flag) {
+      throw UnsupportedOperationException(
+        op,
+        _conn._platform.capabilities.platformKind.name,
+      );
+    }
+  }
 
   @override
-  Stream<BondState> get bondStateChanges => _conn._bondStateChanges;
+  BondState get bondState {
+    _requireCapability(_conn._platform.capabilities.canBond, 'bondState');
+    return _conn._bondStateValue;
+  }
 
   @override
-  Future<void> bond() => _conn._bondImpl();
+  Stream<BondState> get bondStateChanges {
+    _requireCapability(
+      _conn._platform.capabilities.canBond,
+      'bondStateChanges',
+    );
+    return _conn._bondStateChanges;
+  }
 
   @override
-  Future<void> removeBond() => _conn._removeBondImpl();
+  Future<void> bond() {
+    _requireCapability(_conn._platform.capabilities.canBond, 'bond');
+    return _conn._bondImpl();
+  }
 
   @override
-  Phy get txPhy => _conn._txPhyValue;
+  Future<void> removeBond() {
+    _requireCapability(_conn._platform.capabilities.canBond, 'removeBond');
+    return _conn._removeBondImpl();
+  }
 
   @override
-  Phy get rxPhy => _conn._rxPhyValue;
+  Phy get txPhy {
+    _requireCapability(_conn._platform.capabilities.canRequestPhy, 'txPhy');
+    return _conn._txPhyValue;
+  }
 
   @override
-  Stream<({Phy tx, Phy rx})> get phyChanges => _conn._phyChanges;
+  Phy get rxPhy {
+    _requireCapability(_conn._platform.capabilities.canRequestPhy, 'rxPhy');
+    return _conn._rxPhyValue;
+  }
 
   @override
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) =>
-      _conn._requestPhyImpl(txPhy: txPhy, rxPhy: rxPhy);
+  Stream<({Phy tx, Phy rx})> get phyChanges {
+    _requireCapability(
+      _conn._platform.capabilities.canRequestPhy,
+      'phyChanges',
+    );
+    return _conn._phyChanges;
+  }
 
   @override
-  ConnectionParameters get connectionParameters =>
-      _conn._connectionParametersValue;
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) {
+    _requireCapability(
+      _conn._platform.capabilities.canRequestPhy,
+      'requestPhy',
+    );
+    return _conn._requestPhyImpl(txPhy: txPhy, rxPhy: rxPhy);
+  }
 
   @override
-  Future<void> requestConnectionParameters(ConnectionParameters params) =>
-      _conn._requestConnectionParametersImpl(params);
+  ConnectionParameters get connectionParameters {
+    _requireCapability(
+      _conn._platform.capabilities.canRequestConnectionParameters,
+      'connectionParameters',
+    );
+    return _conn._connectionParametersValue;
+  }
+
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) {
+    _requireCapability(
+      _conn._platform.capabilities.canRequestConnectionParameters,
+      'requestConnectionParameters',
+    );
+    return _conn._requestConnectionParametersImpl(params);
+  }
 }
 
 /// Empty const singleton implementing [IosConnectionExtensions]. Reserved

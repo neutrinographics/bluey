@@ -86,4 +86,132 @@ void main() {
       r.bluey.dispose();
     });
   });
+
+  group('AndroidConnectionExtensions — capability gating', () {
+    // Build an Android-flavored fake with each flag individually false.
+    platform.Capabilities androidWith({
+      bool canBond = true,
+      bool canRequestPhy = true,
+      bool canRequestConnectionParameters = true,
+    }) =>
+        platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
+          canScan: true,
+          canConnect: true,
+          canAdvertise: true,
+          canRequestMtu: true,
+          maxMtu: 517,
+          canBond: canBond,
+          canRequestPhy: canRequestPhy,
+          canRequestConnectionParameters: canRequestConnectionParameters,
+        );
+
+    group('canBond=false', () {
+      test('bond() throws', () async {
+        final r = await connectWith(androidWith(canBond: false));
+        expect(
+          () => r.conn.android!.bond(),
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'bond')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+
+      test('removeBond() throws', () async {
+        final r = await connectWith(androidWith(canBond: false));
+        expect(
+          () => r.conn.android!.removeBond(),
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'removeBond')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+
+      test('bondState getter throws synchronously', () async {
+        final r = await connectWith(androidWith(canBond: false));
+        expect(
+          () => r.conn.android!.bondState,
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'bondState')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+
+      test('bondStateChanges getter throws synchronously', () async {
+        final r = await connectWith(androidWith(canBond: false));
+        expect(
+          () => r.conn.android!.bondStateChanges,
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'bondStateChanges')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+    });
+
+    group('canRequestPhy=false', () {
+      test('requestPhy() throws', () async {
+        final r = await connectWith(androidWith(canRequestPhy: false));
+        expect(
+          () => r.conn.android!.requestPhy(),
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'requestPhy')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+
+      test('txPhy / rxPhy / phyChanges getters throw synchronously', () async {
+        final r = await connectWith(androidWith(canRequestPhy: false));
+        expect(
+          () => r.conn.android!.txPhy,
+          throwsA(isA<UnsupportedOperationException>()),
+        );
+        expect(
+          () => r.conn.android!.rxPhy,
+          throwsA(isA<UnsupportedOperationException>()),
+        );
+        expect(
+          () => r.conn.android!.phyChanges,
+          throwsA(isA<UnsupportedOperationException>()),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+    });
+
+    group('canRequestConnectionParameters=false', () {
+      test('requestConnectionParameters() throws', () async {
+        final r =
+            await connectWith(androidWith(canRequestConnectionParameters: false));
+        expect(
+          () => r.conn.android!.requestConnectionParameters(
+            ConnectionParameters(
+              interval: ConnectionInterval(30),
+              latency: PeripheralLatency(0),
+              timeout: SupervisionTimeout(4000),
+            ),
+          ),
+          throwsA(isA<UnsupportedOperationException>()
+              .having((e) => e.operation, 'operation', 'requestConnectionParameters')),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+
+      test('connectionParameters getter throws synchronously', () async {
+        final r =
+            await connectWith(androidWith(canRequestConnectionParameters: false));
+        expect(
+          () => r.conn.android!.connectionParameters,
+          throwsA(isA<UnsupportedOperationException>()),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      });
+    });
+  });
 }
