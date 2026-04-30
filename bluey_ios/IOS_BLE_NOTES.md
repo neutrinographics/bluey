@@ -40,8 +40,7 @@ There is no way to distinguish between:
 ### Client Tracking Without Subscriptions
 
 If a client only reads and writes without subscribing to any characteristic, we will never receive a disconnection signal. The client will remain in our tracked list indefinitely until:
-- The server is disposed
-- The client is explicitly disconnected via `disconnectCentral()`
+- The server is disposed (`closeServer`)
 - The lifecycle heartbeat timeout fires (see below)
 
 ### Solution: Lifecycle Control Service
@@ -98,9 +97,9 @@ When the app moves to the background:
 
 iOS does not provide a direct way to disconnect a connected client from the peripheral side. `CBPeripheralManager` has no `cancelConnection` or equivalent method.
 
-**Our approach (post-I045):** `disconnectCentral` throws `BlueyPlatformException` (translated from `gatt-status-failed` with REQUEST_NOT_SUPPORTED) instead of silently untracking and returning success. Lying to the caller masks the platform limitation and leads to "ghost peer" bugs where the central keeps reading/writing/subscribing after the server believes it gone.
+**Our approach (post-I045-followup, capabilities-matrix bundle):** the cross-platform `disconnectCentral` API has been removed entirely. Neither iOS nor Android can reliably force-disconnect a remote central in the BLE topology Bluey uses, so exposing a method that always failed (or, worse, silently lied about success) created "ghost peer" bugs without offering real value. Server consumers needing to terminate a session should call `closeServer()` for full teardown.
 
-Bluey peers (clients that speak the lifecycle protocol) can write `0x00` to the heartbeat characteristic as a cooperative disconnect signal — that path lives on the *client* side via `PeerConnection.disconnect()` and is fully effective. There is no server-initiated equivalent on iOS. Pre-I045 callers that depended on the silent untrack should either: (a) catch the throw and use `removeService` / `stopAdvertising` for global teardown, or (b) negotiate a client-driven disconnect via the lifecycle protocol.
+Bluey peers (clients that speak the lifecycle protocol) can still write `0x00` to the heartbeat characteristic as a cooperative disconnect signal — that path lives on the *client* side via `PeerConnection.disconnect()` and is fully effective. There is no server-initiated equivalent on iOS.
 
 ## Permissions
 

@@ -1394,8 +1394,6 @@ protocol BlueyHostApi {
   func respondToReadRequest(requestId: Int64, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, Error>) -> Void)
   /// Respond to a write request.
   func respondToWriteRequest(requestId: Int64, status: GattStatusDto, completion: @escaping (Result<Void, Error>) -> Void)
-  /// Disconnect a central from the server.
-  func disconnectCentral(centralId: String, completion: @escaping (Result<Void, Error>) -> Void)
   /// Close the GATT server and disconnect all centrals.
   func closeServer(completion: @escaping (Result<Void, Error>) -> Void)
   /// Set the minimum severity level for native log events forwarded to Dart.
@@ -1855,24 +1853,6 @@ class BlueyHostApiSetup {
       }
     } else {
       respondToWriteRequestChannel.setMessageHandler(nil)
-    }
-    /// Disconnect a central from the server.
-    let disconnectCentralChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.disconnectCentral\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      disconnectCentralChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let centralIdArg = args[0] as! String
-        api.disconnectCentral(centralId: centralIdArg) { result in
-          switch result {
-          case .success:
-            reply(wrapResult(nil))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      disconnectCentralChannel.setMessageHandler(nil)
     }
     /// Close the GATT server and disconnect all centrals.
     let closeServerChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.closeServer\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)

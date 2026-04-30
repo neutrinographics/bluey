@@ -265,35 +265,6 @@ class PeripheralManagerImpl: NSObject {
         completion(.success(()))
     }
 
-    // MARK: - Central Management
-
-    func disconnectCentral(centralId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // I045: CoreBluetooth's CBPeripheralManager has no method to
-        // terminate an active central connection. Apple's design treats
-        // peripheral-side connection lifecycle as the central's
-        // responsibility. Returning success while only untracking the
-        // central locally lies to the caller — the BLE link stays up,
-        // the central can keep reading/writing/subscribing, and the
-        // caller (which freed associated resources on the back of the
-        // success) sees subsequent activity from a "ghost" peer.
-        //
-        // Throw an honest unsupported error so callers know the operation
-        // didn't actually disconnect anyone. Bluey peers can still use
-        // the lifecycle disconnect command (write 0x00 to the heartbeat
-        // characteristic) as a cooperative signal, but that's the
-        // caller's choice — we don't attempt it transparently here.
-        //
-        // Follow-up: a `Capabilities.canForceDisconnectRemoteCentral`
-        // flag (set false on iOS, also false on Android per I207) would
-        // let consumers gate the call without try/catch. Tracked under
-        // the I053/I065 capabilities-matrix work.
-        BlueyLog.shared.log(.warn, "bluey.ios.peripheral",
-                            "disconnectCentral: unsupported on iOS — throwing instead of silently untracking",
-                            data: ["centralId": centralId],
-                            errorCode: "unsupported")
-        completion(.failure(BlueyError.unsupported.toServerPigeonError()))
-    }
-
     func closeServer(completion: @escaping (Result<Void, Error>) -> Void) {
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "closeServer",
                             data: ["serviceCount": services.count,
