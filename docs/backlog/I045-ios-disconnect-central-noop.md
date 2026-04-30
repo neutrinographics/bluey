@@ -4,8 +4,9 @@ title: iOS `disconnectCentral` returns success without disconnecting the central
 category: bug
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-30
+fixed_in: d015870
 related: [I207]
 ---
 
