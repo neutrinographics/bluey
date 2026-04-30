@@ -228,6 +228,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
 | [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify`, `indicate`, `respondTo*`) bypass the I099 typed-translation helper | medium |
+| [I312](I312-ios-extensions-singleton-asymmetry.md) | `_IosConnectionExtensionsImpl` is a top-level const singleton vs Android's per-connection facade | low |
 
 ### Fixed — verified in HEAD
 
