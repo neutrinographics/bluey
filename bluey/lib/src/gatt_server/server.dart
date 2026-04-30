@@ -15,16 +15,13 @@ export 'hosted_gatt.dart';
 ///
 /// When a client connects to this peripheral, a [Client] instance is
 /// created to represent it. Use this to send notifications to specific
-/// clients or to disconnect them.
+/// clients.
 abstract class Client {
   /// The unique identifier of this client.
   UUID get id;
 
   /// The current MTU for this connection.
   int get mtu;
-
-  /// Disconnect this client.
-  Future<void> disconnect();
 }
 
 /// GATT server for peripheral role.

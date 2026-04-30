@@ -157,10 +157,6 @@ final class MockBlueyPlatform extends BlueyPlatform
   ) => throw UnimplementedError();
 
   @override
-  Future<void> disconnectCentral(String centralId) =>
-      throw UnimplementedError();
-
-  @override
   Future<void> closeServer() => throw UnimplementedError();
 
   @override

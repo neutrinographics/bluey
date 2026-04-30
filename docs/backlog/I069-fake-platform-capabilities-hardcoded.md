@@ -4,8 +4,9 @@ title: FakeBlueyPlatform.capabilities is hardcoded; no test coverage of capabili
 category: limitation
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-30
+fixed_in: e177f1d
 related: [I065, I066]
 ---
 
@@ -52,3 +53,11 @@ final iosLikePlatform = FakeBlueyPlatform(
 ```
 
 Once available, add tests that exercise expected `UnsupportedOperationException` behavior for each capability-gated method. This is the test-side counterpart of I065's "make capabilities load-bearing" goal.
+
+## Resolution
+
+Resolved 2026-04-30. The structural fix (parameterized constructor)
+already landed in a prior cycle. This bundle added the missing
+test-side coverage at `bluey/test/connection/capability_gating_test.dart`,
+which exercises every gated method by passing custom `Capabilities`
+instances to `FakeBlueyPlatform`.

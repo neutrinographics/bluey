@@ -4,8 +4,9 @@ title: Replace iOS-detection heuristic on `Connection.ios` with a precise capabi
 category: limitation
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-28
+status: fixed
+last_verified: 2026-04-30
+fixed_in: e177f1d
 related: [I089, I053, I065, I069]
 ---
 
@@ -48,3 +49,11 @@ This is best done alongside I053 (capabilities matrix expansion) and I065 (capab
 External references:
 - Apple Accessory Design Guidelines, R8 (BLE) — confirms the iOS-side feature absence the heuristic relies on.
 - The original I089 spec at `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` calls out this heuristic as provisional.
+
+## Resolution
+
+Resolved 2026-04-30 with Option B from the entry: introduced
+`PlatformKind { android, ios, fake, other }` enum and a required
+`Capabilities.platformKind` field. `BlueyConnection.android` /
+`BlueyConnection.ios` getters now dispatch on `platformKind` instead
+of inferring from absent Android-only flags.

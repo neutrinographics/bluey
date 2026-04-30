@@ -1877,25 +1877,6 @@ class BlueyHostApi {
     ;
   }
 
-  /// Disconnect a central from the server.
-  Future<void> disconnectCentral(String centralId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.disconnectCentral$pigeonVar_messageChannelSuffix';
-    final pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId]);
-    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
-
-    _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
-  }
-
   /// Close the GATT server and disconnect all centrals.
   Future<void> closeServer() async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_ios.BlueyHostApi.closeServer$pigeonVar_messageChannelSuffix';

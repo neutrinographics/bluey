@@ -187,11 +187,6 @@ class AndroidServer {
 
   // === Client Management ===
 
-  /// Disconnects a connected central.
-  Future<void> disconnectCentral(String centralId) async {
-    await _hostApi.disconnectCentral(centralId);
-  }
-
   /// Closes the GATT server.
   Future<void> closeServer() async {
     await _hostApi.closeServer();

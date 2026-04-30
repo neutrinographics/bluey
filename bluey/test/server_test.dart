@@ -195,12 +195,6 @@ void main() {
 
       expect(central.mtu, equals(512));
     });
-
-    test('can disconnect', () async {
-      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
-
-      await expectLater(central.disconnect(), completes);
-    });
   });
 
   group('Server', () {
@@ -285,14 +279,7 @@ class MockClient implements Client {
   @override
   final int mtu;
 
-  bool disconnected = false;
-
   MockClient({required this.id, required this.mtu});
-
-  @override
-  Future<void> disconnect() async {
-    disconnected = true;
-  }
 }
 
 /// Mock implementation of Server for testing.

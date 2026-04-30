@@ -1627,8 +1627,6 @@ interface BlueyHostApi {
   fun respondToReadRequest(requestId: Long, status: GattStatusDto, value: ByteArray?, callback: (Result<Unit>) -> Unit)
   /** Respond to a write request. */
   fun respondToWriteRequest(requestId: Long, status: GattStatusDto, callback: (Result<Unit>) -> Unit)
-  /** Disconnect a central from the server. */
-  fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit)
   /**
    * Close the GATT server and disconnect all centrals.
    * Call this when the server is no longer needed to release resources
@@ -2132,25 +2130,6 @@ interface BlueyHostApi {
             val requestIdArg = args[0] as Long
             val statusArg = args[1] as GattStatusDto
             api.respondToWriteRequest(requestIdArg, statusArg) { result: Result<Unit> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(MessagesPigeonUtils.wrapError(error))
-              } else {
-                reply.reply(MessagesPigeonUtils.wrapResult(null))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.disconnectCentral$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val centralIdArg = args[0] as String
-            api.disconnectCentral(centralIdArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))

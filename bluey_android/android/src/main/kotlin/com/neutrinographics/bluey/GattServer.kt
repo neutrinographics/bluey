@@ -502,27 +502,6 @@ class GattServer(
         }
     }
 
-    fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
-        val server = gattServer
-        if (server == null) {
-            callback(Result.success(Unit))
-            return
-        }
-
-        val device = connectedCentrals[centralId]
-        if (device == null) {
-            callback(Result.success(Unit))
-            return
-        }
-
-        try {
-            server.cancelConnection(device)
-            callback(Result.success(Unit))
-        } catch (e: SecurityException) {
-            callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_CONNECT")))
-        }
-    }
-
     fun cleanup() {
         BlueyLog.log(
             LogLevelDto.INFO, GATT_SERVER_CONTEXT,

@@ -1,8 +1,7 @@
 import 'package:bluey/bluey.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Minimal stub [Client] that records calls to [disconnect] for the
-/// delegation tests below.
+/// Minimal stub [Client] used by the identity / equality tests below.
 class _SpyClient implements Client {
   _SpyClient({required this.id, required this.mtu});
 
@@ -11,13 +10,6 @@ class _SpyClient implements Client {
 
   @override
   final int mtu;
-
-  bool disconnectCalled = false;
-
-  @override
-  Future<void> disconnect() async {
-    disconnectCalled = true;
-  }
 }
 
 void main() {

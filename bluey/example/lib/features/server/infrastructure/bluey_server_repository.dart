@@ -130,11 +130,6 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
-  Future<void> disconnectClient(Client client) async {
-    await client.disconnect();
-  }
-
-  @override
   Future<Server?> resetServer({required ServerId identity}) async {
     await _server?.dispose();
     _server = null;

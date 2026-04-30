@@ -635,17 +635,6 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         }
     }
 
-    override fun disconnectCentral(centralId: String, callback: (Result<Unit>) -> Unit) {
-        try {
-            val gs = gattServer ?: throw BlueyAndroidError.NotInitialized("GattServer")
-            gs.disconnectCentral(centralId) { result ->
-                callback(result.recoverCatching { e -> throw e.toServerFlutterError() })
-            }
-        } catch (e: Throwable) {
-            callback(Result.failure(e.toServerFlutterError()))
-        }
-    }
-
     override fun setLogLevel(level: LogLevelDto, callback: (Result<Unit>) -> Unit) {
         try {
             BlueyLog.setLevel(level)

@@ -472,10 +472,6 @@ abstract class BlueyHostApi {
   @async
   void respondToWriteRequest(int requestId, GattStatusDto status);
 
-  /// Disconnect a central from the server.
-  @async
-  void disconnectCentral(String centralId);
-
   /// Close the GATT server and disconnect all centrals.
   @async
   void closeServer();

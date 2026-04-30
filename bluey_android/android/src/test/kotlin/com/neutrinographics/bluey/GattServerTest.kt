@@ -300,33 +300,6 @@ class GattServerTest {
     }
 
     @Test
-    fun `connected central is tracked in internal map`() {
-        val service = LocalServiceDto(
-            uuid = "12345678-1234-1234-1234-123456789abc",
-            isPrimary = true,
-            characteristics = emptyList(),
-            includedServices = emptyList()
-        )
-        gattServer.addService(service) {}
-
-        val mockDevice = mockk<BluetoothDevice>(relaxed = true)
-        every { mockDevice.address } returns "AA:BB:CC:DD:EE:FF"
-
-        // Connect
-        capturedCallback!!.onConnectionStateChange(
-            mockDevice,
-            0,
-            BluetoothProfile.STATE_CONNECTED
-        )
-
-        // Try to disconnect the central - this should work if it's tracked
-        gattServer.disconnectCentral("AA:BB:CC:DD:EE:FF") {}
-
-        // Verify cancelConnection was called on the correct device
-        verify { mockBluetoothGattServer.cancelConnection(mockDevice) }
-    }
-
-    @Test
     fun `onCharacteristicReadRequest does not call sendResponse`() {
         // Open the server.
         val service = LocalServiceDto(

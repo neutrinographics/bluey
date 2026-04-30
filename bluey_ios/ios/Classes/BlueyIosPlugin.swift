@@ -149,10 +149,6 @@ class BlueyHostApiImpl: BlueyHostApi {
         peripheralManager.respondToWriteRequest(requestId: Int(requestId), status: status, completion: completion)
     }
 
-    func disconnectCentral(centralId: String, completion: @escaping (Result<Void, any Error>) -> Void) {
-        peripheralManager.disconnectCentral(centralId: centralId, completion: completion)
-    }
-
     func closeServer(completion: @escaping (Result<Void, any Error>) -> Void) {
         peripheralManager.closeServer(completion: completion)
     }

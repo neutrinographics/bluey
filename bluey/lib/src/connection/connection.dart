@@ -177,10 +177,13 @@ abstract class Connection {
   /// Android-specific extensions (bonding, PHY, connection parameters).
   ///
   /// Returns a non-null facade when the underlying platform's
-  /// [Capabilities] indicate at least one Android-only feature is
-  /// available (`canBond`, `canRequestPhy`, or
-  /// `canRequestConnectionParameters`). Returns `null` on platforms that
-  /// don't expose these APIs (notably iOS).
+  /// [Capabilities.platformKind] is [PlatformKind.android]. Returns
+  /// `null` on every other platform.
+  ///
+  /// A non-null `android` does NOT imply every member is callable — each
+  /// member additionally gates on its own capability flag (e.g.
+  /// [AndroidConnectionExtensions.bond] requires `canBond=true`) and
+  /// throws [UnsupportedOperationException] otherwise.
   ///
   /// Use the null-aware operator for safe access:
   /// ```dart
@@ -191,9 +194,9 @@ abstract class Connection {
 
   /// iOS-specific extensions.
   ///
-  /// Returns a non-null facade on iOS-flavored capabilities (heuristic:
-  /// none of the Android-only flags are set). Currently exposes no
-  /// members; reserved for future iOS-specific features.
+  /// Returns a non-null facade when [Capabilities.platformKind] is
+  /// [PlatformKind.ios]. Currently exposes no members; reserved for
+  /// future iOS-specific features.
   IosConnectionExtensions? get ios;
 }
 

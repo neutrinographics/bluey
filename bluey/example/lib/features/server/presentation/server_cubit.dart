@@ -14,7 +14,6 @@ import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
 import '../application/observe_peer_connections.dart';
-import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
@@ -36,7 +35,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final SendNotification _sendNotification;
   final ObserveConnections _observeConnections;
   final ObservePeerConnections _observePeerConnections;
-  final DisconnectClient _disconnectClient;
   final DisposeServer _disposeServer;
   final GetConnectedClients _getConnectedClients;
   final ObserveDisconnections _observeDisconnections;
@@ -71,7 +69,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required SendNotification sendNotification,
     required ObserveConnections observeConnections,
     required ObservePeerConnections observePeerConnections,
-    required DisconnectClient disconnectClient,
     required DisposeServer disposeServer,
     required GetConnectedClients getConnectedClients,
     required ObserveDisconnections observeDisconnections,
@@ -88,7 +85,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _sendNotification = sendNotification,
        _observeConnections = observeConnections,
        _observePeerConnections = observePeerConnections,
-       _disconnectClient = disconnectClient,
        _disposeServer = disposeServer,
        _getConnectedClients = getConnectedClients,
        _observeDisconnections = observeDisconnections,
@@ -324,17 +320,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
       _addLog('Notify', 'Sent notification #$count to all centrals');
     } catch (e) {
       emit(state.copyWith(error: 'Failed to send notification: $e'));
-    }
-  }
-
-  /// Disconnects a specific client.
-  Future<void> disconnectClient(Client client) async {
-    try {
-      await _disconnectClient(client);
-      _refreshConnectedClients();
-      _addLog('Connection', 'Disconnected client: ${client.id}');
-    } catch (e) {
-      emit(state.copyWith(error: 'Failed to disconnect: $e'));
     }
   }
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+**Breaking changes:**
+
+- `Capabilities` constructor now requires `platformKind: PlatformKind`.
+- `BlueyPlatform.disconnectCentral` removed.
+
+**New:**
+
+- `PlatformKind` enum + `Capabilities.platformKind` field.
+- `Capabilities.canAdvertiseManufacturerData` flag.
+- `Capabilities.fake` preset.
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

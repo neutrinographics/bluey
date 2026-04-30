@@ -1,28 +1,105 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
-**Server-side peer identification:**
+**Breaking changes:**
 
-- New `Server.peerConnections: Stream<PeerClient>` — emits a `PeerClient` the first time a connected central sends a lifecycle heartbeat write. Mirrors the connection-side `tryUpgrade` semantics: identification is per-session; reconnect-then-heartbeat re-identifies. Consumers that only care about Bluey peers can subscribe here and ignore `connections`.
-- New `PeerClient` type — composition wrapper around `Client` (server-side analog of `PeerConnection`).
+- `Capabilities` constructor now requires a `platformKind: PlatformKind`
+  argument (`enum PlatformKind { android, ios, fake, other }`). Use the
+  presets (`Capabilities.android`, `.iOS`, `.fake`, etc.) where possible.
+- `Client.disconnect()` removed. Server consumers needing to force-disconnect
+  a connected client must close the entire server. Cooperative
+  disconnect via the lifecycle protocol remains future work.
+- `BlueyConnection.requestMtu` now throws `UnsupportedOperationException`
+  on iOS (was: `BlueyPlatformException` with null code). Check
+  `bluey.capabilities.canRequestMtu` before calling.
+- `Bluey.bondedDevices` now throws `UnsupportedOperationException` on
+  platforms where `capabilities.canBond` is `false` (iOS) instead of
+  silently returning an empty list. Check `bluey.capabilities.canBond`
+  before calling.
+- Every member of `connection.android` (`bond`, `bondState`, `requestPhy`,
+  etc.) now throws `UnsupportedOperationException` when its corresponding
+  capability flag is `false`. With the current `Capabilities.android`
+  preset (Android Stage B unimplemented), every member throws — flip the
+  per-feature flags to `true` as I035 Stage B lands.
+- `Server.startAdvertising(manufacturerData: …)` now throws on iOS
+  (the manufacturer data was previously silently dropped — see I204).
+- `connection.android` and `connection.ios` getters now dispatch on
+  `Capabilities.platformKind` instead of inferring from the absence of
+  Android-only flags. Bug fix on Android: `connection.android` returns
+  non-null on real Android devices regardless of which Stage B flags
+  have landed.
+- `PeerConnection.disconnect()` now writes `0x00` to the lifecycle
+  control characteristic before the platform disconnect, so the server
+  fires its disconnect-detection path immediately instead of waiting
+  for heartbeat-silence timeout. The courtesy write is bounded with a
+  1 s timeout (preserves I074: an unresponsive peer doesn't stall the
+  disconnect).
+- `PeerConnection.sendDisconnectCommand()` is **removed**. The fast-path
+  semantics are now the default behavior of `disconnect()`. Callers who
+  need a raw GATT disconnect with no peer-protocol involvement should
+  call `peer.connection.disconnect()` directly.
+- `Bluey.errorStream` is **removed**. It was populated by the legacy
+  string-matching `_wrapError` path and offered no information that
+  isn't already available either through the typed exception thrown at
+  the failing call site or through `bluey.logEvents`. Callers that
+  subscribed to it should pattern-match on the typed `BlueyException`
+  thrown from the failing call, or filter `bluey.logEvents` to
+  `level >= warn` for an observability sink.
 
-**Client-side peer watch:**
+**New:**
 
-- New `Bluey.watchPeer(Connection): Stream<PeerConnection?>` — emits the initial `tryUpgrade` result, then re-attempts on every `connection.servicesChanges` emission until upgrade succeeds. Completes after the first non-null peer (the resulting `PeerConnection` handles in-place handle refresh internally) or when the connection disconnects. Resilient to stale GATT caches, where a freshly-launched server's lifecycle service isn't visible to the central until a Service Changed indication lands. `tryUpgrade` remains the one-shot snapshot; its docstring now points at `watchPeer` for the streaming case.
-
-**PeerConnection.disconnect — fast server-side detection by default (breaking):**
-
-- `PeerConnection.disconnect()` now writes `0x00` to the lifecycle control characteristic before the platform disconnect, so the server fires its disconnect-detection path immediately instead of waiting for heartbeat-silence timeout. The courtesy write is bounded with a 1 s timeout (preserves I074: an unresponsive peer doesn't stall the disconnect).
-- `PeerConnection.sendDisconnectCommand()` is **removed**. The fast-path semantics are now the default behavior of `disconnect()`. Callers who need a raw GATT disconnect with no peer-protocol involvement should call `peer.connection.disconnect()` directly.
+- `PlatformKind` enum and `Capabilities.platformKind` discriminator.
+- `Capabilities.canAdvertiseManufacturerData` flag.
+- `Capabilities.fake` preset for tests.
+- `Server.peerConnections: Stream<PeerClient>` — emits a `PeerClient`
+  the first time a connected central sends a lifecycle heartbeat
+  write. Mirrors the connection-side `tryUpgrade` semantics:
+  identification is per-session; reconnect-then-heartbeat
+  re-identifies. Consumers that only care about Bluey peers can
+  subscribe here and ignore `connections`.
+- `PeerClient` type — composition wrapper around `Client` (server-side
+  analog of `PeerConnection`).
+- `Bluey.watchPeer(Connection): Stream<PeerConnection?>` — emits the
+  initial `tryUpgrade` result, then re-attempts on every
+  `connection.servicesChanges` emission until upgrade succeeds.
+  Completes after the first non-null peer (the resulting
+  `PeerConnection` handles in-place handle refresh internally) or when
+  the connection disconnects. Resilient to stale GATT caches, where a
+  freshly-launched server's lifecycle service isn't visible to the
+  central until a Service Changed indication lands. `tryUpgrade`
+  remains the one-shot snapshot; its docstring now points at
+  `watchPeer` for the streaming case.
 
 **Typed error translation (I099 + I090 + I092):**
 
-- `Bluey.errorStream` is **removed (breaking)**. It was populated by the legacy string-matching `_wrapError` path and offered no information that isn't already available either through the typed exception thrown at the failing call site or through `bluey.logEvents`. Callers that subscribed to it should pattern-match on the typed `BlueyException` thrown from the failing call, or filter `bluey.logEvents` to `level >= warn` for an observability sink.
-- New `bluey/lib/src/shared/error_translation.dart` houses the anti-corruption layer: a pure `translatePlatformException(Object) → BlueyException` plus a Future sugar `withErrorTranslation<T>(...)` with optional `LifecycleClient` accounting (preserves I097's user-op activity hooks). Replaces the prior split between `_runGattOp`'s typed catch ladder and `Bluey._wrapError`'s string-matching fallback.
-- Every `_wrapError` call site (`configure`, `state`, `requestEnable`, `authorize`, `openSettings`, `connect`, `bondedDevices`, plus the state-stream `onError` translator) now routes through the typed helper. Pattern-matching on `BlueyException` subtypes is reliable on these paths for the first time. Behavioral note: a few sites previously yielded `BluetoothUnavailableException` / `ConnectionException` via lucky keyword matches in the platform's free-text error messages; post-fix they yield more accurate `BlueyPlatformException` / `GattTimeoutException` / etc. preserving the wire-level codes.
-- Connection extension methods (`disconnect`, `connection.android?.bond` / `removeBond` / `requestPhy` / `requestConnectionParameters`) previously bypassed translation entirely — raw `PlatformException` / typed platform-interface exceptions could leak unwrapped to callers. Closes I090.
-- Scanner `onError` translates platform errors before forwarding on the scan stream's error channel. Subscribers that ignored `onError` are unaffected; subscribers that pattern-matched on the raw error channel will need to update — but they were broken anyway. Closes I092.
+- New `bluey/lib/src/shared/error_translation.dart` houses the
+  anti-corruption layer: a pure
+  `translatePlatformException(Object) → BlueyException` plus a Future
+  sugar `withErrorTranslation<T>(...)` with optional `LifecycleClient`
+  accounting (preserves I097's user-op activity hooks). Replaces the
+  prior split between `_runGattOp`'s typed catch ladder and
+  `Bluey._wrapError`'s string-matching fallback.
+- Every `_wrapError` call site (`configure`, `state`, `requestEnable`,
+  `authorize`, `openSettings`, `connect`, `bondedDevices`, plus the
+  state-stream `onError` translator) now routes through the typed
+  helper. Pattern-matching on `BlueyException` subtypes is reliable on
+  these paths for the first time. Behavioral note: a few sites
+  previously yielded `BluetoothUnavailableException` /
+  `ConnectionException` via lucky keyword matches in the platform's
+  free-text error messages; post-fix they yield more accurate
+  `BlueyPlatformException` / `GattTimeoutException` / etc. preserving
+  the wire-level codes.
+- Connection extension methods (`disconnect`,
+  `connection.android?.bond` / `removeBond` / `requestPhy` /
+  `requestConnectionParameters`) previously bypassed translation
+  entirely — raw `PlatformException` / typed platform-interface
+  exceptions could leak unwrapped to callers. Closes I090.
+- Scanner `onError` translates platform errors before forwarding on
+  the scan stream's error channel. Subscribers that ignored `onError`
+  are unaffected; subscribers that pattern-matched on the raw error
+  channel will need to update — but they were broken anyway. Closes
+  I092.
 
 ## 0.3.0
 

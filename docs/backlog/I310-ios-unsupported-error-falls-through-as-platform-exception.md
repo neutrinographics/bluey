@@ -4,8 +4,9 @@ title: iOS platform adapter throws Dart `UnsupportedError` for capability-gated 
 category: bug
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-29
+status: fixed
+last_verified: 2026-04-30
+fixed_in: e177f1d
 related: [I053, I065, I069, I099]
 ---
 
@@ -64,3 +65,12 @@ iOS adapter throws this instead of `UnsupportedError`. The translation helper ad
 ## Verification plan
 
 When picked up: run the iOS-client stress tests (Mixed Ops, MTU probe) and assert the surfaced exception is the typed unsupported-operation type, not `BlueyPlatformException(null)`. Equally: a unit test that calls `connection.requestMtu(Mtu(247))` against a fake iOS-flavored capabilities matrix and asserts the typed exception.
+
+## Resolution
+
+Resolved 2026-04-30 with Option B from the entry (gate at the domain
+layer). `BlueyConnection.requestMtu` and every member of
+`_AndroidConnectionExtensionsImpl` now consult `Capabilities` before
+calling the platform method; iOS-flavored capabilities never reach the
+adapter's `UnsupportedError` throws. Those throws are kept as
+defense-in-depth.

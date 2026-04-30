@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+**Breaking changes:**
+
+- `BlueyAndroid.disconnectCentral` removed (Pigeon API + native impl).
+
 ## 0.3.0
 
 **Structured logging pipeline (I307):**

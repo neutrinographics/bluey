@@ -8,18 +8,29 @@ import '../fakes/test_helpers.dart';
 
 /// Tests that `BlueyConnection` consults [Capabilities] before subscribing
 /// to or fetching bond / PHY / connection-parameter state from the
-/// platform.
+/// platform during connection setup.
 ///
-/// The Android platform interface throws [UnimplementedError] on every
-/// bond/PHY/connection-parameter call (I035 Stage A), so the domain layer
-/// must skip these calls when the matrix says the feature is unsupported
-/// — otherwise every Android client connect crashes inside the
-/// constructor (the bondStateStream / phyStream calls throw
-/// synchronously).
+/// Two complementary surfaces are exercised here:
 ///
-/// The fake platform mirrors that behaviour: when a capability is `false`,
-/// the corresponding methods throw [UnimplementedError]. A passing test
-/// proves the domain layer never called them.
+/// 1. **Construction-time skip:** the Android platform interface throws
+///    [UnimplementedError] on every bond/PHY/connection-parameter call
+///    (I035 Stage A), so the domain layer must skip those subscriptions
+///    when the matrix says the feature is unsupported — otherwise every
+///    Android client connect would crash inside the constructor (the
+///    `bondStateStream` / `phyStream` calls throw synchronously). The
+///    fake platform mirrors this: when a capability is `false`, the
+///    corresponding platform methods throw [UnimplementedError]. A
+///    successful connect proves the domain layer never called them.
+///
+/// 2. **Call-time gate (post-Task-5 of the capabilities-matrix bundle):**
+///    when a flag is `false` and the user *does* invoke a gated member
+///    (e.g. `connection.android!.bondState`), the call throws a typed
+///    [UnsupportedOperationException] at the call site. The synchronous
+///    throw assertions below verify this gate is in place.
+///
+/// Comprehensive call-site gating coverage lives in
+/// `capability_gating_test.dart`; the tests here additionally guard the
+/// connection-setup behaviour (subscribe-only-when-supported).
 void main() {
   Device deviceFor(String address) => Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
@@ -29,10 +40,12 @@ void main() {
 
   group('BlueyConnection capability gating', () {
     test(
-        'connecting on a canBond=false platform does not throw and yields '
-        'BondState.none with a non-broken bondStateChanges stream', () async {
+        'connecting on a canBond=false Android platform completes without '
+        'throwing; bondState / bondStateChanges getters then throw '
+        'UnsupportedOperationException at the call site', () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -53,25 +66,31 @@ void main() {
 
       // canRequestPhy/canRequestConnectionParameters are still true, so
       // `conn.android` is non-null. Bond state is exposed via the
-      // android extension only (post-B.3, I089).
+      // android extension only (post-B.3, I089). Post-Task-5: reading
+      // bondState / bondStateChanges on a canBond=false platform throws
+      // UnsupportedOperationException at the call site (capability gate).
       expect(conn.android, isNotNull);
-      expect(conn.android?.bondState, BondState.none);
-
-      // The stream must exist and be subscribable; on a canBond=false
-      // platform there are simply no events to deliver.
-      final sub = conn.android!.bondStateChanges.listen((_) {});
-      await sub.cancel();
+      expect(
+        () => conn.android!.bondState,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.bondStateChanges,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
     });
 
     test(
-        'connecting on a canRequestPhy=false platform does not throw and '
-        'yields default PHY values with a non-broken phyChanges stream',
+        'connecting on a canRequestPhy=false Android platform completes '
+        'without throwing; txPhy / rxPhy / phyChanges getters then throw '
+        'UnsupportedOperationException at the call site',
         () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -92,23 +111,35 @@ void main() {
 
       // canBond/canRequestConnectionParameters are still true, so
       // `conn.android` is non-null. PHY is exposed via the android
-      // extension only (post-B.3, I089).
+      // extension only (post-B.3, I089). Post-Task-5: reading txPhy /
+      // rxPhy / phyChanges on a canRequestPhy=false platform throws
+      // UnsupportedOperationException at the call site (capability gate).
       expect(conn.android, isNotNull);
-      expect(conn.android?.txPhy, Phy.le1m);
-      expect(conn.android?.rxPhy, Phy.le1m);
-
-      final sub = conn.android!.phyChanges.listen((_) {});
-      await sub.cancel();
+      expect(
+        () => conn.android!.txPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.rxPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.phyChanges,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
     });
 
     test(
-        'connecting on a canRequestConnectionParameters=false platform does '
-        'not throw and yields default ConnectionParameters', () async {
+        'connecting on a canRequestConnectionParameters=false Android '
+        'platform completes without throwing; the connectionParameters '
+        'getter then throws UnsupportedOperationException at the call site',
+        () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
@@ -129,30 +160,53 @@ void main() {
 
       // canBond/canRequestPhy are still true, so `conn.android` is
       // non-null. Connection parameters are exposed via the android
-      // extension only (post-B.3, I089).
+      // extension only (post-B.3, I089). Post-Task-5: reading
+      // connectionParameters on a canRequestConnectionParameters=false
+      // platform throws UnsupportedOperationException at the call site
+      // (capability gate).
       expect(conn.android, isNotNull);
-      // Defaults from BlueyConnection's initial state.
-      expect(conn.android?.connectionParameters.interval.milliseconds, 30.0);
-      expect(conn.android?.connectionParameters.latency.events, 0);
-      expect(conn.android?.connectionParameters.timeout.milliseconds, 4000);
+      expect(
+        () => conn.android!.connectionParameters,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
     });
 
     test(
-        'connecting on an Android-shaped platform '
-        '(canBond / canRequestPhy / canRequestConnectionParameters all false) '
-        'completes successfully — this is what unblocks Android client '
-        'manual testing under I035 Stage A', () async {
+        'connecting on a real Android-Stage-A platform '
+        '(platformKind=android with canBond / canRequestPhy / '
+        'canRequestConnectionParameters all false) completes successfully '
+        'and exposes a non-null connection.android — the I035 Stage A '
+        'regression guard', () async {
+      // Mirrors today's Capabilities.android preset: an Android device
+      // running pre-Stage-B Bluey. The bond/PHY/conn-param flags are all
+      // off because the underlying platform-interface methods throw
+      // UnimplementedError (I035 Stage A). The domain layer must skip
+      // those subscriptions during connection setup; otherwise the fake's
+      // matching throw would crash the constructor.
+      //
+      // Distinct from the iOS-flavored variant (Capabilities.iOS, also
+      // all three flags false) covered in capability_gating_test.dart:
+      // there `connection.android` is null because platformKind!=android;
+      // here it must be non-null because platformKind=android, even
+      // though every Android extension member would throw if invoked
+      // (I303 bug fix — connection.android is no longer gated on the
+      // presence of Stage B flags).
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
           canScan: true,
           canConnect: true,
           canAdvertise: true,
+          canRequestMtu: true,
+          maxMtu: 517,
           canBond: false,
           canRequestPhy: false,
           canRequestConnectionParameters: false,
+          canRequestEnable: true,
+          canAdvertiseManufacturerData: true,
         ),
       );
       platform.BlueyPlatform.instance = fakePlatform;
@@ -165,12 +219,27 @@ void main() {
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
-      // All Android-only flags are false, so this is iOS-flavored under
-      // the B.2 heuristic and `conn.android` is null. The bond / PHY /
-      // conn-params surface is unreachable, which is correct for a
-      // capability-gated platform. The key assertion is that connect
-      // completed without throwing, which it did.
-      expect(conn.android, isNull);
+      // Connect completed without throwing — the construction-time skip
+      // is in place. Post-I303, connection.android is non-null because
+      // platformKind=android.
+      expect(conn.android, isNotNull);
+
+      // Every gated extension member throws at the call site (these
+      // assertions duplicate per-member coverage in
+      // capability_gating_test.dart but make this regression guard
+      // self-contained).
+      expect(
+        () => conn.android!.bondState,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.txPhy,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
+      expect(
+        () => conn.android!.connectionParameters,
+        throwsA(isA<UnsupportedOperationException>()),
+      );
 
       await conn.disconnect();
       bluey.dispose();
@@ -179,7 +248,23 @@ void main() {
     test(
         'connecting on a fully-capable platform still wires up bond / PHY / '
         'conn-params subscriptions (regression guard for the gate)', () async {
-      final fakePlatform = FakeBlueyPlatform();
+      // Use an Android-flavored, fully-capable Capabilities so that
+      // `connection.android` is non-null under the platformKind gate
+      // (I303). Flags mirror Capabilities.fake but with platformKind=android.
+      final fakePlatform = FakeBlueyPlatform(
+        capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
+          canScan: true,
+          canConnect: true,
+          canAdvertise: true,
+          canRequestMtu: true,
+          maxMtu: 517,
+          canBond: true,
+          canRequestPhy: true,
+          canRequestConnectionParameters: true,
+          canAdvertiseManufacturerData: true,
+        ),
+      );
       platform.BlueyPlatform.instance = fakePlatform;
 
       fakePlatform.simulatePeripheral(

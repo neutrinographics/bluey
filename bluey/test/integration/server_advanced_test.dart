@@ -516,34 +516,6 @@ void main() {
     });
 
     group('Server Disconnect Central', () {
-      test('server can disconnect a specific central', () async {
-        final bluey = Bluey();
-        final server = bluey.server()!;
-
-        await server.addService(
-          HostedService(
-            uuid: UUID('0000180d-0000-1000-8000-00805f9b34fb'),
-            characteristics: [],
-          ),
-        );
-
-        await server.startAdvertising(name: 'Test Server');
-
-        fakePlatform.simulateCentralConnection(centralId: 'phone-1');
-        fakePlatform.simulateCentralConnection(centralId: 'phone-2');
-
-        expect(fakePlatform.connectedCentralIds, hasLength(2));
-
-        // Server disconnects one central
-        await fakePlatform.disconnectCentral('phone-1');
-
-        expect(fakePlatform.connectedCentralIds, hasLength(1));
-        expect(fakePlatform.connectedCentralIds, contains('phone-2'));
-
-        await server.dispose();
-        await bluey.dispose();
-      });
-
       test('closeServer disconnects all centrals', () async {
         final bluey = Bluey();
         final server = bluey.server()!;

@@ -128,7 +128,6 @@ class BlueyServer implements Server {
         ),
       );
       final client = BlueyClient(
-        platform: _platform,
         id: platformCentral.id,
         mtu: platformCentral.mtu,
       );
@@ -254,6 +253,19 @@ class BlueyServer implements Server {
     }
   }
 
+  /// Throws [UnsupportedOperationException] tagged with this server's
+  /// platform name when [flag] is false. Used by capability-gated
+  /// methods (e.g. `startAdvertising` with manufacturer data) to fail
+  /// loudly on platforms that silently ignore the option.
+  void _requireCapability(bool flag, String op) {
+    if (!flag) {
+      throw UnsupportedOperationException(
+        op,
+        _platform.capabilities.platformKind.name,
+      );
+    }
+  }
+
   /// Resolves [characteristic] to a platform handle. Falls back to a
   /// scan across every recorded service when the caller hasn't passed a
   /// service UUID — `notify(charUuid)` in the public API only carries
@@ -289,6 +301,12 @@ class BlueyServer implements Server {
         'serviceCount': services?.length ?? 0,
       },
     );
+    if (manufacturerData != null) {
+      _requireCapability(
+        _platform.capabilities.canAdvertiseManufacturerData,
+        'startAdvertising(manufacturerData)',
+      );
+    }
     // Ensure the eagerly-registered control service has completed before
     // advertising. The Future is cached and completes only once.
     await _controlServiceReady;
@@ -579,7 +597,6 @@ class BlueyServer implements Server {
         ),
       );
       final client = BlueyClient(
-        platform: _platform,
         id: clientId,
         mtu: 23, // Default MTU — actual MTU is unknown without platform event
       );
@@ -728,17 +745,12 @@ class BlueyServer implements Server {
 
 /// Concrete implementation of [Client].
 class BlueyClient implements Client {
-  final platform.BlueyPlatform _platform;
   final String _platformId;
   final int _mtu;
 
-  BlueyClient({
-    required platform.BlueyPlatform platform,
-    required String id,
-    required int mtu,
-  }) : _platform = platform,
-       _platformId = id,
-       _mtu = mtu;
+  BlueyClient({required String id, required int mtu})
+    : _platformId = id,
+      _mtu = mtu;
 
   @override
   UUID get id {
@@ -760,9 +772,4 @@ class BlueyClient implements Client {
 
   @override
   int get mtu => _mtu;
-
-  @override
-  Future<void> disconnect() async {
-    await _platform.disconnectCentral(_platformId);
-  }
 }

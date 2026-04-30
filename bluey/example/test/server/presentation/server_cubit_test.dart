@@ -23,7 +23,6 @@ void main() {
   late MockSendNotification mockSendNotification;
   late MockObserveConnections mockObserveConnections;
   late MockObservePeerConnections mockObservePeerConnections;
-  late MockDisconnectClient mockDisconnectClient;
   late MockDisposeServer mockDisposeServer;
   late MockGetConnectedClients mockGetConnectedClients;
   late MockObserveDisconnections mockObserveDisconnections;
@@ -57,7 +56,6 @@ void main() {
     mockObservePeerConnections = MockObservePeerConnections();
     when(() => mockObservePeerConnections())
         .thenAnswer((_) => const Stream.empty());
-    mockDisconnectClient = MockDisconnectClient();
     mockDisposeServer = MockDisposeServer();
     mockGetConnectedClients = MockGetConnectedClients();
     mockObserveDisconnections = MockObserveDisconnections();
@@ -101,7 +99,6 @@ void main() {
       sendNotification: mockSendNotification,
       observeConnections: mockObserveConnections,
       observePeerConnections: mockObservePeerConnections,
-      disconnectClient: mockDisconnectClient,
       disposeServer: mockDisposeServer,
       getConnectedClients: mockGetConnectedClients,
       observeDisconnections: mockObserveDisconnections,
@@ -282,55 +279,6 @@ void main() {
       act: (cubit) => cubit.sendNotification(),
       verify: (cubit) {
         expect(cubit.state.error, contains('Failed to send notification'));
-      },
-    );
-
-    blocTest<ServerCubit, ServerScreenState>(
-      'disconnectClient refreshes centrals list',
-      setUp: () {
-        when(() => mockDisconnectClient(any())).thenAnswer((_) async {});
-        when(() => mockGetConnectedClients()).thenReturn([]);
-      },
-      build: createCubit,
-      seed: () {
-        final client = MockClient();
-        when(
-          () => client.id,
-        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
-        return ServerScreenState(connectedClients: [client]);
-      },
-      act: (cubit) {
-        final client = cubit.state.connectedClients.first;
-        return cubit.disconnectClient(client);
-      },
-      verify: (cubit) {
-        expect(cubit.state.connectedClients, isEmpty);
-        verify(() => mockDisconnectClient(any())).called(1);
-        verify(() => mockGetConnectedClients()).called(greaterThanOrEqualTo(1));
-      },
-    );
-
-    blocTest<ServerCubit, ServerScreenState>(
-      'disconnectClient emits error on failure',
-      setUp: () {
-        when(
-          () => mockDisconnectClient(any()),
-        ).thenThrow(Exception('Disconnect failed'));
-      },
-      build: createCubit,
-      seed: () {
-        final client = MockClient();
-        when(
-          () => client.id,
-        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
-        return ServerScreenState(connectedClients: [client]);
-      },
-      act: (cubit) {
-        final client = cubit.state.connectedClients.first;
-        return cubit.disconnectClient(client);
-      },
-      verify: (cubit) {
-        expect(cubit.state.error, contains('Failed to disconnect'));
       },
     );
 

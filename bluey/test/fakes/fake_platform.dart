@@ -36,14 +36,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// `canRequestPhy=false` / `canRequestConnectionParameters=false` and
   /// skips the corresponding platform calls (I035 / I065).
   FakeBlueyPlatform({
-    Capabilities capabilities = const Capabilities(
-      canScan: true,
-      canConnect: true,
-      canAdvertise: true,
-      canBond: true,
-      canRequestPhy: true,
-      canRequestConnectionParameters: true,
-    ),
+    Capabilities capabilities = Capabilities.fake,
   })  : _capabilities = capabilities,
         super.impl();
 
@@ -1550,11 +1543,6 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         completer.completeError(Exception('Write failed with status: $status'));
       }
     }
-  }
-
-  @override
-  Future<void> disconnectCentral(String centralId) async {
-    simulateCentralDisconnection(centralId);
   }
 
   @override

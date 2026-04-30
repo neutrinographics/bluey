@@ -4,8 +4,9 @@ title: iOS `disconnectCentral` returns success without disconnecting the central
 category: bug
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-04-30
+fixed_in: d015870
 related: [I207]
 ---
 
@@ -39,3 +40,13 @@ External references:
 - Apple [`CBPeripheralManager`](https://developer.apple.com/documentation/corebluetooth/cbperipheralmanager) — no force-disconnect method exists.
 - [Apple Developer Forums thread #93060](https://developer.apple.com/forums/thread/93060) confirming the platform limitation.
 - I207 (Android equivalent, marked wontfix) — consider whether I045 should also be wontfix or if the cooperative fallback is worth implementing.
+
+**Followup resolved 2026-04-30**: rather than adding a
+`canForceDisconnectRemoteCentral` flag, `Client.disconnect()` and
+`BlueyPlatform.disconnectCentral` were removed entirely. Neither
+supported platform can reliably force-disconnect in the BLE topology
+Bluey uses (centrals always initiate); a flag that is `false` on every
+platform would gate a method whose only honest behavior is `throw`.
+Server consumers needing force-disconnect must close the entire
+server; cooperative disconnect via the lifecycle protocol remains
+future work.

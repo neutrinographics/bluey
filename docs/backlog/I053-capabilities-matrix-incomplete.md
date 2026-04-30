@@ -4,8 +4,9 @@ title: "`Capabilities` matrix incomplete"
 category: unimplemented
 severity: medium
 platform: platform-interface
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-04-30
+fixed_in: e177f1d
 related: [I030, I031, I032, I033, I034, I051, I052]
 ---
 
@@ -43,3 +44,14 @@ Closely related to an existing deprecation direction: the "silent stub returning
 - If platform can do it, implement it.
 - If platform can't do it ever, throw `UnsupportedOperationException`.
 - Never return a lie.
+
+## Resolution
+
+Resolved 2026-04-30 by the capabilities-matrix-load-bearing bundle. The
+matrix gained `PlatformKind` and `canAdvertiseManufacturerData`; every
+existing flag is now consulted in the domain layer before crossing the
+platform-interface seam (I065). Flags that gate features Bluey doesn't
+yet expose (`canL2capCoc`, `canStateRestoration`, `canDoCodedPhy`, etc.)
+are deliberately not added — they would be decorative until the
+corresponding API lands. See spec at
+`docs/superpowers/specs/2026-04-30-capabilities-matrix-load-bearing-design.md`.
