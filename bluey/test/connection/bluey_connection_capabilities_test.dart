@@ -183,7 +183,23 @@ void main() {
     test(
         'connecting on a fully-capable platform still wires up bond / PHY / '
         'conn-params subscriptions (regression guard for the gate)', () async {
-      final fakePlatform = FakeBlueyPlatform();
+      // Use an Android-flavored, fully-capable Capabilities so that
+      // `connection.android` is non-null under the platformKind gate
+      // (I303). Flags mirror Capabilities.fake but with platformKind=android.
+      final fakePlatform = FakeBlueyPlatform(
+        capabilities: const platform.Capabilities(
+          platformKind: platform.PlatformKind.android,
+          canScan: true,
+          canConnect: true,
+          canAdvertise: true,
+          canRequestMtu: true,
+          maxMtu: 517,
+          canBond: true,
+          canRequestPhy: true,
+          canRequestConnectionParameters: true,
+          canAdvertiseManufacturerData: true,
+        ),
+      );
       platform.BlueyPlatform.instance = fakePlatform;
 
       fakePlatform.simulatePeripheral(

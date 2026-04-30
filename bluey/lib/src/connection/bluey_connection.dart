@@ -515,27 +515,18 @@ class BlueyConnection implements Connection {
 
   @override
   AndroidConnectionExtensions? get android {
-    final caps = _platform.capabilities;
-    if (caps.canBond ||
-        caps.canRequestPhy ||
-        caps.canRequestConnectionParameters) {
-      return _androidExtensions ??= _AndroidConnectionExtensionsImpl(this);
+    if (_platform.capabilities.platformKind != platform.PlatformKind.android) {
+      return null;
     }
-    return null;
+    return _androidExtensions ??= _AndroidConnectionExtensionsImpl(this);
   }
 
   @override
   IosConnectionExtensions? get ios {
-    final caps = _platform.capabilities;
-    // Heuristic: a platform with NONE of the Android-only flags is
-    // treated as iOS-flavored. If [Capabilities] ever gains a dedicated
-    // `isIos` flag, this should be replaced with a precise check.
-    if (!caps.canBond &&
-        !caps.canRequestPhy &&
-        !caps.canRequestConnectionParameters) {
-      return _iosExtensions;
+    if (_platform.capabilities.platformKind != platform.PlatformKind.ios) {
+      return null;
     }
-    return null;
+    return _iosExtensions;
   }
 
   @override
