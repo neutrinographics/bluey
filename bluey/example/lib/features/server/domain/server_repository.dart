@@ -64,9 +64,6 @@ abstract class ServerRepository {
     required GattResponseStatus status,
   });
 
-  /// Disconnects a specific client device.
-  Future<void> disconnectClient(Client central);
-
   /// Disposes the server resources.
   Future<void> dispose();
 }

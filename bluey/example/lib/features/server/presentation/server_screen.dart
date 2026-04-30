@@ -16,7 +16,6 @@ import '../application/add_service.dart';
 import '../application/send_notification.dart';
 import '../application/observe_connections.dart';
 import '../application/observe_peer_connections.dart';
-import '../application/disconnect_client.dart';
 import '../application/dispose_server.dart';
 import '../application/get_connected_clients.dart';
 import '../application/observe_disconnections.dart';
@@ -76,7 +75,6 @@ class ServerScreen extends StatelessWidget {
             sendNotification: getIt<SendNotification>(),
             observeConnections: getIt<ObserveConnections>(),
             observePeerConnections: getIt<ObservePeerConnections>(),
-            disconnectClient: getIt<DisconnectClient>(),
             disposeServer: getIt<DisposeServer>(),
             getConnectedClients: getIt<GetConnectedClients>(),
             observeDisconnections: getIt<ObserveDisconnections>(),
