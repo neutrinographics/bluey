@@ -99,8 +99,7 @@ drain). Bounded by the cap and by `closeServer`; fix only when real
 use surfaces a problem.
 
 Sub-finding from the verification session: the example app's stress
-test runner (`stress_test_runner.dart`) has two latent bugs that the
-now-correct iOS pacing exposes — its timeout budget is too tight for
-the actual TX rate, and partial bursts are discarded entirely instead
-of being counted as partial. Filed separately if it surfaces as a
-priority; for now, smaller counts (≤100) pass cleanly.
+test runner (`stress_test_runner.dart`) had two latent bugs that the
+now-correct iOS pacing exposed — its timeout budget was too tight for
+the actual TX rate, and partial bursts were discarded entirely
+instead of being counted as partial. Filed and fixed as **I316**.
