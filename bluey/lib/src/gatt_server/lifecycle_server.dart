@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
+import '../event_bus.dart';
+import '../events.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
@@ -20,6 +22,7 @@ class LifecycleServer {
   final void Function(String clientId) onClientGone;
   final void Function(String clientId)? onHeartbeatReceived;
   final BlueyLogger _logger;
+  final EventPublisher? _events;
 
   bool _controlServiceAdded = false;
   final Map<String, _ClientLiveness> _clients = {};
@@ -31,10 +34,12 @@ class LifecycleServer {
     required this.onClientGone,
     required BlueyLogger logger,
     this.onHeartbeatReceived,
+    EventPublisher? events,
   })  : _platform = platformApi,
         _interval = interval,
         _serverId = serverId,
-        _logger = logger;
+        _logger = logger,
+        _events = events;
 
   /// Whether lifecycle management is enabled (interval is non-null).
   bool get isEnabled => _interval != null;
@@ -195,7 +200,17 @@ class LifecycleServer {
         'requestId': requestId,
       },
     );
+    final wasIdle = state.pendingRequests.isEmpty;
     state.pendingRequests.add(requestId);
+    if (wasIdle) {
+      // Transition from no-pending-requests to one-pending — the
+      // timer is about to be paused by _resetTimer. Diagnostic event
+      // fires once per pause edge, not on every subsequent request.
+      _events?.emit(LifecyclePausedForPendingRequestEvent(
+        clientId: clientId,
+        source: 'LifecycleServer',
+      ));
+    }
     _resetTimer(clientId);
   }
 
@@ -254,6 +269,10 @@ class LifecycleServer {
         data: {'clientId': clientId},
       );
       _clients.remove(clientId);
+      _events?.emit(ClientLifecycleTimeoutEvent(
+        clientId: clientId,
+        source: 'LifecycleServer',
+      ));
       onClientGone(clientId);
     });
   }

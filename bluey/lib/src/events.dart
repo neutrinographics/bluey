@@ -399,6 +399,115 @@ final class IndicationSentEvent extends BlueyEvent {
   }
 }
 
+// === Lifecycle Protocol Events (I068) ===
+//
+// Bluey's lifecycle protocol — heartbeat write + dead-peer detection
+// — is what distinguishes the library from a raw GATT pipe. Its
+// state transitions are the highest-value diagnostic events for
+// debugging "why did my peer disconnect?" and "why isn't my server
+// noticing the client is gone?". These events surface the protocol's
+// behaviour on `bluey.events` for programmatic consumption alongside
+// the structured logs (post-I307).
+
+/// Heartbeat write was sent to the peer (client side).
+final class HeartbeatSentEvent extends BlueyEvent {
+  final UUID deviceId;
+
+  HeartbeatSentEvent({required this.deviceId, super.source});
+
+  @override
+  String toString() =>
+      '[Lifecycle] Heartbeat sent to ${deviceId.toShortString()}';
+}
+
+/// Heartbeat write was acknowledged by the peer (client side).
+final class HeartbeatAcknowledgedEvent extends BlueyEvent {
+  final UUID deviceId;
+
+  HeartbeatAcknowledgedEvent({required this.deviceId, super.source});
+
+  @override
+  String toString() =>
+      '[Lifecycle] Heartbeat ack from ${deviceId.toShortString()}';
+}
+
+/// Heartbeat write failed (client side). [isDeadPeerSignal] is `true`
+/// when the failure type is one the silence detector counts toward
+/// the dead-peer threshold (e.g. timeout, disconnected); `false` when
+/// it's a transient error that does not move the silence clock.
+final class HeartbeatFailedEvent extends BlueyEvent {
+  final UUID deviceId;
+  final bool isDeadPeerSignal;
+  final String? reason;
+
+  HeartbeatFailedEvent({
+    required this.deviceId,
+    required this.isDeadPeerSignal,
+    this.reason,
+    super.source,
+  });
+
+  @override
+  String toString() {
+    final r = reason != null ? ' ($reason)' : '';
+    final sig = isDeadPeerSignal ? ' [counts]' : ' [transient]';
+    return '[Lifecycle] Heartbeat failed to ${deviceId.toShortString()}$r$sig';
+  }
+}
+
+/// The lifecycle silence detector tripped — peer has been quiet for
+/// long enough that we treat it as gone (client side). Followed by a
+/// local disconnect.
+final class PeerDeclaredUnreachableEvent extends BlueyEvent {
+  final UUID deviceId;
+
+  PeerDeclaredUnreachableEvent({required this.deviceId, super.source});
+
+  @override
+  String toString() =>
+      '[Lifecycle] Peer ${deviceId.toShortString()} declared unreachable';
+}
+
+/// Server-side: a heartbeat-silence threshold was reached and the
+/// client is being declared gone. Distinct from
+/// [ClientDisconnectedEvent] — the latter fires for any disconnect,
+/// while this fires only when the lifecycle protocol detects silence.
+final class ClientLifecycleTimeoutEvent extends BlueyEvent {
+  final String clientId;
+
+  ClientLifecycleTimeoutEvent({required this.clientId, super.source});
+
+  @override
+  String toString() =>
+      '[Lifecycle] Client ${_shortId(clientId)} timed out (heartbeat silence)';
+
+  String _shortId(String id) {
+    if (id.length > 8) return '${id.substring(0, 8)}...';
+    return id;
+  }
+}
+
+/// Server-side: the lifecycle silence timer was paused because a
+/// pending request from this client is in flight (post-I079). The
+/// timer resumes once the request is responded to or drained.
+final class LifecyclePausedForPendingRequestEvent extends BlueyEvent {
+  final String clientId;
+
+  LifecyclePausedForPendingRequestEvent({
+    required this.clientId,
+    super.source,
+  });
+
+  @override
+  String toString() =>
+      '[Lifecycle] Paused timer for ${_shortId(clientId)} (pending request)';
+
+  String _shortId(String id) {
+    if (id.length > 8) return '${id.substring(0, 8)}...';
+    return id;
+  }
+}
+
 // === Error Events ===
 
 /// An error occurred.

@@ -4,10 +4,13 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:meta/meta.dart';
 
+import '../event_bus.dart';
+import '../events.dart';
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
+import '../shared/uuid.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -25,6 +28,8 @@ class LifecycleClient {
   final Duration _peerSilenceTimeout;
   final void Function() onServerUnreachable;
   final BlueyLogger _logger;
+  final EventPublisher? _events;
+  final UUID? _deviceId;
 
   late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
@@ -62,10 +67,14 @@ class LifecycleClient {
     required this.onServerUnreachable,
     required BlueyLogger logger,
     Stream<List<RemoteService>>? servicesChanges,
+    EventPublisher? events,
+    UUID? deviceId,
   })  : _platform = platformApi,
         _connectionId = connectionId,
         _peerSilenceTimeout = peerSilenceTimeout,
-        _logger = logger {
+        _logger = logger,
+        _events = events,
+        _deviceId = deviceId {
     if (servicesChanges != null) {
       _servicesChangesSub = servicesChanges.listen(_refreshFromServices);
     }
@@ -85,6 +94,12 @@ class LifecycleClient {
           'onServerUnreachable invoked',
           data: {'connectionId': _connectionId},
         );
+        if (_deviceId != null) {
+          _events?.emit(PeerDeclaredUnreachableEvent(
+            deviceId: _deviceId,
+            source: 'LifecycleClient',
+          ));
+        }
         // Single-fire from monitor; we still need to clean up our
         // own state and signal upward.
         stop();
@@ -475,6 +490,12 @@ class LifecycleClient {
         'characteristicHandle': charHandle.value,
       },
     );
+    if (_deviceId != null) {
+      _events?.emit(HeartbeatSentEvent(
+        deviceId: _deviceId,
+        source: 'LifecycleClient',
+      ));
+    }
     _monitor.markProbeInFlight();
     _platform
         .writeCharacteristic(
@@ -491,6 +512,12 @@ class LifecycleClient {
         'heartbeat-response received',
         data: {'connectionId': _connectionId},
       );
+      if (_deviceId != null) {
+        _events?.emit(HeartbeatAcknowledgedEvent(
+          deviceId: _deviceId,
+          source: 'LifecycleClient',
+        ));
+      }
       _monitor.recordProbeSuccess();
       // Success refreshed lastActivity → monitor deadline is now
       // exactly activityWindow from now. No explicit override.
@@ -512,6 +539,14 @@ class LifecycleClient {
           },
           errorCode: error.runtimeType.toString(),
         );
+        if (_deviceId != null) {
+          _events?.emit(HeartbeatFailedEvent(
+            deviceId: _deviceId,
+            isDeadPeerSignal: false,
+            reason: error.runtimeType.toString(),
+            source: 'LifecycleClient',
+          ));
+        }
         _monitor.cancelProbe();
         _scheduleProbe(after: _monitor.activityWindow);
         return;
@@ -526,6 +561,14 @@ class LifecycleClient {
         },
         errorCode: error.runtimeType.toString(),
       );
+      if (_deviceId != null) {
+        _events?.emit(HeartbeatFailedEvent(
+          deviceId: _deviceId,
+          isDeadPeerSignal: true,
+          reason: error.runtimeType.toString(),
+          source: 'LifecycleClient',
+        ));
+      }
       // Release the in-flight flag: the probe write is done (with a dead-peer
       // error), so the next probe can be dispatched normally.
       _monitor.cancelProbe();

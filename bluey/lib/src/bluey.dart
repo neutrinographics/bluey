@@ -657,6 +657,8 @@ class Bluey {
         },
         logger: _logger,
         servicesChanges: rawConnection.servicesChanges,
+        events: _eventBus,
+        deviceId: rawConnection.deviceId,
       );
       lifecycleClient.start(allServices: services);
 

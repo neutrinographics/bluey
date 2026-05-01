@@ -116,6 +116,8 @@ class _BlueyPeer implements BlueyPeer {
         },
         logger: _logger,
         servicesChanges: blueyConnection.servicesChanges,
+        events: _events,
+        deviceId: blueyConnection.deviceId,
       );
       lifecycleClient.start(allServices: allServices);
 

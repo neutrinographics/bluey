@@ -87,6 +87,7 @@ class BlueyServer implements Server {
       onClientGone: _handleClientDisconnected,
       onHeartbeatReceived: _trackClientIfNeeded,
       logger: logger,
+      events: _eventBus,
     );
     // Eagerly add the control service so it's available for incoming
     // connections even before startAdvertising() is called. A client may
