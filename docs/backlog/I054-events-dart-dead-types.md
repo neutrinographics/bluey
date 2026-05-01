@@ -4,9 +4,10 @@ title: Several `BlueyEvent` subtypes are defined but never emitted
 category: no-op
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-26
-related: [I068]
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 14bae42
+related: [I068, I317]
 ---
 
 ## Symptom
@@ -33,11 +34,33 @@ Implementation gap. The event types were declared as part of the catalog but the
 
 ## Notes
 
-Two viable resolutions:
+Fixed in `14bae42`. Resolution: option (1) — emit from the existing
+call sites rather than deleting the types.
 
-1. **Emit from `_loggedGattOp` success paths.** Add an `event:` callback parameter to `_loggedGattOp` that constructs the appropriate event given the operation name and result, then call it on success. Hook into every call site — `BlueyRemoteCharacteristic.read`/`write`, `BlueyConnection.services`, `BlueyRemoteCharacteristic.notifications`.
-2. **Delete the dead types.** If the events stream is intended only for high-level lifecycle (connect/scan/server), document that and remove the GATT-op event types.
+A new `EventPublisher` port (just `void emit(BlueyEvent)`) was
+introduced in `event_bus.dart`; `BlueyEventBus` implements it. Aggregates
+that need to publish events depend on the port (Interface Segregation
+— minimum surface needed). Threading: `BlueyConnection` and
+`BlueyRemoteCharacteristic` constructors accept `EventPublisher?`,
+threaded from `Bluey._eventBus` via `Bluey.connect` and through
+`PeerDiscovery` / `BlueyPeer` for the peer-protocol path.
 
-Recommended: option (1). The events stream is the right diagnostic API for consumer-visible monitoring; the structured `dev.log` calls give essentially the same data but are harder to consume programmatically.
+Emission sites:
+- `BlueyConnection.services()` — `DiscoveringServicesEvent` before,
+  `ServicesDiscoveredEvent` after.
+- `BlueyRemoteCharacteristic.read()` — `CharacteristicReadEvent` after success.
+- `BlueyRemoteCharacteristic.write()` — `CharacteristicWrittenEvent` after success.
+- `BlueyRemoteCharacteristic.notifications` first-listen / last-cancel —
+  `NotificationSubscriptionEvent(enabled: true|false)`.
+- Inbound platform notifications — `NotificationReceivedEvent`.
 
-Pair with I068 (lifecycle protocol events not emitted as BlueyEvents) — both are about making the events stream as comprehensive as the catalog suggests.
+`DebugEvent` left as-is; it's a generic catch-all without a clear
+production emission site.
+
+Migration of existing consumers (`BlueyServer` / `BlueyScanner` /
+`Bluey`) from depending on the concrete `BlueyEventBus` to
+depending on `EventPublisher` is filed as **I317** — left as a
+transitional inconsistency to keep this fix scoped.
+
+Paired with I068 (lifecycle protocol events) — both shipped together
+and share the new `EventPublisher` port.

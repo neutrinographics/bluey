@@ -114,7 +114,7 @@ Ordered by recommended sequence. Bundles preferred where the underlying concerns
 - **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour.
 - ~~**Server-API polish** (I058 + I059)~~ — DONE ([`6ebcf53`](#)). `AdvertiseMode` enum threaded through `Server.startAdvertising`; `Server.removeService` now returns `Future<void>` and propagates errors (breaking).
 - ~~**Peer-discovery polish** (I055 + I056)~~ — DONE ([`4abcba9`](#)). Control-UUID scan filter on the client; `peerDiscoverable` opt-in on the server (default `false` pending I313 — Android scan-response slot — so the budget doesn't bite app advertising). 3 s default `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect`. Breaking rename of `BlueyPeer.connect.timeout` → `probeTimeout` (the old name was a no-op).
-- **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. Bundle.
+- ~~**Diagnostic events** (I054 + I068)~~ — DONE ([`14bae42`](#) + [`d2fb012`](#)). Five GATT-op events emitted from `BlueyConnection` / `BlueyRemoteCharacteristic`; six lifecycle-protocol events emitted from `LifecycleClient` / `LifecycleServer`. New `EventPublisher` port introduced; existing-consumer migration filed as I317.
 - **iOS NSError mapping cleanups** (I091 + I093) — unmapped `CBATTError` codes / `notFound` mapping. I091 was implicated in the `bluey-unknown` results from the 2026-04-29 stress-test session.
 
 #### Remaining iOS one-offs
@@ -145,8 +145,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC → UUID truncation | medium |
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
-| [I054](I054-events-dart-dead-types.md) | Several `BlueyEvent` subtypes are defined but never emitted | low |
-| [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
@@ -220,6 +218,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
 | [I312](I312-ios-extensions-singleton-asymmetry.md) | `_IosConnectionExtensionsImpl` is a top-level const singleton vs Android's per-connection facade | low |
+| [I317](I317-migrate-existing-consumers-to-event-publisher.md) | Migrate `BlueyServer` / `BlueyScanner` / `Bluey` to depend on `EventPublisher` port instead of concrete `BlueyEventBus` (transitional inconsistency post-I054/I068) | low |
 
 ### Fixed — verified in HEAD
 
@@ -282,6 +281,8 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I314](I314-example-cubit-stale-services-on-cold-start.md) | Example app's ConnectionCubit now subscribes to `connection.servicesChanges`; the cold-start "Stress Tests button missing until manual refresh" symptom resolved; refresh button removed (disconnect/reconnect is the force-rediscovery path) | `53d5764` |
 | [I040](I040-ios-notification-retry-on-ready.md) | iOS notification-TX backpressure now absorbed by `PendingNotificationQueue`; `peripheralManagerIsReady(toUpdateSubscribers:)` drains in arrival order; per-entry completions resolve on actual delivery (not on enqueue). Stale-entry-on-disconnect cleanup tracked as I315. Verified on hardware at notification-throughput count=100 | `47ba2f5` |
 | [I316](I316-stress-runner-tight-timeout-and-partial-burst-discard.md) | Example app's `runNotificationThroughput`: timeout now configurable (default `10 ms × count + 2 s`) and partial bursts report received successes + missing failures instead of being discarded as total failures (was masked pre-I040 by the fire-and-forget notify path) | `ce65141` |
+| [I054](I054-events-dart-dead-types.md) | Five GATT-op `BlueyEvent` subtypes (DiscoveringServices / ServicesDiscovered / CharacteristicRead / CharacteristicWritten / NotificationSubscription / NotificationReceived) now `emit()`ed from `BlueyConnection` and `BlueyRemoteCharacteristic`; new `EventPublisher` port introduced (full migration of existing consumers tracked as I317) | `14bae42` |
+| [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state transitions surface on `bluey.events`: HeartbeatSent / Acknowledged / Failed (with isDeadPeerSignal) / PeerDeclaredUnreachable on the client side; LifecyclePausedForPendingRequest / ClientLifecycleTimeout on the server side | `d2fb012` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
