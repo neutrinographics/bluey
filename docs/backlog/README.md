@@ -113,7 +113,7 @@ Ordered by recommended sequence. Bundles preferred where the underlying concerns
 
 - **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour.
 - ~~**Server-API polish** (I058 + I059)~~ — DONE ([`6ebcf53`](#)). `AdvertiseMode` enum threaded through `Server.startAdvertising`; `Server.removeService` now returns `Future<void>` and propagates errors (breaking).
-- **Peer-discovery polish** (I055 + I056) — scan filter + probe timeout. ~1–2 hours.
+- ~~**Peer-discovery polish** (I055 + I056)~~ — DONE ([`4abcba9`](#)). Control-UUID scan filter on the client; `peerDiscoverable` opt-in on the server (default `false` pending I313 — Android scan-response slot — so the budget doesn't bite app advertising). 3 s default `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect`. Breaking rename of `BlueyPeer.connect.timeout` → `probeTimeout` (the old name was a no-op).
 - **Diagnostic events** (I054 + I068) — emit dead `BlueyEvent` types + add lifecycle-protocol events. Bundle.
 - **iOS NSError mapping cleanups** (I091 + I093) — unmapped `CBATTError` codes / `notFound` mapping. I091 was implicated in the `bluey-unknown` results from the 2026-04-29 stress-test session.
 
@@ -146,8 +146,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
 | [I054](I054-events-dart-dead-types.md) | Several `BlueyEvent` subtypes are defined but never emitted | low |
-| [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery scans without service filter; probes every nearby device | medium |
-| [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses platform default timeout | medium |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state changes not emitted as `BlueyEvent`s | low |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
@@ -158,6 +156,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | ID | Title | Severity |
 |---|---|---|
 | [I013](I013-scan-failure-error-code-not-propagated.md) | Scan failure error code discarded | medium |
+| [I313](I313-android-control-uuid-in-scan-response.md) | Android scan-response slot unused; blocks `peerDiscoverable: true` default (I055 follow-up) | medium |
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
@@ -278,6 +277,8 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I310](I310-ios-unsupported-error-falls-through-as-platform-exception.md) | Domain-layer capability gating prevents iOS-flavored capabilities from reaching the adapter's `UnsupportedError` throws; throws kept as defense-in-depth | `e177f1d` (bundle `ec40c41..e177f1d`) |
 | [I058](I058-server-advertising-mode-dropped.md) | `Server.startAdvertising` propagates user-supplied advertising mode via new public-domain `AdvertiseMode` enum (Android-only; iOS ignores) | `6ebcf53` |
 | [I059](I059-server-remove-service-fire-and-forget.md) | `Server.removeService` return type changed from `void` to `Future<void>`; awaits the platform call and propagates errors (breaking) | `6ebcf53` |
+| [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery filters scans on the Bluey control UUID; `Server.startAdvertising` gained opt-in `peerDiscoverable` (default off — see I313 follow-up for the Android scan-response work) | `4abcba9` |
+| [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses an explicit 3 s default; `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect` (renamed from dead `timeout` param — breaking) | `4abcba9` |
 
 ### Wontfix — documented platform limitations & superseded premises
 

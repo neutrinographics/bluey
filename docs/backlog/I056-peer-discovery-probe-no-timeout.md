@@ -4,8 +4,9 @@ title: PeerDiscovery probe-connect uses platform default timeout (Android 30s, i
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 4abcba9
 related: [I055]
 ---
 
@@ -36,15 +37,15 @@ The `timeoutMs: null` path defers to the platform's default. The default differs
 
 ## Notes
 
-Pass an explicit short timeout (3 seconds is a reasonable default for a probe; the device either responds quickly or gets skipped).
+Fixed in `4abcba9`. `PeerDiscovery._readServerIdRaw` now passes
+`PlatformConnectConfig.timeoutMs: probeTimeout.inMilliseconds`. The
+default lives on `PeerDiscovery.defaultProbeTimeout` (3 s); exposed as
+`probeTimeout` on `Bluey.discoverPeers`, `BlueyPeer.connect`, and the
+internal `PeerDiscovery.discover` / `connectTo` for power users who
+want to tune it. Probe-loop catch-and-skip behavior unchanged.
 
-```dart
-final config = const platform.PlatformConnectConfig(
-  timeoutMs: 3000,
-  mtu: null,
-);
-```
-
-If the connect throws `GattOperationTimeoutException` after 3 seconds, the probe loop already catches and skips. No further changes needed.
-
-Consider exposing this as a parameter on `Bluey.discoverPeers` for power users who want to tune it.
+Sub-fix: `BlueyPeer.connect`'s `timeout` parameter was a no-op (passed
+to `connectTo` which ignored it). Renamed to `probeTimeout` and now
+threaded through to the platform connect — exactly what its dartdoc
+already claimed it did. Breaking rename, but the parameter was dead
+code, so no functional caller behavior changes.

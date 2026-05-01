@@ -4,9 +4,10 @@ title: PeerDiscovery scans without service filter; probes every nearby device
 category: limitation
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
-related: [I056, I057]
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 4abcba9
+related: [I056, I057, I313]
 ---
 
 ## Symptom
@@ -32,23 +33,36 @@ The Bluey server eagerly adds the control service (`b1e70001-0000-1000-8000-0080
 
 ## Notes
 
-The control service UUID is the natural filter for peer discovery — it uniquely identifies a Bluey-protocol peer.
+Fixed in `4abcba9`.
 
-Two-part fix:
+**Client side:** `PeerDiscovery._collectCandidates` now uses
+`serviceUuids: [lifecycle.controlServiceUuid]` instead of `const []`.
+Probe time is O(matches) instead of O(nearby devices).
 
-1. **Server side:** include the control service UUID in the advertising payload by default. This consumes 18 bytes (16 UUID + 2 header) from the 31-byte legacy advertising budget — non-trivial. On iOS, the OS automatically promotes 128-bit UUIDs to the overflow area when scanning is foreground, so it remains discoverable to other Bluey clients explicitly scanning for that UUID. On Android, it appears in the primary advertisement.
-2. **Client side:** change `_collectCandidates` to filter by the control service UUID:
+**Server side:** `Server.startAdvertising` gained a `bool peerDiscoverable
+= false` parameter. When `true`, `BlueyServer` prepends the control UUID
+to the advertised `serviceUuids` (with dedup against any user-supplied
+listing). The original sketch in this entry suggested defaulting to
+"on" — that turned out wrong-sized for Android: a 128-bit UUID consumes
+~18 bytes from the 31-byte legacy advertising budget, and slipping the
+control UUID into apps already at the limit would silently break them
+with `ADVERTISE_FAILED_DATA_TOO_LARGE`. Default `false` makes the cost
+explicit at the API.
 
-```dart
-final scanConfig = platform.PlatformScanConfig(
-  serviceUuids: [lifecycle.controlServiceUuid],
-  timeoutMs: timeout.inMilliseconds,
-);
-```
+**Follow-up filed as I313**: route the control UUID through Android's
+scan-response slot (a separate 31-byte budget). Once that lands, the
+default can flip to `true` safely without competing with the user's
+primary AD content. Until then, callers opt in deliberately.
 
-Probe time becomes O(matches) rather than O(nearby devices).
+iOS handles the budget pressure gracefully via the overflow area —
+foreground scans on other iOS devices that explicitly filter on the
+control UUID still match — so the cost is mostly an Android concern.
 
-**Privacy tradeoff.** Advertising the control service UUID exposes a stable Bluey-using-app fingerprint. For privacy-sensitive deployments (consumer apps where users don't want their app stack identifiable from a passive BLE scan), this is undesirable. Make the advertising of the control UUID a configurable option on `Server.startAdvertising`.
+**Privacy tradeoff acknowledged.** Opt-in `peerDiscoverable: true` does
+expose a stable Bluey-using-app fingerprint to passive BLE scanners.
+Privacy-sensitive deployments leave it `false` and either ship an OOB
+ServerId discovery channel or use `Bluey.peer(knownId).connect()` with
+out-of-band peer pairing.
 
 External references:
 - BLE Core Specification 5.4, Vol 3, Part C, §11: GAP modes and advertising data formats.
