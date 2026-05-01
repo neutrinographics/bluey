@@ -50,7 +50,7 @@ class _BlueyPeer implements BlueyPeer {
   @override
   Future<PeerConnection> connect({
     Duration? scanTimeout,
-    Duration? timeout,
+    Duration? probeTimeout,
   }) async {
     if (_connecting) {
       throw StateError('Peer $serverId is already connecting');
@@ -58,6 +58,8 @@ class _BlueyPeer implements BlueyPeer {
     _connecting = true;
     try {
       final effectiveScanTimeout = scanTimeout ?? const Duration(seconds: 5);
+      final effectiveProbeTimeout =
+          probeTimeout ?? PeerDiscovery.defaultProbeTimeout;
 
       _logger.log(
         BlueyLogLevel.info,
@@ -75,7 +77,7 @@ class _BlueyPeer implements BlueyPeer {
         final rawConnection = await discovery.connectTo(
           serverId,
           scanTimeout: effectiveScanTimeout,
-          timeout: timeout,
+          probeTimeout: effectiveProbeTimeout,
         );
         blueyConnection = rawConnection as BlueyConnection;
       } catch (e) {

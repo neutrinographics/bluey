@@ -180,4 +180,105 @@ void main() {
       expect(ids.first, equals(goodId));
     });
   });
+
+  // I055: peer discovery must filter the OS-level scan on the control
+  // service UUID so probing is O(matches) rather than O(nearby devices).
+  group('PeerDiscovery scan filter (I055)', () {
+    test('discover scans with the control service UUID as filter', () async {
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
+      await discovery.discover(timeout: const Duration(milliseconds: 200));
+
+      expect(
+        fakePlatform.lastScanConfig?.serviceUuids,
+        equals([lifecycle.controlServiceUuid]),
+      );
+    });
+
+    test('connectTo scans with the control service UUID as filter', () async {
+      final id = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
+      final connection = await discovery.connectTo(
+        id,
+        scanTimeout: const Duration(milliseconds: 500),
+      );
+
+      expect(
+        fakePlatform.lastScanConfig?.serviceUuids,
+        equals([lifecycle.controlServiceUuid]),
+      );
+      await connection.disconnect();
+    });
+  });
+
+  // I056: probe-connect must use a short bounded timeout so a single
+  // unresponsive candidate doesn't stall the whole discovery session.
+  group('PeerDiscovery probe timeout (I056)', () {
+    test('discover uses 3s default probe timeout when none provided',
+        () async {
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
+      await discovery.discover(timeout: const Duration(milliseconds: 200));
+
+      expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(3000));
+    });
+
+    test('discover threads custom probeTimeout through to platform connect',
+        () async {
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
+      await discovery.discover(
+        timeout: const Duration(milliseconds: 200),
+        probeTimeout: const Duration(milliseconds: 750),
+      );
+
+      expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(750));
+    });
+
+    test('connectTo threads custom probeTimeout through to platform connect',
+        () async {
+      final id = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
+      final connection = await discovery.connectTo(
+        id,
+        scanTimeout: const Duration(milliseconds: 500),
+        probeTimeout: const Duration(milliseconds: 1500),
+      );
+
+      expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(1500));
+      await connection.disconnect();
+    });
+  });
 }

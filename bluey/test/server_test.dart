@@ -327,6 +327,7 @@ class MockServer implements Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
     AdvertiseMode? mode,
+    bool peerDiscoverable = false,
   }) async {
     _isAdvertising = true;
   }

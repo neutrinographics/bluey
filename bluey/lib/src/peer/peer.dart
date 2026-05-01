@@ -26,8 +26,9 @@ abstract class BlueyPeer {
   /// UUID), connects to each matching candidate in turn, and returns
   /// the connection to the first one whose `serverId` matches.
   ///
-  /// [scanTimeout] bounds the discovery phase. [timeout] bounds each
-  /// individual platform-level connect attempt.
+  /// [scanTimeout] bounds the discovery phase. [probeTimeout] bounds
+  /// each individual probe-connect attempt — see I056. When omitted,
+  /// `PeerDiscovery.defaultProbeTimeout` (3 s) is used.
   ///
   /// Returns a [PeerConnection] — a peer-protocol wrapper around the
   /// raw GATT [Connection] that hides the lifecycle control service
@@ -40,6 +41,6 @@ abstract class BlueyPeer {
   /// connection failures.
   Future<PeerConnection> connect({
     Duration? scanTimeout,
-    Duration? timeout,
+    Duration? probeTimeout,
   });
 }

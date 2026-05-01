@@ -744,6 +744,63 @@ void main() {
 
         expect(mockPlatform.lastAdvertiseConfig?.mode, isNull);
       });
+
+      // I055: opt-in peer-discoverability surfaces the Bluey control
+      // service UUID in the advertising payload so clients filtering on
+      // it (the post-I055 PeerDiscovery._collectCandidates path) can
+      // find this server. Off by default — costs ~18 bytes from the
+      // 31-byte legacy advertising budget on Android.
+      test('startAdvertising omits control UUID by default', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(
+          services: [UUID.short(0x180F)],
+        );
+
+        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
+        expect(advertised, hasLength(1));
+        expect(advertised, isNot(contains(lifecycle.controlServiceUuid)));
+      });
+
+      test('startAdvertising(peerDiscoverable: true) prepends control UUID',
+          () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(
+          services: [UUID.short(0x180F)],
+          peerDiscoverable: true,
+        );
+
+        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
+        expect(advertised, hasLength(2));
+        expect(advertised?.first, equals(lifecycle.controlServiceUuid));
+      });
+
+      test(
+          'startAdvertising(peerDiscoverable: true) does not duplicate the '
+          'control UUID when caller already lists it', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(
+          services: [UUID(lifecycle.controlServiceUuid)],
+          peerDiscoverable: true,
+        );
+
+        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
+        expect(advertised, hasLength(1));
+        expect(advertised?.single, equals(lifecycle.controlServiceUuid));
+      });
+
+      test(
+          'startAdvertising(peerDiscoverable: true) works when the caller '
+          'passes no app services', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(peerDiscoverable: true);
+
+        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
+        expect(advertised, equals([lifecycle.controlServiceUuid]));
+      });
     });
 
     group('Central Connections', () {

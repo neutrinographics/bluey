@@ -783,14 +783,21 @@ class Bluey {
   /// and returns a list of [BlueyPeer]s deduplicated by [ServerId].
   ///
   /// [timeout] bounds the scan window. Defaults to 5 seconds.
+  /// [probeTimeout] bounds each individual probe-connect attempt; one
+  /// unresponsive candidate doesn't stall the whole session. Defaults
+  /// to [PeerDiscovery.defaultProbeTimeout] (3 s) — see I056.
   Future<List<BlueyPeer>> discoverPeers({
     Duration timeout = const Duration(seconds: 5),
+    Duration probeTimeout = PeerDiscovery.defaultProbeTimeout,
   }) async {
     final discovery = PeerDiscovery(
       platformApi: _platform,
       logger: _logger,
     );
-    final ids = await discovery.discover(timeout: timeout);
+    final ids = await discovery.discover(
+      timeout: timeout,
+      probeTimeout: probeTimeout,
+    );
     return ids
         .map((id) => createBlueyPeer(
               platformApi: _platform,

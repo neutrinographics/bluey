@@ -249,6 +249,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Uint8List? cccdValueByHandle(String deviceId, int descriptorHandle) =>
       _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
 
+  /// The most recent [PlatformScanConfig] received by [scan]. Public
+  /// so tests can assert on the scan filter / timeout chosen by callers
+  /// (e.g. peer-discovery's control-UUID filter — see I055).
+  PlatformScanConfig? lastScanConfig;
+
+  /// The most recent [PlatformConnectConfig] received by [connect].
+  /// Public so tests can assert on the timeout chosen by callers
+  /// (e.g. peer-discovery's probe timeout — see I056).
+  PlatformConnectConfig? lastConnectConfig;
+
   // === Server State (as peripheral) ===
   final List<PlatformLocalService> _localServices = [];
   bool _isAdvertising = false;
@@ -757,6 +767,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
+    lastScanConfig = config;
     // Create a new controller for each scan to avoid "closed stream" issues
     final scanController = StreamController<PlatformDevice>.broadcast();
 
@@ -786,6 +797,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    lastConnectConfig = config;
     final peripheral = _peripherals[deviceId];
     if (peripheral == null) {
       throw Exception('Device not found: $deviceId');

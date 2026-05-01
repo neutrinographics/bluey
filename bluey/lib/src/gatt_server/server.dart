@@ -133,6 +133,16 @@ abstract class Server {
   /// [mode] - Advertising mode (Android only). Controls the advertising
   /// interval and power consumption. Ignored on iOS, which manages
   /// intervals automatically. When `null` the platform applies its default.
+  /// [peerDiscoverable] - When `true`, the Bluey lifecycle control service
+  /// UUID is included in the advertising payload so other Bluey clients
+  /// can find this server via `bluey.discoverPeers()`. Defaults to
+  /// `false`. On Android, including the control UUID consumes ~18 bytes
+  /// from the 31-byte legacy advertising budget; combine carefully with
+  /// [services] and [manufacturerData] or you'll exceed the limit and
+  /// `startAdvertising` will fail. On iOS, 128-bit service UUIDs that
+  /// overflow the primary advertisement are auto-promoted to the
+  /// overflow area, so the cost competes only with other 128-bit
+  /// service UUIDs you advertise.
   ///
   /// Throws [AdvertisingException] if advertising fails.
   Future<void> startAdvertising({
@@ -141,6 +151,7 @@ abstract class Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
     AdvertiseMode? mode,
+    bool peerDiscoverable = false,
   });
 
   /// Stop advertising.

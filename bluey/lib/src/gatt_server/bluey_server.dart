@@ -292,6 +292,7 @@ class BlueyServer implements Server {
     ManufacturerData? manufacturerData,
     Duration? timeout,
     AdvertiseMode? mode,
+    bool peerDiscoverable = false,
   }) async {
     _logger.log(
       BlueyLogLevel.info,
@@ -327,9 +328,15 @@ class BlueyServer implements Server {
       }
     }
 
+    final advertisedUuids =
+        services?.map((u) => u.toString().toLowerCase()).toList() ?? [];
+    if (peerDiscoverable &&
+        !advertisedUuids.contains(lifecycle.controlServiceUuid)) {
+      advertisedUuids.insert(0, lifecycle.controlServiceUuid);
+    }
     final config = platform.PlatformAdvertiseConfig(
       name: name,
-      serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
+      serviceUuids: advertisedUuids,
       manufacturerDataCompanyId: manufacturerData?.companyId,
       manufacturerData: manufacturerData?.data,
       timeoutMs: timeout?.inMilliseconds,

@@ -20,6 +20,14 @@ import 'server_id.dart';
 /// It is used internally by the `Bluey` facade and is not part of the
 /// public API.
 class PeerDiscovery {
+  /// Default probe-connect timeout. A single unresponsive candidate
+  /// shouldn't stall the whole discovery session, so each probe is
+  /// bounded short. 3 s is a heuristic balance: long enough that a
+  /// briefly-asleep peripheral can wake and respond, short enough that
+  /// 10 dead candidates only add ~30 s to discovery rather than ~5 min
+  /// (the platform default — see I056).
+  static const Duration defaultProbeTimeout = Duration(seconds: 3);
+
   final platform.BlueyPlatform _platform;
   final BlueyLogger _logger;
 
@@ -35,7 +43,12 @@ class PeerDiscovery {
   ///
   /// [timeout] bounds the scan phase. After the timeout, the scan is
   /// stopped and the collected candidates are probed sequentially.
-  Future<List<ServerId>> discover({required Duration timeout}) async {
+  /// [probeTimeout] bounds each individual probe-connect attempt;
+  /// defaults to [defaultProbeTimeout].
+  Future<List<ServerId>> discover({
+    required Duration timeout,
+    Duration probeTimeout = defaultProbeTimeout,
+  }) async {
     _logger.log(
       BlueyLogLevel.info,
       'bluey.peer.discovery',
@@ -52,7 +65,7 @@ class PeerDiscovery {
         data: {'deviceId': address},
       );
       try {
-        final id = await _probeServerId(address);
+        final id = await _probeServerId(address, probeTimeout);
         ids.add(id);
         _logger.log(
           BlueyLogLevel.info,
@@ -93,16 +106,17 @@ class PeerDiscovery {
   ///
   /// [scanTimeout] bounds the discovery phase. If no match is found
   /// within the scan window, throws [PeerNotFoundException].
-  /// [timeout] optionally bounds each individual connect attempt.
+  /// [probeTimeout] bounds each individual probe-connect attempt;
+  /// defaults to [defaultProbeTimeout].
   Future<Connection> connectTo(
     ServerId expected, {
     required Duration scanTimeout,
-    Duration? timeout,
+    Duration probeTimeout = defaultProbeTimeout,
   }) async {
     final candidates = await _collectCandidates(scanTimeout);
     for (final address in candidates) {
       try {
-        final id = await _readServerIdRaw(address);
+        final id = await _readServerIdRaw(address, probeTimeout);
         if (id == expected) {
           // The probe left the device connected. Build a full
           // BlueyConnection for the caller.
@@ -125,13 +139,16 @@ class PeerDiscovery {
     throw PeerNotFoundException(expected, scanTimeout);
   }
 
-  /// Scans broadly (no filter) and collects all device addresses as
-  /// candidates. Each candidate is probed individually to check for
-  /// the Bluey control service.
+  /// Scans for peripherals advertising the Bluey lifecycle control
+  /// service UUID and collects their addresses. Filtering at the OS
+  /// level is the only way to keep probe time O(matches) rather than
+  /// O(nearby BLE devices) — see I055. Servers must opt in via
+  /// `Server.startAdvertising(peerDiscoverable: true)` for their
+  /// advertisements to surface here.
   Future<Set<String>> _collectCandidates(Duration timeout) async {
     final addresses = <String>{};
     final scanConfig = platform.PlatformScanConfig(
-      serviceUuids: const [],
+      serviceUuids: [lifecycle.controlServiceUuid],
       timeoutMs: timeout.inMilliseconds,
     );
     await for (final result in _platform.scan(scanConfig).timeout(
@@ -150,17 +167,20 @@ class PeerDiscovery {
   ///
   /// Uses platform calls directly (not [BlueyConnection]) to avoid
   /// starting lifecycle heartbeats on throw-away probe connections.
-  Future<ServerId> _probeServerId(String address) async {
-    final id = await _readServerIdRaw(address);
+  Future<ServerId> _probeServerId(String address, Duration probeTimeout) async {
+    final id = await _readServerIdRaw(address, probeTimeout);
     await _platform.disconnect(address);
     return id;
   }
 
   /// Connects, discovers services, reads the serverId characteristic,
   /// and returns the decoded [ServerId]. Leaves the connection open.
-  Future<ServerId> _readServerIdRaw(String address) async {
-    final config = const platform.PlatformConnectConfig(
-      timeoutMs: null,
+  Future<ServerId> _readServerIdRaw(
+    String address,
+    Duration probeTimeout,
+  ) async {
+    final config = platform.PlatformConnectConfig(
+      timeoutMs: probeTimeout.inMilliseconds,
       mtu: null,
     );
     await _platform.connect(address, config);
