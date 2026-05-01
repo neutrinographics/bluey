@@ -4,8 +4,9 @@ title: BlueyServer.startAdvertising drops user-supplied advertising mode
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 6ebcf53
 related: [I051]
 ---
 
@@ -36,14 +37,21 @@ Implementation oversight. The platform interface already supports it (`PlatformA
 
 ## Notes
 
-Two-step fix:
+Fixed in `6ebcf53`. Public-domain `AdvertiseMode` enum
+(`lowPower` / `balanced` / `lowLatency`) added to
+`bluey/lib/src/gatt_server/server.dart`. `Server.startAdvertising` gained an
+optional `AdvertiseMode? mode` parameter (default `null` = let the platform
+decide; the entry's original sketch suggested defaulting to `balanced` but
+keeping it `null` preserves the iOS-noop story cleanly without forcing a
+domain-level choice). `BlueyServer` translates via a new
+`_mapAdvertiseModeToPlatform` helper, mirroring the existing
+`_mapGattResponseStatusToPlatform` pattern. Documented as Android-only —
+iOS ignores the value because CoreBluetooth manages intervals
+automatically.
 
-1. Add `AdvertiseMode` enum to the public domain layer (`bluey/lib/src/gatt_server/server.dart` or similar).
-2. Add `mode` parameter to `Server.startAdvertising`, default to `balanced`, propagate to `PlatformAdvertiseConfig.mode` in `BlueyServer`.
-
-Document loudly that `mode` is Android-only — iOS manages advertising intervals automatically.
-
-This is a subset of I051 (advertising options not exposed) but specifically the `mode` parameter has all the plumbing in place; only the final hop is missing.
+4 new tests in `bluey/test/bluey_server_test.dart` cover propagation of
+each enum value plus the null-passthrough case. Remains a subset of I051
+(scan/advertise options); other AdvertiseSettings.Builder fields stay open.
 
 External references:
 - Android [`AdvertiseSettings.Builder.setAdvertiseMode(int)`](https://developer.android.com/reference/android/bluetooth/le/AdvertiseSettings.Builder#setAdvertiseMode(int)).

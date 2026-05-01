@@ -4,8 +4,9 @@ title: BlueyServer.removeService doesn't await the platform call
 category: bug
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 6ebcf53
 related: [I086]
 ---
 
@@ -32,6 +33,15 @@ API shape mismatch. The Server interface declared `removeService` as synchronous
 
 ## Notes
 
-Change `Server.removeService` to return `Future<void>`, await the platform call, propagate errors. This is a breaking API change; account for it in the next minor version.
+Fixed in `6ebcf53`. `Server.removeService` return type changed from `void`
+to `Future<void>`. `BlueyServer.removeService` now awaits the platform call;
+platform exceptions propagate to the caller. Two new domain-layer tests
+cover both halves: a `Completer`-gated test proves the wrapper future is
+gated on platform completion (would resolve in the first microtask under
+fire-and-forget), and a throw-injection test asserts platform exceptions
+reach the caller (would be swallowed as an unhandled microtask error
+under fire-and-forget). Breaking API change.
 
-This issue compounds with I086 (`removeService` races with in-flight notify fanout): with a fire-and-forget removal, the consumer cannot even sequence "stop fanning notifies before removing" without race windows.
+I086 (`removeService` races with in-flight notify fanout) is now
+addressable from the consumer side: `await server.removeService(uuid)`
+sequences cleanly with notify fanout discipline.
