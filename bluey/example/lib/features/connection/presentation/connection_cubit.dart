@@ -21,6 +21,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
   StreamSubscription<ConnectionState>? _stateSubscription;
   StreamSubscription<ConnectionSettings>? _settingsSubscription;
   StreamSubscription<PeerConnection?>? _peerSubscription;
+  StreamSubscription<List<RemoteService>>? _servicesSubscription;
   ConnectionSettings _settings;
 
   /// Set during a user-initiated reconnect (tolerance change). The
@@ -55,6 +56,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
       _stateSubscription = null;
       await _peerSubscription?.cancel();
       _peerSubscription = null;
+      await _servicesSubscription?.cancel();
+      _servicesSubscription = null;
       try {
         await _gracefulDisconnect(state.connection!);
       } catch (_) {
@@ -148,6 +151,22 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         },
       );
 
+      // Mirror the peer-watching pattern for the discovered service
+      // tree: the library re-discovers and emits on `servicesChanges`
+      // whenever the cache is invalidated (Service Changed indication
+      // from the peer, stale-cache refresh on Android, etc.). Without
+      // this subscription the cubit's `state.services` would stay frozen
+      // at the initial discovery, hiding consumer UI gated on specific
+      // services (e.g., the "Stress Tests" button) until manual refresh.
+      _servicesSubscription?.cancel();
+      _servicesSubscription = connection.servicesChanges.listen(
+        (services) => emit(state.copyWith(services: services)),
+        onError: (_) {
+          // Re-discovery failures surface elsewhere; the previous
+          // service tree remains usable.
+        },
+      );
+
       // Load services after connecting
       await loadServices();
     } on BlueyException catch (e) {
@@ -178,6 +197,8 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     _stateSubscription = null;
     await _peerSubscription?.cancel();
     _peerSubscription = null;
+    await _servicesSubscription?.cancel();
+    _servicesSubscription = null;
 
     try {
       await _gracefulDisconnect(connection);
@@ -217,6 +238,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     _settingsSubscription?.cancel();
     _stateSubscription?.cancel();
     _peerSubscription?.cancel();
+    _servicesSubscription?.cancel();
     // Fire-and-forget: route through the peer protocol if a peer is
     // established so the server cleans up immediately.
     final peer = state.peer;

@@ -58,6 +58,51 @@ void main() {
       cubit.close();
     });
 
+    // Reproduces the cold-start bug where `state.services` stayed stale
+    // after a Service Changed re-discovery, hiding consumer UI gated on
+    // specific services (e.g., the example app's "Stress Tests" button).
+    // The cubit must subscribe to `connection.servicesChanges` and emit
+    // a fresh `state.services` when the library re-discovers — same hook
+    // `Bluey.watchPeer` already uses for the BLUEY badge.
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'state.services updates when connection.servicesChanges emits',
+      setUp: () {
+        final mockConnection = MockConnection();
+        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
+        when(() => mockConnection.stateChanges)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.servicesChanges)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
+
+        final initialService = MockRemoteService();
+        final freshService1 = MockRemoteService();
+        final freshService2 = MockRemoteService();
+
+        // Initial loadServices() returns one service. servicesChanges then
+        // emits the post-Service-Changed re-discovery with two — exactly
+        // the cold-start cache-stale shape.
+        when(() => mockConnection.servicesChanges).thenAnswer((_) async* {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          yield [freshService1, freshService2];
+        });
+
+        when(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
+            .thenAnswer((_) async => mockConnection);
+        when(() => mockGetServices(any()))
+            .thenAnswer((_) async => [initialService]);
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.connect();
+        // Allow servicesChanges to deliver its emission.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      verify: (cubit) {
+        expect(cubit.state.services, hasLength(2));
+      },
+    );
+
     blocTest<ConnectionCubit, ConnectionScreenState>(
       'connect succeeds and auto-discovers services',
       setUp: () {
@@ -66,6 +111,8 @@ void main() {
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.servicesChanges)
+            .thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         final mockService = MockRemoteService();
@@ -112,6 +159,8 @@ void main() {
         final mockConnection = MockConnection();
         when(() => mockConnection.state).thenReturn(ConnectionState.ready);
         when(() => mockConnection.stateChanges)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.servicesChanges)
             .thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
@@ -176,6 +225,8 @@ void main() {
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.servicesChanges)
+            .thenAnswer((_) => const Stream.empty());
       },
       build: () {
         final cubit = createCubit();
@@ -263,6 +314,8 @@ void main() {
           await Future.delayed(Duration.zero);
           throw Exception('State stream error');
         });
+        when(() => mockConnection.servicesChanges)
+            .thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         when(
@@ -289,11 +342,15 @@ void main() {
       when(() => firstConn.state).thenReturn(ConnectionState.ready);
       when(() => firstConn.stateChanges)
           .thenAnswer((_) => const Stream.empty());
+      when(() => firstConn.servicesChanges)
+          .thenAnswer((_) => const Stream.empty());
       when(() => firstConn.disconnect()).thenAnswer((_) async {});
 
       final secondConn = MockConnection();
       when(() => secondConn.state).thenReturn(ConnectionState.ready);
       when(() => secondConn.stateChanges)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => secondConn.servicesChanges)
           .thenAnswer((_) => const Stream.empty());
       when(() => secondConn.disconnect()).thenAnswer((_) async {});
 
@@ -336,6 +393,8 @@ void main() {
       final mockConn = MockConnection();
       when(() => mockConn.state).thenReturn(ConnectionState.ready);
       when(() => mockConn.stateChanges)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockConn.servicesChanges)
           .thenAnswer((_) => const Stream.empty());
       when(() => mockConn.disconnect()).thenAnswer((_) async {});
 

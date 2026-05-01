@@ -28,6 +28,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasRefreshAffordance = onRefresh != null || isRefreshing;
     return Row(
       children: [
         Text(
@@ -45,18 +46,24 @@ class SectionHeader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child:
-                    isRefreshing
-                        ? const CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: _kAccent,
-                        )
-                        : const Icon(Icons.refresh, color: _kLight, size: 16),
-              ),
-              const SizedBox(width: 8),
+              if (hasRefreshAffordance) ...[
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child:
+                      isRefreshing
+                          ? const CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: _kAccent,
+                          )
+                          : const Icon(
+                            Icons.refresh,
+                            color: _kLight,
+                            size: 16,
+                          ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(

@@ -371,30 +371,6 @@ class _ConnectedContent extends StatefulWidget {
 }
 
 class _ConnectedContentState extends State<_ConnectedContent> {
-  bool _isRefreshing = false;
-
-  Future<void> _refreshServices() async {
-    if (_isRefreshing) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final cubit = context.read<ConnectionCubit>();
-    setState(() => _isRefreshing = true);
-    try {
-      await cubit.loadServices();
-      if (!mounted) return;
-      setState(() => _isRefreshing = false);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Services refreshed'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isRefreshing = false);
-      messenger.showSnackBar(const SnackBar(content: Text('Refresh failed')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
@@ -420,8 +396,7 @@ class _ConnectedContentState extends State<_ConnectedContent> {
             child: SectionHeader(
               title: 'Services',
               count: state.services?.length ?? 0,
-              isRefreshing: _isRefreshing || state.isDiscovering,
-              onRefresh: _refreshServices,
+              isRefreshing: state.isDiscovering,
             ),
           ),
         ),
