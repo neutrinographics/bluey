@@ -4,9 +4,10 @@ title: "`isReadyToUpdateSubscribers` does not retry failed notifications"
 category: no-op
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-30
-related: [I311]
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 47ba2f5
+related: [I311, I315]
 ---
 
 ## Symptom
@@ -67,3 +68,39 @@ The example app's `StressServiceHandler.onWrite` re-raises through
 The wrapper-type half of the symptom (raw `PlatformException` instead of a
 typed `BlueyPlatformException`) is tracked separately as I311 — server-side
 methods bypass the I099 typed-translation helper.
+
+## Fix landed (2026-05-01)
+
+Fixed in `47ba2f5`. New `PendingNotificationQueue.swift` (generic FIFO,
+fully unit-tested) plumbed into `PeripheralManagerImpl`. On
+`updateValue` returning `false`, the plugin enqueues with the original
+Pigeon completion handler; `peripheralManagerIsReady(toUpdateSubscribers:)`
+drains the queue in arrival order. Per-entry completions resolve when
+the OS actually accepts the notification — preserving the I099 / I311
+contract that success means delivery.
+
+- Cap = 1024 entries. At cap, `enqueue` refuses and the call surfaces as
+  `bluey-unknown` (now via the post-I311 typed `BlueyPlatformException`).
+- `removeService` fails-out queued entries for the removed
+  characteristics with `BlueyError.handleInvalidated`.
+- `closeServer` fails all remaining entries with the same error.
+
+Hardware verification 2026-05-01: notification-throughput stress test
+at count=100 passes cleanly with iOS-as-server / Android-as-client. No
+`bluey-unknown` errors on the iOS server during normal operation; the
+queue drains transparently every ~2 ms (one drain per notification at
+the BLE air-interface rate).
+
+Stale-entry-on-disconnect cleanup tracked separately as **I315**: an
+iOS `notifyCharacteristicTo` entry for a central that disconnects
+mid-burst will sit in the queue until `closeServer` flushes (or, more
+likely, until iOS's internal accepts/silently-drops it on the next
+drain). Bounded by the cap and by `closeServer`; fix only when real
+use surfaces a problem.
+
+Sub-finding from the verification session: the example app's stress
+test runner (`stress_test_runner.dart`) has two latent bugs that the
+now-correct iOS pacing exposes — its timeout budget is too tight for
+the actual TX rate, and partial bursts are discarded entirely instead
+of being counted as partial. Filed separately if it surfaces as a
+priority; for now, smaller counts (≤100) pass cleanly.

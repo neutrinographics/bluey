@@ -188,7 +188,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I040](I040-ios-notification-retry-on-ready.md) | `isReadyToUpdateSubscribers` does not retry failed notifications | medium |
 | [I041](I041-ios-read-notification-race.md) | `didUpdateCharacteristicValue` conflates read response with notification | medium |
 | [I042](I042-ios-services-cache-dead.md) | `services` cache dict is dead storage | low |
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
@@ -198,6 +197,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
+| [I315](I315-ios-pending-notification-stale-entries-on-disconnect.md) | `PendingNotificationQueue` (post-I040) may hold stale entries for centrals that disconnect mid-burst — bounded by cap + `closeServer` | low |
 
 ### Open — cross-platform unimplemented features
 
@@ -280,6 +280,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses an explicit 3 s default; `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect` (renamed from dead `timeout` param — breaking) | `4abcba9` |
 | [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify` / `notifyTo` / `indicate` / `indicateTo` / `respondToRead` / `respondToWrite`) now route through `withErrorTranslation`; finishes the I099 server-side surface (raw `PlatformException` no longer leaks; `ServerRespondFailedException` preserved as the server-domain refinement) | `013fb3c` |
 | [I314](I314-example-cubit-stale-services-on-cold-start.md) | Example app's ConnectionCubit now subscribes to `connection.servicesChanges`; the cold-start "Stress Tests button missing until manual refresh" symptom resolved; refresh button removed (disconnect/reconnect is the force-rediscovery path) | `53d5764` |
+| [I040](I040-ios-notification-retry-on-ready.md) | iOS notification-TX backpressure now absorbed by `PendingNotificationQueue`; `peripheralManagerIsReady(toUpdateSubscribers:)` drains in arrival order; per-entry completions resolve on actual delivery (not on enqueue). Stale-entry-on-disconnect cleanup tracked as I315. Verified on hardware at notification-throughput count=100 | `47ba2f5` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
