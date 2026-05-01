@@ -279,6 +279,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery filters scans on the Bluey control UUID; `Server.startAdvertising` gained opt-in `peerDiscoverable` (default off — see I313 follow-up for the Android scan-response work) | `4abcba9` |
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses an explicit 3 s default; `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect` (renamed from dead `timeout` param — breaking) | `4abcba9` |
 | [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify` / `notifyTo` / `indicate` / `indicateTo` / `respondToRead` / `respondToWrite`) now route through `withErrorTranslation`; finishes the I099 server-side surface (raw `PlatformException` no longer leaks; `ServerRespondFailedException` preserved as the server-domain refinement) | `013fb3c` |
+| [I314](I314-example-cubit-stale-services-on-cold-start.md) | Example app's ConnectionCubit now subscribes to `connection.servicesChanges`; the cold-start "Stress Tests button missing until manual refresh" symptom resolved; refresh button removed (disconnect/reconnect is the force-rediscovery path) | `53d5764` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
