@@ -21,7 +21,7 @@ import 'server.dart';
 /// Concrete implementation of [Server] that delegates to the platform.
 class BlueyServer implements Server {
   final platform.BlueyPlatform _platform;
-  final BlueyEventBus _eventBus;
+  final EventPublisher _eventBus;
   final BlueyLogger _logger;
   final ServerId _serverId;
   late final LifecycleServer _lifecycle;

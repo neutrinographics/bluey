@@ -17,7 +17,7 @@ import 'scanner.dart';
 /// Concrete implementation of [Scanner] that delegates to the platform.
 class BlueyScanner implements Scanner {
   final platform.BlueyPlatform _platform;
-  final BlueyEventBus _eventBus;
+  final EventPublisher _eventBus;
   bool _isScanning = false;
   Timer? _timeoutTimer;
   StreamSubscription<platform.PlatformDevice>? _platformSubscription;
