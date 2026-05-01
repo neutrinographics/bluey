@@ -4,8 +4,9 @@ title: Server-side methods bypass the I099 typed-translation helper
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-30
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 013fb3c
 related: [I099, I040, I308]
 ---
 
@@ -53,21 +54,30 @@ I099's scope decision and was not flagged in its design review.
 
 ## Notes
 
-Fix sketch:
+Fixed in `013fb3c`. All six methods now wrap the platform call in
+`withErrorTranslation`, mirroring the post-I099 client-side pattern.
+The entry's original listing missed `indicateTo`; same bug class, same
+fix landed.
 
-1. Wrap each of the five calls in `withErrorTranslation` (the helper from
-   `bluey/lib/src/shared/error_translation.dart` introduced in I099).
-2. Fold `respondToWrite` / `respondToRead`'s manual
-   `GattOperationStatusFailedException` catch into the helper call —
-   either by catching it on the outside (preserving `ServerRespondFailedException`)
-   or by extending the helper to accept a typed-translation hook.
-3. Add tests for each method asserting the typed exception type. The
-   pattern from `bluey/test/connection/error_translation_test.dart` (or
-   wherever the I099 tests live) is the model.
+For `respondToRead` / `respondToWrite`, kept the server-domain
+`ServerRespondFailedException` shape: the wrapper post-processes the
+translated `GattOperationFailedException` (the
+`withErrorTranslation`-translated form of platform-interface
+`GattOperationStatusFailedException`) into `ServerRespondFailedException`
+with `clientId` + `characteristicId` context the client side doesn't
+need.
 
-Estimated 1-2 hours. Pure follow-up — no behavioral change to the success
-path, only a uniform exception-type contract on the failure path.
+Behavior shift for non-platform-interface error types:
+`withErrorTranslation`'s defensive backstop now wraps any unrecognized
+`Object` into `BlueyPlatformException` (preserving the original on
+`.cause`). Pre-I311, raw `StateError` / `RuntimeError` thrown by the
+platform layer leaked unchanged from server methods. Post-I311, they're
+typed. Matches the I099 contract: no raw error type leaks past the
+domain seam. The I079
+`requestCompleted-fires-even-if-platform-respond-throws` test updated
+accordingly.
 
-This is a clean small bundle on its own; it can also fold into the I040
-fix bundle since the two surface together (I040 produces the `bluey-unknown`
-code; I311 governs the wrapper type that carries the code).
+I040 (iOS notification-throughput backpressure that produces
+`bluey-unknown`) remains open — this fix governs the **wrapper type**
+that carries the code. Notifications are still dropped under iOS TX
+queue pressure; the upstream cause needs a separate Swift retry queue.

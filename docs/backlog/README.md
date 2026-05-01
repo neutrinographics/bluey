@@ -219,7 +219,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
-| [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify`, `indicate`, `respondTo*`) bypass the I099 typed-translation helper | medium |
 | [I312](I312-ios-extensions-singleton-asymmetry.md) | `_IosConnectionExtensionsImpl` is a top-level const singleton vs Android's per-connection facade | low |
 
 ### Fixed — verified in HEAD
@@ -279,6 +278,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I059](I059-server-remove-service-fire-and-forget.md) | `Server.removeService` return type changed from `void` to `Future<void>`; awaits the platform call and propagates errors (breaking) | `6ebcf53` |
 | [I055](I055-peer-discovery-no-scan-filter.md) | PeerDiscovery filters scans on the Bluey control UUID; `Server.startAdvertising` gained opt-in `peerDiscoverable` (default off — see I313 follow-up for the Android scan-response work) | `4abcba9` |
 | [I056](I056-peer-discovery-probe-no-timeout.md) | PeerDiscovery probe-connect uses an explicit 3 s default; `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect` (renamed from dead `timeout` param — breaking) | `4abcba9` |
+| [I311](I311-server-side-bypass-typed-translation.md) | Server-side methods (`notify` / `notifyTo` / `indicate` / `indicateTo` / `respondToRead` / `respondToWrite`) now route through `withErrorTranslation`; finishes the I099 server-side surface (raw `PlatformException` no longer leaks; `ServerRespondFailedException` preserved as the server-domain refinement) | `013fb3c` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
