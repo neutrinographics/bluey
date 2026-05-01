@@ -17,6 +17,7 @@
 		AB1B2C3D4E5F6A7B8C9D0E20 /* CentralManagerHandleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1B2C3D4E5F6A7B8C9D0E20 /* CentralManagerHandleTests.swift */; };
 		AB1B2C3D4E5F6A7B8C9D0E21 /* PeripheralManagerHandleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1B2C3D4E5F6A7B8C9D0E21 /* PeripheralManagerHandleTests.swift */; };
 		AB1B2C3D4E5F6A7B8C9D0E22 /* BlueyLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1B2C3D4E5F6A7B8C9D0E22 /* BlueyLogTests.swift */; };
+		AB1B2C3D4E5F6A7B8C9D0E23 /* PendingNotificationQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1B2C3D4E5F6A7B8C9D0E23 /* PendingNotificationQueueTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
@@ -61,6 +62,7 @@
 		BC1B2C3D4E5F6A7B8C9D0E20 /* CentralManagerHandleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CentralManagerHandleTests.swift; sourceTree = "<group>"; };
 		BC1B2C3D4E5F6A7B8C9D0E21 /* PeripheralManagerHandleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeripheralManagerHandleTests.swift; sourceTree = "<group>"; };
 		BC1B2C3D4E5F6A7B8C9D0E22 /* BlueyLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlueyLogTests.swift; sourceTree = "<group>"; };
+		BC1B2C3D4E5F6A7B8C9D0E23 /* PendingNotificationQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNotificationQueueTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3473C39380A6BB8EAC5DAD29 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 				BC1B2C3D4E5F6A7B8C9D0E20 /* CentralManagerHandleTests.swift */,
 				BC1B2C3D4E5F6A7B8C9D0E21 /* PeripheralManagerHandleTests.swift */,
 				BC1B2C3D4E5F6A7B8C9D0E22 /* BlueyLogTests.swift */,
+				BC1B2C3D4E5F6A7B8C9D0E23 /* PendingNotificationQueueTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -398,6 +401,7 @@
 				AB1B2C3D4E5F6A7B8C9D0E20 /* CentralManagerHandleTests.swift in Sources */,
 				AB1B2C3D4E5F6A7B8C9D0E21 /* PeripheralManagerHandleTests.swift in Sources */,
 				AB1B2C3D4E5F6A7B8C9D0E22 /* BlueyLogTests.swift in Sources */,
+				AB1B2C3D4E5F6A7B8C9D0E23 /* PendingNotificationQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

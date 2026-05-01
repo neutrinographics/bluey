@@ -29,6 +29,12 @@ class PeripheralManagerImpl: NSObject {
     // attribute across callbacks, so identity matching is reliable.
     private let handleStore = PeripheralHandleStore<CBCharacteristic>()
 
+    // I040 — FIFO queue for notifications deferred by iOS's
+    // `updateValue` returning `false` (TX queue full). Drained by
+    // `peripheralManagerIsReady(toUpdateSubscribers:)`.
+    private let pendingNotifications =
+        PendingNotificationQueue<CBMutableCharacteristic, CBCentral>()
+
     // Subscribed centrals per characteristic
     private var subscribedCentrals: [String: Set<String>] = [:] // [charUuid: Set<centralId>]
 
@@ -120,8 +126,8 @@ class PeripheralManagerImpl: NSObject {
         // I088 D.13 — drop handle entries for this service's
         // characteristics. The handle-store counter does NOT reset
         // — once a handle has been issued it is never reused.
+        var mutableCharsToRemove: [CBMutableCharacteristic] = []
         if let chars = service.characteristics {
-            var mutableCharsToRemove: [CBMutableCharacteristic] = []
             for char in chars {
                 let charUuid = char.uuid.uuidString.lowercased()
                 subscribedCentrals.removeValue(forKey: charUuid)
@@ -130,6 +136,19 @@ class PeripheralManagerImpl: NSObject {
                 }
             }
             handleStore.removeCharacteristics(mutableCharsToRemove)
+        }
+
+        // I040 — fail-out any queued notifications targeting these
+        // characteristics. Without this, the entries would sit in the
+        // queue and head-of-line block subsequent drains (or get
+        // silently consumed by iOS for handles that no longer exist).
+        if !mutableCharsToRemove.isEmpty {
+            pendingNotifications.failEntries(
+                matching: { entry in
+                    mutableCharsToRemove.contains { $0 === entry.characteristic }
+                },
+                error: BlueyError.handleInvalidated.toServerPigeonError()
+            )
         }
 
         peripheralManager.remove(service)
@@ -183,11 +202,24 @@ class PeripheralManagerImpl: NSObject {
         let success = peripheralManager.updateValue(value.data, for: characteristic, onSubscribedCentrals: nil)
         if success {
             completion(.success(()))
+            return
+        }
+
+        // I040 — queue is full. Defer until isReadyToUpdateSubscribers fires.
+        let entry = PendingNotificationQueue<CBMutableCharacteristic, CBCentral>.Entry(
+            characteristic: characteristic,
+            data: value.data,
+            central: nil,
+            completion: completion
+        )
+        if pendingNotifications.enqueue(entry) {
+            BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristic: deferred (queue full, will retry)",
+                                data: ["characteristicHandle": characteristicHandle,
+                                       "queueDepth": pendingNotifications.count])
         } else {
-            // Queue is full, will retry when isReadyToUpdateSubscribers is called
-            // For simplicity, we report failure here
-            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristic: updateValue queue full",
-                                data: ["characteristicHandle": characteristicHandle],
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristic: queue cap reached",
+                                data: ["characteristicHandle": characteristicHandle,
+                                       "queueDepth": pendingNotifications.count],
                                 errorCode: "notify-queue-full")
             completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
@@ -217,10 +249,26 @@ class PeripheralManagerImpl: NSObject {
         let success = peripheralManager.updateValue(value.data, for: characteristic, onSubscribedCentrals: [central])
         if success {
             completion(.success(()))
-        } else {
-            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristicTo: updateValue queue full",
+            return
+        }
+
+        // I040 — queue is full. Defer until isReadyToUpdateSubscribers fires.
+        let entry = PendingNotificationQueue<CBMutableCharacteristic, CBCentral>.Entry(
+            characteristic: characteristic,
+            data: value.data,
+            central: central,
+            completion: completion
+        )
+        if pendingNotifications.enqueue(entry) {
+            BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristicTo: deferred (queue full, will retry)",
                                 data: ["centralId": centralId,
-                                       "characteristicHandle": characteristicHandle],
+                                       "characteristicHandle": characteristicHandle,
+                                       "queueDepth": pendingNotifications.count])
+        } else {
+            BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "notifyCharacteristicTo: queue cap reached",
+                                data: ["centralId": centralId,
+                                       "characteristicHandle": characteristicHandle,
+                                       "queueDepth": pendingNotifications.count],
                                 errorCode: "notify-queue-full")
             completion(.failure(BlueyError.unknown.toServerPigeonError()))
         }
@@ -297,6 +345,14 @@ class PeripheralManagerImpl: NSObject {
         centrals.removeAll()
         pendingReadRequests.removeAll()
         pendingWriteRequests.removeAll()
+
+        // I040 — release any pending notification callers waiting on a
+        // server that's now closed. Surfaces as
+        // AttributeHandleInvalidatedException on the Dart side, matching
+        // the post-removeService shape.
+        pendingNotifications.failAll(
+            error: BlueyError.handleInvalidated.toServerPigeonError()
+        )
 
         completion(.success(()))
     }
@@ -482,8 +538,34 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func isReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
-        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "peripheralManagerIsReady toUpdateSubscribers")
-        // The queue has space again for notifications
-        // We could retry any failed notifications here
+        let depthBefore = pendingNotifications.count
+        BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "peripheralManagerIsReady toUpdateSubscribers",
+                            data: ["queueDepthBefore": depthBefore])
+
+        // I040 — drain deferred notifications in arrival order. Each
+        // entry is re-attempted via `updateValue`; the first re-attempt
+        // that returns `false` halts draining and waits for the next
+        // ready callback.
+        pendingNotifications.drain { entry in
+            if let central = entry.central {
+                return peripheral.updateValue(
+                    entry.data,
+                    for: entry.characteristic,
+                    onSubscribedCentrals: [central]
+                )
+            } else {
+                return peripheral.updateValue(
+                    entry.data,
+                    for: entry.characteristic,
+                    onSubscribedCentrals: nil
+                )
+            }
+        }
+
+        if depthBefore > 0 {
+            BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "drained pending notifications",
+                                data: ["queueDepthBefore": depthBefore,
+                                       "queueDepthAfter": pendingNotifications.count])
+        }
     }
 }
