@@ -114,7 +114,25 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
 - Bootstrap caveat: events emitted during `Bluey()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
 
-### Ubiquitous Language (avoid platform-specific terms)
+### Ubiquitous Language
+
+The domain layer uses bounded-context-aligned vocabulary; the platform-interface layer uses BLE-spec-aligned vocabulary (`Central`, `Peripheral`, `PlatformDevice`). The seam between them translates intentionally — `PlatformCentral` becomes `Client` inside the GATT-Server context, `PlatformDevice` becomes `Device` inside the Discovery context. Each bounded context is internally consistent; the translation only happens at the Domain ↔ Platform-Interface boundary.
+
+#### Glossary
+
+| Term | Bounded context | Definition |
+|------|-----------------|------------|
+| **Device** | Discovery | A BLE peripheral discovered via scanning. The local role is implicitly central. Wraps `PlatformDevice` at the platform seam. |
+| **Connection** | Connection | An established GATT link to a remote `Device`. The local role is GATT client. |
+| **Server** | GATT Server | The peripheral role hosted by *this* device. The local role is GATT server. |
+| **Client** | GATT Server | A GATT central that has connected to our local `Server`. Wraps `PlatformCentral` at the platform seam. |
+| **Peer** (`BlueyPeer`) | Peer | A `Device` (or, server-side, a `Client`) that speaks the Bluey lifecycle protocol. Promotion to peer happens only after control-service discovery; raw connections are protocol-free. |
+| **PeerConnection** | Peer | A `Connection` wrapped with a stable `ServerId` and the lifecycle-protocol disconnect path. Composition over inheritance — `peer.connection` exposes the raw GATT surface. |
+| **ServerId** | Peer | The stable identity advertised through the lifecycle control service. Survives MAC randomization on Android and CBPeripheral identifier rotation on iOS. |
+| **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `disconnectCentral`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
+| **AttributeHandle** | Connection / GATT Client | Opaque platform-assigned identifier for a service / characteristic / descriptor. Valid only within one connection; invalidated on disconnect or Service Changed. |
+
+#### Quick reference (use / avoid)
 
 | Use | Avoid |
 |-----|-------|

@@ -110,6 +110,9 @@ class BlueyServer implements Server {
       data: {'serverId': _serverId.toString()},
     );
 
+    // Domain ↔ Platform seam: the platform-interface emits `PlatformCentral`
+    // (BLE-spec vocabulary). Inside the GATT-Server bounded context the
+    // connected GATT central is a `Client`. We translate exactly once, here.
     _centralConnectionsSub = _platform.centralConnections.listen((
       platformCentral,
     ) {
@@ -790,6 +793,13 @@ class BlueyServer implements Server {
 }
 
 /// Concrete implementation of [Client].
+///
+/// Wraps a `PlatformCentral` from the platform-interface layer for use
+/// inside the GATT-Server bounded context, where the connected GATT
+/// central is named `Client` (not `Central`). The translation is
+/// intentional: domain vocabulary is bounded-context-aligned, while the
+/// platform interface follows the BLE-spec terms. See the Ubiquitous
+/// Language section in `CLAUDE.md`.
 class BlueyClient implements Client {
   final String _platformId;
   final int _mtu;

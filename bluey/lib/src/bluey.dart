@@ -709,7 +709,10 @@ class Bluey {
     }
   }
 
-  /// Maps a platform device to a domain Device (identity only).
+  /// Domain ↔ Platform seam: translates `PlatformDevice` (BLE-spec
+  /// vocabulary, platform-interface layer) into the Discovery context's
+  /// `Device` (domain layer). Identity-only — advertisement data is
+  /// handled separately by the scanner pipeline.
   Device _mapDevice(platform.PlatformDevice platformDevice) {
     return Device(
       id: deviceIdToUuid(platformDevice.id),
