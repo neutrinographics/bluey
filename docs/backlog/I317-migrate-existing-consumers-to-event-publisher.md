@@ -4,8 +4,9 @@ title: Migrate BlueyServer / BlueyScanner / Bluey to depend on EventPublisher (n
 category: limitation
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-05-01
+fixed_in: 84a04dd
 related: [I054, I068]
 ---
 
@@ -47,23 +48,19 @@ inconsistency to keep that bundle scoped.
 
 ## Notes
 
-Mechanical migration:
+Fixed in `84a04dd`. Two-line diff:
+- `BlueyServer._eventBus` field type changed from `BlueyEventBus` to
+  `EventPublisher`.
+- `BlueyScanner._eventBus` field type same change.
 
-1. Change each aggregate's field type from `BlueyEventBus` to
-   `EventPublisher`. Constructor parameter type matches.
-2. `Bluey` keeps `_eventBus` typed as `BlueyEventBus` because it owns
-   the lifecycle (`close()`) and exposes `events` (`stream`). When
-   passing it into aggregates, Dart upcasts implicitly via the
-   `BlueyEventBus implements EventPublisher` relation.
-3. Test fakes that mocked `BlueyEventBus` keep working — they extend
-   the same class.
+`Bluey` keeps `_eventBus` typed as `BlueyEventBus` because it owns
+the bus's full lifecycle: it exposes `stream` via the public `events`
+getter and calls `close()` during `dispose()`. Passing `_eventBus`
+into the aggregates now works via implicit upcast through the
+`BlueyEventBus implements EventPublisher` relation (introduced in
+`14bae42`).
 
-After this lands, every aggregate in the codebase that emits events
-will depend on `EventPublisher`, not on the concrete bus. The bus is
-only mentioned at the orchestrator (`Bluey`) and at construction
-sites that wire it through.
-
-Estimated effort: 1 hour. Pure refactor — no behavior change, no test
-changes. The risk is finding a place that uses the bus's `stream` /
-`close` from inside an aggregate (which would be a separate bug —
-those are orchestrator concerns and shouldn't be there).
+No tests modified — none of the existing tests cared about the
+concrete type. After this lands, every aggregate in the codebase
+that emits events depends on `EventPublisher`. The concrete bus is
+only mentioned at the orchestrator (`Bluey`).

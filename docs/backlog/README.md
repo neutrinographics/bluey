@@ -218,7 +218,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
 | [I312](I312-ios-extensions-singleton-asymmetry.md) | `_IosConnectionExtensionsImpl` is a top-level const singleton vs Android's per-connection facade | low |
-| [I317](I317-migrate-existing-consumers-to-event-publisher.md) | Migrate `BlueyServer` / `BlueyScanner` / `Bluey` to depend on `EventPublisher` port instead of concrete `BlueyEventBus` (transitional inconsistency post-I054/I068) | low |
 
 ### Fixed — verified in HEAD
 
@@ -283,6 +282,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I316](I316-stress-runner-tight-timeout-and-partial-burst-discard.md) | Example app's `runNotificationThroughput`: timeout now configurable (default `10 ms × count + 2 s`) and partial bursts report received successes + missing failures instead of being discarded as total failures (was masked pre-I040 by the fire-and-forget notify path) | `ce65141` |
 | [I054](I054-events-dart-dead-types.md) | Five GATT-op `BlueyEvent` subtypes (DiscoveringServices / ServicesDiscovered / CharacteristicRead / CharacteristicWritten / NotificationSubscription / NotificationReceived) now `emit()`ed from `BlueyConnection` and `BlueyRemoteCharacteristic`; new `EventPublisher` port introduced (full migration of existing consumers tracked as I317) | `14bae42` |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state transitions surface on `bluey.events`: HeartbeatSent / Acknowledged / Failed (with isDeadPeerSignal) / PeerDeclaredUnreachable on the client side; LifecyclePausedForPendingRequest / ClientLifecycleTimeout on the server side | `d2fb012` |
+| [I317](I317-migrate-existing-consumers-to-event-publisher.md) | `BlueyServer` / `BlueyScanner` migrated from concrete `BlueyEventBus` to abstract `EventPublisher` dependency; finishes the I054 / I068 port-extraction. Two-line refactor | `84a04dd` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
