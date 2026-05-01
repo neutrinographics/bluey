@@ -4,8 +4,9 @@ title: Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silen
 category: limitation
 severity: low
 platform: domain
-status: open
-last_verified: 2026-04-26
+status: fixed
+last_verified: 2026-05-01
+fixed_in: 1c34d90
 related: [I300]
 ---
 
@@ -64,6 +65,18 @@ The original review proposal (REVIEW-2026-04-26-ddd-followup.md) suggested two a
 2. ~~Rename `Client` → `ConnectedClient`.~~ The Server bounded context already uses `Client` consistently. Renaming to `ConnectedClient` would be cosmetic, not a clarity improvement.
 
 This entry's scope is therefore narrower than the original proposal: the glossary + the Domain ↔ Platform seam documentation. The full original is preserved in the parent review for reference.
+
+## Resolution
+
+Fixed in this commit:
+
+- **Step 1 (glossary)** — `CLAUDE.md` Ubiquitous Language section now contains a per-term Glossary table covering Device / Connection / Server / Client / Peer / PeerConnection / ServerId / Central-Peripheral / AttributeHandle, each tagged with its bounded context. The previous use/avoid table is preserved as a quick reference below the glossary.
+- **Step 2 (seam comments)** — three comments anchor the Domain ↔ Platform translation:
+  - `bluey/lib/src/gatt_server/bluey_server.dart` — comment above `_platform.centralConnections.listen(...)` calls out that this is the `PlatformCentral → Client` seam, translated exactly once.
+  - `bluey/lib/src/gatt_server/bluey_server.dart` — `BlueyClient` class doc-comment now explains that it wraps `PlatformCentral` for the GATT-Server bounded context and points at `CLAUDE.md`.
+  - `bluey/lib/src/bluey.dart` — `_mapDevice` doc-comment names the symmetric `PlatformDevice → Device` seam for the Discovery context.
+
+The originally-referenced `_platform.disconnectCentral(...)` site no longer exists in HEAD — the platform-interface exposes `closeServer()` instead, with no per-central disconnect call. Likewise `Client.disconnect()` is not a public method (the `Client` abstract surface is `id` + `mtu` only). The seam comments target the translation sites that actually exist.
 
 ## Cost-benefit
 

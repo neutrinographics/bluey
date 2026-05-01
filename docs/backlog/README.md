@@ -111,7 +111,7 @@ Ordered by recommended sequence. Bundles preferred where the underlying concerns
 
 #### Smaller bundles (1–2 hours each)
 
-- **Glossary + DDD docs** (I302) — add a glossary to CLAUDE.md documenting the Domain ↔ Platform-Interface vocabulary translation. ~1 hour.
+- ~~**Glossary + DDD docs** (I302)~~ — DONE. Per-term Glossary table added to `CLAUDE.md` (Device / Connection / Server / Client / Peer / PeerConnection / ServerId / Central-Peripheral / AttributeHandle, each tagged with bounded context). Three Domain ↔ Platform seam comments anchored at the actual translation sites in `bluey_server.dart` (`PlatformCentral → Client`) and `bluey.dart` (`PlatformDevice → Device`).
 - ~~**Server-API polish** (I058 + I059)~~ — DONE ([`6ebcf53`](#)). `AdvertiseMode` enum threaded through `Server.startAdvertising`; `Server.removeService` now returns `Future<void>` and propagates errors (breaking).
 - ~~**Peer-discovery polish** (I055 + I056)~~ — DONE ([`4abcba9`](#)). Control-UUID scan filter on the client; `peerDiscoverable` opt-in on the server (default `false` pending I313 — Android scan-response slot — so the budget doesn't bite app advertising). 3 s default `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect`. Breaking rename of `BlueyPeer.connect.timeout` → `probeTimeout` (the old name was a no-op).
 - ~~**Diagnostic events** (I054 + I068)~~ — DONE ([`14bae42`](#) + [`d2fb012`](#)). Five GATT-op events emitted from `BlueyConnection` / `BlueyRemoteCharacteristic`; six lifecycle-protocol events emitted from `LifecycleClient` / `LifecycleServer`. New `EventPublisher` port introduced; existing-consumer migration filed as I317.
@@ -213,7 +213,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I302](I302-ubiquitous-language-glossary.md) | Cross-context vocabulary lacks a glossary; Domain ↔ Platform seam silently translates terms | low |
 | [I304](I304-peer-builder-helper-extraction.md) | `_tryBuildPeerConnection` and `_BlueyPeer.connect` duplicate the LifecycleClient setup | low |
 | [I308](I308-domain-catches-flutter-platform-exception.md) | Domain layer catches Flutter `PlatformException` directly (framework dependency leak) | low |
 | [I309](I309-domain-imports-platform-interface-types-directly.md) | Domain imports `bluey_platform_interface` types directly instead of going through an abstract repository | low |
@@ -283,6 +282,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I054](I054-events-dart-dead-types.md) | Five GATT-op `BlueyEvent` subtypes (DiscoveringServices / ServicesDiscovered / CharacteristicRead / CharacteristicWritten / NotificationSubscription / NotificationReceived) now `emit()`ed from `BlueyConnection` and `BlueyRemoteCharacteristic`; new `EventPublisher` port introduced (full migration of existing consumers tracked as I317) | `14bae42` |
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state transitions surface on `bluey.events`: HeartbeatSent / Acknowledged / Failed (with isDeadPeerSignal) / PeerDeclaredUnreachable on the client side; LifecyclePausedForPendingRequest / ClientLifecycleTimeout on the server side | `d2fb012` |
 | [I317](I317-migrate-existing-consumers-to-event-publisher.md) | `BlueyServer` / `BlueyScanner` migrated from concrete `BlueyEventBus` to abstract `EventPublisher` dependency; finishes the I054 / I068 port-extraction. Two-line refactor | `84a04dd` |
+| [I302](I302-ubiquitous-language-glossary.md) | Per-term Glossary table added to `CLAUDE.md` (Device / Connection / Server / Client / Peer / PeerConnection / ServerId / Central-Peripheral / AttributeHandle, each tagged with bounded context). Three Domain ↔ Platform seam comments anchored at the actual translation sites in `bluey_server.dart` and `bluey.dart` | `1c34d90` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
