@@ -172,8 +172,6 @@ abstract class Connection {
   /// After calling disconnect, this connection instance should not be used.
   Future<void> disconnect();
 
-  // === Platform-specific extensions ===
-
   /// Android-specific extensions (bonding, PHY, connection parameters).
   ///
   /// Returns a non-null facade when the underlying platform's

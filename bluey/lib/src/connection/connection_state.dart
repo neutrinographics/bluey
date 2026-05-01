@@ -11,10 +11,9 @@
 ///   lifecycle protocol upgrade is complete. GATT operations are safe.
 /// - [disconnecting] — link being torn down.
 ///
-/// The [linked] → [ready] split (added in I067) replaces the previous
-/// single `connected` value. Most consumers want [isConnected] (true for
-/// either [linked] or [ready]) for "is the link up?" or [isReady] for
-/// "is the connection safe to issue GATT ops on?".
+/// Most consumers want [isConnected] (true for either [linked] or
+/// [ready]) for "is the link up?" or [isReady] for "is the connection
+/// safe to issue GATT ops on?".
 enum ConnectionState {
   disconnected,
   connecting,

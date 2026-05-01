@@ -28,8 +28,6 @@ sealed class BlueyEvent {
   }
 }
 
-// === Scan Events ===
-
 /// Scan started.
 final class ScanStartedEvent extends BlueyEvent {
   final List<UUID>? serviceFilter;
@@ -82,8 +80,6 @@ final class ScanStoppedEvent extends BlueyEvent {
   }
 }
 
-// === Connection Events ===
-
 /// Connection attempt started.
 final class ConnectingEvent extends BlueyEvent {
   final UUID deviceId;
@@ -117,8 +113,6 @@ final class DisconnectedEvent extends BlueyEvent {
     return '[Connection] Disconnected from ${deviceId.toShortString()}$r';
   }
 }
-
-// === GATT Events ===
 
 /// Service discovery started.
 final class DiscoveringServicesEvent extends BlueyEvent {
@@ -224,8 +218,6 @@ final class NotificationSubscriptionEvent extends BlueyEvent {
     return '[GATT] $action ${characteristicId.toShortString()}';
   }
 }
-
-// === Server (Peripheral) Events ===
 
 /// Server started.
 final class ServerStartedEvent extends BlueyEvent {
@@ -399,15 +391,13 @@ final class IndicationSentEvent extends BlueyEvent {
   }
 }
 
-// === Lifecycle Protocol Events (I068) ===
-//
 // Bluey's lifecycle protocol — heartbeat write + dead-peer detection
 // — is what distinguishes the library from a raw GATT pipe. Its
 // state transitions are the highest-value diagnostic events for
 // debugging "why did my peer disconnect?" and "why isn't my server
 // noticing the client is gone?". These events surface the protocol's
 // behaviour on `bluey.events` for programmatic consumption alongside
-// the structured logs (post-I307).
+// the structured logs.
 
 /// Heartbeat write was sent to the peer (client side).
 final class HeartbeatSentEvent extends BlueyEvent {
@@ -488,8 +478,8 @@ final class ClientLifecycleTimeoutEvent extends BlueyEvent {
 }
 
 /// Server-side: the lifecycle silence timer was paused because a
-/// pending request from this client is in flight (post-I079). The
-/// timer resumes once the request is responded to or drained.
+/// pending request from this client is in flight. The timer resumes
+/// once the request is responded to or drained.
 final class LifecyclePausedForPendingRequestEvent extends BlueyEvent {
   final String clientId;
 
@@ -508,8 +498,6 @@ final class LifecyclePausedForPendingRequestEvent extends BlueyEvent {
   }
 }
 
-// === Error Events ===
-
 /// An error occurred.
 final class ErrorEvent extends BlueyEvent {
   final String message;
@@ -520,8 +508,6 @@ final class ErrorEvent extends BlueyEvent {
   @override
   String toString() => '[Error] $message';
 }
-
-// === Debug Events ===
 
 /// Generic debug event for tracing.
 final class DebugEvent extends BlueyEvent {

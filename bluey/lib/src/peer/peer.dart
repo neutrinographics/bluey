@@ -27,7 +27,7 @@ abstract class BlueyPeer {
   /// the connection to the first one whose `serverId` matches.
   ///
   /// [scanTimeout] bounds the discovery phase. [probeTimeout] bounds
-  /// each individual probe-connect attempt — see I056. When omitted,
+  /// each individual probe-connect attempt; when omitted,
   /// `PeerDiscovery.defaultProbeTimeout` (3 s) is used.
   ///
   /// Returns a [PeerConnection] — a peer-protocol wrapper around the

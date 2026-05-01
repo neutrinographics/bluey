@@ -22,8 +22,8 @@ import 'uuid.dart';
 /// This is the anti-corruption layer between the Platform bounded
 /// context (`bluey_platform_interface`) and the Domain bounded context
 /// (`bluey`). It must be the *only* place these mappings live;
-/// duplicating them elsewhere reintroduces the I099 string-matching
-/// drift problem.
+/// duplicating them elsewhere reintroduces the string-matching drift
+/// problem we replaced this layer with.
 BlueyException translatePlatformException(
   Object error, {
   required String operation,
@@ -69,7 +69,7 @@ BlueyException translatePlatformException(
 }
 
 /// Future-shaped sugar over [translatePlatformException], with optional
-/// lifecycle-accounting hooks (preserves I097 user-op accounting).
+/// lifecycle-accounting hooks for user-op accounting.
 ///
 /// Lifecycle hooks fire iff [lifecycleClient] is non-null:
 /// - `markUserOpStarted()` before the body
@@ -78,7 +78,7 @@ BlueyException translatePlatformException(
 /// - `markUserOpEnded()` in finally
 ///
 /// [recordUserOpFailure] is intentionally called with the *original*
-/// platform exception (not the translated domain exception). The I097
+/// platform exception (not the translated domain exception). The
 /// filter inside `recordUserOpFailure` does an
 /// `is platform.GattOperationTimeoutException` check that would not
 /// match the translated `GattTimeoutException`.

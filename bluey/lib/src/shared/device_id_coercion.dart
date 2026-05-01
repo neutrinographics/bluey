@@ -12,17 +12,16 @@ import 'uuid.dart';
 ///   characters before being parsed as a UUID. This produces a
 ///   deterministic — but synthetic — UUID for the device.
 ///
-/// This synthesis is a workaround, not a model: see
-/// [I006](../../../../docs/backlog/I006-mac-to-uuid-truncation.md)
-/// for the underlying typed-identifier issue. I057 consolidated the
-/// previously-duplicated copies of this function so that I006's eventual
-/// fix has only one site to rewrite.
+/// This synthesis is a workaround, not a model — a 48-bit MAC zero-padded
+/// to 128 bits is not a real UUID, just a deterministic placeholder. The
+/// proper fix is a typed device-identifier value object that can hold
+/// either form natively; until that lands, every site that needs a UUID
+/// from a platform device id calls through here so there's only one
+/// place to rewrite.
 UUID deviceIdToUuid(String id) {
-  // Already in UUID format (iOS path).
   if (id.length == 36 && id.contains('-')) {
     return UUID(id);
   }
-  // MAC address (Android path): strip colons, lowercase, left-pad to 32 hex.
   final clean = id.replaceAll(':', '').toLowerCase();
   final padded = clean.padLeft(32, '0');
   return UUID(padded);

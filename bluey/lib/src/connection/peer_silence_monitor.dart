@@ -72,8 +72,6 @@ class PeerSilenceMonitor {
   /// or `stop()` has been called.
   bool get isRunning => _running;
 
-  // === Lifecycle ===
-
   /// Activates the monitor. Failures recorded before `start()` are
   /// ignored; activity is tracked but the timer is not armed.
   void start() {
@@ -88,8 +86,6 @@ class PeerSilenceMonitor {
     _deathTimer?.cancel();
     _deathTimer = null;
   }
-
-  // === Activity (peer responded) ===
 
   /// Records evidence that the peer is alive: a successful user op,
   /// an incoming notification, or a probe ack. Cancels the death
@@ -117,8 +113,6 @@ class PeerSilenceMonitor {
     _probeInFlight = false;
     recordActivity();
   }
-
-  // === Failure (peer didn't respond) ===
 
   /// Records evidence that the peer may be unresponsive. If this is
   /// the first failure since the last success, arms the death timer
@@ -152,8 +146,6 @@ class PeerSilenceMonitor {
     _running = false; // single-fire
     onSilent();
   }
-
-  // === Probe scheduling helpers ===
 
   /// Whether a probe is currently in flight. Caller-side flag set
   /// before dispatching the heartbeat write.
@@ -190,8 +182,6 @@ class PeerSilenceMonitor {
     assert(window > Duration.zero, 'activityWindow must be positive');
     _activityWindow = window;
   }
-
-  // === Test inspection ===
 
   @visibleForTesting
   DateTime? get lastActivityAt => _lastActivityAt;

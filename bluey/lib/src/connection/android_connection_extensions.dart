@@ -13,8 +13,6 @@ import 'connection.dart' show BondState, ConnectionParameters, Phy;
 /// final phy = connection.android?.txPhy ?? Phy.le1m;
 /// ```
 abstract class AndroidConnectionExtensions {
-  // === Bonding ===
-
   /// Current bonding state.
   ///
   /// Returns the current bond state between this device and the local device.
@@ -45,8 +43,6 @@ abstract class AndroidConnectionExtensions {
   /// Throws [DisconnectedException] if not connected.
   Future<void> removeBond();
 
-  // === PHY ===
-
   /// Current transmit PHY.
   ///
   /// Returns the PHY being used for transmitting data to the device.
@@ -76,8 +72,6 @@ abstract class AndroidConnectionExtensions {
   ///
   /// Throws [DisconnectedException] if not connected.
   Future<void> requestPhy({Phy? txPhy, Phy? rxPhy});
-
-  // === Connection Parameters ===
 
   /// Current connection parameters.
   ///

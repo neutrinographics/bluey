@@ -69,7 +69,7 @@ abstract class PeerConnection {
   ///
   /// The courtesy write is bounded with a short timeout — an
   /// unresponsive peer (the typical disconnect scenario) does not
-  /// block the platform disconnect (I074).
+  /// block the platform disconnect.
   ///
   /// Callers who want a raw GATT disconnect with no peer-protocol
   /// involvement can call `peer.connection.disconnect()` directly.
@@ -135,7 +135,7 @@ class _BlueyPeerConnection implements PeerConnection {
     //
     // The disconnect-command write is bounded with a short timeout so
     // an unresponsive peer (the typical disconnect scenario) doesn't
-    // block the platform disconnect for the full per-op timeout (I074).
+    // block the platform disconnect for the full per-op timeout.
     try {
       await _lifecycle
           .sendDisconnectCommand()

@@ -134,7 +134,7 @@ class BlueyConnection implements Connection {
 
   // Start as `linked` since we're constructed after a successful platform
   // connect — the link is up but services have not yet been discovered.
-  // The first `services()` call promotes us to `ready`. See I067.
+  // The first `services()` call promotes us to `ready`.
   ConnectionState _state = ConnectionState.linked;
   int _mtu = 23; // Default BLE MTU
   BondState _bondState = BondState.none;
@@ -166,18 +166,17 @@ class BlueyConnection implements Connection {
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
-  // I088 D.11 — in-flight GATT-op aborters. Each call to a public GATT
-  // op on the connection / characteristic / descriptor surface
-  // registers a completer here for the lifetime of the underlying
-  // platform call. On Service Changed, every entry is failed with
+  // In-flight GATT-op aborters. Each call to a public GATT op on the
+  // connection / characteristic / descriptor surface registers a
+  // completer here for the lifetime of the underlying platform call.
+  // On Service Changed, every entry is failed with
   // [AttributeHandleInvalidatedException] so callers stop waiting on
   // futures whose handles are now stale and re-discover instead.
   final Set<Completer<Object?>> _pendingGattOpAborters = {};
 
-  /// Domain port for emitting GATT-op events (I054). Optional so
-  /// existing internal call sites that build a connection without an
-  /// event-bus context (e.g. some tests) keep working — emission is a
-  /// no-op when null.
+  /// Domain port for emitting GATT-op events. Optional so internal call
+  /// sites that build a connection without an event-bus context (e.g.
+  /// some tests) keep working — emission is a no-op when null.
   final EventPublisher? _events;
 
   /// Creates a new connection instance.
@@ -213,13 +212,12 @@ class BlueyConnection implements Connection {
           },
         );
 
-    // I088 D.11 — Service Changed invalidates the entire discovered
-    // attribute tree. Native sides have already cleared their handle
-    // tables by the time this event fires (D.3 Android, D.5 iOS). Here
-    // we mirror that on the Dart side: drop the cached services so the
-    // next `services()` call re-discovers, and abort every in-flight
-    // GATT op with a typed exception so callers stop waiting on
-    // futures whose handles are now stale.
+    // Service Changed invalidates the entire discovered attribute tree.
+    // Native sides have already cleared their handle tables by the time
+    // this event fires. Here we mirror that on the Dart side: drop the
+    // cached services so the next `services()` call re-discovers, and
+    // abort every in-flight GATT op with a typed exception so callers
+    // stop waiting on futures whose handles are now stale.
     _platformServiceChangesSubscription = _platform.serviceChanges
         .where((id) => id == _connectionId)
         .listen((_) {
@@ -228,11 +226,11 @@ class BlueyConnection implements Connection {
 
     // Bond / PHY / connection-parameter subscriptions and initial fetches
     // are guarded by [Capabilities]. Platforms that don't support an
-    // operation throw `UnimplementedError` from the corresponding stub
-    // (e.g. Android post-I035 Stage A); calling them unconditionally
-    // would crash every connect on those platforms. The default field
-    // values seeded above (BondState.none, le1m PHY, 30 ms / 0 / 4 s
-    // connection parameters) stand in when the capability is absent.
+    // operation throw `UnimplementedError` from the corresponding stub;
+    // calling them unconditionally would crash every connect on those
+    // platforms. The default field values seeded above (BondState.none,
+    // le1m PHY, 30 ms / 0 / 4 s connection parameters) stand in when
+    // the capability is absent.
     final caps = _platform.capabilities;
 
     if (caps.canBond) {
@@ -292,7 +290,7 @@ class BlueyConnection implements Connection {
   /// `BlueyRemoteDescriptor` via the closure threaded through their
   /// constructors. Without this gate, calling read/write/etc. on a
   /// dead connection lets a raw [PlatformException] escape from the
-  /// platform layer (I002).
+  /// platform layer.
   void _ensureConnected() {
     if (_state == ConnectionState.linked || _state == ConnectionState.ready) {
       return;
@@ -315,12 +313,12 @@ class BlueyConnection implements Connection {
     }
   }
 
-  /// I088 D.11 — wraps [body] so that a Service Changed event fired
-  /// while the call is in flight surfaces the typed
-  /// [AttributeHandleInvalidatedException] on the original future, even
-  /// if the platform layer never produces a response. The aborter token
-  /// is registered for the lifetime of the platform call; whichever of
-  /// (platform completion, abort) fires first wins.
+  /// Wraps [body] so that a Service Changed event fired while the call
+  /// is in flight surfaces the typed [AttributeHandleInvalidatedException]
+  /// on the original future, even if the platform layer never produces
+  /// a response. The aborter token is registered for the lifetime of the
+  /// platform call; whichever of (platform completion, abort) fires
+  /// first wins.
   Future<T> _trackInFlight<T>(Future<T> Function() body) {
     final aborter = Completer<Object?>();
     _pendingGattOpAborters.add(aborter);
@@ -544,8 +542,6 @@ class BlueyConnection implements Connection {
         ));
   }
 
-  // === Platform-specific extensions ===
-
   AndroidConnectionExtensions? _androidExtensions;
 
   @override
@@ -599,8 +595,6 @@ class BlueyConnection implements Connection {
     );
   }
 
-  // === Bonding (private; exposed via connection.android?.X) ===
-
   BondState get _bondStateValue => _bondState;
 
   Stream<BondState> get _bondStateChanges => _bondStateController.stream;
@@ -623,8 +617,6 @@ class BlueyConnection implements Connection {
     );
   }
 
-  // === PHY (private; exposed via connection.android?.X) ===
-
   Phy get _txPhyValue => _txPhy;
 
   Phy get _rxPhyValue => _rxPhy;
@@ -643,8 +635,6 @@ class BlueyConnection implements Connection {
       deviceId: deviceId,
     );
   }
-
-  // === Connection Parameters (private; exposed via connection.android?.X) ===
 
   ConnectionParameters get _connectionParametersValue => _connectionParameters;
 
@@ -674,11 +664,11 @@ class BlueyConnection implements Connection {
     await _phyController.close();
     await _servicesChangesController.close();
 
-    // I003 — dispose every cached service before nulling the cache, so
-    // each BlueyRemoteCharacteristic's lazily-built notification
-    // controller is closed and its platform subscription cancelled.
-    // Without this walk, controllers persisted across connect/disconnect
-    // cycles and memory grew monotonically.
+    // Dispose every cached service before nulling the cache so each
+    // BlueyRemoteCharacteristic's lazily-built notification controller
+    // is closed and its platform subscription cancelled. Without this
+    // walk, controllers persist across connect/disconnect cycles and
+    // memory grows monotonically.
     final cached = _cachedServices;
     _cachedServices = null;
     if (cached != null) {
@@ -699,7 +689,6 @@ class BlueyConnection implements Connection {
       case platform.PlatformConnectionState.connected:
         // Platform doesn't model the linked → ready distinction; the
         // promotion to ready is driven domain-side from `services()`.
-        // See I067.
         return ConnectionState.linked;
       case platform.PlatformConnectionState.disconnecting:
         return ConnectionState.disconnecting;
@@ -853,9 +842,9 @@ class BlueyRemoteService implements RemoteService {
 
   /// Releases per-characteristic resources (notification subscriptions
   /// and broadcast controllers) for every characteristic in this
-  /// service. Called by [BlueyConnection._cleanup] on disconnect to
-  /// prevent the leak documented in I003. Included services are
-  /// disposed recursively. Idempotent.
+  /// service. Called by [BlueyConnection._cleanup] on disconnect so
+  /// controllers don't persist across connect/disconnect cycles.
+  /// Included services are disposed recursively. Idempotent.
   Future<void> dispose() async {
     for (final char in _characteristics) {
       if (char is BlueyRemoteCharacteristic) {
@@ -914,7 +903,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   /// discovery still feed activity / failure signals into the
   /// lifecycle once it starts.
   ///
-  /// [ensureConnected] is the connection's pre-flight gate (I002).
+  /// [ensureConnected] is the connection's pre-flight gate.
   /// Invoked at the top of every public op; throws
   /// [DisconnectedException] if the owning connection is no longer
   /// in `linked` or `ready`. Defaults to a no-op for tests that
@@ -1103,10 +1092,9 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
 
   /// Releases this characteristic's notification resources. Called by
   /// the owning [BlueyRemoteService.dispose] when the connection is
-  /// torn down (I003). Cancels the platform notification subscription
-  /// and closes the lazily-built broadcast controller. Idempotent and
-  /// safe when no consumer ever subscribed (controller was never
-  /// created).
+  /// torn down. Cancels the platform notification subscription and
+  /// closes the lazily-built broadcast controller. Idempotent and safe
+  /// when no consumer ever subscribed (controller was never created).
   Future<void> dispose() async {
     final sub = _notificationSubscription;
     _notificationSubscription = null;
@@ -1167,7 +1155,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   /// upgrades to the Bluey lifecycle protocol. See
   /// [BlueyRemoteCharacteristic] for the same pattern and reasoning.
   ///
-  /// [ensureConnected] is the connection's pre-flight gate (I002).
+  /// [ensureConnected] is the connection's pre-flight gate.
   /// Defaults to a no-op for tests that build a descriptor without a
   /// parent connection.
   ///

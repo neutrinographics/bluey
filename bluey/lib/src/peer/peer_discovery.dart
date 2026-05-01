@@ -26,7 +26,7 @@ class PeerDiscovery {
   /// bounded short. 3 s is a heuristic balance: long enough that a
   /// briefly-asleep peripheral can wake and respond, short enough that
   /// 10 dead candidates only add ~30 s to discovery rather than ~5 min
-  /// (the platform default — see I056).
+  /// (the platform default).
   static const Duration defaultProbeTimeout = Duration(seconds: 3);
 
   final platform.BlueyPlatform _platform;
@@ -152,7 +152,7 @@ class PeerDiscovery {
   /// Scans for peripherals advertising the Bluey lifecycle control
   /// service UUID and collects their addresses. Filtering at the OS
   /// level is the only way to keep probe time O(matches) rather than
-  /// O(nearby BLE devices) — see I055. Servers must opt in via
+  /// O(nearby BLE devices). Servers must opt in via
   /// `Server.startAdvertising(peerDiscoverable: true)` for their
   /// advertisements to surface here.
   Future<Set<String>> _collectCandidates(Duration timeout) async {

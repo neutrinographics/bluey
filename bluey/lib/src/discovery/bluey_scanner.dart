@@ -101,10 +101,7 @@ class BlueyScanner implements Scanner {
     _isScanning = false;
   }
 
-  // === Private mapping methods ===
-
   ScanResult _mapScanResult(platform.PlatformDevice platformDevice) {
-    // Convert manufacturer data
     ManufacturerData? manufacturerData;
     if (platformDevice.manufacturerDataCompanyId != null &&
         platformDevice.manufacturerData != null) {
@@ -114,11 +111,9 @@ class BlueyScanner implements Scanner {
       );
     }
 
-    // Convert service UUIDs
     final serviceUuids =
         platformDevice.serviceUuids.map((s) => UUID(s)).toList();
 
-    // Create advertisement
     final advertisement = Advertisement(
       serviceUuids: serviceUuids,
       serviceData: {},
@@ -126,7 +121,6 @@ class BlueyScanner implements Scanner {
       isConnectable: true,
     );
 
-    // Create device (identity only)
     final device = Device(
       id: _deviceIdToUuid(platformDevice.id),
       address: platformDevice.id,
@@ -145,12 +139,9 @@ class BlueyScanner implements Scanner {
   /// On Android, the ID is a MAC address (e.g., "AA:BB:CC:DD:EE:FF").
   /// On iOS, the ID is already a UUID.
   UUID _deviceIdToUuid(String id) {
-    // Check if it's already a UUID format
     if (id.length == 36 && id.contains('-')) {
       return UUID(id);
     }
-
-    // Convert MAC address to UUID format
     final clean = id.replaceAll(':', '').toLowerCase();
     final padded = clean.padLeft(32, '0');
     return UUID(padded);

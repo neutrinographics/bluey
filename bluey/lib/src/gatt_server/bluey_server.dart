@@ -34,14 +34,14 @@ class BlueyServer implements Server {
   /// value. Keyed by `(serviceUuid, charUuid)` lowercase. Used by
   /// `notify` / `indicate` / `notifyTo` / `indicateTo` to resolve a
   /// user-supplied UUID into the platform-minted handle the wire
-  /// format requires (I088 D.13). Public API stays UUID-based for
-  /// users; only internal storage moves to handle.
+  /// format requires. Public API stays UUID-based for users; only
+  /// internal storage moves to handle.
   final Map<(String, String), int> _localCharHandles = {};
 
   /// User-initiated `addService` futures still in flight. Tracked here
   /// so [startAdvertising] can await them — without this, advertising
   /// could begin while services were still registering and a central
-  /// connecting in that window would see an incomplete GATT tree (I080).
+  /// connecting in that window would see an incomplete GATT tree.
   final List<Future<void>> _pendingServiceAdds = [];
 
   final StreamController<Client> _connectionsController =
@@ -209,7 +209,7 @@ class BlueyServer implements Server {
 
     // Track this addService so startAdvertising can wait for it even if
     // the user fires addService and startAdvertising without awaiting
-    // in between (I080).
+    // in between.
     final platformFuture = _platform.addService(platformService);
     _pendingServiceAdds.add(platformFuture);
     try {
@@ -320,8 +320,8 @@ class BlueyServer implements Server {
 
     // Wait for any user-initiated addService calls still in flight so a
     // central connecting after advertising starts sees the full GATT
-    // tree (I080). Failures are reported via the original addService
-    // Future; here we just need to let the in-flight call settle before
+    // tree. Failures are reported via the original addService Future;
+    // here we just need to let the in-flight call settle before
     // advertising. Snapshot the list because addService removes from
     // _pendingServiceAdds in its finally block.
     final pending = List<Future<void>>.from(_pendingServiceAdds);
@@ -617,8 +617,6 @@ class BlueyServer implements Server {
     _connectedClients.clear();
   }
 
-  // === Client tracking ===
-
   /// Tracks a client if not already known. The platform may not always report
   /// connections (Android can miss onConnectionStateChange for cached
   /// connections, iOS has no connection callback at all). A control service
@@ -657,8 +655,6 @@ class BlueyServer implements Server {
     }
   }
 
-  // === Lifecycle management ===
-
   void _handleClientDisconnected(String clientId) {
     _logger.log(
       BlueyLogLevel.info,
@@ -685,8 +681,6 @@ class BlueyServer implements Server {
     // (e.g., stale connections from before a server restart).
     _disconnectionsController.add(clientId);
   }
-
-  // === Private mapping methods ===
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(
     HostedService service,

@@ -16,8 +16,6 @@ sealed class BlueyException implements Exception {
   String toString() => 'BlueyException: $message';
 }
 
-// === State Exceptions ===
-
 /// Bluetooth is not available on this device.
 class BluetoothUnavailableException extends BlueyException {
   const BluetoothUnavailableException()
@@ -46,8 +44,6 @@ class PermissionDeniedException extends BlueyException {
         action: 'Request permissions or direct user to Settings',
       );
 }
-
-// === Connection Exceptions ===
 
 /// Reasons why a connection attempt might fail.
 enum ConnectionFailureReason {
@@ -88,8 +84,6 @@ class DisconnectedException extends BlueyException {
   const DisconnectedException(this.deviceId, this.reason)
     : super('Device disconnected: $reason', action: 'Reconnect if needed');
 }
-
-// === GATT Exceptions ===
 
 /// Service not found on device.
 class ServiceNotFoundException extends BlueyException {
@@ -288,8 +282,6 @@ class OperationNotSupportedException extends BlueyException {
       );
 }
 
-// === Server Exceptions ===
-
 /// Server-side respond to a [ReadRequest] or [WriteRequest] failed at the
 /// platform layer.
 ///
@@ -355,8 +347,6 @@ class AdvertisingException extends BlueyException {
       );
 }
 
-// === Peer Exceptions ===
-
 /// No peer with the expected [ServerId] was found within the timeout.
 class PeerNotFoundException extends BlueyException {
   final ServerId expected;
@@ -401,8 +391,6 @@ class PeerIdentityMismatchException extends BlueyException {
   PeerIdentityMismatchException(this.expected, this.actual)
     : super('Peer identity mismatch: expected $expected but got $actual.');
 }
-
-// === Platform Exceptions ===
 
 /// Operation not supported on this platform.
 class UnsupportedOperationException extends BlueyException {

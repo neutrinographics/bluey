@@ -792,7 +792,7 @@ class Bluey {
   /// [timeout] bounds the scan window. Defaults to 5 seconds.
   /// [probeTimeout] bounds each individual probe-connect attempt; one
   /// unresponsive candidate doesn't stall the whole session. Defaults
-  /// to [PeerDiscovery.defaultProbeTimeout] (3 s) — see I056.
+  /// to [PeerDiscovery.defaultProbeTimeout] (3 s).
   Future<List<BlueyPeer>> discoverPeers({
     Duration timeout = const Duration(seconds: 5),
     Duration probeTimeout = PeerDiscovery.defaultProbeTimeout,
@@ -831,8 +831,6 @@ class Bluey {
       _shared = null;
     }
   }
-
-  // === Private mapping methods ===
 
   platform.PlatformLogLevel _mapLogLevelToPlatform(BlueyLogLevel level) {
     switch (level) {

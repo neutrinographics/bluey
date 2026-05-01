@@ -47,7 +47,7 @@ class LifecycleClient {
 
   /// Count of user-initiated GATT ops currently in flight on this
   /// connection. While > 0, scheduled probes defer rather than fire —
-  /// the in-flight op is itself an outstanding peer probe (see I097).
+  /// the in-flight op is itself an outstanding peer probe.
   /// Maintained by [BlueyConnection] via [markUserOpStarted] /
   /// [markUserOpEnded].
   int _pendingUserOps = 0;
@@ -186,7 +186,7 @@ class LifecycleClient {
   /// Called by [BlueyConnection] when a user GATT op is dispatched.
   /// While [_pendingUserOps] is > 0, scheduled probes defer rather
   /// than fire — the in-flight op is itself an outstanding peer probe
-  /// and its outcome will tell us about the peer's liveness. See I097.
+  /// and its outcome will tell us about the peer's liveness.
   void markUserOpStarted() {
     _pendingUserOps++;
   }
@@ -454,8 +454,8 @@ class LifecycleClient {
     if (_heartbeatCharHandle == null) return;
     if (_monitor.probeInFlight) return;
     if (_pendingUserOps > 0) {
-      // I097: defer while a user op is in flight — that op is itself
-      // an outstanding peer probe.
+      // Defer while a user op is in flight — that op is itself an
+      // outstanding peer probe.
       _scheduleProbe(after: _monitor.activityWindow);
       return;
     }
