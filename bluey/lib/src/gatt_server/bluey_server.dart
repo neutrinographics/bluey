@@ -281,8 +281,8 @@ class BlueyServer implements Server {
   }
 
   @override
-  void removeService(UUID uuid) {
-    _platform.removeService(uuid.toString());
+  Future<void> removeService(UUID uuid) async {
+    await _platform.removeService(uuid.toString());
   }
 
   @override
@@ -291,6 +291,7 @@ class BlueyServer implements Server {
     List<UUID>? services,
     ManufacturerData? manufacturerData,
     Duration? timeout,
+    AdvertiseMode? mode,
   }) async {
     _logger.log(
       BlueyLogLevel.info,
@@ -332,6 +333,7 @@ class BlueyServer implements Server {
       manufacturerDataCompanyId: manufacturerData?.companyId,
       manufacturerData: manufacturerData?.data,
       timeoutMs: timeout?.inMilliseconds,
+      mode: mode == null ? null : _mapAdvertiseModeToPlatform(mode),
     );
 
     await _platform.startAdvertising(config);
@@ -712,6 +714,19 @@ class BlueyServer implements Server {
         return platform.PlatformGattPermission.write;
       case GattPermission.writeEncrypted:
         return platform.PlatformGattPermission.writeEncrypted;
+    }
+  }
+
+  platform.PlatformAdvertiseMode _mapAdvertiseModeToPlatform(
+    AdvertiseMode mode,
+  ) {
+    switch (mode) {
+      case AdvertiseMode.lowPower:
+        return platform.PlatformAdvertiseMode.lowPower;
+      case AdvertiseMode.balanced:
+        return platform.PlatformAdvertiseMode.balanced;
+      case AdvertiseMode.lowLatency:
+        return platform.PlatformAdvertiseMode.lowLatency;
     }
   }
 

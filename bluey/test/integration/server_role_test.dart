@@ -149,7 +149,7 @@ void main() {
         expect(fakePlatform.localServices, hasLength(2));
 
         // Act
-        server.removeService(serviceUuid);
+        await server.removeService(serviceUuid);
 
         // Assert: only the lifecycle control service remains
         expect(fakePlatform.localServices, hasLength(1));

@@ -36,6 +36,15 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   // make the next respondToReadRequest fail before recording the call.
   Object? throwOnRespondToReadRequest;
 
+  // I059: when set, the next removeService call awaits this completer
+  // before completing. Used to prove the wrapper Future is gated on the
+  // platform call rather than fire-and-forget.
+  Completer<void>? gateRemoveService;
+
+  // I059: when set, the next removeService call throws this object before
+  // recording the call. Used to verify the wrapper propagates errors.
+  Object? throwOnRemoveService;
+
   // Stream controllers for server events
   final _centralConnectionsController =
       StreamController<platform.PlatformCentral>.broadcast();
@@ -265,6 +274,16 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Future<void> removeService(String serviceUuid) async {
+    final err = throwOnRemoveService;
+    if (err != null) {
+      throwOnRemoveService = null;
+      throw err;
+    }
+    final gate = gateRemoveService;
+    if (gate != null) {
+      gateRemoveService = null;
+      await gate.future;
+    }
     removedServiceUuids.add(serviceUuid);
   }
 
@@ -552,14 +571,50 @@ void main() {
         final server = bluey.server()!;
         final uuid = UUID.short(0x180F);
 
-        server.removeService(uuid);
-
-        await Future.delayed(Duration.zero);
+        await server.removeService(uuid);
 
         expect(mockPlatform.removedServiceUuids, hasLength(1));
         expect(
           mockPlatform.removedServiceUuids.first,
           equals('0000180f-0000-1000-8000-00805f9b34fb'),
+        );
+      });
+
+      // I059: the wrapper Future must not resolve until the platform call
+      // completes. A fire-and-forget implementation would resolve in the
+      // first microtask, before the gate is satisfied.
+      test('removeService awaits the platform call', () async {
+        final server = bluey.server()!;
+        final gate = Completer<void>();
+        mockPlatform.gateRemoveService = gate;
+
+        var done = false;
+        final removeFuture = server.removeService(UUID.short(0x180F)).then((_) {
+          done = true;
+        });
+
+        // Yield repeatedly so any non-awaited microtask chains drain.
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(done, isFalse,
+            reason: 'removeService resolved before platform completed');
+
+        gate.complete();
+        await removeFuture;
+        expect(done, isTrue);
+        expect(mockPlatform.removedServiceUuids, hasLength(1));
+      });
+
+      // I059: platform exceptions must reach the caller, not be swallowed
+      // by an unawaited Future.
+      test('removeService propagates platform errors', () async {
+        final server = bluey.server()!;
+        mockPlatform.throwOnRemoveService = StateError('boom');
+
+        await expectLater(
+          server.removeService(UUID.short(0x180F)),
+          throwsA(isA<StateError>()),
         );
       });
     });
@@ -645,6 +700,49 @@ void main() {
         await server.stopAdvertising();
         expect(server.isAdvertising, isFalse);
         expect(mockPlatform.isAdvertising, isFalse);
+      });
+
+      // I058: each value of the public-domain AdvertiseMode enum must
+      // reach the platform via PlatformAdvertiseConfig.mode.
+      test('startAdvertising propagates AdvertiseMode.lowPower', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(mode: AdvertiseMode.lowPower);
+
+        expect(
+          mockPlatform.lastAdvertiseConfig?.mode,
+          equals(platform.PlatformAdvertiseMode.lowPower),
+        );
+      });
+
+      test('startAdvertising propagates AdvertiseMode.balanced', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(mode: AdvertiseMode.balanced);
+
+        expect(
+          mockPlatform.lastAdvertiseConfig?.mode,
+          equals(platform.PlatformAdvertiseMode.balanced),
+        );
+      });
+
+      test('startAdvertising propagates AdvertiseMode.lowLatency', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(mode: AdvertiseMode.lowLatency);
+
+        expect(
+          mockPlatform.lastAdvertiseConfig?.mode,
+          equals(platform.PlatformAdvertiseMode.lowLatency),
+        );
+      });
+
+      test('startAdvertising leaves mode null when omitted', () async {
+        final server = bluey.server()!;
+
+        await server.startAdvertising(name: 'Test');
+
+        expect(mockPlatform.lastAdvertiseConfig?.mode, isNull);
       });
     });
 

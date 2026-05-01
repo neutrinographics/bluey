@@ -226,14 +226,14 @@ void main() {
       expect(server.services.length, equals(1));
     });
 
-    test('can remove service', () {
+    test('can remove service', () async {
       final service = HostedService(
         uuid: UUID.short(0x180F),
         characteristics: [],
       );
 
-      server.addService(service);
-      server.removeService(UUID.short(0x180F));
+      await server.addService(service);
+      await server.removeService(UUID.short(0x180F));
       expect(server.services.length, equals(0));
     });
 
@@ -326,6 +326,7 @@ class MockServer implements Server {
     List<UUID>? services,
     ManufacturerData? manufacturerData,
     Duration? timeout,
+    AdvertiseMode? mode,
   }) async {
     _isAdvertising = true;
   }

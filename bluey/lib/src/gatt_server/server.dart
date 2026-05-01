@@ -11,6 +11,24 @@ import 'hosted_gatt.dart';
 export 'gatt_request.dart';
 export 'hosted_gatt.dart';
 
+/// Advertising mode (Android only).
+///
+/// Controls the advertising interval and power consumption. Honored only on
+/// Android — iOS manages advertising intervals automatically and ignores
+/// this value.
+enum AdvertiseMode {
+  /// Lowest power consumption, ~1000 ms advertising interval. Best for
+  /// background advertising where quick discovery isn't critical.
+  lowPower,
+
+  /// Balanced power consumption, ~250 ms advertising interval.
+  balanced,
+
+  /// Lowest latency, ~100 ms advertising interval. Fastest discovery, highest
+  /// power consumption.
+  lowLatency,
+}
+
 /// A connected client device (from the server's perspective).
 ///
 /// When a client connects to this peripheral, a [Client] instance is
@@ -97,7 +115,10 @@ abstract class Server {
   /// Remove a service by UUID.
   ///
   /// Cannot be called while advertising.
-  void removeService(UUID uuid);
+  ///
+  /// Returns a [Future] that completes when the platform has acknowledged
+  /// the removal. Errors from the platform are propagated.
+  Future<void> removeService(UUID uuid);
 
   /// Start advertising.
   ///
@@ -109,6 +130,9 @@ abstract class Server {
   /// [services] - Service UUIDs to include in the advertisement.
   /// [manufacturerData] - Manufacturer-specific data.
   /// [timeout] - Stop advertising after this duration.
+  /// [mode] - Advertising mode (Android only). Controls the advertising
+  /// interval and power consumption. Ignored on iOS, which manages
+  /// intervals automatically. When `null` the platform applies its default.
   ///
   /// Throws [AdvertisingException] if advertising fails.
   Future<void> startAdvertising({
@@ -116,6 +140,7 @@ abstract class Server {
     List<UUID>? services,
     ManufacturerData? manufacturerData,
     Duration? timeout,
+    AdvertiseMode? mode,
   });
 
   /// Stop advertising.

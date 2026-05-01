@@ -469,7 +469,9 @@ void main() {
         expect(fakePlatform.localServices, hasLength(3));
 
         // Remove one service
-        server.removeService(UUID('0000180d-0000-1000-8000-00805f9b34fb'));
+        await server.removeService(
+          UUID('0000180d-0000-1000-8000-00805f9b34fb'),
+        );
 
         // +1 for the auto-registered lifecycle control service
         expect(fakePlatform.localServices, hasLength(2));
