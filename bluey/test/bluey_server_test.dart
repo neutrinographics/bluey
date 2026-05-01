@@ -6,6 +6,7 @@ import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/test_helpers.dart';
@@ -35,6 +36,15 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   // I009: symmetric hook for respondToReadRequest. Set to a throwable to
   // make the next respondToReadRequest fail before recording the call.
   Object? throwOnRespondToReadRequest;
+
+  // I311: per-method throw hooks for the four notify/indicate paths.
+  // When set, the next call throws the stored object before recording —
+  // used to verify that BlueyServer wraps platform errors in
+  // withErrorTranslation just like the client side does post-I099.
+  Object? throwOnNotifyCharacteristic;
+  Object? throwOnNotifyCharacteristicTo;
+  Object? throwOnIndicateCharacteristic;
+  Object? throwOnIndicateCharacteristicTo;
 
   // I059: when set, the next removeService call awaits this completer
   // before completing. Used to prove the wrapper Future is gated on the
@@ -303,6 +313,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) async {
+    final err = throwOnNotifyCharacteristic;
+    if (err != null) {
+      throwOnNotifyCharacteristic = null;
+      throw err;
+    }
     notifyCalls.add(
       NotifyCall(
         characteristicUuid: _localUuidForHandle(characteristicHandle),
@@ -317,6 +332,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) async {
+    final err = throwOnNotifyCharacteristicTo;
+    if (err != null) {
+      throwOnNotifyCharacteristicTo = null;
+      throw err;
+    }
     notifyToCalls.add(
       NotifyToCall(
         centralId: centralId,
@@ -331,6 +351,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) async {
+    final err = throwOnIndicateCharacteristic;
+    if (err != null) {
+      throwOnIndicateCharacteristic = null;
+      throw err;
+    }
     indicateCalls.add(
       IndicateCall(
         characteristicUuid: _localUuidForHandle(characteristicHandle),
@@ -345,6 +370,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) async {
+    final err = throwOnIndicateCharacteristicTo;
+    if (err != null) {
+      throwOnIndicateCharacteristicTo = null;
+      throw err;
+    }
     indicateToCalls.add(
       IndicateToCall(
         centralId: centralId,
@@ -1683,7 +1713,9 @@ void main() {
                 StateError('platform respond failed');
 
             // App responds — platform call throws, but pending must already
-            // be drained.
+            // be drained. Post-I311, withErrorTranslation's defensive backstop
+            // wraps the underlying StateError into a BlueyException; the
+            // original is preserved on `.cause`.
             Object? thrown;
             unawaited(server
                 .respondToWrite(captured!, status: GattResponseStatus.success)
@@ -1691,7 +1723,8 @@ void main() {
               thrown = e;
             }));
             async.flushMicrotasks();
-            expect(thrown, isA<StateError>());
+            expect(thrown, isA<BlueyException>());
+            expect((thrown as BlueyPlatformException).cause, isA<StateError>());
 
             // If pending was drained correctly, the heartbeat clock has
             // restarted. After the interval elapses, gone fires.
@@ -1884,6 +1917,223 @@ void main() {
           characteristicId: UUID('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
         );
         expect(e, isA<BlueyException>());
+      });
+    });
+
+    group('server-side error translation (I311)', () {
+      // Pins the I311 contract: every public BlueyServer method that
+      // crosses the platform-interface seam wraps its platform call in
+      // withErrorTranslation, mirroring the client-side surface
+      // post-I099. The reproduction shape we care about is the iOS
+      // notify-queue backpressure path (I040), which surfaces from the
+      // native side as PlatformException(code: 'bluey-unknown'); after
+      // I099 contract enforcement, it must reach the caller as a typed
+      // BlueyPlatformException (a BlueyException subtype) and never as
+      // raw flutter/services PlatformException.
+
+      Future<void> registerNotifiableChar(Server server) async {
+        await server.addService(
+          HostedService(
+            uuid: UUID.short(0x180D),
+            characteristics: [
+              HostedCharacteristic.notifiable(uuid: UUID.short(0x2A19)),
+            ],
+          ),
+        );
+      }
+
+      Future<void> registerIndicatableChar(Server server) async {
+        await server.addService(
+          HostedService(
+            uuid: UUID.short(0x180D),
+            characteristics: [
+              HostedCharacteristic(
+                uuid: UUID.short(0x2A19),
+                properties: const CharacteristicProperties(
+                  canRead: false,
+                  canWrite: false,
+                  canWriteWithoutResponse: false,
+                  canNotify: false,
+                  canIndicate: true,
+                ),
+                permissions: const [],
+              ),
+            ],
+          ),
+        );
+      }
+
+      Future<Client> connectCentral(Server server) async {
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+        return server.connectedClients.first;
+      }
+
+      test('notify wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        await registerNotifiableChar(server);
+
+        mockPlatform.throwOnNotifyCharacteristic = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.notify(UUID.short(0x2A19), data: Uint8List.fromList([1])),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
+      });
+
+      test('notifyTo wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        await registerNotifiableChar(server);
+        final central = await connectCentral(server);
+
+        mockPlatform.throwOnNotifyCharacteristicTo = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.notifyTo(
+            central,
+            UUID.short(0x2A19),
+            data: Uint8List.fromList([1]),
+          ),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
+      });
+
+      test('indicate wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        await registerIndicatableChar(server);
+
+        mockPlatform.throwOnIndicateCharacteristic = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.indicate(UUID.short(0x2A19), data: Uint8List.fromList([1])),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
+      });
+
+      test('indicateTo wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        await registerIndicatableChar(server);
+        final central = await connectCentral(server);
+
+        mockPlatform.throwOnIndicateCharacteristicTo = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.indicateTo(
+            central,
+            UUID.short(0x2A19),
+            data: Uint8List.fromList([1]),
+          ),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
+      });
+
+      test('respondToRead wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        late ReadRequest captured;
+        server.readRequests.listen((r) => captured = r);
+        mockPlatform.emitReadRequest(
+          platform.PlatformReadRequest(
+            requestId: 99,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            offset: 0,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        mockPlatform.throwOnRespondToReadRequest = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.respondToRead(
+            captured,
+            status: GattResponseStatus.success,
+            value: Uint8List.fromList([1]),
+          ),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
+      });
+
+      test('respondToWrite wraps PlatformException(bluey-unknown) as typed '
+          'BlueyPlatformException', () async {
+        final server = bluey.server()!;
+        server.connections.listen((_) {});
+        mockPlatform.emitCentralConnected(
+          const platform.PlatformCentral(id: 'central-1', mtu: 512),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        late WriteRequest captured;
+        server.writeRequests.listen((r) => captured = r);
+        mockPlatform.emitWriteRequest(
+          platform.PlatformWriteRequest(
+            requestId: 17,
+            centralId: 'central-1',
+            characteristicUuid: '00002a19-0000-1000-8000-00805f9b34fb',
+            value: Uint8List.fromList([1, 2, 3]),
+            offset: 0,
+            responseNeeded: true,
+            characteristicHandle: 0,
+          ),
+        );
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        mockPlatform.throwOnRespondToWriteRequest = PlatformException(
+          code: 'bluey-unknown',
+          message: 'An unknown error occurred',
+        );
+
+        await expectLater(
+          server.respondToWrite(captured, status: GattResponseStatus.success),
+          throwsA(
+            isA<BlueyPlatformException>()
+                .having((e) => e.code, 'code', 'bluey-unknown'),
+          ),
+        );
       });
     });
   });

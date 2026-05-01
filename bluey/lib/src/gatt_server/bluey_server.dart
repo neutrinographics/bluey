@@ -11,6 +11,7 @@ import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
+import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
@@ -390,7 +391,10 @@ class BlueyServer implements Server {
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
     }
-    await _platform.notifyCharacteristic(handle, data);
+    await withErrorTranslation(
+      () => _platform.notifyCharacteristic(handle, data),
+      operation: 'notify',
+    );
     _logger.log(
       BlueyLogLevel.debug,
       'bluey.server',
@@ -420,10 +424,14 @@ class BlueyServer implements Server {
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
     }
-    await _platform.notifyCharacteristicTo(
-      blueyClient._platformId,
-      handle,
-      data,
+    await withErrorTranslation(
+      () => _platform.notifyCharacteristicTo(
+        blueyClient._platformId,
+        handle,
+        data,
+      ),
+      operation: 'notifyTo',
+      deviceId: client.id,
     );
     _emitEvent(
       NotificationSentEvent(
@@ -441,7 +449,10 @@ class BlueyServer implements Server {
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
     }
-    await _platform.indicateCharacteristic(handle, data);
+    await withErrorTranslation(
+      () => _platform.indicateCharacteristic(handle, data),
+      operation: 'indicate',
+    );
     _emitEvent(
       IndicationSentEvent(
         characteristicId: characteristic,
@@ -462,10 +473,14 @@ class BlueyServer implements Server {
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
     }
-    await _platform.indicateCharacteristicTo(
-      blueyClient._platformId,
-      handle,
-      data,
+    await withErrorTranslation(
+      () => _platform.indicateCharacteristicTo(
+        blueyClient._platformId,
+        handle,
+        data,
+      ),
+      operation: 'indicateTo',
+      deviceId: client.id,
     );
     _emitEvent(
       IndicationSentEvent(
@@ -527,12 +542,16 @@ class BlueyServer implements Server {
     // platform error, etc.).
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
     try {
-      await _platform.respondToReadRequest(
-        request.internalRequestId,
-        _mapGattResponseStatusToPlatform(status),
-        value,
+      await withErrorTranslation(
+        () => _platform.respondToReadRequest(
+          request.internalRequestId,
+          _mapGattResponseStatusToPlatform(status),
+          value,
+        ),
+        operation: 'respondToRead',
+        deviceId: request.client.id,
       );
-    } on platform.GattOperationStatusFailedException catch (e) {
+    } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(
         operation: 'respondToRead',
         status: e.status,
@@ -551,11 +570,15 @@ class BlueyServer implements Server {
     // Drain pending state BEFORE the platform call — see respondToRead.
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
     try {
-      await _platform.respondToWriteRequest(
-        request.internalRequestId,
-        _mapGattResponseStatusToPlatform(status),
+      await withErrorTranslation(
+        () => _platform.respondToWriteRequest(
+          request.internalRequestId,
+          _mapGattResponseStatusToPlatform(status),
+        ),
+        operation: 'respondToWrite',
+        deviceId: request.client.id,
       );
-    } on platform.GattOperationStatusFailedException catch (e) {
+    } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(
         operation: 'respondToWrite',
         status: e.status,
