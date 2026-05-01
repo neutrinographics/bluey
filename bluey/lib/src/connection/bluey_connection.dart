@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
+import '../event_bus.dart';
+import '../events.dart';
 import '../gatt_client/gatt.dart';
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
@@ -172,6 +174,12 @@ class BlueyConnection implements Connection {
   // futures whose handles are now stale and re-discover instead.
   final Set<Completer<Object?>> _pendingGattOpAborters = {};
 
+  /// Domain port for emitting GATT-op events (I054). Optional so
+  /// existing internal call sites that build a connection without an
+  /// event-bus context (e.g. some tests) keep working — emission is a
+  /// no-op when null.
+  final EventPublisher? _events;
+
   /// Creates a new connection instance.
   ///
   /// This is called internally by Bluey and should not be used directly.
@@ -180,9 +188,11 @@ class BlueyConnection implements Connection {
     required String connectionId,
     required this.deviceId,
     required BlueyLogger logger,
+    EventPublisher? events,
   }) : _platform = platformInstance,
        _connectionId = connectionId,
-       _logger = logger {
+       _logger = logger,
+       _events = events {
     // Subscribe to platform connection state changes.
     //
     // The platform reports four states (connecting / connected /
@@ -448,6 +458,10 @@ class BlueyConnection implements Connection {
       'services discovery started',
       data: {'deviceId': deviceId.toString()},
     );
+    _events?.emit(DiscoveringServicesEvent(
+      deviceId: deviceId,
+      source: 'BlueyConnection',
+    ));
     final stopwatch = Stopwatch()..start();
     final platformServices = await _trackInFlight(() => _runGattOp(
           deviceId,
@@ -467,6 +481,11 @@ class BlueyConnection implements Connection {
         'durationMs': stopwatch.elapsedMilliseconds,
       },
     );
+    _events?.emit(ServicesDiscoveredEvent(
+      deviceId: deviceId,
+      serviceCount: _cachedServices!.length,
+      source: 'BlueyConnection',
+    ));
 
     // Trace-level enumeration of every discovered service UUID. Useful
     // for debugging UUID-canonicalization mismatches (e.g. peer-detection
@@ -761,6 +780,7 @@ class BlueyConnection implements Connection {
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
       logger: _logger,
+      events: _events,
     );
   }
 
@@ -868,6 +888,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final void Function() _ensureConnected;
   final _TrackInFlight _trackInFlight;
   final BlueyLogger? _logger;
+  final EventPublisher? _events;
 
   @override
   final UUID uuid;
@@ -910,6 +931,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     void Function()? ensureConnected,
     _TrackInFlight? trackInFlight,
     BlueyLogger? logger,
+    EventPublisher? events,
   }) : _platform = platform,
        _connectionId = connectionId,
        _deviceId = deviceId,
@@ -917,7 +939,8 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {}),
        _trackInFlight = trackInFlight ?? _passthroughInFlight,
-       _logger = logger;
+       _logger = logger,
+       _events = events;
 
   @override
   Future<Uint8List> read() async {
@@ -925,7 +948,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    return _trackInFlight(() => _loggedGattOp(
+    final value = await _trackInFlight(() => _loggedGattOp(
           deviceId: _deviceId,
           op: 'readCharacteristic',
           startDetail: 'char=$uuid',
@@ -937,6 +960,13 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
           lifecycleClient: _lifecycle(),
           logger: _logger,
         ));
+    _events?.emit(CharacteristicReadEvent(
+      deviceId: _deviceId,
+      characteristicId: uuid,
+      valueLength: value.length,
+      source: 'BlueyRemoteCharacteristic',
+    ));
+    return value;
   }
 
   @override
@@ -948,7 +978,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    return _trackInFlight<void>(() => _loggedGattOp<void>(
+    await _trackInFlight<void>(() => _loggedGattOp<void>(
           deviceId: _deviceId,
           op: 'writeCharacteristic',
           startDetail: 'char=$uuid, bytes=${value.length}',
@@ -962,6 +992,13 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
           lifecycleClient: _lifecycle(),
           logger: _logger,
         ));
+    _events?.emit(CharacteristicWrittenEvent(
+      deviceId: _deviceId,
+      characteristicId: uuid,
+      valueLength: value.length,
+      withResponse: withResponse,
+      source: 'BlueyRemoteCharacteristic',
+    ));
   }
 
   @override
@@ -997,7 +1034,14 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         true,
       ),
       lifecycleClient: _lifecycle(),
-    ).catchError((Object error) {
+    ).then((_) {
+      _events?.emit(NotificationSubscriptionEvent(
+        deviceId: _deviceId,
+        characteristicId: uuid,
+        enabled: true,
+        source: 'BlueyRemoteCharacteristic',
+      ));
+    }).catchError((Object error) {
       _notificationController?.addError(error);
     });
 
@@ -1016,6 +1060,12 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
             // start/end/failure wrapping used for outbound ops.
             _lifecycle()?.recordActivity();
             _notificationController?.add(notification.value);
+            _events?.emit(NotificationReceivedEvent(
+              deviceId: _deviceId,
+              characteristicId: uuid,
+              valueLength: notification.value.length,
+              source: 'BlueyRemoteCharacteristic',
+            ));
           },
           onError: (error) {
             _notificationController?.addError(error);
@@ -1037,7 +1087,14 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         false,
       ),
       lifecycleClient: _lifecycle(),
-    ).catchError((Object _) {});
+    ).then((_) {
+      _events?.emit(NotificationSubscriptionEvent(
+        deviceId: _deviceId,
+        characteristicId: uuid,
+        enabled: false,
+        source: 'BlueyRemoteCharacteristic',
+      ));
+    }).catchError((Object _) {});
 
     // Cancel subscription
     _notificationSubscription?.cancel();

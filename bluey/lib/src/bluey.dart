@@ -381,6 +381,7 @@ class Bluey {
         connectionId: connectionId,
         deviceId: device.id,
         logger: _logger,
+        events: _eventBus,
       );
 
       _logger.log(
@@ -773,6 +774,7 @@ class Bluey {
       serverId: serverId,
       peerSilenceTimeout: peerSilenceTimeout,
       logger: _logger,
+      events: _eventBus,
     );
   }
 
@@ -793,6 +795,7 @@ class Bluey {
     final discovery = PeerDiscovery(
       platformApi: _platform,
       logger: _logger,
+      events: _eventBus,
     );
     final ids = await discovery.discover(
       timeout: timeout,
@@ -803,6 +806,7 @@ class Bluey {
               platformApi: _platform,
               serverId: id,
               logger: _logger,
+              events: _eventBus,
             ))
         .toList(growable: false);
   }

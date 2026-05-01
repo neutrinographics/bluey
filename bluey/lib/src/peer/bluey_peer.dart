@@ -5,6 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/lifecycle_client.dart';
+import '../event_bus.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
@@ -19,12 +20,14 @@ BlueyPeer createBlueyPeer({
   required ServerId serverId,
   required BlueyLogger logger,
   Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
+  EventPublisher? events,
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
     serverId: serverId,
     peerSilenceTimeout: peerSilenceTimeout,
     logger: logger,
+    events: events,
   );
 }
 
@@ -32,6 +35,7 @@ class _BlueyPeer implements BlueyPeer {
   final platform.BlueyPlatform _platform;
   final Duration _peerSilenceTimeout;
   final BlueyLogger _logger;
+  final EventPublisher? _events;
 
   @override
   final ServerId serverId;
@@ -43,9 +47,11 @@ class _BlueyPeer implements BlueyPeer {
     required this.serverId,
     required Duration peerSilenceTimeout,
     required BlueyLogger logger,
+    EventPublisher? events,
   })  : _platform = platformApi,
         _peerSilenceTimeout = peerSilenceTimeout,
-        _logger = logger;
+        _logger = logger,
+        _events = events;
 
   @override
   Future<PeerConnection> connect({
@@ -71,6 +77,7 @@ class _BlueyPeer implements BlueyPeer {
       final discovery = PeerDiscovery(
         platformApi: _platform,
         logger: _logger,
+        events: _events,
       );
       final BlueyConnection blueyConnection;
       try {

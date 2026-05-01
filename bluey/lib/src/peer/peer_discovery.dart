@@ -5,6 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
+import '../event_bus.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
@@ -30,13 +31,21 @@ class PeerDiscovery {
 
   final platform.BlueyPlatform _platform;
   final BlueyLogger _logger;
+  final EventPublisher? _events;
 
   /// Creates a [PeerDiscovery] backed by the given platform API.
+  ///
+  /// [events] is forwarded into the [BlueyConnection] returned by
+  /// [connectTo] so GATT-op events fire on the parent `Bluey`'s
+  /// stream. Optional — null in test contexts that don't need
+  /// emissions.
   PeerDiscovery({
     required platform.BlueyPlatform platformApi,
     required BlueyLogger logger,
+    EventPublisher? events,
   })  : _platform = platformApi,
-        _logger = logger;
+        _logger = logger,
+        _events = events;
 
   /// Scans for Bluey servers, briefly connects to each to read its
   /// [ServerId], and returns a deduplicated list.
@@ -125,6 +134,7 @@ class PeerDiscovery {
             connectionId: address,
             deviceId: deviceIdToUuid(address),
             logger: _logger,
+            events: _events,
           );
         }
         // Not a match — disconnect.
