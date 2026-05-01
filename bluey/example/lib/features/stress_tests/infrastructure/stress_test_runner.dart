@@ -489,9 +489,13 @@ class StressTestRunner {
       return;
     }
 
-    // Wait for all expected notifications, with a generous timeout
-    // proportional to count (1ms per notification + 1s overhead).
-    final timeout = Duration(milliseconds: config.count + 1000);
+    // Wait for all expected notifications. Per-test budget is
+    // configurable via `config.timeout`; the default heuristic
+    // (10 ms × count + 2 s) sizes for the post-I040 iOS-server
+    // delivery rate (~2–3 ms / notification, queue-drain bound) with
+    // a 5× safety margin.
+    final timeout = config.timeout ??
+        Duration(milliseconds: 10 * config.count + 2000);
     try {
       await completer.future.timeout(timeout);
     } on TimeoutException {
@@ -499,10 +503,23 @@ class StressTestRunner {
     }
     await sub.cancel();
 
-    // Only count the winning burst's notifications as successes; everything
-    // else is a straggler and should not appear in the result.
-    final winnerLatencies =
-        winningBurstId != null ? latenciesPerId[winningBurstId]! : <Duration>[];
+    // Pick the burst-id with the most arrivals as the result winner.
+    // If a burst hit `count` mid-stream, `winningBurstId` was set by
+    // the listener and the completer fired early — that's the same
+    // burst we'd pick here. If the timeout fired with a partial
+    // delivery, this surfaces what we actually received instead of
+    // discarding it as a total failure (I316).
+    int? bestBurstId;
+    var bestArrivalCount = 0;
+    for (final entry in latenciesPerId.entries) {
+      if (entry.value.length > bestArrivalCount) {
+        bestArrivalCount = entry.value.length;
+        bestBurstId = entry.key;
+      }
+    }
+    final winnerLatencies = bestBurstId != null
+        ? latenciesPerId[bestBurstId]!
+        : <Duration>[];
     for (final l in winnerLatencies) {
       result = result.recordSuccess(latency: l);
     }

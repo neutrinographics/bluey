@@ -72,8 +72,15 @@ class NotificationThroughputConfig extends StressTestConfig {
   final int count;
   /// Bytes per notification (excluding the burst-id prefix byte).
   final int payloadBytes;
+  /// Per-test wall-clock budget for the entire burst to complete. If
+  /// `null`, the runner derives a default from [count] (~10 ms per
+  /// notification + 2 s prologue overhead) — sized for the post-I040
+  /// iOS-server delivery rate (~2–3 ms / notification, queue-drain
+  /// bound) with a 5× safety margin.
+  final Duration? timeout;
   const NotificationThroughputConfig({
     this.count = 100,
     this.payloadBytes = 20,
+    this.timeout,
   });
 }

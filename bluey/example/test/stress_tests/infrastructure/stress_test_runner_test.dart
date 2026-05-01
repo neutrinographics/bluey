@@ -392,6 +392,50 @@ void main() {
       }
     });
 
+    // I316: when fewer than `count` notifications arrive before the
+    // timeout, the runner must report the received ones as successes
+    // (with their measured latencies) and the missing ones as
+    // NotificationTimeout failures. Pre-fix the runner discarded ALL
+    // received notifications when no burst hit `count`, so a partial
+    // delivery looked identical to a total failure.
+    test('partial burst — fewer arrivals than count — reports received '
+        'successes + missing failures', () async {
+      stressChar.onWriteHook = (value, {required bool withResponse}) async {
+        if (value.isNotEmpty && value.first == 0x02) {
+          Future<void>(() async {
+            // Emit 3 of an expected 5 — the test's tight timeout will
+            // fire before any further arrivals could show up.
+            for (var i = 0; i < 3; i++) {
+              stressChar.emitNotification(
+                Uint8List.fromList([0x01, 0x10, 0x11, 0x12, 0x13]),
+              );
+            }
+          });
+        }
+      };
+
+      final results = await runner
+          .runNotificationThroughput(
+            const NotificationThroughputConfig(
+              count: 5,
+              payloadBytes: 4,
+              timeout: Duration(milliseconds: 200),
+            ),
+            conn,
+          )
+          .toList();
+
+      final last = results.last;
+      expect(last.isRunning, isFalse);
+      expect(last.succeeded, equals(3),
+          reason: 'received notifications must count as successes');
+      expect(last.failed, equals(2),
+          reason: 'missing notifications must count as NotificationTimeout');
+      expect(last.failuresByType['NotificationTimeout'], equals(2));
+      expect(last.latencies, hasLength(3),
+          reason: 'latencies recorded for the 3 received notifications');
+    });
+
     test('drops notifications with stale burst-id (different from current)', () async {
       stressChar.onWriteHook = (value, {required bool withResponse}) async {
         if (value.isNotEmpty && value.first == 0x02) {
