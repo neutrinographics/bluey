@@ -6,7 +6,7 @@ severity: medium
 platform: android
 status: fixed
 last_verified: 2026-05-04
-fixed_in: <commit-hash-of-final-merge>
+fixed_in: c91d32b
 related: [I055, I051]
 ---
 
