@@ -1,11 +1,11 @@
 ---
 id: I322
-title: `LifecycleServer.handleReadRequest` invoked twice for the same request id; second `respondToReadRequest` fails with `RespondNotFoundException`
+title: Duplicate `respondTo*Request` invocation; second response fails with `RespondNotFoundException`
 category: bug
 severity: medium
-platform: domain
+platform: both
 status: open
-last_verified: 2026-05-04
+last_verified: 2026-05-05
 related: [I308, I313, I321]
 ---
 
@@ -30,6 +30,15 @@ in `LifecycleServer.handleReadRequest`. The defensive containment
 (typed-exception chain + warn/error log) shipped in this PR; that work
 stops the crash but does not address the underlying issue: **why is the
 lifecycle handler responding to the same `requestId` more than once**?
+
+**Note on `platform: both`.** The crash *surfaces* in domain code
+(`bluey/lib/src/gatt_server/lifecycle_server.dart`), but the root cause
+is upstream — the top-ranked hypothesis (broadcast-stream
+multi-subscriber) lives at the iOS-plugin / platform-interface seam,
+and an Android-side equivalent likely exists. The investigation plan
+below is intentionally cross-layer; the eventual fix may split into
+separate per-layer follow-ups once the layer responsible is
+identified.
 
 ## Location
 
