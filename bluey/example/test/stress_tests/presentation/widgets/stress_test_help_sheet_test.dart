@@ -129,5 +129,87 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(StressTestHelpSheet), findsNothing);
     });
+
+    testWidgets('help sheet leaves scrim tappable on phone-sized viewports', (
+      tester,
+    ) async {
+      // iPhone 14 logical size. Pre-fix the sheet stretched to fill the
+      // screen on small viewports because isScrollControlled: true had no
+      // height cap and nothing constrained the inner Container.
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: TestCard(
+                test: StressTest.burstWrite,
+                config: const BurstWriteConfig(),
+                result: null,
+                isRunning: false,
+                anyRunning: false,
+                onRun: () {},
+                onStop: () {},
+                onConfigChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('i'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StressTestHelpSheet), findsOneWidget);
+
+      final sheetRect = tester.getRect(find.byType(StressTestHelpSheet));
+      expect(
+        sheetRect.top,
+        greaterThanOrEqualTo(50),
+        reason:
+            'Sheet must leave scrim space above so tap-outside-to-dismiss works',
+      );
+
+      // Tap above the sheet — must hit the scrim.
+      await tester.tapAt(Offset(195, sheetRect.top / 2));
+      await tester.pumpAndSettle();
+      expect(find.byType(StressTestHelpSheet), findsNothing);
+    });
+
+    testWidgets('help sheet shows the system drag-handle affordance', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: TestCard(
+                test: StressTest.burstWrite,
+                config: const BurstWriteConfig(),
+                result: null,
+                isRunning: false,
+                anyRunning: false,
+                onRun: () {},
+                onStop: () {},
+                onConfigChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('i'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+      final BottomSheet bottomSheet = tester.widget<BottomSheet>(
+        find.byType(BottomSheet),
+      );
+      expect(
+        bottomSheet.showDragHandle,
+        isTrue,
+        reason: 'Help sheet should opt into the Material drag-handle affordance',
+      );
+    });
   });
 }

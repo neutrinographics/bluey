@@ -13,7 +13,6 @@ const _kGreen = Color(0xFF006D4A);
 const _kRed = Color(0xFFA83836);
 const _kUuidBg = Color(0xFFF0F4F7);
 const _kDivider = Color(0xFFF0F4F7);
-const _kHandle = Color(0xFFE3E9ED);
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -21,6 +20,11 @@ void showStressTestHelp(BuildContext context, StressTest test) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.of(context).size.height * 0.85,
+    ),
     backgroundColor: Colors.transparent,
     builder: (_) => StressTestHelpSheet(test: test),
   );
@@ -45,7 +49,6 @@ class StressTestHelpSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Handle(),
             _SheetHeader(test: test),
             const SizedBox(height: 16),
             const _Divider(),
@@ -70,23 +73,6 @@ class StressTestHelpSheet extends StatelessWidget {
 
 // ─── Internal widgets ─────────────────────────────────────────────────────────
 
-class _Handle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 32,
-        height: 3.5,
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: _kHandle,
-          borderRadius: BorderRadius.circular(99),
-        ),
-      ),
-    );
-  }
-}
-
 class _SheetHeader extends StatelessWidget {
   final StressTest test;
   const _SheetHeader({required this.test});
@@ -105,27 +91,29 @@ class _SheetHeader extends StatelessWidget {
           child: Icon(_icon(test), color: _iconColor(test), size: 16),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              test.displayName,
-              style: GoogleFonts.manrope(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: _kDark,
-                letterSpacing: -0.3,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                test.displayName,
+                style: GoogleFonts.manrope(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _kDark,
+                  letterSpacing: -0.3,
+                ),
               ),
-            ),
-            Text(
-              test.subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: _kMid,
+              Text(
+                test.subtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: _kMid,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
