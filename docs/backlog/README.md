@@ -160,6 +160,8 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
 | [I081](I081-advertiser-concurrent-start.md) | Advertiser allows concurrent `startAdvertising` | medium |
 | [I085](I085-cccd-malformed-bytes-silently-ignored.md) | CCCD write with malformed bytes silently ignored | medium |
+| [I318](I318-android-advertise-name-ignored.md) | `startAdvertising(name:)` silently ignored; system Bluetooth adapter name is broadcast instead | medium |
+| [I319](I319-android-advertise-error-opaque.md) | Advertise failures collapse to `bluey-unknown`; `DATA_TOO_LARGE` ambiguous under slot contention | low |
 
 ### Open — Android GATT server stubs / no-ops
 
