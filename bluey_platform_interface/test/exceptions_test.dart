@@ -116,5 +116,21 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
+
+    test('differs by message', () {
+      const a = PlatformAdvertiseDataTooLargeException('a');
+      const b = PlatformAdvertiseDataTooLargeException('b');
+      expect(a, isNot(equals(b)));
+    });
+
+    test('exposes the message via the public field', () {
+      const e = PlatformAdvertiseDataTooLargeException('boom');
+      expect(e.message, equals('boom'));
+    });
+
+    test('is catchable as Exception', () {
+      const e = PlatformAdvertiseDataTooLargeException('whatever');
+      expect(e, isA<Exception>());
+    });
   });
 }

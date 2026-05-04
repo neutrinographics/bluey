@@ -197,6 +197,7 @@ class PlatformPermissionDeniedException implements Exception {
 /// instead of generic `bluey-unknown` so apps can react (e.g., shorten
 /// the device name, drop a UUID, or move it to scan response).
 class PlatformAdvertiseDataTooLargeException implements Exception {
+  /// Human-readable description of why the advertisement was rejected.
   final String message;
 
   const PlatformAdvertiseDataTooLargeException(this.message);
@@ -207,7 +208,6 @@ class PlatformAdvertiseDataTooLargeException implements Exception {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
       other is PlatformAdvertiseDataTooLargeException &&
           other.message == message;
 
