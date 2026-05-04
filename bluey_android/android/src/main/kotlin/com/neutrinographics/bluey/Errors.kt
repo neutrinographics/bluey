@@ -44,6 +44,8 @@ internal fun Throwable.toServerFlutterError(): FlutterError = when (this) {
     is BlueyAndroidError.CentralNotFound,
     is BlueyAndroidError.NoPendingRequest ->
         FlutterError("gatt-status-failed", message, 0x0A)
+    is BlueyAndroidError.AdvertiseDataTooLarge ->
+        FlutterError("bluey-advertise-data-too-large", message, null)
     is BlueyAndroidError ->
         FlutterError("bluey-unknown", message, null)
     else ->
