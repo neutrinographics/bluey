@@ -22,9 +22,9 @@ void main() {
           id: TestDeviceIds.device1,
           name: 'Test',
           services: [
-            TestServiceBuilder(TestUuids.customService)
-                .withReadable(TestUuids.customChar1)
-                .build(),
+            TestServiceBuilder(
+              TestUuids.customService,
+            ).withReadable(TestUuids.customChar1).build(),
           ],
           characteristicValues: {
             TestUuids.customChar1: Uint8List.fromList([0x01]),
@@ -71,111 +71,115 @@ void main() {
   });
 
   group('_runGattOp defensive PlatformException catch-all', () {
-    test('wraps untranslated PlatformException as BlueyPlatformException',
-        () async {
-      final fakePlatform = FakeBlueyPlatform();
-      platform.BlueyPlatform.instance = fakePlatform;
+    test(
+      'wraps untranslated PlatformException as BlueyPlatformException',
+      () async {
+        final fakePlatform = FakeBlueyPlatform();
+        platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-        services: [
-          TestServiceBuilder(TestUuids.customService)
-              .withReadable(TestUuids.customChar1)
-              .build(),
-        ],
-        characteristicValues: {
-          TestUuids.customChar1: Uint8List.fromList([0x01]),
-        },
-      );
-      await fakePlatform.connect(
-        TestDeviceIds.device1,
-        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
-      );
+        fakePlatform.simulatePeripheral(
+          id: TestDeviceIds.device1,
+          name: 'Test',
+          services: [
+            TestServiceBuilder(
+              TestUuids.customService,
+            ).withReadable(TestUuids.customChar1).build(),
+          ],
+          characteristicValues: {
+            TestUuids.customChar1: Uint8List.fromList([0x01]),
+          },
+        );
+        await fakePlatform.connect(
+          TestDeviceIds.device1,
+          const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+        );
 
-      // Inject a raw PlatformException with an unknown code — models a
-      // platform error that no adapter has translated yet.
-      fakePlatform.simulateReadPlatformErrorCode = 'fictitious-code';
+        // Inject a raw PlatformException with an unknown code — models a
+        // platform error that no adapter has translated yet.
+        fakePlatform.simulateReadPlatformErrorCode = 'fictitious-code';
 
-      final char = BlueyRemoteCharacteristic(
-        platform: fakePlatform,
-        connectionId: TestDeviceIds.device1,
-        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        uuid: UUID(TestUuids.customChar1),
-        handle: AttributeHandle(1),
-        properties: const CharacteristicProperties(
-          canRead: true,
-          canWrite: false,
-          canWriteWithoutResponse: false,
-          canNotify: false,
-          canIndicate: false,
-        ),
-        descriptors: const [],
-      );
+        final char = BlueyRemoteCharacteristic(
+          platform: fakePlatform,
+          connectionId: TestDeviceIds.device1,
+          deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+          uuid: UUID(TestUuids.customChar1),
+          handle: AttributeHandle(1),
+          properties: const CharacteristicProperties(
+            canRead: true,
+            canWrite: false,
+            canWriteWithoutResponse: false,
+            canNotify: false,
+            canIndicate: false,
+          ),
+          descriptors: const [],
+        );
 
-      try {
-        await char.read();
-        fail('expected BlueyPlatformException');
-      } on BlueyPlatformException catch (e) {
-        expect(e.code, 'fictitious-code');
-        expect(e.message, contains('fictitious-code'));
-      }
-    });
+        try {
+          await char.read();
+          fail('expected BlueyPlatformException');
+        } on BlueyPlatformException catch (e) {
+          expect(e.code, 'fictitious-code');
+          expect(e.message, contains('fictitious-code'));
+        }
+      },
+    );
   });
 
   group('_runGattOp PlatformPermissionDeniedException translation', () {
-    test('wraps PlatformPermissionDeniedException as PermissionDeniedException',
-        () async {
-      final fakePlatform = FakeBlueyPlatform();
-      platform.BlueyPlatform.instance = fakePlatform;
+    test(
+      'wraps PlatformPermissionDeniedException as PermissionDeniedException',
+      () async {
+        final fakePlatform = FakeBlueyPlatform();
+        platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-        services: [
-          TestServiceBuilder(TestUuids.customService)
-              .withReadable(TestUuids.customChar1)
-              .build(),
-        ],
-        characteristicValues: {
-          TestUuids.customChar1: Uint8List.fromList([0x01]),
-        },
-      );
-      await fakePlatform.connect(
-        TestDeviceIds.device1,
-        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
-      );
+        fakePlatform.simulatePeripheral(
+          id: TestDeviceIds.device1,
+          name: 'Test',
+          services: [
+            TestServiceBuilder(
+              TestUuids.customService,
+            ).withReadable(TestUuids.customChar1).build(),
+          ],
+          characteristicValues: {
+            TestUuids.customChar1: Uint8List.fromList([0x01]),
+          },
+        );
+        await fakePlatform.connect(
+          TestDeviceIds.device1,
+          const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
+        );
 
-      fakePlatform.simulateReadError(
-        const platform.PlatformPermissionDeniedException(
-          'readCharacteristic',
-          permission: 'BLUETOOTH_CONNECT',
-          message: 'Missing BLUETOOTH_CONNECT permission',
-        ),
-      );
+        fakePlatform.simulateReadError(
+          const platform.PlatformPermissionDeniedException(
+            'readCharacteristic',
+            permission: 'BLUETOOTH_CONNECT',
+            message: 'Missing BLUETOOTH_CONNECT permission',
+          ),
+        );
 
-      final char = BlueyRemoteCharacteristic(
-        platform: fakePlatform,
-        connectionId: TestDeviceIds.device1,
-        deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        uuid: UUID(TestUuids.customChar1),
-        handle: AttributeHandle(1),
-        properties: const CharacteristicProperties(
-          canRead: true,
-          canWrite: false,
-          canWriteWithoutResponse: false,
-          canNotify: false,
-          canIndicate: false,
-        ),
-        descriptors: const [],
-      );
+        final char = BlueyRemoteCharacteristic(
+          platform: fakePlatform,
+          connectionId: TestDeviceIds.device1,
+          deviceId: UUID('00000000-0000-0000-0000-aabbccddee01'),
+          uuid: UUID(TestUuids.customChar1),
+          handle: AttributeHandle(1),
+          properties: const CharacteristicProperties(
+            canRead: true,
+            canWrite: false,
+            canWriteWithoutResponse: false,
+            canNotify: false,
+            canIndicate: false,
+          ),
+          descriptors: const [],
+        );
 
-      try {
-        await char.read();
-        fail('expected PermissionDeniedException');
-      } on PermissionDeniedException catch (e) {
-        expect(e.permissions, ['BLUETOOTH_CONNECT']);
-      }
-    });
+        try {
+          await char.read();
+          fail('expected PermissionDeniedException');
+        } on PermissionDeniedException catch (e) {
+          expect(e.permissions, ['BLUETOOTH_CONNECT']);
+        }
+      },
+    );
   });
 }

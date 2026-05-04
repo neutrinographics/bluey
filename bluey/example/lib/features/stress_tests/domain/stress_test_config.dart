@@ -8,8 +8,10 @@ sealed class StressTestConfig {
 class BurstWriteConfig extends StressTestConfig {
   /// Total number of writes to fire.
   final int count;
+
   /// Payload bytes per write (excluding the 1-byte opcode prefix).
   final int payloadBytes;
+
   /// Whether each write requests a response (true) or fires
   /// without-response (false).
   final bool withResponse;
@@ -30,8 +32,10 @@ class MixedOpsConfig extends StressTestConfig {
 class SoakConfig extends StressTestConfig {
   /// Total wall-clock duration of the soak.
   final Duration duration;
+
   /// Time between successive write attempts.
   final Duration interval;
+
   /// Echo payload size per write.
   final int payloadBytes;
 
@@ -61,6 +65,7 @@ class FailureInjectionConfig extends StressTestConfig {
 class MtuProbeConfig extends StressTestConfig {
   /// MTU value to request from the platform.
   final int requestedMtu;
+
   /// Payload bytes per write/read (defaults to negotiated MTU - 3 ATT
   /// header bytes if 0).
   final int payloadBytes;
@@ -70,8 +75,10 @@ class MtuProbeConfig extends StressTestConfig {
 class NotificationThroughputConfig extends StressTestConfig {
   /// Number of notifications to ask the server to fire.
   final int count;
+
   /// Bytes per notification (excluding the burst-id prefix byte).
   final int payloadBytes;
+
   /// Per-test wall-clock budget for the entire burst to complete. If
   /// `null`, the runner derives a default from [count] (~10 ms per
   /// notification + 2 s prologue overhead) — sized for the post-I040

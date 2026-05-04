@@ -28,11 +28,7 @@ void main() {
   });
 
   Device deviceFromAddress(String address, {String? name}) {
-    return Device(
-      id: deviceIdToUuid(address),
-      address: address,
-      name: name,
-    );
+    return Device(id: deviceIdToUuid(address), address: address, name: name);
   }
 
   group('Bluey.connectAsPeer', () {
@@ -52,59 +48,65 @@ void main() {
       await peerConn.disconnect();
     });
 
-    test('peer.connection is the raw GATT Connection (not the peer wrapper)',
-        () async {
-      final id = ServerId.generate();
-      const address = 'AA:BB:CC:DD:EE:02';
-      fakePlatform.simulateBlueyServer(address: address, serverId: id);
+    test(
+      'peer.connection is the raw GATT Connection (not the peer wrapper)',
+      () async {
+        final id = ServerId.generate();
+        const address = 'AA:BB:CC:DD:EE:02';
+        fakePlatform.simulateBlueyServer(address: address, serverId: id);
 
-      final device = deviceFromAddress(address);
-      final peerConn = await bluey.connectAsPeer(device);
+        final device = deviceFromAddress(address);
+        final peerConn = await bluey.connectAsPeer(device);
 
-      // The exposed `connection` is the raw Connection — distinct from
-      // the PeerConnection wrapper.
-      expect(peerConn.connection, isA<Connection>());
-      expect(identical(peerConn.connection, peerConn), isFalse);
+        // The exposed `connection` is the raw Connection — distinct from
+        // the PeerConnection wrapper.
+        expect(peerConn.connection, isA<Connection>());
+        expect(identical(peerConn.connection, peerConn), isFalse);
 
-      await peerConn.disconnect();
-    });
+        await peerConn.disconnect();
+      },
+    );
 
-    test('disconnect() writes 0x00 to the lifecycle control characteristic '
-        'before tearing down the connection — peers should not need a '
-        'separate fast-path method (sendDisconnectCommand was the old name)',
-        () async {
-      final id = ServerId.generate();
-      const address = 'AA:BB:CC:DD:EE:0C';
-      fakePlatform.simulateBlueyServer(address: address, serverId: id);
+    test(
+      'disconnect() writes 0x00 to the lifecycle control characteristic '
+      'before tearing down the connection — peers should not need a '
+      'separate fast-path method (sendDisconnectCommand was the old name)',
+      () async {
+        final id = ServerId.generate();
+        const address = 'AA:BB:CC:DD:EE:0C';
+        fakePlatform.simulateBlueyServer(address: address, serverId: id);
 
-      final device = deviceFromAddress(address);
-      final peerConn = await bluey.connectAsPeer(device);
+        final device = deviceFromAddress(address);
+        final peerConn = await bluey.connectAsPeer(device);
 
-      // Snapshot writes before disconnect so we can ignore pre-existing
-      // heartbeat traffic.
-      final before = fakePlatform.writeCharacteristicCalls.length;
+        // Snapshot writes before disconnect so we can ignore pre-existing
+        // heartbeat traffic.
+        final before = fakePlatform.writeCharacteristicCalls.length;
 
-      await peerConn.disconnect();
+        await peerConn.disconnect();
 
-      final disconnectWrites = fakePlatform.writeCharacteristicCalls
-          .skip(before)
-          .where(
-            (w) =>
-                w.deviceId == address &&
-                w.characteristicUuid.toLowerCase() ==
-                    lifecycle.heartbeatCharUuid &&
-                w.value.length == 1 &&
-                w.value.first == 0x00,
-          )
-          .toList();
-      expect(
-        disconnectWrites.length,
-        equals(1),
-        reason: 'peer.disconnect() must write 0x00 via the lifecycle '
-            'protocol before the platform disconnect — fast server-side '
-            'detection without waiting for heartbeat-silence timeout',
-      );
-    });
+        final disconnectWrites =
+            fakePlatform.writeCharacteristicCalls
+                .skip(before)
+                .where(
+                  (w) =>
+                      w.deviceId == address &&
+                      w.characteristicUuid.toLowerCase() ==
+                          lifecycle.heartbeatCharUuid &&
+                      w.value.length == 1 &&
+                      w.value.first == 0x00,
+                )
+                .toList();
+        expect(
+          disconnectWrites.length,
+          equals(1),
+          reason:
+              'peer.disconnect() must write 0x00 via the lifecycle '
+              'protocol before the platform disconnect — fast server-side '
+              'detection without waiting for heartbeat-silence timeout',
+        );
+      },
+    );
 
     test('throws NotABlueyPeerException and disconnects the underlying '
         'connection when the device is not a Bluey peer', () async {

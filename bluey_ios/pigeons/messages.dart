@@ -396,11 +396,7 @@ abstract class BlueyHostApi {
 
   /// Enable or disable notifications for a characteristic by handle.
   @async
-  void setNotification(
-    String deviceId,
-    int characteristicHandle,
-    bool enable,
-  );
+  void setNotification(String deviceId, int characteristicHandle, bool enable);
 
   /// Read a descriptor value by platform-minted handle.
   @async

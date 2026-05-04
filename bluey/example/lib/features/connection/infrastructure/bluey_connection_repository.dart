@@ -15,10 +15,7 @@ class BlueyConnectionRepository implements ConnectionRepository {
     Duration? timeout,
     ConnectionSettings settings = const ConnectionSettings(),
   }) async {
-    return await _bluey.connect(
-      device,
-      timeout: timeout,
-    );
+    return await _bluey.connect(device, timeout: timeout);
   }
 
   @override

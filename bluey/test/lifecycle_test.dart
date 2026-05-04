@@ -130,50 +130,50 @@ void main() {
       await bluey.dispose();
     });
 
-    test('heartbeat timeout fires disconnect after client opts into lifecycle',
-        () {
-      fakeAsync((async) {
-        final bluey = Bluey();
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+    test(
+      'heartbeat timeout fires disconnect after client opts into lifecycle',
+      () {
+        fakeAsync((async) {
+          final bluey = Bluey();
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
-        server.startAdvertising();
-        async.elapse(Duration.zero);
+          server.startAdvertising();
+          async.elapse(Duration.zero);
 
-        final disconnections = <String>[];
-        server.disconnections.listen(disconnections.add);
+          final disconnections = <String>[];
+          server.disconnections.listen(disconnections.add);
 
-        fakePlatform.simulateCentralConnection(centralId: _clientId1);
-        async.elapse(Duration.zero);
+          fakePlatform.simulateCentralConnection(centralId: _clientId1);
+          async.elapse(Duration.zero);
 
-        // First heartbeat opts the client into the lifecycle protocol and
-        // starts the timer.
-        fakePlatform.simulateWriteRequest(
-          centralId: _clientId1,
-          characteristicUuid: _heartbeatCharUuid,
-          value: Uint8List.fromList([0x01]),
-          responseNeeded: true,
-        );
-        async.elapse(Duration.zero);
+          // First heartbeat opts the client into the lifecycle protocol and
+          // starts the timer.
+          fakePlatform.simulateWriteRequest(
+            centralId: _clientId1,
+            characteristicUuid: _heartbeatCharUuid,
+            value: Uint8List.fromList([0x01]),
+            responseNeeded: true,
+          );
+          async.elapse(Duration.zero);
 
-        // No further heartbeats — wait for timeout.
-        async.elapse(const Duration(seconds: 5));
+          // No further heartbeats — wait for timeout.
+          async.elapse(const Duration(seconds: 5));
 
-        expect(disconnections, contains(_clientId1));
-        expect(server.connectedClients, isEmpty);
+          expect(disconnections, contains(_clientId1));
+          expect(server.connectedClients, isEmpty);
 
-        server.dispose();
-        bluey.dispose();
-      });
-    });
+          server.dispose();
+          bluey.dispose();
+        });
+      },
+    );
 
     test('heartbeat resets timer', () {
       fakeAsync((async) {
         final bluey = Bluey();
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+        final server =
+            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
         server.startAdvertising();
         async.elapse(Duration.zero);
@@ -239,9 +239,8 @@ void main() {
     test('non-Bluey client that never heartbeats is not disconnected', () {
       fakeAsync((async) {
         final bluey = Bluey();
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+        final server =
+            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
         server.startAdvertising();
         async.elapse(Duration.zero);
@@ -293,9 +292,8 @@ void main() {
     test('platform disconnect cancels heartbeat timer', () {
       fakeAsync((async) {
         final bluey = Bluey();
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+        final server =
+            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
         server.startAdvertising();
         async.elapse(Duration.zero);
@@ -324,9 +322,8 @@ void main() {
     test('dispose cancels all heartbeat timers', () {
       fakeAsync((async) {
         final bluey = Bluey();
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+        final server =
+            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
         server.startAdvertising();
         async.elapse(Duration.zero);
@@ -352,8 +349,7 @@ void main() {
       expect(charUuids, contains('b1e70004-0000-1000-8000-00805f9b34fb'));
 
       final serverIdChar = service.characteristics.firstWhere(
-        (c) =>
-            c.uuid.toLowerCase() == 'b1e70004-0000-1000-8000-00805f9b34fb',
+        (c) => c.uuid.toLowerCase() == 'b1e70004-0000-1000-8000-00805f9b34fb',
       );
       expect(serverIdChar.properties.canRead, isTrue);
       expect(serverIdChar.properties.canWrite, isFalse);
@@ -366,26 +362,29 @@ void main() {
       expect(decodeServerId(bytes), equals(id));
     });
 
-    test('emits disconnect for untracked client (stale connection after server restart)', () async {
-      final bluey = Bluey();
-      final server = bluey.server()!;
-      await server.startAdvertising();
+    test(
+      'emits disconnect for untracked client (stale connection after server restart)',
+      () async {
+        final bluey = Bluey();
+        final server = bluey.server()!;
+        await server.startAdvertising();
 
-      final disconnections = <String>[];
-      server.disconnections.listen(disconnections.add);
+        final disconnections = <String>[];
+        server.disconnections.listen(disconnections.add);
 
-      // Simulate a central that was connected before the server restarted.
-      // The server has NO record of this client -- it was never in
-      // _connectedClients. But the platform reports its disconnection.
-      fakePlatform.simulateCentralDisconnection('stale-client-id');
-      await Future.delayed(Duration.zero);
+        // Simulate a central that was connected before the server restarted.
+        // The server has NO record of this client -- it was never in
+        // _connectedClients. But the platform reports its disconnection.
+        fakePlatform.simulateCentralDisconnection('stale-client-id');
+        await Future.delayed(Duration.zero);
 
-      // The server should still emit the disconnect event.
-      expect(disconnections, contains('stale-client-id'));
+        // The server should still emit the disconnect event.
+        expect(disconnections, contains('stale-client-id'));
 
-      await server.dispose();
-      await bluey.dispose();
-    });
+        await server.dispose();
+        await bluey.dispose();
+      },
+    );
 
     test('auto-generates a ServerId when constructed without identity', () {
       final bluey = Bluey();
@@ -404,29 +403,31 @@ void main() {
       bluey.dispose();
     });
 
-    test('server responds to serverId reads with the configured identity',
-        () async {
-      final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-      final bluey = Bluey();
-      final server = bluey.server(identity: id)!;
-      await server.startAdvertising();
+    test(
+      'server responds to serverId reads with the configured identity',
+      () async {
+        final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+        final bluey = Bluey();
+        final server = bluey.server(identity: id)!;
+        await server.startAdvertising();
 
-      fakePlatform.simulateCentralConnection(centralId: _clientId1);
-      await Future.delayed(Duration.zero);
+        fakePlatform.simulateCentralConnection(centralId: _clientId1);
+        await Future.delayed(Duration.zero);
 
-      fakePlatform.simulateReadRequest(
-        centralId: _clientId1,
-        characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
-      );
-      await Future.delayed(Duration.zero);
+        fakePlatform.simulateReadRequest(
+          centralId: _clientId1,
+          characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+        );
+        await Future.delayed(Duration.zero);
 
-      expect(fakePlatform.respondReadCalls, isNotEmpty);
-      final call = fakePlatform.respondReadCalls.last;
-      expect(call.value, equals(id.toBytes()));
+        expect(fakePlatform.respondReadCalls, isNotEmpty);
+        final call = fakePlatform.respondReadCalls.last;
+        expect(call.value, equals(id.toBytes()));
 
-      await server.dispose();
-      await bluey.dispose();
-    });
+        await server.dispose();
+        await bluey.dispose();
+      },
+    );
   });
 
   group('lifecycle.dart utilities', () {
@@ -437,10 +438,7 @@ void main() {
 
     // 19. isControlService returns false for random UUID
     test('isControlService returns false for random UUID', () {
-      expect(
-        isControlService('0000180d-0000-1000-8000-00805f9b34fb'),
-        isFalse,
-      );
+      expect(isControlService('0000180d-0000-1000-8000-00805f9b34fb'), isFalse);
     });
 
     // 20. isControlServiceCharacteristic returns true for all three char UUIDs
@@ -449,19 +447,22 @@ void main() {
       () {
         expect(
           isControlServiceCharacteristic(
-              'b1e70002-0000-1000-8000-00805f9b34fb'),
+            'b1e70002-0000-1000-8000-00805f9b34fb',
+          ),
           isTrue,
           reason: 'heartbeat char',
         );
         expect(
           isControlServiceCharacteristic(
-              'b1e70003-0000-1000-8000-00805f9b34fb'),
+            'b1e70003-0000-1000-8000-00805f9b34fb',
+          ),
           isTrue,
           reason: 'interval char',
         );
         expect(
           isControlServiceCharacteristic(
-              'b1e70004-0000-1000-8000-00805f9b34fb'),
+            'b1e70004-0000-1000-8000-00805f9b34fb',
+          ),
           isTrue,
           reason: 'serverId char',
         );
@@ -528,10 +529,16 @@ void main() {
       );
       await Future.delayed(Duration.zero);
 
-      expect(server.connectedClients, hasLength(1),
-          reason: 'trackClientIfNeeded should be idempotent');
-      expect(connections, hasLength(1),
-          reason: 'No duplicate connection event');
+      expect(
+        server.connectedClients,
+        hasLength(1),
+        reason: 'trackClientIfNeeded should be idempotent',
+      );
+      expect(
+        connections,
+        hasLength(1),
+        reason: 'No duplicate connection event',
+      );
 
       await server.dispose();
       await bluey.dispose();

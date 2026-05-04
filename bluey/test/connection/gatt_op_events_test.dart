@@ -27,11 +27,8 @@ void main() {
   const serviceUuidStr = '0000180d-0000-1000-8000-00805f9b34fb'; // Heart Rate
   const charUuidStr = '00002a37-0000-1000-8000-00805f9b34fb'; // HR Measurement
 
-  Device deviceFor() => Device(
-        id: deviceId,
-        address: deviceAddress,
-        name: 'Test Device',
-      );
+  Device deviceFor() =>
+      Device(id: deviceId, address: deviceAddress, name: 'Test Device');
 
   void simulatePeripheralWithReadableChar({Uint8List? value}) {
     fakePlatform.simulatePeripheral(
@@ -105,10 +102,8 @@ void main() {
       final sub = bluey.events.listen(events.add);
 
       final connection = await bluey.connect(deviceFor());
-      final char = (await connection.services())
-          .single
-          .characteristics()
-          .single;
+      final char =
+          (await connection.services()).single.characteristics().single;
       final value = await char.read();
 
       await Future<void>.delayed(Duration.zero);
@@ -129,10 +124,8 @@ void main() {
       final sub = bluey.events.listen(events.add);
 
       final connection = await bluey.connect(deviceFor());
-      final char = (await connection.services())
-          .single
-          .characteristics()
-          .single;
+      final char =
+          (await connection.services()).single.characteristics().single;
       final payload = Uint8List.fromList([0x10, 0x20, 0x30, 0x40]);
       await char.write(payload, withResponse: true);
 
@@ -155,10 +148,8 @@ void main() {
       final sub = bluey.events.listen(events.add);
 
       final connection = await bluey.connect(deviceFor());
-      final char = (await connection.services())
-          .single
-          .characteristics()
-          .single;
+      final char =
+          (await connection.services()).single.characteristics().single;
       final notifSub = char.notifications.listen((_) {});
 
       // Allow the platform setNotification call to resolve so the
@@ -183,10 +174,8 @@ void main() {
       final sub = bluey.events.listen(events.add);
 
       final connection = await bluey.connect(deviceFor());
-      final char = (await connection.services())
-          .single
-          .characteristics()
-          .single;
+      final char =
+          (await connection.services()).single.characteristics().single;
       final notifSub = char.notifications.listen((_) {});
       await Future<void>.delayed(const Duration(milliseconds: 5));
 

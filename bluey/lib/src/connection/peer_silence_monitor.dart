@@ -57,11 +57,12 @@ class PeerSilenceMonitor {
     required this.peerSilenceTimeout,
     required this.onSilent,
     required Duration activityWindow,
-  })  : _activityWindow = activityWindow {
-    assert(peerSilenceTimeout > Duration.zero,
-        'peerSilenceTimeout must be positive');
-    assert(activityWindow > Duration.zero,
-        'activityWindow must be positive');
+  }) : _activityWindow = activityWindow {
+    assert(
+      peerSilenceTimeout > Duration.zero,
+      'peerSilenceTimeout must be positive',
+    );
+    assert(activityWindow > Duration.zero, 'activityWindow must be positive');
   }
 
   /// Probe-scheduling cadence. Read-only from outside; mutate via

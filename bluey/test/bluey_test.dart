@@ -205,7 +205,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   // Server (Peripheral) operations - stub implementations
   @override
-  Future<platform.PlatformLocalService> addService(platform.PlatformLocalService service) async => service;
+  Future<platform.PlatformLocalService> addService(
+    platform.PlatformLocalService service,
+  ) async => service;
 
   @override
   Future<void> removeService(String serviceUuid) async {}
@@ -410,9 +412,7 @@ void main() {
 
     group('connect', () {
       test('returns Connection object', () async {
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        );
+        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
 
         final connection = await bluey.connect(device);
 
@@ -421,9 +421,7 @@ void main() {
       });
 
       test('connection emits state changes', () async {
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        );
+        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
 
         final states = <ConnectionState>[];
         final connection = await bluey.connect(device);
@@ -451,9 +449,7 @@ void main() {
 
     group('disconnect', () {
       test('disconnects from device via Connection', () async {
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddeeff'),
-        );
+        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
 
         // Connect and get Connection object
         final connection = await bluey.connect(device);

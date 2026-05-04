@@ -221,8 +221,8 @@ class BlueyConnection implements Connection {
     _platformServiceChangesSubscription = _platform.serviceChanges
         .where((id) => id == _connectionId)
         .listen((_) {
-      _onServiceChanged();
-    });
+          _onServiceChanged();
+        });
 
     // Bond / PHY / connection-parameter subscriptions and initial fetches
     // are guarded by [Capabilities]. Platforms that don't support an
@@ -373,13 +373,15 @@ class BlueyConnection implements Connection {
     // having to call services() themselves. Fire-and-forget; errors
     // surface as a stream error to subscribers (rather than an
     // unhandled future).
-    services().then((fresh) {
-      if (_servicesChangesController.isClosed) return;
-      _servicesChangesController.add(fresh);
-    }).catchError((Object e, StackTrace st) {
-      if (_servicesChangesController.isClosed) return;
-      _servicesChangesController.addError(e, st);
-    });
+    services()
+        .then((fresh) {
+          if (_servicesChangesController.isClosed) return;
+          _servicesChangesController.add(fresh);
+        })
+        .catchError((Object e, StackTrace st) {
+          if (_servicesChangesController.isClosed) return;
+          _servicesChangesController.addError(e, st);
+        });
   }
 
   /// Idempotent, non-regressing state transition. Skips the emit if the
@@ -390,8 +392,7 @@ class BlueyConnection implements Connection {
   /// repeats would otherwise downgrade us).
   void _setState(ConnectionState newState) {
     if (_state == newState) return;
-    if (_state == ConnectionState.ready &&
-        newState == ConnectionState.linked) {
+    if (_state == ConnectionState.ready && newState == ConnectionState.linked) {
       return;
     }
     _state = newState;
@@ -399,10 +400,7 @@ class BlueyConnection implements Connection {
       BlueyLogLevel.info,
       'bluey.connection',
       'state transition',
-      data: {
-        'deviceId': deviceId.toString(),
-        'state': _state.toString(),
-      },
+      data: {'deviceId': deviceId.toString(), 'state': _state.toString()},
     );
     _stateController.add(_state);
   }
@@ -456,18 +454,18 @@ class BlueyConnection implements Connection {
       'services discovery started',
       data: {'deviceId': deviceId.toString()},
     );
-    _events?.emit(DiscoveringServicesEvent(
-      deviceId: deviceId,
-      source: 'BlueyConnection',
-    ));
+    _events?.emit(
+      DiscoveringServicesEvent(deviceId: deviceId, source: 'BlueyConnection'),
+    );
     final stopwatch = Stopwatch()..start();
-    final platformServices = await _trackInFlight(() => _runGattOp(
-          deviceId,
-          'discoverServices',
-          () => _platform.discoverServices(_connectionId),
-        ));
-    _cachedServices =
-        platformServices.map((ps) => _mapService(ps)).toList();
+    final platformServices = await _trackInFlight(
+      () => _runGattOp(
+        deviceId,
+        'discoverServices',
+        () => _platform.discoverServices(_connectionId),
+      ),
+    );
+    _cachedServices = platformServices.map((ps) => _mapService(ps)).toList();
 
     _logger.log(
       BlueyLogLevel.info,
@@ -479,11 +477,13 @@ class BlueyConnection implements Connection {
         'durationMs': stopwatch.elapsedMilliseconds,
       },
     );
-    _events?.emit(ServicesDiscoveredEvent(
-      deviceId: deviceId,
-      serviceCount: _cachedServices!.length,
-      source: 'BlueyConnection',
-    ));
+    _events?.emit(
+      ServicesDiscoveredEvent(
+        deviceId: deviceId,
+        serviceCount: _cachedServices!.length,
+        source: 'BlueyConnection',
+      ),
+    );
 
     // Trace-level enumeration of every discovered service UUID. Useful
     // for debugging UUID-canonicalization mismatches (e.g. peer-detection
@@ -518,28 +518,32 @@ class BlueyConnection implements Connection {
     _requireCapability(_platform.capabilities.canRequestMtu, 'requestMtu');
     _ensureConnected();
     final requested = mtu.value;
-    _mtu = await _trackInFlight(() => _loggedGattOp(
-          deviceId: deviceId,
-          op: 'requestMtu',
-          startDetail: 'requested=$requested',
-          body: () => _platform.requestMtu(_connectionId, requested),
-          completeDetail: (negotiated) =>
-              'requested=$requested, negotiated=$negotiated',
-          logger: _logger,
-        ));
+    _mtu = await _trackInFlight(
+      () => _loggedGattOp(
+        deviceId: deviceId,
+        op: 'requestMtu',
+        startDetail: 'requested=$requested',
+        body: () => _platform.requestMtu(_connectionId, requested),
+        completeDetail:
+            (negotiated) => 'requested=$requested, negotiated=$negotiated',
+        logger: _logger,
+      ),
+    );
     return Mtu.fromPlatform(_mtu);
   }
 
   @override
   Future<int> readRssi() async {
     _ensureConnected();
-    return _trackInFlight(() => _loggedGattOp(
-          deviceId: deviceId,
-          op: 'readRssi',
-          body: () => _platform.readRssi(_connectionId),
-          completeDetail: (rssi) => 'rssi=${rssi}dBm',
-          logger: _logger,
-        ));
+    return _trackInFlight(
+      () => _loggedGattOp(
+        deviceId: deviceId,
+        op: 'readRssi',
+        body: () => _platform.readRssi(_connectionId),
+        completeDetail: (rssi) => 'rssi=${rssi}dBm',
+        logger: _logger,
+      ),
+    );
   }
 
   AndroidConnectionExtensions? _androidExtensions;
@@ -763,9 +767,10 @@ class BlueyConnection implements Connection {
         canNotify: pc.properties.canNotify,
         canIndicate: pc.properties.canIndicate,
       ),
-      descriptors: pc.descriptors
-          .map((pd) => _mapDescriptor(pd, characteristicHandle))
-          .toList(),
+      descriptors:
+          pc.descriptors
+              .map((pd) => _mapDescriptor(pd, characteristicHandle))
+              .toList(),
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
       logger: _logger,
@@ -819,9 +824,7 @@ class BlueyRemoteService implements RemoteService {
   @override
   List<RemoteCharacteristic> characteristics({UUID? uuid}) {
     if (uuid == null) return List.unmodifiable(_characteristics);
-    return List.unmodifiable(
-      _characteristics.where((c) => c.uuid == uuid),
-    );
+    return List.unmodifiable(_characteristics.where((c) => c.uuid == uuid));
   }
 
   @override
@@ -937,24 +940,25 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!properties.canRead) {
       throw const OperationNotSupportedException('read');
     }
-    final value = await _trackInFlight(() => _loggedGattOp(
-          deviceId: _deviceId,
-          op: 'readCharacteristic',
-          startDetail: 'char=$uuid',
-          body: () => _platform.readCharacteristic(
-            _connectionId,
-            handle.value,
-          ),
-          completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
-          lifecycleClient: _lifecycle(),
-          logger: _logger,
-        ));
-    _events?.emit(CharacteristicReadEvent(
-      deviceId: _deviceId,
-      characteristicId: uuid,
-      valueLength: value.length,
-      source: 'BlueyRemoteCharacteristic',
-    ));
+    final value = await _trackInFlight(
+      () => _loggedGattOp(
+        deviceId: _deviceId,
+        op: 'readCharacteristic',
+        startDetail: 'char=$uuid',
+        body: () => _platform.readCharacteristic(_connectionId, handle.value),
+        completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
+        lifecycleClient: _lifecycle(),
+        logger: _logger,
+      ),
+    );
+    _events?.emit(
+      CharacteristicReadEvent(
+        deviceId: _deviceId,
+        characteristicId: uuid,
+        valueLength: value.length,
+        source: 'BlueyRemoteCharacteristic',
+      ),
+    );
     return value;
   }
 
@@ -967,27 +971,32 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     if (!withResponse && !properties.canWriteWithoutResponse) {
       throw const OperationNotSupportedException('writeWithoutResponse');
     }
-    await _trackInFlight<void>(() => _loggedGattOp<void>(
-          deviceId: _deviceId,
-          op: 'writeCharacteristic',
-          startDetail: 'char=$uuid, bytes=${value.length}',
-          body: () => _platform.writeCharacteristic(
-            _connectionId,
-            handle.value,
-            value,
-            withResponse,
-          ),
-          completeDetail: (_) => 'char=$uuid',
-          lifecycleClient: _lifecycle(),
-          logger: _logger,
-        ));
-    _events?.emit(CharacteristicWrittenEvent(
-      deviceId: _deviceId,
-      characteristicId: uuid,
-      valueLength: value.length,
-      withResponse: withResponse,
-      source: 'BlueyRemoteCharacteristic',
-    ));
+    await _trackInFlight<void>(
+      () => _loggedGattOp<void>(
+        deviceId: _deviceId,
+        op: 'writeCharacteristic',
+        startDetail: 'char=$uuid, bytes=${value.length}',
+        body:
+            () => _platform.writeCharacteristic(
+              _connectionId,
+              handle.value,
+              value,
+              withResponse,
+            ),
+        completeDetail: (_) => 'char=$uuid',
+        lifecycleClient: _lifecycle(),
+        logger: _logger,
+      ),
+    );
+    _events?.emit(
+      CharacteristicWrittenEvent(
+        deviceId: _deviceId,
+        characteristicId: uuid,
+        valueLength: value.length,
+        withResponse: withResponse,
+        source: 'BlueyRemoteCharacteristic',
+      ),
+    );
   }
 
   @override
@@ -1015,24 +1024,24 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // must surface on the notification stream so subscribers see it
     // instead of it becoming an unhandled async error.
     _runGattOp(
-      _deviceId,
-      'setNotification',
-      () => _platform.setNotification(
-        _connectionId,
-        handle.value,
-        true,
-      ),
-      lifecycleClient: _lifecycle(),
-    ).then((_) {
-      _events?.emit(NotificationSubscriptionEvent(
-        deviceId: _deviceId,
-        characteristicId: uuid,
-        enabled: true,
-        source: 'BlueyRemoteCharacteristic',
-      ));
-    }).catchError((Object error) {
-      _notificationController?.addError(error);
-    });
+          _deviceId,
+          'setNotification',
+          () => _platform.setNotification(_connectionId, handle.value, true),
+          lifecycleClient: _lifecycle(),
+        )
+        .then((_) {
+          _events?.emit(
+            NotificationSubscriptionEvent(
+              deviceId: _deviceId,
+              characteristicId: uuid,
+              enabled: true,
+              source: 'BlueyRemoteCharacteristic',
+            ),
+          );
+        })
+        .catchError((Object error) {
+          _notificationController?.addError(error);
+        });
 
     // Subscribe to platform notifications
     _notificationSubscription = _platform
@@ -1049,12 +1058,14 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
             // start/end/failure wrapping used for outbound ops.
             _lifecycle()?.recordActivity();
             _notificationController?.add(notification.value);
-            _events?.emit(NotificationReceivedEvent(
-              deviceId: _deviceId,
-              characteristicId: uuid,
-              valueLength: notification.value.length,
-              source: 'BlueyRemoteCharacteristic',
-            ));
+            _events?.emit(
+              NotificationReceivedEvent(
+                deviceId: _deviceId,
+                characteristicId: uuid,
+                valueLength: notification.value.length,
+                source: 'BlueyRemoteCharacteristic',
+              ),
+            );
           },
           onError: (error) {
             _notificationController?.addError(error);
@@ -1068,22 +1079,22 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // errors. Swallow silently to keep teardown best-effort — a link-loss
     // race on shutdown is an expected condition, not a test failure.
     _runGattOp(
-      _deviceId,
-      'setNotification',
-      () => _platform.setNotification(
-        _connectionId,
-        handle.value,
-        false,
-      ),
-      lifecycleClient: _lifecycle(),
-    ).then((_) {
-      _events?.emit(NotificationSubscriptionEvent(
-        deviceId: _deviceId,
-        characteristicId: uuid,
-        enabled: false,
-        source: 'BlueyRemoteCharacteristic',
-      ));
-    }).catchError((Object _) {});
+          _deviceId,
+          'setNotification',
+          () => _platform.setNotification(_connectionId, handle.value, false),
+          lifecycleClient: _lifecycle(),
+        )
+        .then((_) {
+          _events?.emit(
+            NotificationSubscriptionEvent(
+              deviceId: _deviceId,
+              characteristicId: uuid,
+              enabled: false,
+              source: 'BlueyRemoteCharacteristic',
+            ),
+          );
+        })
+        .catchError((Object _) {});
 
     // Cancel subscription
     _notificationSubscription?.cancel();
@@ -1185,32 +1196,36 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   @override
   Future<Uint8List> read() async {
     _ensureConnected();
-    return _trackInFlight(() => _runGattOp(
-          _deviceId,
-          'readDescriptor',
-          () => _platform.readDescriptor(
-            _connectionId,
-            _characteristicHandle.value,
-            handle.value,
-          ),
-          lifecycleClient: _lifecycle(),
-        ));
+    return _trackInFlight(
+      () => _runGattOp(
+        _deviceId,
+        'readDescriptor',
+        () => _platform.readDescriptor(
+          _connectionId,
+          _characteristicHandle.value,
+          handle.value,
+        ),
+        lifecycleClient: _lifecycle(),
+      ),
+    );
   }
 
   @override
   Future<void> write(Uint8List value) async {
     _ensureConnected();
-    return _trackInFlight<void>(() => _runGattOp(
-          _deviceId,
-          'writeDescriptor',
-          () => _platform.writeDescriptor(
-            _connectionId,
-            _characteristicHandle.value,
-            handle.value,
-            value,
-          ),
-          lifecycleClient: _lifecycle(),
-        ));
+    return _trackInFlight<void>(
+      () => _runGattOp(
+        _deviceId,
+        'writeDescriptor',
+        () => _platform.writeDescriptor(
+          _connectionId,
+          _characteristicHandle.value,
+          handle.value,
+          value,
+        ),
+        lifecycleClient: _lifecycle(),
+      ),
+    );
   }
 }
 

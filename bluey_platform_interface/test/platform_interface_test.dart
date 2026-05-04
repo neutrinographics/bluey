@@ -177,8 +177,7 @@ final class MockBlueyPlatform extends BlueyPlatform
   Future<void> removeBond(String deviceId) => throw UnimplementedError();
 
   @override
-  Future<List<PlatformDevice>> getBondedDevices() =>
-      throw UnimplementedError();
+  Future<List<PlatformDevice>> getBondedDevices() => throw UnimplementedError();
 
   @override
   Future<({PlatformPhy tx, PlatformPhy rx})> getPhy(String deviceId) =>

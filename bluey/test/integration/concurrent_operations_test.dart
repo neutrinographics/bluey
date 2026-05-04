@@ -127,7 +127,8 @@ void main() {
         expect(results, hasLength(3));
 
         // Connect to all three in parallel
-        final connectionFutures = results.map((r) => bluey.connect(r.device)).toList();
+        final connectionFutures =
+            results.map((r) => bluey.connect(r.device)).toList();
         final connections = await Future.wait(connectionFutures);
 
         expect(connections, hasLength(3));
@@ -238,8 +239,14 @@ void main() {
 
         // Read both characteristics in parallel
         final results = await Future.wait([
-          fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', ),
-          fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a38-0000-1000-8000-00805f9b34fb', ),
+          fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+          ),
+          fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a38-0000-1000-8000-00805f9b34fb',
+          ),
         ]);
 
         expect(results[0], equals(Uint8List.fromList([0x01])));
@@ -293,13 +300,29 @@ void main() {
 
         // Write to both characteristics in parallel
         await Future.wait([
-          fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0xAA]), true, ),
-          fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a38-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0xBB]), true, ),
+          fakePlatform.writeCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0xAA]),
+            true,
+          ),
+          fakePlatform.writeCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a38-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0xBB]),
+            true,
+          ),
         ]);
 
         // Verify both writes succeeded
-        final value1 = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
-        final value2 = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a38-0000-1000-8000-00805f9b34fb', );
+        final value1 = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
+        final value2 = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a38-0000-1000-8000-00805f9b34fb',
+        );
 
         expect(value1, equals(Uint8List.fromList([0xAA])));
         expect(value2, equals(Uint8List.fromList([0xBB])));
@@ -343,14 +366,33 @@ void main() {
 
         // Interleave multiple read/write operations
         await Future.wait([
-          fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', ),
-          fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01]), true, ),
-          fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', ),
-          fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x02]), true, ),
+          fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+          ),
+          fakePlatform.writeCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x01]),
+            true,
+          ),
+          fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+          ),
+          fakePlatform.writeCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x02]),
+            true,
+          ),
         ]);
 
         // Final value should be the last write
-        final finalValue = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
+        final finalValue = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
         expect(finalValue, equals(Uint8List.fromList([0x02])));
 
         await bluey.dispose();
@@ -402,8 +444,16 @@ void main() {
         await bluey.connect(device);
 
         // Subscribe to notifications
-        await fakePlatform.setNotificationByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', true, );
-        await fakePlatform.setNotificationByUuid('AA:BB:CC:DD:EE:01', '00002a38-0000-1000-8000-00805f9b34fb', true, );
+        await fakePlatform.setNotificationByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          true,
+        );
+        await fakePlatform.setNotificationByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a38-0000-1000-8000-00805f9b34fb',
+          true,
+        );
 
         final notifications = <platform.PlatformNotification>[];
         final subscription = fakePlatform
@@ -599,12 +649,23 @@ void main() {
         fakePlatform.simulateCentralConnection(centralId: 'central-2');
 
         // Broadcast notification to all
-        await fakePlatform.notifyCharacteristicByUuid('00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01]), );
+        await fakePlatform.notifyCharacteristicByUuid(
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List.fromList([0x01]),
+        );
 
         // Individual notifications to each
         await Future.wait([
-          fakePlatform.notifyCharacteristicToByUuid('central-1', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x02]), ),
-          fakePlatform.notifyCharacteristicToByUuid('central-2', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x03]), ),
+          fakePlatform.notifyCharacteristicToByUuid(
+            'central-1',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x02]),
+          ),
+          fakePlatform.notifyCharacteristicToByUuid(
+            'central-2',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x03]),
+          ),
         ]);
 
         await server.dispose();
@@ -665,7 +726,10 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Read from remote device (as client)
-        final remoteValue = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a19-0000-1000-8000-00805f9b34fb', );
+        final remoteValue = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a19-0000-1000-8000-00805f9b34fb',
+        );
         expect(remoteValue, equals(Uint8List.fromList([0x64])));
 
         // Accept connection as server

@@ -21,10 +21,7 @@ void main() {
     });
 
     test('two handles with the same value share a hash code', () {
-      expect(
-        AttributeHandle(7).hashCode,
-        equals(AttributeHandle(7).hashCode),
-      );
+      expect(AttributeHandle(7).hashCode, equals(AttributeHandle(7).hashCode));
     });
 
     test('two handles with different values are not equal', () {

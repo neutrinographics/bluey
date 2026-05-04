@@ -74,19 +74,16 @@ class IosConnectionManager {
   final BlueyHostApi _hostApi;
 
   final Map<String, StreamController<PlatformConnectionState>>
-      _connectionStateControllers = {};
+  _connectionStateControllers = {};
   final Map<String, StreamController<PlatformNotification>>
-      _notificationControllers = {};
+  _notificationControllers = {};
 
   IosConnectionManager(this._hostApi);
 
   // === Connection ===
 
   /// Connects to a device and creates per-device streams.
-  Future<String> connect(
-    String deviceId,
-    PlatformConnectConfig config,
-  ) async {
+  Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
 
     _connectionStateControllers[deviceId] =
@@ -373,5 +370,4 @@ class IosConnectionManager {
   PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
     return PlatformDescriptor(uuid: expandUuid(dto.uuid), handle: dto.handle);
   }
-
 }

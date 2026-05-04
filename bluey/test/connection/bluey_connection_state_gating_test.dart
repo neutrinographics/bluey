@@ -22,8 +22,10 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  Future<({Connection connection, RemoteCharacteristic char, RemoteDescriptor desc})>
-      establishWithChar() async {
+  Future<
+    ({Connection connection, RemoteCharacteristic char, RemoteDescriptor desc})
+  >
+  establishWithChar() async {
     fakePlatform.simulatePeripheral(
       id: TestDeviceIds.device1,
       name: 'Sensor',
@@ -86,7 +88,9 @@ void main() {
       await ctx.connection.disconnect();
 
       await expectLater(
-        ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android)),
+        ctx.connection.requestMtu(
+          Mtu(247, capabilities: platform.Capabilities.android),
+        ),
         throwsA(isA<DisconnectedException>()),
       );
     });
@@ -111,83 +115,99 @@ void main() {
       );
     });
 
-    test('characteristic.read after disconnect throws DisconnectedException',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'characteristic.read after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      await expectLater(
-        ctx.char.read(),
-        throwsA(isA<DisconnectedException>()),
-      );
-    });
+        await expectLater(
+          ctx.char.read(),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
-    test('characteristic.write after disconnect throws DisconnectedException',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'characteristic.write after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      await expectLater(
-        ctx.char.write(Uint8List.fromList([0x42])),
-        throwsA(isA<DisconnectedException>()),
-      );
-    });
+        await expectLater(
+          ctx.char.write(Uint8List.fromList([0x42])),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
-    test('characteristic.notifications after disconnect throws DisconnectedException',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'characteristic.notifications after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      // Synchronous throw on getter access (matches the existing
-      // OperationNotSupportedException pattern when the characteristic
-      // doesn't support notify).
-      expect(
-        () => ctx.char.notifications,
-        throwsA(isA<DisconnectedException>()),
-      );
-    });
+        // Synchronous throw on getter access (matches the existing
+        // OperationNotSupportedException pattern when the characteristic
+        // doesn't support notify).
+        expect(
+          () => ctx.char.notifications,
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
-    test('descriptor.read after disconnect throws DisconnectedException',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'descriptor.read after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      await expectLater(
-        ctx.desc.read(),
-        throwsA(isA<DisconnectedException>()),
-      );
-    });
+        await expectLater(
+          ctx.desc.read(),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
-    test('descriptor.write after disconnect throws DisconnectedException',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'descriptor.write after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      await expectLater(
-        ctx.desc.write(Uint8List.fromList([0x01, 0x00])),
-        throwsA(isA<DisconnectedException>()),
-      );
-    });
+        await expectLater(
+          ctx.desc.write(Uint8List.fromList([0x01, 0x00])),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
-    test('DisconnectedException carries the connection deviceId and unknown reason',
-        () async {
-      final ctx = await establishWithChar();
-      await ctx.connection.disconnect();
+    test(
+      'DisconnectedException carries the connection deviceId and unknown reason',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
 
-      try {
-        await ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android));
-        fail('expected DisconnectedException');
-      } on DisconnectedException catch (e) {
-        expect(e.deviceId, ctx.connection.deviceId);
-        expect(e.reason, DisconnectReason.unknown);
-      }
-    });
+        try {
+          await ctx.connection.requestMtu(
+            Mtu(247, capabilities: platform.Capabilities.android),
+          );
+          fail('expected DisconnectedException');
+        } on DisconnectedException catch (e) {
+          expect(e.deviceId, ctx.connection.deviceId);
+          expect(e.reason, DisconnectReason.unknown);
+        }
+      },
+    );
 
     test('healthy connection allows GATT ops (regression guard)', () async {
       final ctx = await establishWithChar();
 
       // None of these should throw.
-      await ctx.connection.requestMtu(Mtu(247, capabilities: platform.Capabilities.android));
+      await ctx.connection.requestMtu(
+        Mtu(247, capabilities: platform.Capabilities.android),
+      );
       await ctx.char.read();
       await ctx.char.write(Uint8List.fromList([0x01]));
 

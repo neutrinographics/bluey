@@ -173,27 +173,28 @@ class Capabilities {
         other.canAdvertiseInBackground == canAdvertiseInBackground &&
         other.canBond == canBond &&
         other.canRequestPhy == canRequestPhy &&
-        other.canRequestConnectionParameters == canRequestConnectionParameters &&
+        other.canRequestConnectionParameters ==
+            canRequestConnectionParameters &&
         other.canRequestEnable == canRequestEnable &&
         other.canAdvertiseManufacturerData == canAdvertiseManufacturerData;
   }
 
   @override
   int get hashCode => Object.hash(
-        platformKind,
-        canScan,
-        canConnect,
-        canAdvertise,
-        canRequestMtu,
-        maxMtu,
-        canScanInBackground,
-        canAdvertiseInBackground,
-        canBond,
-        canRequestPhy,
-        canRequestConnectionParameters,
-        canRequestEnable,
-        canAdvertiseManufacturerData,
-      );
+    platformKind,
+    canScan,
+    canConnect,
+    canAdvertise,
+    canRequestMtu,
+    maxMtu,
+    canScanInBackground,
+    canAdvertiseInBackground,
+    canBond,
+    canRequestPhy,
+    canRequestConnectionParameters,
+    canRequestEnable,
+    canAdvertiseManufacturerData,
+  );
 
   @override
   String toString() {

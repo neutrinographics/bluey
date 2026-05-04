@@ -37,8 +37,9 @@ void main() {
       expect(cubit.state.peerSilenceTimeout, const Duration(seconds: 30));
     });
 
-    testWidgets('tapping Strict dispatches setPeerSilenceTimeout(10s)',
-        (tester) async {
+    testWidgets('tapping Strict dispatches setPeerSilenceTimeout(10s)', (
+      tester,
+    ) async {
       final cubit = ConnectionSettingsCubit();
       await tester.pumpWidget(wrap(const ToleranceControl(), cubit));
 
@@ -48,8 +49,9 @@ void main() {
       expect(cubit.state.peerSilenceTimeout, const Duration(seconds: 10));
     });
 
-    testWidgets('tapping Very tolerant dispatches setPeerSilenceTimeout(60s)',
-        (tester) async {
+    testWidgets('tapping Very tolerant dispatches setPeerSilenceTimeout(60s)', (
+      tester,
+    ) async {
       final cubit = ConnectionSettingsCubit();
       await tester.pumpWidget(wrap(const ToleranceControl(), cubit));
 

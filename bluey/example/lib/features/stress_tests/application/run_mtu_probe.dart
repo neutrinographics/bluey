@@ -8,10 +8,7 @@ class RunMtuProbe {
   final StressTestRunner _runner;
   RunMtuProbe(this._runner);
 
-  Stream<StressTestResult> call(
-    MtuProbeConfig config,
-    Connection connection,
-  ) {
+  Stream<StressTestResult> call(MtuProbeConfig config, Connection connection) {
     return _runner.runMtuProbe(config, connection);
   }
 }

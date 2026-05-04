@@ -28,12 +28,12 @@ void main() {
       id: TestDeviceIds.device1,
       name: 'Logger Test Device',
       services: [
-        TestServiceBuilder(TestUuids.heartRateService)
-            .withNotifiable(TestUuids.heartRateMeasurement)
-            .build(),
-        TestServiceBuilder(TestUuids.batteryService)
-            .withReadable(TestUuids.batteryLevel)
-            .build(),
+        TestServiceBuilder(
+          TestUuids.heartRateService,
+        ).withNotifiable(TestUuids.heartRateMeasurement).build(),
+        TestServiceBuilder(
+          TestUuids.batteryService,
+        ).withReadable(TestUuids.batteryLevel).build(),
       ],
     );
   });

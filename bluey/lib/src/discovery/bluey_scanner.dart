@@ -39,38 +39,42 @@ class BlueyScanner implements Scanner {
 
     final controller = StreamController<ScanResult>();
 
-    _platformSubscription = _platform.scan(config).listen(
-      (platformDevice) {
-        final result = _mapScanResult(platformDevice);
-        _eventBus.emit(
-          DeviceDiscoveredEvent(
-            deviceId: result.device.id,
-            name: result.device.name,
-            rssi: result.rssi,
-          ),
+    _platformSubscription = _platform
+        .scan(config)
+        .listen(
+          (platformDevice) {
+            final result = _mapScanResult(platformDevice);
+            _eventBus.emit(
+              DeviceDiscoveredEvent(
+                deviceId: result.device.id,
+                name: result.device.name,
+                rssi: result.rssi,
+              ),
+            );
+            controller.add(result);
+          },
+          onDone: () {
+            _timeoutTimer?.cancel();
+            _finishScan(controller);
+          },
+          onError: (Object error) {
+            _timeoutTimer?.cancel();
+            controller.addError(
+              translatePlatformException(error, operation: 'scan'),
+            );
+            _finishScan(controller);
+          },
         );
-        controller.add(result);
-      },
-      onDone: () {
-        _timeoutTimer?.cancel();
-        _finishScan(controller);
-      },
-      onError: (Object error) {
-        _timeoutTimer?.cancel();
-        controller.addError(translatePlatformException(
-          error,
-          operation: 'scan',
-        ));
-        _finishScan(controller);
-      },
-    );
 
     if (timeout != null) {
-      _timeoutTimer = Timer(timeout, () => stop().then((_) {
-        if (!controller.isClosed) {
-          controller.close();
-        }
-      }));
+      _timeoutTimer = Timer(
+        timeout,
+        () => stop().then((_) {
+          if (!controller.isClosed) {
+            controller.close();
+          }
+        }),
+      );
     }
 
     return controller.stream;

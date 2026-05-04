@@ -264,11 +264,7 @@ final class ClientConnectedEvent extends BlueyEvent {
   final String clientId;
   final int? mtu;
 
-  ClientConnectedEvent({
-    required this.clientId,
-    this.mtu,
-    super.source,
-  });
+  ClientConnectedEvent({required this.clientId, this.mtu, super.source});
 
   @override
   String toString() {
@@ -483,10 +479,7 @@ final class ClientLifecycleTimeoutEvent extends BlueyEvent {
 final class LifecyclePausedForPendingRequestEvent extends BlueyEvent {
   final String clientId;
 
-  LifecyclePausedForPendingRequestEvent({
-    required this.clientId,
-    super.source,
-  });
+  LifecyclePausedForPendingRequestEvent({required this.clientId, super.source});
 
   @override
   String toString() =>

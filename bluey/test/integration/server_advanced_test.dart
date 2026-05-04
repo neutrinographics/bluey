@@ -118,10 +118,18 @@ void main() {
         fakePlatform.simulateCentralConnection(centralId: 'phone-2');
 
         // Send to specific central
-        await fakePlatform.notifyCharacteristicToByUuid('phone-1', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01, 0x02]), );
+        await fakePlatform.notifyCharacteristicToByUuid(
+          'phone-1',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List.fromList([0x01, 0x02]),
+        );
 
         // Send to other central
-        await fakePlatform.notifyCharacteristicToByUuid('phone-2', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x03, 0x04]), );
+        await fakePlatform.notifyCharacteristicToByUuid(
+          'phone-2',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List.fromList([0x03, 0x04]),
+        );
 
         await server.dispose();
         await bluey.dispose();
@@ -149,7 +157,10 @@ void main() {
         fakePlatform.simulateCentralConnection(centralId: 'phone-3');
 
         // Broadcast to all
-        await fakePlatform.notifyCharacteristicByUuid('00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0xFF]), );
+        await fakePlatform.notifyCharacteristicByUuid(
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List.fromList([0xFF]),
+        );
 
         await server.dispose();
         await bluey.dispose();

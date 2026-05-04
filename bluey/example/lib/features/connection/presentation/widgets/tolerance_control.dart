@@ -36,40 +36,44 @@ class ToleranceControl extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Row(
-              children: _options.map((option) {
-                final isSelected =
-                    settings.peerSilenceTimeout == option.value;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: isSelected
-                        ? null
-                        : () => context
-                            .read<ConnectionSettingsCubit>()
-                            .setPeerSilenceTimeout(option.value),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF3F6187)
-                            : const Color(0xFFF0F4F7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        option.label,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF596064),
+              children:
+                  _options.map((option) {
+                    final isSelected =
+                        settings.peerSilenceTimeout == option.value;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap:
+                            isSelected
+                                ? null
+                                : () => context
+                                    .read<ConnectionSettingsCubit>()
+                                    .setPeerSilenceTimeout(option.value),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? const Color(0xFF3F6187)
+                                    : const Color(0xFFF0F4F7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            option.label,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF596064),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
           ],
         );

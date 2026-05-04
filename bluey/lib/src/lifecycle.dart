@@ -112,9 +112,7 @@ PlatformLocalService buildControlService() {
           canNotify: false,
           canIndicate: false,
         ),
-        permissions: const [
-          PlatformGattPermission.write,
-        ],
+        permissions: const [PlatformGattPermission.write],
         descriptors: const [],
       ),
       PlatformLocalCharacteristic(
@@ -126,9 +124,7 @@ PlatformLocalService buildControlService() {
           canNotify: false,
           canIndicate: false,
         ),
-        permissions: const [
-          PlatformGattPermission.read,
-        ],
+        permissions: const [PlatformGattPermission.read],
         descriptors: const [],
       ),
       PlatformLocalCharacteristic(
@@ -140,9 +136,7 @@ PlatformLocalService buildControlService() {
           canNotify: false,
           canIndicate: false,
         ),
-        permissions: const [
-          PlatformGattPermission.read,
-        ],
+        permissions: const [PlatformGattPermission.read],
         descriptors: const [],
       ),
     ],

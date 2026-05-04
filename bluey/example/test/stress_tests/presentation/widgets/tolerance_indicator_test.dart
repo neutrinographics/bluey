@@ -9,32 +9,36 @@ void main() {
   group('ToleranceIndicator', () {
     testWidgets('renders Strict label for 10 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(
-            peerSilenceTimeout: Duration(seconds: 10))),
+        wrap(
+          const ToleranceIndicator(peerSilenceTimeout: Duration(seconds: 10)),
+        ),
       );
       expect(find.text('Tolerance: Strict'), findsOneWidget);
     });
 
     testWidgets('renders Tolerant label for 30 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(
-            peerSilenceTimeout: Duration(seconds: 30))),
+        wrap(
+          const ToleranceIndicator(peerSilenceTimeout: Duration(seconds: 30)),
+        ),
       );
       expect(find.text('Tolerance: Tolerant'), findsOneWidget);
     });
 
     testWidgets('renders Very tolerant label for 60 s', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(
-            peerSilenceTimeout: Duration(seconds: 60))),
+        wrap(
+          const ToleranceIndicator(peerSilenceTimeout: Duration(seconds: 60)),
+        ),
       );
       expect(find.text('Tolerance: Very tolerant'), findsOneWidget);
     });
 
     testWidgets('renders raw seconds for non-named value', (tester) async {
       await tester.pumpWidget(
-        wrap(const ToleranceIndicator(
-            peerSilenceTimeout: Duration(seconds: 7))),
+        wrap(
+          const ToleranceIndicator(peerSilenceTimeout: Duration(seconds: 7)),
+        ),
       );
       expect(find.text('Tolerance: 7s'), findsOneWidget);
     });

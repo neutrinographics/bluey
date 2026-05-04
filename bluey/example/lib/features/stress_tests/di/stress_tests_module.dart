@@ -15,7 +15,9 @@ void registerStressTestsDependencies(GetIt getIt) {
   getIt.registerFactory<RunMixedOps>(() => RunMixedOps(getIt()));
   getIt.registerFactory<RunSoak>(() => RunSoak(getIt()));
   getIt.registerFactory<RunTimeoutProbe>(() => RunTimeoutProbe(getIt()));
-  getIt.registerFactory<RunFailureInjection>(() => RunFailureInjection(getIt()));
+  getIt.registerFactory<RunFailureInjection>(
+    () => RunFailureInjection(getIt()),
+  );
   getIt.registerFactory<RunMtuProbe>(() => RunMtuProbe(getIt()));
   getIt.registerFactory<RunNotificationThroughput>(
     () => RunNotificationThroughput(getIt()),

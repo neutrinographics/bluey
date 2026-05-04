@@ -23,8 +23,7 @@ enum ConnectionState {
 
   /// Whether the connection is somewhere in its active lifecycle —
   /// connecting, linked, or fully ready. False once disconnecting starts.
-  bool get isActive =>
-      this == connecting || this == linked || this == ready;
+  bool get isActive => this == connecting || this == linked || this == ready;
 
   /// Whether the link is up at the controller level. True for both
   /// [linked] and [ready]; use this if you only care that the device is

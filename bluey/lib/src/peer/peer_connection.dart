@@ -137,9 +137,9 @@ class _BlueyPeerConnection implements PeerConnection {
     // an unresponsive peer (the typical disconnect scenario) doesn't
     // block the platform disconnect for the full per-op timeout.
     try {
-      await _lifecycle
-          .sendDisconnectCommand()
-          .timeout(const Duration(seconds: 1));
+      await _lifecycle.sendDisconnectCommand().timeout(
+        const Duration(seconds: 1),
+      );
     } catch (_) {
       // Best-effort courtesy; proceed to platform disconnect regardless.
     }

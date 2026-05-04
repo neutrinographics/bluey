@@ -65,10 +65,16 @@ void main() {
 
         final sent = eventLog.whereType<HeartbeatSentEvent>().toList();
         final acked = eventLog.whereType<HeartbeatAcknowledgedEvent>().toList();
-        expect(sent, isNotEmpty,
-            reason: 'at least one HeartbeatSentEvent expected');
-        expect(acked, isNotEmpty,
-            reason: 'at least one HeartbeatAcknowledgedEvent expected');
+        expect(
+          sent,
+          isNotEmpty,
+          reason: 'at least one HeartbeatSentEvent expected',
+        );
+        expect(
+          acked,
+          isNotEmpty,
+          reason: 'at least one HeartbeatAcknowledgedEvent expected',
+        );
         // Sent count must equal or exceed acked count (each successful
         // ack corresponds to a prior send).
         expect(sent.length, greaterThanOrEqualTo(acked.length));
@@ -118,8 +124,11 @@ void main() {
 
         final failed = eventLog.whereType<HeartbeatFailedEvent>().toList();
         expect(failed, isNotEmpty);
-        expect(failed.first.isDeadPeerSignal, isTrue,
-            reason: 'GattOperationTimeoutException is a dead-peer signal');
+        expect(
+          failed.first.isDeadPeerSignal,
+          isTrue,
+          reason: 'GattOperationTimeoutException is a dead-peer signal',
+        );
         expect(failed.first.deviceId, equals(deviceId));
 
         fakePlatform.simulateWriteTimeout = false;
@@ -161,8 +170,11 @@ void main() {
 
         final failed = eventLog.whereType<HeartbeatFailedEvent>().toList();
         expect(failed, isNotEmpty);
-        expect(failed.first.isDeadPeerSignal, isFalse,
-            reason: 'transient errors must not be tagged as dead-peer signals');
+        expect(
+          failed.first.isDeadPeerSignal,
+          isFalse,
+          reason: 'transient errors must not be tagged as dead-peer signals',
+        );
 
         fakePlatform.simulateWriteFailure = false;
         peerConn.disconnect().catchError((_) {});
@@ -171,8 +183,7 @@ void main() {
       });
     });
 
-    test('PeerDeclaredUnreachableEvent fires when silence detector trips',
-        () {
+    test('PeerDeclaredUnreachableEvent fires when silence detector trips', () {
       fakeAsync((async) {
         final fakePlatform = FakeBlueyPlatform();
         platform.BlueyPlatform.instance = fakePlatform;
@@ -204,8 +215,11 @@ void main() {
 
         final unreachable =
             eventLog.whereType<PeerDeclaredUnreachableEvent>().toList();
-        expect(unreachable, hasLength(1),
-            reason: 'silence detector should have tripped exactly once');
+        expect(
+          unreachable,
+          hasLength(1),
+          reason: 'silence detector should have tripped exactly once',
+        );
         expect(unreachable.single.deviceId, equals(deviceId));
 
         fakePlatform.simulateWriteTimeout = false;
@@ -272,36 +286,39 @@ void main() {
       // respond to the write — `simulateWriteRequest` only resolves
       // when `respondToWriteRequest` fires, so we deliberately leak the
       // future via `unawaited` and assert on the pause emission instead.
-      unawaited(fakePlatform.simulateWriteRequest(
-        centralId: clientId,
-        characteristicUuid: userCharUuid,
-        value: Uint8List.fromList([0xAB]),
-        responseNeeded: true,
-      ));
+      unawaited(
+        fakePlatform.simulateWriteRequest(
+          centralId: clientId,
+          characteristicUuid: userCharUuid,
+          value: Uint8List.fromList([0xAB]),
+          responseNeeded: true,
+        ),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 10));
       await eventSub.cancel();
 
       final paused =
           eventLog.whereType<LifecyclePausedForPendingRequestEvent>().toList();
-      expect(paused, hasLength(1),
-          reason: 'first pending request should fire pause event exactly once');
+      expect(
+        paused,
+        hasLength(1),
+        reason: 'first pending request should fire pause event exactly once',
+      );
       expect(paused.single.clientId, equals(clientId));
 
       await server.dispose();
       await bluey.dispose();
     });
 
-    test('ClientLifecycleTimeoutEvent fires when heartbeat timer expires',
-        () {
+    test('ClientLifecycleTimeoutEvent fires when heartbeat timer expires', () {
       fakeAsync((async) {
         final fakePlatform = FakeBlueyPlatform();
         platform.BlueyPlatform.instance = fakePlatform;
 
         final bluey = Bluey();
         // Short interval so the timer expires quickly under fakeAsync.
-        final server = bluey.server(
-          lifecycleInterval: const Duration(seconds: 5),
-        )!;
+        final server =
+            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
         const clientId = '00000000-0000-0000-0000-000000000002';
 
         server.addService(

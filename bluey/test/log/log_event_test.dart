@@ -97,55 +97,69 @@ void main() {
       );
       expect(
         base,
-        isNot(equals(BlueyLogEvent(
-          timestamp: timestamp,
-          level: BlueyLogLevel.info,
-          context: 'other',
-          message: 'msg',
-          errorCode: 'E1',
-        ))),
+        isNot(
+          equals(
+            BlueyLogEvent(
+              timestamp: timestamp,
+              level: BlueyLogLevel.info,
+              context: 'other',
+              message: 'msg',
+              errorCode: 'E1',
+            ),
+          ),
+        ),
       );
       expect(
         base,
-        isNot(equals(BlueyLogEvent(
-          timestamp: timestamp,
-          level: BlueyLogLevel.info,
-          context: 'ctx',
-          message: 'other',
-          errorCode: 'E1',
-        ))),
+        isNot(
+          equals(
+            BlueyLogEvent(
+              timestamp: timestamp,
+              level: BlueyLogLevel.info,
+              context: 'ctx',
+              message: 'other',
+              errorCode: 'E1',
+            ),
+          ),
+        ),
       );
       expect(
         base,
-        isNot(equals(BlueyLogEvent(
-          timestamp: timestamp,
-          level: BlueyLogLevel.info,
-          context: 'ctx',
-          message: 'msg',
-          errorCode: 'E2',
-        ))),
+        isNot(
+          equals(
+            BlueyLogEvent(
+              timestamp: timestamp,
+              level: BlueyLogLevel.info,
+              context: 'ctx',
+              message: 'msg',
+              errorCode: 'E2',
+            ),
+          ),
+        ),
       );
     });
 
-    test('data map equality is deep (same keys/values, different instance)',
-        () {
-      final a = BlueyLogEvent(
-        timestamp: timestamp,
-        level: BlueyLogLevel.info,
-        context: 'ctx',
-        message: 'msg',
-        data: {'address': 'AA:BB', 'count': 3},
-      );
-      final b = BlueyLogEvent(
-        timestamp: timestamp,
-        level: BlueyLogLevel.info,
-        context: 'ctx',
-        message: 'msg',
-        data: {'address': 'AA:BB', 'count': 3},
-      );
-      expect(a, equals(b));
-      expect(a.hashCode, equals(b.hashCode));
-    });
+    test(
+      'data map equality is deep (same keys/values, different instance)',
+      () {
+        final a = BlueyLogEvent(
+          timestamp: timestamp,
+          level: BlueyLogLevel.info,
+          context: 'ctx',
+          message: 'msg',
+          data: {'address': 'AA:BB', 'count': 3},
+        );
+        final b = BlueyLogEvent(
+          timestamp: timestamp,
+          level: BlueyLogLevel.info,
+          context: 'ctx',
+          message: 'msg',
+          data: {'address': 'AA:BB', 'count': 3},
+        );
+        expect(a, equals(b));
+        expect(a.hashCode, equals(b.hashCode));
+      },
+    );
 
     test('different data -> not equal', () {
       final a = BlueyLogEvent(

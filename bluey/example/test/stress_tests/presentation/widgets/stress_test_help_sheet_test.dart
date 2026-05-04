@@ -6,26 +6,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StressTestConfig _defaultConfig(StressTest test) => switch (test) {
-      StressTest.burstWrite => const BurstWriteConfig(),
-      StressTest.mixedOps => const MixedOpsConfig(),
-      StressTest.soak => const SoakConfig(),
-      StressTest.timeoutProbe => const TimeoutProbeConfig(),
-      StressTest.failureInjection => const FailureInjectionConfig(),
-      StressTest.mtuProbe => const MtuProbeConfig(),
-      StressTest.notificationThroughput => const NotificationThroughputConfig(),
-    };
+  StressTest.burstWrite => const BurstWriteConfig(),
+  StressTest.mixedOps => const MixedOpsConfig(),
+  StressTest.soak => const SoakConfig(),
+  StressTest.timeoutProbe => const TimeoutProbeConfig(),
+  StressTest.failureInjection => const FailureInjectionConfig(),
+  StressTest.mtuProbe => const MtuProbeConfig(),
+  StressTest.notificationThroughput => const NotificationThroughputConfig(),
+};
 
 void main() {
-  Widget wrapSheet(Widget child) => MaterialApp(
-        home: Scaffold(body: child),
-      );
+  Widget wrapSheet(Widget child) => MaterialApp(home: Scaffold(body: child));
 
   group('StressTestHelpSheet', () {
     for (final test in StressTest.values) {
       testWidgets('renders display name for ${test.name}', (tester) async {
-        await tester.pumpWidget(
-          wrapSheet(StressTestHelpSheet(test: test)),
-        );
+        await tester.pumpWidget(wrapSheet(StressTestHelpSheet(test: test)));
         expect(find.text(test.displayName), findsOneWidget);
       });
     }
@@ -74,8 +70,9 @@ void main() {
       }
     });
 
-    testWidgets('tapping info button opens help sheet with correct content',
-        (tester) async {
+    testWidgets('tapping info button opens help sheet with correct content', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

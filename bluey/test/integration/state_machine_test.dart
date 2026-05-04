@@ -177,8 +177,16 @@ void main() {
         await connection.services(); // promote linked → ready
 
         // Perform operations
-        await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01]), true, );
+        await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List.fromList([0x01]),
+          true,
+        );
 
         // State should still be connected
         expect(connection.state, equals(ConnectionState.ready));

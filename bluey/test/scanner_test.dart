@@ -144,10 +144,7 @@ void main() {
 
       scanner
           .scan(timeout: Duration(milliseconds: 100))
-          .listen(
-            results.add,
-            onDone: () => streamDone = true,
-          );
+          .listen(results.add, onDone: () => streamDone = true);
 
       // Results arrive before timeout
       await Future.delayed(Duration(milliseconds: 50));

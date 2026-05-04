@@ -36,15 +36,15 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     required RunMtuProbe runMtuProbe,
     required RunNotificationThroughput runNotificationThroughput,
     required Connection connection,
-  })  : _runBurstWrite = runBurstWrite,
-        _runMixedOps = runMixedOps,
-        _runSoak = runSoak,
-        _runTimeoutProbe = runTimeoutProbe,
-        _runFailureInjection = runFailureInjection,
-        _runMtuProbe = runMtuProbe,
-        _runNotificationThroughput = runNotificationThroughput,
-        _connection = connection,
-        super(StressTestsState.initial());
+  }) : _runBurstWrite = runBurstWrite,
+       _runMixedOps = runMixedOps,
+       _runSoak = runSoak,
+       _runTimeoutProbe = runTimeoutProbe,
+       _runFailureInjection = runFailureInjection,
+       _runMtuProbe = runMtuProbe,
+       _runNotificationThroughput = runNotificationThroughput,
+       _connection = connection,
+       super(StressTestsState.initial());
 
   /// Updates the config form for a card. Ignored while the card is running.
   void updateConfig(StressTest test, StressTestConfig config) {
@@ -63,49 +63,57 @@ class StressTestsCubit extends Cubit<StressTestsState> {
     final token = ++_runToken;
 
     final Stream<StressTestResult> stream = switch (test) {
-      StressTest.burstWrite =>
-        _runBurstWrite(card.config as BurstWriteConfig, _connection),
-      StressTest.mixedOps =>
-        _runMixedOps(card.config as MixedOpsConfig, _connection),
-      StressTest.soak =>
-        _runSoak(card.config as SoakConfig, _connection),
-      StressTest.timeoutProbe =>
-        _runTimeoutProbe(card.config as TimeoutProbeConfig, _connection),
-      StressTest.failureInjection =>
-        _runFailureInjection(card.config as FailureInjectionConfig, _connection),
-      StressTest.mtuProbe =>
-        _runMtuProbe(card.config as MtuProbeConfig, _connection),
-      StressTest.notificationThroughput =>
-        _runNotificationThroughput(
-          card.config as NotificationThroughputConfig,
-          _connection,
-        ),
+      StressTest.burstWrite => _runBurstWrite(
+        card.config as BurstWriteConfig,
+        _connection,
+      ),
+      StressTest.mixedOps => _runMixedOps(
+        card.config as MixedOpsConfig,
+        _connection,
+      ),
+      StressTest.soak => _runSoak(card.config as SoakConfig, _connection),
+      StressTest.timeoutProbe => _runTimeoutProbe(
+        card.config as TimeoutProbeConfig,
+        _connection,
+      ),
+      StressTest.failureInjection => _runFailureInjection(
+        card.config as FailureInjectionConfig,
+        _connection,
+      ),
+      StressTest.mtuProbe => _runMtuProbe(
+        card.config as MtuProbeConfig,
+        _connection,
+      ),
+      StressTest.notificationThroughput => _runNotificationThroughput(
+        card.config as NotificationThroughputConfig,
+        _connection,
+      ),
     };
 
     _activeSub = stream.listen(
       (StressTestResult result) {
         if (token != _runToken) return;
-        emit(state.updateCard(
-          test,
-          state.cards[test]!.copyWith(
-            result: result,
-            isRunning: result.isRunning,
+        emit(
+          state.updateCard(
+            test,
+            state.cards[test]!.copyWith(
+              result: result,
+              isRunning: result.isRunning,
+            ),
           ),
-        ));
+        );
       },
       onDone: () {
         if (token != _runToken) return;
-        emit(state.updateCard(
-          test,
-          state.cards[test]!.copyWith(isRunning: false),
-        ));
+        emit(
+          state.updateCard(test, state.cards[test]!.copyWith(isRunning: false)),
+        );
       },
       onError: (Object e) {
         if (token != _runToken) return;
-        emit(state.updateCard(
-          test,
-          state.cards[test]!.copyWith(isRunning: false),
-        ));
+        emit(
+          state.updateCard(test, state.cards[test]!.copyWith(isRunning: false)),
+        );
       },
     );
   }

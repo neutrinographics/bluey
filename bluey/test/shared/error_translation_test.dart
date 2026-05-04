@@ -37,11 +37,12 @@ void main() {
       expect(result, isA<GattTimeoutException>());
     });
 
-    test(
-        'GattOperationDisconnectedException → '
+    test('GattOperationDisconnectedException → '
         'DisconnectedException(deviceId, linkLoss)', () {
       final result = translatePlatformException(
-        const platform.GattOperationDisconnectedException('writeCharacteristic'),
+        const platform.GattOperationDisconnectedException(
+          'writeCharacteristic',
+        ),
         operation: 'writeCharacteristic',
         deviceId: testDeviceId,
       );
@@ -51,8 +52,7 @@ void main() {
       expect(disconnected.reason, DisconnectReason.linkLoss);
     });
 
-    test(
-        'GattOperationDisconnectedException without deviceId uses a '
+    test('GattOperationDisconnectedException without deviceId uses a '
         'placeholder UUID — non-GATT call sites (connect) still get a '
         'typed DisconnectedException', () {
       final result = translatePlatformException(
@@ -62,8 +62,7 @@ void main() {
       expect(result, isA<DisconnectedException>());
     });
 
-    test(
-        'GattOperationStatusFailedException → '
+    test('GattOperationStatusFailedException → '
         'GattOperationFailedException carrying status', () {
       final result = translatePlatformException(
         const platform.GattOperationStatusFailedException(
@@ -78,8 +77,7 @@ void main() {
       expect(failed.status, 0x03);
     });
 
-    test(
-        'GattOperationUnknownPlatformException with code "gatt-handle-'
+    test('GattOperationUnknownPlatformException with code "gatt-handle-'
         'invalidated" → AttributeHandleInvalidatedException', () {
       final result = translatePlatformException(
         const platform.GattOperationUnknownPlatformException(
@@ -92,8 +90,7 @@ void main() {
       expect(result, isA<AttributeHandleInvalidatedException>());
     });
 
-    test(
-        'GattOperationUnknownPlatformException with other code → '
+    test('GattOperationUnknownPlatformException with other code → '
         'BlueyPlatformException preserving the wire code', () {
       final result = translatePlatformException(
         const platform.GattOperationUnknownPlatformException(
@@ -109,8 +106,7 @@ void main() {
       expect(platformExc.code, 'bluey-some-future-code');
     });
 
-    test(
-        'PlatformPermissionDeniedException → PermissionDeniedException '
+    test('PlatformPermissionDeniedException → PermissionDeniedException '
         'wrapping the single denied permission', () {
       final result = translatePlatformException(
         const platform.PlatformPermissionDeniedException(
@@ -124,8 +120,7 @@ void main() {
       expect(denied.permissions, equals(['BLUETOOTH_CONNECT']));
     });
 
-    test(
-        'Flutter PlatformException → BlueyPlatformException (defensive '
+    test('Flutter PlatformException → BlueyPlatformException (defensive '
         'backstop for un-translated platform errors)', () {
       final result = translatePlatformException(
         PlatformException(code: 'some-future-code', message: 'oops'),
@@ -136,8 +131,7 @@ void main() {
       expect(platformExc.code, 'some-future-code');
     });
 
-    test(
-        'arbitrary Object (e.g. StateError) → BlueyPlatformException — '
+    test('arbitrary Object (e.g. StateError) → BlueyPlatformException — '
         'nothing leaks raw to callers', () {
       final result = translatePlatformException(
         StateError('something unrelated'),

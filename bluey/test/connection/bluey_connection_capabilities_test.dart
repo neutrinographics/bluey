@@ -33,14 +33,13 @@ import '../fakes/test_helpers.dart';
 /// connection-setup behaviour (subscribe-only-when-supported).
 void main() {
   Device deviceFor(String address) => Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: address,
-        name: 'Test Device',
-      );
+    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+    address: address,
+    name: 'Test Device',
+  );
 
   group('BlueyConnection capability gating', () {
-    test(
-        'connecting on a canBond=false Android platform completes without '
+    test('connecting on a canBond=false Android platform completes without '
         'throwing; bondState / bondStateChanges getters then throw '
         'UnsupportedOperationException at the call site', () async {
       final fakePlatform = FakeBlueyPlatform(
@@ -56,10 +55,7 @@ void main() {
       );
       platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-      );
+      fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
@@ -83,11 +79,9 @@ void main() {
       bluey.dispose();
     });
 
-    test(
-        'connecting on a canRequestPhy=false Android platform completes '
+    test('connecting on a canRequestPhy=false Android platform completes '
         'without throwing; txPhy / rxPhy / phyChanges getters then throw '
-        'UnsupportedOperationException at the call site',
-        () async {
+        'UnsupportedOperationException at the call site', () async {
       final fakePlatform = FakeBlueyPlatform(
         capabilities: const platform.Capabilities(
           platformKind: platform.PlatformKind.android,
@@ -101,10 +95,7 @@ void main() {
       );
       platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-      );
+      fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
@@ -133,49 +124,49 @@ void main() {
     });
 
     test(
-        'connecting on a canRequestConnectionParameters=false Android '
-        'platform completes without throwing; the connectionParameters '
-        'getter then throws UnsupportedOperationException at the call site',
-        () async {
-      final fakePlatform = FakeBlueyPlatform(
-        capabilities: const platform.Capabilities(
-          platformKind: platform.PlatformKind.android,
-          canScan: true,
-          canConnect: true,
-          canAdvertise: true,
-          canBond: true,
-          canRequestPhy: true,
-          canRequestConnectionParameters: false,
-        ),
-      );
-      platform.BlueyPlatform.instance = fakePlatform;
+      'connecting on a canRequestConnectionParameters=false Android '
+      'platform completes without throwing; the connectionParameters '
+      'getter then throws UnsupportedOperationException at the call site',
+      () async {
+        final fakePlatform = FakeBlueyPlatform(
+          capabilities: const platform.Capabilities(
+            platformKind: platform.PlatformKind.android,
+            canScan: true,
+            canConnect: true,
+            canAdvertise: true,
+            canBond: true,
+            canRequestPhy: true,
+            canRequestConnectionParameters: false,
+          ),
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-      );
+        fakePlatform.simulatePeripheral(
+          id: TestDeviceIds.device1,
+          name: 'Test',
+        );
 
-      final bluey = Bluey();
-      final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
+        final bluey = Bluey();
+        final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
-      // canBond/canRequestPhy are still true, so `conn.android` is
-      // non-null. Connection parameters are exposed via the android
-      // extension only (post-B.3, I089). Post-Task-5: reading
-      // connectionParameters on a canRequestConnectionParameters=false
-      // platform throws UnsupportedOperationException at the call site
-      // (capability gate).
-      expect(conn.android, isNotNull);
-      expect(
-        () => conn.android!.connectionParameters,
-        throwsA(isA<UnsupportedOperationException>()),
-      );
+        // canBond/canRequestPhy are still true, so `conn.android` is
+        // non-null. Connection parameters are exposed via the android
+        // extension only (post-B.3, I089). Post-Task-5: reading
+        // connectionParameters on a canRequestConnectionParameters=false
+        // platform throws UnsupportedOperationException at the call site
+        // (capability gate).
+        expect(conn.android, isNotNull);
+        expect(
+          () => conn.android!.connectionParameters,
+          throwsA(isA<UnsupportedOperationException>()),
+        );
 
-      await conn.disconnect();
-      bluey.dispose();
-    });
+        await conn.disconnect();
+        bluey.dispose();
+      },
+    );
 
-    test(
-        'connecting on a real Android-Stage-A platform '
+    test('connecting on a real Android-Stage-A platform '
         '(platformKind=android with canBond / canRequestPhy / '
         'canRequestConnectionParameters all false) completes successfully '
         'and exposes a non-null connection.android — the I035 Stage A '
@@ -211,10 +202,7 @@ void main() {
       );
       platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-      );
+      fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
@@ -245,8 +233,7 @@ void main() {
       bluey.dispose();
     });
 
-    test(
-        'connecting on a fully-capable platform still wires up bond / PHY / '
+    test('connecting on a fully-capable platform still wires up bond / PHY / '
         'conn-params subscriptions (regression guard for the gate)', () async {
       // Use an Android-flavored, fully-capable Capabilities so that
       // `connection.android` is non-null under the platformKind gate
@@ -267,10 +254,7 @@ void main() {
       );
       platform.BlueyPlatform.instance = fakePlatform;
 
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Test',
-      );
+      fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
       final bluey = Bluey();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));

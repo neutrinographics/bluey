@@ -69,12 +69,12 @@ class LifecycleClient {
     Stream<List<RemoteService>>? servicesChanges,
     EventPublisher? events,
     UUID? deviceId,
-  })  : _platform = platformApi,
-        _connectionId = connectionId,
-        _peerSilenceTimeout = peerSilenceTimeout,
-        _logger = logger,
-        _events = events,
-        _deviceId = deviceId {
+  }) : _platform = platformApi,
+       _connectionId = connectionId,
+       _peerSilenceTimeout = peerSilenceTimeout,
+       _logger = logger,
+       _events = events,
+       _deviceId = deviceId {
     if (servicesChanges != null) {
       _servicesChangesSub = servicesChanges.listen(_refreshFromServices);
     }
@@ -95,10 +95,12 @@ class LifecycleClient {
           data: {'connectionId': _connectionId},
         );
         if (_deviceId != null) {
-          _events?.emit(PeerDeclaredUnreachableEvent(
-            deviceId: _deviceId,
-            source: 'LifecycleClient',
-          ));
+          _events?.emit(
+            PeerDeclaredUnreachableEvent(
+              deviceId: _deviceId,
+              source: 'LifecycleClient',
+            ),
+          );
         }
         // Single-fire from monitor; we still need to clean up our
         // own state and signal upward.
@@ -228,15 +230,21 @@ class LifecycleClient {
     );
     if (_isRunning) return;
 
-    final controlService = allServices
-        .where((s) => lifecycle.isControlService(s.uuid.toString()))
-        .firstOrNull;
+    final controlService =
+        allServices
+            .where((s) => lifecycle.isControlService(s.uuid.toString()))
+            .firstOrNull;
     if (controlService == null) return;
 
-    final heartbeatChar = controlService.characteristics().where(
-          (c) =>
-              c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
-        ).firstOrNull;
+    final heartbeatChar =
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() ==
+                  lifecycle.heartbeatCharUuid,
+            )
+            .firstOrNull;
     if (heartbeatChar == null) return;
 
     // Commit point — from here on, any synchronous failure must
@@ -261,25 +269,31 @@ class LifecycleClient {
       _sendProbe();
 
       // Find the interval characteristic and read the server's interval.
-      final intervalChar = controlService.characteristics().where(
-            (c) =>
-                c.uuid.toString().toLowerCase() == lifecycle.intervalCharUuid,
-          ).firstOrNull;
+      final intervalChar =
+          controlService
+              .characteristics()
+              .where(
+                (c) =>
+                    c.uuid.toString().toLowerCase() ==
+                    lifecycle.intervalCharUuid,
+              )
+              .firstOrNull;
 
       if (intervalChar != null) {
         _platform
             .readCharacteristic(_connectionId, intervalChar.handle.value)
             .then((bytes) {
-          if (!_isRunning) return;
-          final serverInterval = lifecycle.decodeInterval(bytes);
-          final heartbeatInterval = Duration(
-            milliseconds: serverInterval.inMilliseconds ~/ 2,
-          );
-          _beginHeartbeat(heartbeatInterval);
-        }).catchError((_) {
-          if (!_isRunning) return;
-          _beginHeartbeat(_defaultHeartbeatInterval);
-        });
+              if (!_isRunning) return;
+              final serverInterval = lifecycle.decodeInterval(bytes);
+              final heartbeatInterval = Duration(
+                milliseconds: serverInterval.inMilliseconds ~/ 2,
+              );
+              _beginHeartbeat(heartbeatInterval);
+            })
+            .catchError((_) {
+              if (!_isRunning) return;
+              _beginHeartbeat(_defaultHeartbeatInterval);
+            });
       } else {
         _beginHeartbeat(_defaultHeartbeatInterval);
       }
@@ -353,9 +367,10 @@ class LifecycleClient {
       );
       return;
     }
-    final controlService = allServices
-        .where((s) => lifecycle.isControlService(s.uuid.toString()))
-        .firstOrNull;
+    final controlService =
+        allServices
+            .where((s) => lifecycle.isControlService(s.uuid.toString()))
+            .firstOrNull;
     if (controlService == null) {
       _logger.log(
         BlueyLogLevel.warn,
@@ -365,10 +380,15 @@ class LifecycleClient {
       );
       return;
     }
-    final heartbeatChar = controlService.characteristics().where(
-          (c) =>
-              c.uuid.toString().toLowerCase() == lifecycle.heartbeatCharUuid,
-        ).firstOrNull;
+    final heartbeatChar =
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() ==
+                  lifecycle.heartbeatCharUuid,
+            )
+            .firstOrNull;
     if (heartbeatChar == null) {
       _logger.log(
         BlueyLogLevel.warn,
@@ -469,8 +489,7 @@ class LifecycleClient {
     // the full `activityWindow` when `_lastActivityAt` is null, causing
     // an infinite-defer loop after the first probe fails transient
     // before any successful exchange has happened.
-    if (_monitor.hasActivity &&
-        _monitor.timeUntilNextProbe() > Duration.zero) {
+    if (_monitor.hasActivity && _monitor.timeUntilNextProbe() > Duration.zero) {
       _scheduleProbe();
       return;
     }
@@ -491,10 +510,9 @@ class LifecycleClient {
       },
     );
     if (_deviceId != null) {
-      _events?.emit(HeartbeatSentEvent(
-        deviceId: _deviceId,
-        source: 'LifecycleClient',
-      ));
+      _events?.emit(
+        HeartbeatSentEvent(deviceId: _deviceId, source: 'LifecycleClient'),
+      );
     }
     _monitor.markProbeInFlight();
     _platform
@@ -505,83 +523,90 @@ class LifecycleClient {
           true,
         )
         .then((_) {
-      if (!_isRunning) return;
-      _logger.log(
-        BlueyLogLevel.debug,
-        'bluey.connection.lifecycle',
-        'heartbeat-response received',
-        data: {'connectionId': _connectionId},
-      );
-      if (_deviceId != null) {
-        _events?.emit(HeartbeatAcknowledgedEvent(
-          deviceId: _deviceId,
-          source: 'LifecycleClient',
-        ));
-      }
-      _monitor.recordProbeSuccess();
-      // Success refreshed lastActivity → monitor deadline is now
-      // exactly activityWindow from now. No explicit override.
-      _scheduleProbe();
-    }).catchError((Object error) {
-      if (!_isRunning) return;
-      if (!_isDeadPeerSignal(error)) {
-        // Transient platform error — release in-flight, retry after a
-        // full activityWindow (the monitor deadline has already elapsed
-        // by the time we got here, so without the explicit delay we'd
-        // hammer the peer with immediate retries).
-        _logger.log(
-          BlueyLogLevel.warn,
-          'bluey.connection.lifecycle',
-          'heartbeat transient failure',
-          data: {
-            'connectionId': _connectionId,
-            'exception': error.runtimeType.toString(),
-          },
-          errorCode: error.runtimeType.toString(),
-        );
-        if (_deviceId != null) {
-          _events?.emit(HeartbeatFailedEvent(
-            deviceId: _deviceId,
-            isDeadPeerSignal: false,
-            reason: error.runtimeType.toString(),
-            source: 'LifecycleClient',
-          ));
-        }
-        _monitor.cancelProbe();
-        _scheduleProbe(after: _monitor.activityWindow);
-        return;
-      }
-      _logger.log(
-        BlueyLogLevel.warn,
-        'bluey.connection.lifecycle',
-        'heartbeat failed (counted)',
-        data: {
-          'connectionId': _connectionId,
-          'exception': error.runtimeType.toString(),
-        },
-        errorCode: error.runtimeType.toString(),
-      );
-      if (_deviceId != null) {
-        _events?.emit(HeartbeatFailedEvent(
-          deviceId: _deviceId,
-          isDeadPeerSignal: true,
-          reason: error.runtimeType.toString(),
-          source: 'LifecycleClient',
-        ));
-      }
-      // Release the in-flight flag: the probe write is done (with a dead-peer
-      // error), so the next probe can be dispatched normally.
-      _monitor.cancelProbe();
-      // Feed the peer-silence detector. If the death watch trips, the
-      // monitor's onSilent callback (set in the constructor) will call
-      // our stop() + onServerUnreachable. No reschedule needed in that
-      // case — the lifecycle is shutting down. Otherwise, keep retrying
-      // on the original cadence.
-      _monitor.recordPeerFailure();
-      if (_isRunning) {
-        _scheduleProbe(after: _monitor.activityWindow);
-      }
-    });
+          if (!_isRunning) return;
+          _logger.log(
+            BlueyLogLevel.debug,
+            'bluey.connection.lifecycle',
+            'heartbeat-response received',
+            data: {'connectionId': _connectionId},
+          );
+          if (_deviceId != null) {
+            _events?.emit(
+              HeartbeatAcknowledgedEvent(
+                deviceId: _deviceId,
+                source: 'LifecycleClient',
+              ),
+            );
+          }
+          _monitor.recordProbeSuccess();
+          // Success refreshed lastActivity → monitor deadline is now
+          // exactly activityWindow from now. No explicit override.
+          _scheduleProbe();
+        })
+        .catchError((Object error) {
+          if (!_isRunning) return;
+          if (!_isDeadPeerSignal(error)) {
+            // Transient platform error — release in-flight, retry after a
+            // full activityWindow (the monitor deadline has already elapsed
+            // by the time we got here, so without the explicit delay we'd
+            // hammer the peer with immediate retries).
+            _logger.log(
+              BlueyLogLevel.warn,
+              'bluey.connection.lifecycle',
+              'heartbeat transient failure',
+              data: {
+                'connectionId': _connectionId,
+                'exception': error.runtimeType.toString(),
+              },
+              errorCode: error.runtimeType.toString(),
+            );
+            if (_deviceId != null) {
+              _events?.emit(
+                HeartbeatFailedEvent(
+                  deviceId: _deviceId,
+                  isDeadPeerSignal: false,
+                  reason: error.runtimeType.toString(),
+                  source: 'LifecycleClient',
+                ),
+              );
+            }
+            _monitor.cancelProbe();
+            _scheduleProbe(after: _monitor.activityWindow);
+            return;
+          }
+          _logger.log(
+            BlueyLogLevel.warn,
+            'bluey.connection.lifecycle',
+            'heartbeat failed (counted)',
+            data: {
+              'connectionId': _connectionId,
+              'exception': error.runtimeType.toString(),
+            },
+            errorCode: error.runtimeType.toString(),
+          );
+          if (_deviceId != null) {
+            _events?.emit(
+              HeartbeatFailedEvent(
+                deviceId: _deviceId,
+                isDeadPeerSignal: true,
+                reason: error.runtimeType.toString(),
+                source: 'LifecycleClient',
+              ),
+            );
+          }
+          // Release the in-flight flag: the probe write is done (with a dead-peer
+          // error), so the next probe can be dispatched normally.
+          _monitor.cancelProbe();
+          // Feed the peer-silence detector. If the death watch trips, the
+          // monitor's onSilent callback (set in the constructor) will call
+          // our stop() + onServerUnreachable. No reschedule needed in that
+          // case — the lifecycle is shutting down. Otherwise, keep retrying
+          // on the original cadence.
+          _monitor.recordPeerFailure();
+          if (_isRunning) {
+            _scheduleProbe(after: _monitor.activityWindow);
+          }
+        });
   }
 
   /// Whether [error] is evidence that the peer is no longer reachable.

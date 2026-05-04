@@ -503,8 +503,10 @@ final class BlueyAndroid extends BlueyPlatform {
   PlatformLogEvent _mapLogEventDto(LogEventDto dto) {
     return PlatformLogEvent(
       timestamp:
-          DateTime.fromMicrosecondsSinceEpoch(dto.timestampMicros, isUtc: true)
-              .toLocal(),
+          DateTime.fromMicrosecondsSinceEpoch(
+            dto.timestampMicros,
+            isUtc: true,
+          ).toLocal(),
       level: _mapLogLevelFromDto(dto.level),
       context: dto.context,
       message: dto.message,

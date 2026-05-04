@@ -61,10 +61,10 @@ class BlueyServer implements Server {
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
   final StreamController<platform.PlatformReadRequest>
-      _filteredReadRequestsController =
+  _filteredReadRequestsController =
       StreamController<platform.PlatformReadRequest>.broadcast();
   final StreamController<platform.PlatformWriteRequest>
-      _filteredWriteRequestsController =
+  _filteredWriteRequestsController =
       StreamController<platform.PlatformWriteRequest>.broadcast();
 
   StreamSubscription? _centralConnectionsSub;
@@ -78,8 +78,8 @@ class BlueyServer implements Server {
     required BlueyLogger logger,
     Duration? lifecycleInterval = lifecycle.defaultLifecycleInterval,
     ServerId? identity,
-  })  : _logger = logger,
-        _serverId = identity ?? ServerId.generate() {
+  }) : _logger = logger,
+       _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
       interval: lifecycleInterval,
@@ -120,10 +120,7 @@ class BlueyServer implements Server {
         BlueyLogLevel.info,
         'bluey.server',
         'central connected',
-        data: {
-          'clientId': platformCentral.id,
-          'mtu': platformCentral.mtu,
-        },
+        data: {'clientId': platformCentral.id, 'mtu': platformCentral.mtu},
       );
       _emitEvent(
         ClientConnectedEvent(
@@ -303,10 +300,7 @@ class BlueyServer implements Server {
       BlueyLogLevel.info,
       'bluey.server',
       'startAdvertising entered',
-      data: {
-        'name': name,
-        'serviceCount': services?.length ?? 0,
-      },
+      data: {'name': name, 'serviceCount': services?.length ?? 0},
     );
     if (manufacturerData != null) {
       _requireCapability(
@@ -354,10 +348,7 @@ class BlueyServer implements Server {
       BlueyLogLevel.info,
       'bluey.server',
       'advertising started',
-      data: {
-        'name': name,
-        'serviceCount': services?.length ?? 0,
-      },
+      data: {'name': name, 'serviceCount': services?.length ?? 0},
     );
     _emitEvent(
       AdvertisingStartedEvent(
@@ -370,11 +361,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> stopAdvertising() async {
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.server',
-      'stopAdvertising invoked',
-    );
+    _logger.log(BlueyLogLevel.info, 'bluey.server', 'stopAdvertising invoked');
     await _platform.stopAdvertising();
     _isAdvertising = false;
     _emitEvent(AdvertisingStoppedEvent(source: 'BlueyServer'));
@@ -625,10 +612,7 @@ class BlueyServer implements Server {
     final wasNew = !_connectedClients.containsKey(clientId);
     if (wasNew) {
       _emitEvent(
-        ClientConnectedEvent(
-          clientId: clientId,
-          source: 'BlueyServer',
-        ),
+        ClientConnectedEvent(clientId: clientId, source: 'BlueyServer'),
       );
       final client = BlueyClient(
         id: clientId,

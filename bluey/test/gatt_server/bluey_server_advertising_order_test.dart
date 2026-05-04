@@ -20,8 +20,7 @@ void main() {
   });
 
   group('BlueyServer addService → startAdvertising ordering (I080)', () {
-    test(
-        'startAdvertising waits for an in-flight addService to complete '
+    test('startAdvertising waits for an in-flight addService to complete '
         'even when the user does not await between them', () async {
       final bluey = Bluey();
       final server = bluey.server()!;
@@ -38,12 +37,12 @@ void main() {
 
       // Track completion order.
       final order = <String>[];
-      final addFuture = server.addService(hostedService).then(
-            (_) => order.add('add'),
-          );
+      final addFuture = server
+          .addService(hostedService)
+          .then((_) => order.add('add'));
       final advertiseFuture = server.startAdvertising().then(
-            (_) => order.add('advertise'),
-          );
+        (_) => order.add('advertise'),
+      );
 
       // Let any synchronous microtasks drain.
       await Future<void>.delayed(Duration.zero);
@@ -73,8 +72,7 @@ void main() {
       bluey.dispose();
     });
 
-    test(
-        'startAdvertising with no in-flight addService completes normally '
+    test('startAdvertising with no in-flight addService completes normally '
         '(regression guard)', () async {
       final bluey = Bluey();
       final server = bluey.server()!;
@@ -82,11 +80,13 @@ void main() {
       // Add a service and await it before calling startAdvertising.
       // This is the well-behaved sequential pattern that always worked;
       // the I080 fix must not regress it.
-      await server.addService(HostedService(
-        uuid: UUID('12345678-1234-1234-1234-123456789abc'),
-        isPrimary: true,
-        characteristics: const [],
-      ));
+      await server.addService(
+        HostedService(
+          uuid: UUID('12345678-1234-1234-1234-123456789abc'),
+          isPrimary: true,
+          characteristics: const [],
+        ),
+      );
 
       await server.startAdvertising();
       expect(server.isAdvertising, isTrue);

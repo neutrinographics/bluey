@@ -29,8 +29,7 @@ void main() {
   });
 
   group('BlueyConnection notification-controller disposal (I003)', () {
-    test(
-        'subscribed notification stream emits done when the connection '
+    test('subscribed notification stream emits done when the connection '
         'is disconnected — proves the per-characteristic controller is '
         'closed by _cleanup()', () async {
       fakePlatform.simulatePeripheral(
@@ -86,19 +85,19 @@ void main() {
       // should be effectively immediate (next microtask).
       await doneCompleter.future.timeout(
         const Duration(seconds: 1),
-        onTimeout: () => fail(
-          'notification stream did not emit done after disconnect — '
-          'BlueyRemoteCharacteristic._notificationController must be '
-          'closed by BlueyConnection._cleanup() (I003)',
-        ),
+        onTimeout:
+            () => fail(
+              'notification stream did not emit done after disconnect — '
+              'BlueyRemoteCharacteristic._notificationController must be '
+              'closed by BlueyConnection._cleanup() (I003)',
+            ),
       );
 
       await sub.cancel();
       bluey.dispose();
     });
 
-    test(
-        'subscribing across multiple characteristics on the same connection '
+    test('subscribing across multiple characteristics on the same connection '
         'closes every controller on disconnect', () async {
       fakePlatform.simulatePeripheral(
         id: TestDeviceIds.device1,
@@ -151,10 +150,12 @@ void main() {
       final doneCompleters = chars.map((_) => Completer<void>()).toList();
       final subs = <StreamSubscription<Uint8List>>[];
       for (var i = 0; i < chars.length; i++) {
-        subs.add(chars[i].notifications.listen(
-              (_) {},
-              onDone: doneCompleters[i].complete,
-            ));
+        subs.add(
+          chars[i].notifications.listen(
+            (_) {},
+            onDone: doneCompleters[i].complete,
+          ),
+        );
       }
 
       await connection.disconnect();
@@ -164,11 +165,12 @@ void main() {
         for (final c in doneCompleters)
           c.future.timeout(
             const Duration(seconds: 1),
-            onTimeout: () => fail(
-              'at least one notification stream did not emit done after '
-              'disconnect — BlueyRemoteService.dispose() must iterate '
-              'all characteristics (I003)',
-            ),
+            onTimeout:
+                () => fail(
+                  'at least one notification stream did not emit done after '
+                  'disconnect — BlueyRemoteService.dispose() must iterate '
+                  'all characteristics (I003)',
+                ),
           ),
       ]);
 
@@ -178,8 +180,7 @@ void main() {
       bluey.dispose();
     });
 
-    test(
-        'characteristics that were never subscribed do not break disposal '
+    test('characteristics that were never subscribed do not break disposal '
         '(idempotent dispose() on a never-listened controller)', () async {
       // Regression guard: BlueyRemoteCharacteristic.dispose() must be
       // safe to call when the controller was never created (the

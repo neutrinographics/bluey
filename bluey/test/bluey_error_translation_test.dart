@@ -28,100 +28,103 @@ void main() {
   });
 
   group('Bluey error translation (I099)', () {
-    test('configure() — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.configureError =
-          const platform.PlatformPermissionDeniedException(
-        'configure',
-        permission: 'BLUETOOTH_CONNECT',
-      );
-      await expectLater(
-        bluey.configure(),
-        throwsA(isA<PermissionDeniedException>()),
-      );
-    });
-
-    test('state getter — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.getStateError =
-          const platform.GattOperationUnknownPlatformException(
-        'getState',
-        code: 'unexpected-state',
-      );
-      await expectLater(
-        bluey.state,
-        throwsA(isA<BlueyPlatformException>()),
-      );
-    });
-
-    test('requestEnable() — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.requestEnableError =
-          const platform.PlatformPermissionDeniedException(
-        'requestEnable',
-        permission: 'BLUETOOTH',
-      );
-      await expectLater(
-        bluey.requestEnable(),
-        throwsA(isA<PermissionDeniedException>()),
-      );
-    });
-
-    test('authorize() — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.authorizeError =
-          const platform.GattOperationUnknownPlatformException(
-        'authorize',
-        code: 'something-failed',
-      );
-      await expectLater(
-        bluey.authorize(),
-        throwsA(isA<BlueyPlatformException>()),
-      );
-    });
-
-    test('openSettings() — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.openSettingsError =
-          const platform.GattOperationUnknownPlatformException(
-        'openSettings',
-        code: 'unavailable',
-      );
-      await expectLater(
-        bluey.openSettings(),
-        throwsA(isA<BlueyPlatformException>()),
-      );
-    });
+    test(
+      'configure() — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform
+            .configureError = const platform.PlatformPermissionDeniedException(
+          'configure',
+          permission: 'BLUETOOTH_CONNECT',
+        );
+        await expectLater(
+          bluey.configure(),
+          throwsA(isA<PermissionDeniedException>()),
+        );
+      },
+    );
 
     test(
-        'connect() — typed platform timeout → typed BlueyException '
+      'state getter — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform.getStateError =
+            const platform.GattOperationUnknownPlatformException(
+              'getState',
+              code: 'unexpected-state',
+            );
+        await expectLater(bluey.state, throwsA(isA<BlueyPlatformException>()));
+      },
+    );
+
+    test(
+      'requestEnable() — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform.requestEnableError =
+            const platform.PlatformPermissionDeniedException(
+              'requestEnable',
+              permission: 'BLUETOOTH',
+            );
+        await expectLater(
+          bluey.requestEnable(),
+          throwsA(isA<PermissionDeniedException>()),
+        );
+      },
+    );
+
+    test(
+      'authorize() — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform.authorizeError =
+            const platform.GattOperationUnknownPlatformException(
+              'authorize',
+              code: 'something-failed',
+            );
+        await expectLater(
+          bluey.authorize(),
+          throwsA(isA<BlueyPlatformException>()),
+        );
+      },
+    );
+
+    test(
+      'openSettings() — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform.openSettingsError =
+            const platform.GattOperationUnknownPlatformException(
+              'openSettings',
+              code: 'unavailable',
+            );
+        await expectLater(
+          bluey.openSettings(),
+          throwsA(isA<BlueyPlatformException>()),
+        );
+      },
+    );
+
+    test('connect() — typed platform timeout → typed BlueyException '
         '(no string-matched ConnectionException)', () async {
-      mockPlatform.connectError =
-          const platform.GattOperationTimeoutException('connect');
-      final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+      mockPlatform.connectError = const platform.GattOperationTimeoutException(
+        'connect',
       );
-      await expectLater(
-        bluey.connect(device),
-        throwsA(isA<BlueyException>()),
-      );
-    });
-
-    test('bondedDevices — typed platform exception → typed BlueyException',
-        () async {
-      mockPlatform.bondedDevicesError =
-          const platform.PlatformPermissionDeniedException(
-        'getBondedDevices',
-        permission: 'BLUETOOTH_CONNECT',
-      );
-      await expectLater(
-        bluey.bondedDevices,
-        throwsA(isA<PermissionDeniedException>()),
-      );
+      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddee01'));
+      await expectLater(bluey.connect(device), throwsA(isA<BlueyException>()));
     });
 
     test(
-        'state-stream onError translates platform errors to BlueyException '
+      'bondedDevices — typed platform exception → typed BlueyException',
+      () async {
+        mockPlatform.bondedDevicesError =
+            const platform.PlatformPermissionDeniedException(
+              'getBondedDevices',
+              permission: 'BLUETOOTH_CONNECT',
+            );
+        await expectLater(
+          bluey.bondedDevices,
+          throwsA(isA<PermissionDeniedException>()),
+        );
+      },
+    );
+
+    test('state-stream onError translates platform errors to BlueyException '
         'and re-emits on the stream\'s error channel', () async {
       // Capture the next error emission on bluey.stateStream.
       final errorCompleter = Completer<Object>();

@@ -24,19 +24,16 @@ class _StubRemoteService implements RemoteService {
   List<RemoteService> get includedServices => const [];
 
   @override
-  RemoteCharacteristic characteristic(UUID uuid) =>
-      throw UnimplementedError();
+  RemoteCharacteristic characteristic(UUID uuid) => throw UnimplementedError();
 }
 
 /// Records calls made on the wrapped [Connection] so the view's tests
 /// can assert delegation. Same shape as `_SpyConnection` in
 /// `peer_connection_test.dart`, scoped to what the view exercises.
 class _SpyConnection implements Connection {
-  _SpyConnection({
-    UUID? deviceId,
-    List<RemoteService> services = const [],
-  })  : _deviceId = deviceId ?? UUID.short(0xAAAA),
-        _services = services;
+  _SpyConnection({UUID? deviceId, List<RemoteService> services = const []})
+    : _deviceId = deviceId ?? UUID.short(0xAAAA),
+      _services = services;
 
   final UUID _deviceId;
   final List<RemoteService> _services;
@@ -87,8 +84,7 @@ class _SpyConnection implements Connection {
   @override
   Stream<ConnectionState> get stateChanges => throw UnimplementedError();
   @override
-  Stream<List<RemoteService>> get servicesChanges =>
-      throw UnimplementedError();
+  Stream<List<RemoteService>> get servicesChanges => throw UnimplementedError();
   @override
   Mtu get mtu => throw UnimplementedError();
   @override
@@ -139,8 +135,7 @@ void main() {
       expect(result.map((s) => s.uuid), [userUuid1, userUuid2]);
     });
 
-    test('is a pure pass-through when no control service is present',
-        () async {
+    test('is a pure pass-through when no control service is present', () async {
       final user1 = _StubRemoteService(userUuid1);
       final user2 = _StubRemoteService(userUuid2);
       final conn = _SpyConnection(services: [user1, user2]);
@@ -151,8 +146,7 @@ void main() {
       expect(result.map((s) => s.uuid), [userUuid1, userUuid2]);
     });
 
-    test('forwards the cache flag to the underlying connection',
-        () async {
+    test('forwards the cache flag to the underlying connection', () async {
       final conn = _SpyConnection();
       final view = PeerRemoteServiceView(conn);
 
@@ -181,8 +175,7 @@ void main() {
       expect(conn.serviceArgs, isEmpty);
     });
 
-    test('delegates to the underlying connection for a user service',
-        () {
+    test('delegates to the underlying connection for a user service', () {
       final user1 = _StubRemoteService(userUuid1);
       final conn = _SpyConnection(services: [user1]);
 
@@ -207,8 +200,7 @@ void main() {
       expect(conn.hasServiceArgs, isEmpty);
     });
 
-    test('delegates to the underlying connection for a user UUID',
-        () async {
+    test('delegates to the underlying connection for a user UUID', () async {
       final user1 = _StubRemoteService(userUuid1);
       final conn = _SpyConnection(services: [user1]);
 

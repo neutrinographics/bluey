@@ -104,11 +104,16 @@ class Bluey {
   Bluey()
     : _platform = platform.BlueyPlatform.instance,
       _eventBus = BlueyEventBus() {
-    _stateSubscription = _platform.stateStream.listen((state) {
-      _currentState = _mapState(state);
-      _stateController.add(_currentState);
-    }, onError: (error) => _stateController.addError(
-        translatePlatformException(error, operation: 'stateStream')));
+    _stateSubscription = _platform.stateStream.listen(
+      (state) {
+        _currentState = _mapState(state);
+        _stateController.add(_currentState);
+      },
+      onError:
+          (error) => _stateController.addError(
+            translatePlatformException(error, operation: 'stateStream'),
+          ),
+    );
 
     // Forward native log events into the unified logger stream so that
     // `bluey.logEvents` is the single, merged surface for both Dart-side
@@ -173,9 +178,12 @@ class Bluey {
       () => _platform.configure(
         platform.BlueyConfig(
           cleanupOnActivityDestroy: cleanupOnActivityDestroy,
-          discoverServicesTimeoutMs: gattTimeouts.discoverServices.inMilliseconds,
-          readCharacteristicTimeoutMs: gattTimeouts.readCharacteristic.inMilliseconds,
-          writeCharacteristicTimeoutMs: gattTimeouts.writeCharacteristic.inMilliseconds,
+          discoverServicesTimeoutMs:
+              gattTimeouts.discoverServices.inMilliseconds,
+          readCharacteristicTimeoutMs:
+              gattTimeouts.readCharacteristic.inMilliseconds,
+          writeCharacteristicTimeoutMs:
+              gattTimeouts.writeCharacteristic.inMilliseconds,
           readDescriptorTimeoutMs: gattTimeouts.readDescriptor.inMilliseconds,
           writeDescriptorTimeoutMs: gattTimeouts.writeDescriptor.inMilliseconds,
           requestMtuTimeoutMs: gattTimeouts.requestMtu.inMilliseconds,
@@ -338,10 +346,7 @@ class Bluey {
   /// devices) or call [tryUpgrade] on the returned connection.
   ///
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(
-    Device device, {
-    Duration? timeout,
-  }) async {
+  Future<Connection> connect(Device device, {Duration? timeout}) async {
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
@@ -358,10 +363,7 @@ class Bluey {
       BlueyLogLevel.info,
       'bluey.connection',
       'connect started',
-      data: {
-        'deviceId': device.id.toString(),
-        'address': device.address,
-      },
+      data: {'deviceId': device.id.toString(), 'address': device.address},
     );
 
     _emitEvent(ConnectingEvent(deviceId: device.id));
@@ -441,10 +443,7 @@ class Bluey {
       'connectAsPeer entered',
       data: {'deviceId': device.id.toString()},
     );
-    final connection = await connect(
-      device,
-      timeout: timeout,
-    );
+    final connection = await connect(device, timeout: timeout);
     final peer = await _tryBuildPeerConnection(
       connection,
       peerSilenceTimeout: peerSilenceTimeout,
@@ -609,9 +608,10 @@ class Bluey {
 
       final services = await rawConnection.services();
 
-      final controlService = services
-          .where((s) => lifecycle.isControlService(s.uuid.toString()))
-          .firstOrNull;
+      final controlService =
+          services
+              .where((s) => lifecycle.isControlService(s.uuid.toString()))
+              .firstOrNull;
 
       if (controlService == null) {
         _logger.log(
@@ -624,10 +624,15 @@ class Bluey {
       }
 
       // Read the ServerId.
-      final serverIdChar = controlService.characteristics().where(
-            (c) =>
-                c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
-          ).firstOrNull;
+      final serverIdChar =
+          controlService
+              .characteristics()
+              .where(
+                (c) =>
+                    c.uuid.toString().toLowerCase() ==
+                    lifecycle.serverIdCharUuid,
+              )
+              .firstOrNull;
 
       ServerId? serverId;
       if (serverIdChar != null) {
@@ -644,9 +649,10 @@ class Bluey {
       // client's connection id. The peer wrapper does not require
       // mutating this object; it only needs the platform connection
       // id to drive the heartbeat writes.
-      final connectionId = rawConnection is BlueyConnection
-          ? rawConnection.connectionId
-          : rawConnection.deviceId.toString();
+      final connectionId =
+          rawConnection is BlueyConnection
+              ? rawConnection.connectionId
+              : rawConnection.deviceId.toString();
 
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
@@ -689,8 +695,7 @@ class Bluey {
   Future<List<Device>> get bondedDevices {
     _requireCapability(_platform.capabilities.canBond, 'bondedDevices');
     return withErrorTranslation(
-      () async =>
-          (await _platform.getBondedDevices()).map(_mapDevice).toList(),
+      () async => (await _platform.getBondedDevices()).map(_mapDevice).toList(),
       operation: 'getBondedDevices',
     );
   }
@@ -807,12 +812,14 @@ class Bluey {
       probeTimeout: probeTimeout,
     );
     return ids
-        .map((id) => createBlueyPeer(
-              platformApi: _platform,
-              serverId: id,
-              logger: _logger,
-              events: _eventBus,
-            ))
+        .map(
+          (id) => createBlueyPeer(
+            platformApi: _platform,
+            serverId: id,
+            logger: _logger,
+            events: _eventBus,
+          ),
+        )
         .toList(growable: false);
   }
 

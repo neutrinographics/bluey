@@ -71,9 +71,9 @@ Future<T> _translateGattPlatformError<T>(
 class AndroidConnectionManager {
   final BlueyHostApi _hostApi;
   final Map<String, StreamController<PlatformConnectionState>>
-      _connectionStateControllers = {};
+  _connectionStateControllers = {};
   final Map<String, StreamController<PlatformNotification>>
-      _notificationControllers = {};
+  _notificationControllers = {};
 
   AndroidConnectionManager(this._hostApi);
 
@@ -242,7 +242,9 @@ class AndroidConnectionManager {
 
   /// Returns the bond state for a device.
   Future<PlatformBondState> getBondState(String deviceId) async {
-    throw UnimplementedError('Android: getBondState not yet implemented (I035)');
+    throw UnimplementedError(
+      'Android: getBondState not yet implemented (I035)',
+    );
   }
 
   /// Returns a stream of bond state changes for a device.

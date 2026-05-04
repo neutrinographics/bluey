@@ -54,8 +54,9 @@ void main() {
     mockSendNotification = MockSendNotification();
     mockObserveConnections = MockObserveConnections();
     mockObservePeerConnections = MockObservePeerConnections();
-    when(() => mockObservePeerConnections())
-        .thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockObservePeerConnections(),
+    ).thenAnswer((_) => const Stream.empty());
     mockDisposeServer = MockDisposeServer();
     mockGetConnectedClients = MockGetConnectedClients();
     mockObserveDisconnections = MockObserveDisconnections();
@@ -380,7 +381,6 @@ void main() {
       await cubit.close();
       verify(() => mockDisposeServer()).called(1);
     });
-
   });
 
   group('stress write null-server drop', () {
@@ -469,10 +469,7 @@ void main() {
         await Future.delayed(const Duration(milliseconds: 10));
       },
       verify: (cubit) {
-        expect(
-          cubit.state.log.any((e) => e.tag == 'Stress'),
-          isFalse,
-        );
+        expect(cubit.state.log.any((e) => e.tag == 'Stress'), isFalse);
       },
     );
   });

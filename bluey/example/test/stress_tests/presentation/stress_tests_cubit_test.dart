@@ -61,21 +61,22 @@ void main() {
   });
 
   StressTestsCubit makeCubit() => StressTestsCubit(
-        runBurstWrite: mockRun,
-        runMixedOps: mockRunMixedOps,
-        runSoak: mockRunSoak,
-        runTimeoutProbe: mockRunTimeoutProbe,
-        runFailureInjection: mockRunFailureInjection,
-        runMtuProbe: mockRunMtuProbe,
-        runNotificationThroughput: mockRunNotificationThroughput,
-        connection: mockConn,
-      );
+    runBurstWrite: mockRun,
+    runMixedOps: mockRunMixedOps,
+    runSoak: mockRunSoak,
+    runTimeoutProbe: mockRunTimeoutProbe,
+    runFailureInjection: mockRunFailureInjection,
+    runMtuProbe: mockRunMtuProbe,
+    runNotificationThroughput: mockRunNotificationThroughput,
+    connection: mockConn,
+  );
 
   group('StressTestsCubit.run', () {
     test('emits cards updated as the runner emits results', () async {
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       final sub = cubit.stream.listen((_) {});
@@ -83,9 +84,11 @@ void main() {
       cubit.run(StressTest.burstWrite);
       controller.add(StressTestResult.initial());
       await Future<void>.delayed(Duration.zero);
-      controller.add(StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 1))
-          .finished(elapsed: const Duration(milliseconds: 1)));
+      controller.add(
+        StressTestResult.initial()
+            .recordSuccess(latency: const Duration(milliseconds: 1))
+            .finished(elapsed: const Duration(milliseconds: 1)),
+      );
       await controller.close();
       await Future<void>.delayed(Duration.zero);
 
@@ -97,8 +100,9 @@ void main() {
 
     test('is a no-op when another card is already running', () async {
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       cubit.run(StressTest.burstWrite);
@@ -114,8 +118,9 @@ void main() {
   group('StressTestsCubit.stop', () {
     test('clears isRunning for the active card', () async {
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       cubit.run(StressTest.burstWrite);
@@ -131,19 +136,26 @@ void main() {
     test('preserves the result when stopping mid-run', () async {
       // This test would have caught the copyWith-clears-result bug.
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       cubit.run(StressTest.burstWrite);
-      controller.add(StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 5)));
+      controller.add(
+        StressTestResult.initial().recordSuccess(
+          latency: const Duration(milliseconds: 5),
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
       expect(cubit.state.cards[StressTest.burstWrite]!.result, isNotNull);
 
       await cubit.stop();
-      expect(cubit.state.cards[StressTest.burstWrite]!.result, isNotNull,
-          reason: 'stop() must not erase the intermediate result snapshot');
+      expect(
+        cubit.state.cards[StressTest.burstWrite]!.result,
+        isNotNull,
+        reason: 'stop() must not erase the intermediate result snapshot',
+      );
 
       await controller.close();
       await cubit.close();
@@ -151,32 +163,40 @@ void main() {
 
     test('stop() drops late stream emissions', () async {
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       cubit.run(StressTest.burstWrite);
 
       // Emit before stop — should update card.
-      controller.add(StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 1)));
+      controller.add(
+        StressTestResult.initial().recordSuccess(
+          latency: const Duration(milliseconds: 1),
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
       expect(
-          cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
-          equals(1));
+        cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
+        equals(1),
+      );
 
       await cubit.stop();
 
       // Emit AFTER stop — should be dropped.
-      controller.add(StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 1))
-          .recordSuccess(latency: const Duration(milliseconds: 1)));
+      controller.add(
+        StressTestResult.initial()
+            .recordSuccess(latency: const Duration(milliseconds: 1))
+            .recordSuccess(latency: const Duration(milliseconds: 1)),
+      );
       await Future<void>.delayed(Duration.zero);
 
       expect(
-          cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
-          equals(1),
-          reason: 'late stream event should not update the card after stop()');
+        cubit.state.cards[StressTest.burstWrite]!.result?.succeeded,
+        equals(1),
+        reason: 'late stream event should not update the card after stop()',
+      );
 
       await controller.close();
       await cubit.close();
@@ -197,8 +217,9 @@ void main() {
 
     test('is a no-op while the card is running', () async {
       final controller = StreamController<StressTestResult>();
-      when(() => mockRun.call(any(), any()))
-          .thenAnswer((_) => controller.stream);
+      when(
+        () => mockRun.call(any(), any()),
+      ).thenAnswer((_) => controller.stream);
 
       final cubit = makeCubit();
       cubit.run(StressTest.burstWrite);

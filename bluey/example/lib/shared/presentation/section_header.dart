@@ -56,11 +56,7 @@ class SectionHeader extends StatelessWidget {
                             strokeWidth: 1.5,
                             color: _kAccent,
                           )
-                          : const Icon(
-                            Icons.refresh,
-                            color: _kLight,
-                            size: 16,
-                          ),
+                          : const Icon(Icons.refresh, color: _kLight, size: 16),
                 ),
                 const SizedBox(width: 8),
               ],

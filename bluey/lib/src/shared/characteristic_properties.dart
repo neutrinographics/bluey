@@ -67,12 +67,12 @@ class CharacteristicProperties {
 
   @override
   int get hashCode => Object.hash(
-        canRead,
-        canWrite,
-        canWriteWithoutResponse,
-        canNotify,
-        canIndicate,
-      );
+    canRead,
+    canWrite,
+    canWriteWithoutResponse,
+    canNotify,
+    canIndicate,
+  );
 
   @override
   String toString() {

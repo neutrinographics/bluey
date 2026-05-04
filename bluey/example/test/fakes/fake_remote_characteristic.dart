@@ -16,7 +16,7 @@ class FakeRemoteCharacteristic implements RemoteCharacteristic {
   /// Called for each write. Default: succeed with no side effects.
   /// Override to inject delays or throws.
   Future<void> Function(Uint8List value, {required bool withResponse})
-      onWriteHook = (_, {required bool withResponse}) async {};
+  onWriteHook = (_, {required bool withResponse}) async {};
 
   /// Called for each read. Default: returns empty bytes.
   Future<Uint8List> Function() onReadHook = () async => Uint8List(0);

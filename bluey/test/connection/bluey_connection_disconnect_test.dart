@@ -23,8 +23,7 @@ void main() {
   });
 
   group('PeerConnection.disconnect', () {
-    test(
-        'I074: disconnect proceeds with platform disconnect even '
+    test('I074: disconnect proceeds with platform disconnect even '
         'when the courtesy lifecycle write hangs', () async {
       fakePlatform.simulateBlueyServer(
         address: TestDeviceIds.device1,
@@ -32,11 +31,13 @@ void main() {
       );
 
       final bluey = Bluey();
-      final peerConn = await bluey.connectAsPeer(Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: TestDeviceIds.device1,
-        name: 'Test Device',
-      ));
+      final peerConn = await bluey.connectAsPeer(
+        Device(
+          id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+          address: TestDeviceIds.device1,
+          name: 'Test Device',
+        ),
+      );
 
       // Let any initial heartbeat traffic settle so the next held write
       // is unambiguously the disconnect-command write.
@@ -51,16 +52,19 @@ void main() {
       // call swallows its own timeout, then proceeds to platform
       // disconnect.
       await peerConn.disconnect().timeout(
-            const Duration(seconds: 3),
-            onTimeout: () =>
-                fail('peer.disconnect() did not return within 3s; '
-                    'the courtesy lifecycle write blocked it'),
-          );
+        const Duration(seconds: 3),
+        onTimeout:
+            () => fail(
+              'peer.disconnect() did not return within 3s; '
+              'the courtesy lifecycle write blocked it',
+            ),
+      );
 
       expect(
         peerConn.connection.state,
         ConnectionState.disconnected,
-        reason: 'underlying connection must reach disconnected after '
+        reason:
+            'underlying connection must reach disconnected after '
             'peer.disconnect() returns',
       );
 

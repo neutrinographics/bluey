@@ -137,11 +137,12 @@ class AmbiguousAttributeException extends BlueyException {
     this.matchCount, {
     required this.attributeKind,
   }) : super(
-          '$matchCount $attributeKind' 's share UUID $uuid; '
-              'singular accessor cannot disambiguate. '
-              '${_actionFor(attributeKind)}',
-          action: _actionFor(attributeKind),
-        );
+         '$matchCount $attributeKind'
+         's share UUID $uuid; '
+         'singular accessor cannot disambiguate. '
+         '${_actionFor(attributeKind)}',
+         action: _actionFor(attributeKind),
+       );
 
   static String _actionFor(String kind) {
     switch (kind) {
@@ -174,12 +175,13 @@ class AmbiguousAttributeException extends BlueyException {
 /// (the link itself is gone).
 class AttributeHandleInvalidatedException extends BlueyException {
   AttributeHandleInvalidatedException()
-      : super(
-          'GATT attribute handle invalidated by Service Changed; '
-              're-discover services to obtain fresh handles.',
-          action: 'Call connection.services() to re-discover, then '
-              'reissue the op against the new attribute references.',
-        );
+    : super(
+        'GATT attribute handle invalidated by Service Changed; '
+        're-discover services to obtain fresh handles.',
+        action:
+            'Call connection.services() to re-discover, then '
+            'reissue the op against the new attribute references.',
+      );
 }
 
 /// A GATT operation referenced an attribute handle the platform side
@@ -193,11 +195,12 @@ class AttributeHandleInvalidatedException extends BlueyException {
 /// and points the caller at re-discovery as the recovery path.
 class AttributeNotFoundException extends BlueyException {
   AttributeNotFoundException()
-      : super(
-          'GATT attribute handle not found on the platform side.',
-          action: 'Verify the handle was obtained from this connection '
-              'and has not outlived its parent service tree.',
-        );
+    : super(
+        'GATT attribute handle not found on the platform side.',
+        action:
+            'Verify the handle was obtained from this connection '
+            'and has not outlived its parent service tree.',
+      );
 }
 
 /// GATT operation status codes.
@@ -236,11 +239,10 @@ class GattTimeoutException extends BlueyException {
   final String operation;
 
   const GattTimeoutException(this.operation)
-      : super(
-          'GATT operation "$operation" timed out',
-          action:
-              'Check Connection.state; the remote device may be unreachable.',
-        );
+    : super(
+        'GATT operation "$operation" timed out',
+        action: 'Check Connection.state; the remote device may be unreachable.',
+      );
 }
 
 /// A GATT operation completed but the peer returned a non-success status
@@ -264,11 +266,11 @@ class GattOperationFailedException extends BlueyException {
   final int status;
 
   const GattOperationFailedException(this.operation, this.status)
-      : super(
-          'GATT operation "$operation" failed with status $status',
-          action:
-              'Inspect status; retry, request bonding, or disconnect depending on the code.',
-        );
+    : super(
+        'GATT operation "$operation" failed with status $status',
+        action:
+            'Inspect status; retry, request bonding, or disconnect depending on the code.',
+      );
 }
 
 /// Operation not supported by this characteristic.
@@ -320,11 +322,12 @@ class ServerRespondFailedException extends BlueyException {
     required this.clientId,
     required this.characteristicId,
   }) : super(
-          'Server "$operation" failed for client $clientId on '
-          'characteristic $characteristicId (ATT status $status)',
-          action: 'The central likely disconnected before the response '
-              'could be delivered; safe to log and move on.',
-        );
+         'Server "$operation" failed for client $clientId on '
+         'characteristic $characteristicId (ATT status $status)',
+         action:
+             'The central likely disconnected before the response '
+             'could be delivered; safe to log and move on.',
+       );
 }
 
 /// Reasons why advertising might fail.
@@ -370,16 +373,17 @@ class NotABlueyPeerException extends BlueyException {
   final UUID deviceId;
 
   NotABlueyPeerException(this.deviceId)
-      : super(
-          'Device $deviceId is not a Bluey peer '
-          '(no lifecycle control service)',
-          action:
-              'Use Bluey.connect for non-Bluey devices, or '
-              'Bluey.tryUpgrade if you already hold a Connection.',
-        );
+    : super(
+        'Device $deviceId is not a Bluey peer '
+        '(no lifecycle control service)',
+        action:
+            'Use Bluey.connect for non-Bluey devices, or '
+            'Bluey.tryUpgrade if you already hold a Connection.',
+      );
 
   @override
-  String toString() => 'NotABlueyPeerException: device $deviceId is not a '
+  String toString() =>
+      'NotABlueyPeerException: device $deviceId is not a '
       'Bluey peer (no lifecycle control service)';
 }
 

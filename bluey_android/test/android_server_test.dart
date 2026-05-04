@@ -16,12 +16,14 @@ void main() {
   late AndroidServer server;
 
   setUpAll(() {
-    registerFallbackValue(LocalServiceDto(
-      uuid: '',
-      isPrimary: true,
-      characteristics: [],
-      includedServices: [],
-    ));
+    registerFallbackValue(
+      LocalServiceDto(
+        uuid: '',
+        isPrimary: true,
+        characteristics: [],
+        includedServices: [],
+      ),
+    );
     registerFallbackValue(AdvertiseConfigDto(serviceUuids: []));
     registerFallbackValue(GattStatusDto.success);
     registerFallbackValue(Uint8List(0));
@@ -37,9 +39,10 @@ void main() {
       test('maps PlatformLocalService to DTO correctly', () async {
         // Mock returns the same DTO back (handles populated would be from
         // the native side; we just round-trip the input here).
-        when(() => mockHostApi.addService(any()))
-            .thenAnswer((invocation) async =>
-                invocation.positionalArguments.first as LocalServiceDto);
+        when(() => mockHostApi.addService(any())).thenAnswer(
+          (invocation) async =>
+              invocation.positionalArguments.first as LocalServiceDto,
+        );
 
         final service = PlatformLocalService(
           uuid: '180D',
@@ -87,13 +90,17 @@ void main() {
         expect(char.properties.canWriteWithoutResponse, isFalse);
         expect(char.properties.canNotify, isTrue);
         expect(char.properties.canIndicate, isFalse);
-        expect(char.permissions,
-            equals([GattPermissionDto.read, GattPermissionDto.write]));
+        expect(
+          char.permissions,
+          equals([GattPermissionDto.read, GattPermissionDto.write]),
+        );
 
         expect(char.descriptors, hasLength(1));
         expect(char.descriptors[0].uuid, equals('2902'));
         expect(
-            char.descriptors[0].permissions, equals([GattPermissionDto.read]));
+          char.descriptors[0].permissions,
+          equals([GattPermissionDto.read]),
+        );
         expect(char.descriptors[0].value, equals([0x00, 0x00]));
 
         expect(captured.includedServices, isEmpty);
@@ -112,8 +119,9 @@ void main() {
 
     group('startAdvertising', () {
       test('maps config to DTO correctly', () async {
-        when(() => mockHostApi.startAdvertising(any()))
-            .thenAnswer((_) async {});
+        when(
+          () => mockHostApi.startAdvertising(any()),
+        ).thenAnswer((_) async {});
 
         final config = PlatformAdvertiseConfig(
           name: 'TestDevice',
@@ -126,9 +134,11 @@ void main() {
 
         await server.startAdvertising(config);
 
-        final captured = verify(() => mockHostApi.startAdvertising(captureAny()))
-            .captured
-            .single as AdvertiseConfigDto;
+        final captured =
+            verify(
+                  () => mockHostApi.startAdvertising(captureAny()),
+                ).captured.single
+                as AdvertiseConfigDto;
 
         expect(captured.name, equals('TestDevice'));
         expect(captured.serviceUuids, equals(['180D', '180F']));
@@ -139,8 +149,9 @@ void main() {
       });
 
       test('maps all advertise modes correctly', () async {
-        when(() => mockHostApi.startAdvertising(any()))
-            .thenAnswer((_) async {});
+        when(
+          () => mockHostApi.startAdvertising(any()),
+        ).thenAnswer((_) async {});
 
         for (final (platformMode, expectedDto) in [
           (PlatformAdvertiseMode.lowPower, AdvertiseModeDto.lowPower),
@@ -155,9 +166,10 @@ void main() {
           await server.startAdvertising(config);
 
           final captured =
-              verify(() => mockHostApi.startAdvertising(captureAny()))
-                  .captured
-                  .single as AdvertiseConfigDto;
+              verify(
+                    () => mockHostApi.startAdvertising(captureAny()),
+                  ).captured.single
+                  as AdvertiseConfigDto;
 
           expect(captured.mode, equals(expectedDto));
         }
@@ -176,8 +188,9 @@ void main() {
 
     group('notifyCharacteristic', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any()))
-            .thenAnswer((_) async {});
+        when(
+          () => mockHostApi.notifyCharacteristic(any(), any()),
+        ).thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
         await server.notifyCharacteristic(42, value);
@@ -188,59 +201,70 @@ void main() {
 
     group('notifyCharacteristicTo', () {
       test('calls hostApi', () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
-            .thenAnswer((_) async {});
+        when(
+          () => mockHostApi.notifyCharacteristicTo(any(), any(), any()),
+        ).thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x01, 0x02]);
         await server.notifyCharacteristicTo('central-1', 42, value);
 
-        verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', 42, value))
-            .called(1);
+        verify(
+          () => mockHostApi.notifyCharacteristicTo('central-1', 42, value),
+        ).called(1);
       });
     });
 
     group('indicateCharacteristic', () {
-      test('calls notifyCharacteristic on hostApi (same underlying call)',
-          () async {
-        when(() => mockHostApi.notifyCharacteristic(any(), any()))
-            .thenAnswer((_) async {});
+      test(
+        'calls notifyCharacteristic on hostApi (same underlying call)',
+        () async {
+          when(
+            () => mockHostApi.notifyCharacteristic(any(), any()),
+          ).thenAnswer((_) async {});
 
-        final value = Uint8List.fromList([0x03, 0x04]);
-        await server.indicateCharacteristic(42, value);
+          final value = Uint8List.fromList([0x03, 0x04]);
+          await server.indicateCharacteristic(42, value);
 
-        verify(() => mockHostApi.notifyCharacteristic(42, value)).called(1);
-      });
+          verify(() => mockHostApi.notifyCharacteristic(42, value)).called(1);
+        },
+      );
     });
 
     group('indicateCharacteristicTo', () {
-      test('calls notifyCharacteristicTo on hostApi (same underlying call)',
-          () async {
-        when(() => mockHostApi.notifyCharacteristicTo(any(), any(), any()))
-            .thenAnswer((_) async {});
+      test(
+        'calls notifyCharacteristicTo on hostApi (same underlying call)',
+        () async {
+          when(
+            () => mockHostApi.notifyCharacteristicTo(any(), any(), any()),
+          ).thenAnswer((_) async {});
 
-        final value = Uint8List.fromList([0x03, 0x04]);
-        await server.indicateCharacteristicTo('central-1', 42, value);
+          final value = Uint8List.fromList([0x03, 0x04]);
+          await server.indicateCharacteristicTo('central-1', 42, value);
 
-        verify(() =>
-                mockHostApi.notifyCharacteristicTo('central-1', 42, value))
-            .called(1);
-      });
+          verify(
+            () => mockHostApi.notifyCharacteristicTo('central-1', 42, value),
+          ).called(1);
+        },
+      );
     });
 
     group('respondToReadRequest', () {
       test('calls hostApi with correct DTO mapping', () async {
-        when(() => mockHostApi.respondToReadRequest(
-              any(), any(), any(),
-            )).thenAnswer((_) async {});
+        when(
+          () => mockHostApi.respondToReadRequest(any(), any(), any()),
+        ).thenAnswer((_) async {});
 
         final value = Uint8List.fromList([0x42]);
-        await server.respondToReadRequest(
-            1, PlatformGattStatus.success, value);
+        await server.respondToReadRequest(1, PlatformGattStatus.success, value);
 
-        final captured = verify(() => mockHostApi.respondToReadRequest(
-              captureAny(), captureAny(), captureAny(),
-            )).captured;
+        final captured =
+            verify(
+              () => mockHostApi.respondToReadRequest(
+                captureAny(),
+                captureAny(),
+                captureAny(),
+              ),
+            ).captured;
 
         expect(captured[0], equals(1));
         expect(captured[1], equals(GattStatusDto.success));
@@ -248,73 +272,86 @@ void main() {
       });
 
       test('maps all gatt status values correctly', () async {
-        when(() => mockHostApi.respondToReadRequest(
-              any(), any(), any(),
-            )).thenAnswer((_) async {});
+        when(
+          () => mockHostApi.respondToReadRequest(any(), any(), any()),
+        ).thenAnswer((_) async {});
 
         for (final (platformStatus, expectedDto) in [
           (PlatformGattStatus.success, GattStatusDto.success),
           (PlatformGattStatus.readNotPermitted, GattStatusDto.readNotPermitted),
           (
             PlatformGattStatus.writeNotPermitted,
-            GattStatusDto.writeNotPermitted
+            GattStatusDto.writeNotPermitted,
           ),
           (PlatformGattStatus.invalidOffset, GattStatusDto.invalidOffset),
           (
             PlatformGattStatus.invalidAttributeLength,
-            GattStatusDto.invalidAttributeLength
+            GattStatusDto.invalidAttributeLength,
           ),
           (
             PlatformGattStatus.insufficientAuthentication,
-            GattStatusDto.insufficientAuthentication
+            GattStatusDto.insufficientAuthentication,
           ),
           (
             PlatformGattStatus.insufficientEncryption,
-            GattStatusDto.insufficientEncryption
+            GattStatusDto.insufficientEncryption,
           ),
           (
             PlatformGattStatus.requestNotSupported,
-            GattStatusDto.requestNotSupported
+            GattStatusDto.requestNotSupported,
           ),
         ]) {
           await server.respondToReadRequest(1, platformStatus, null);
 
-          final captured = verify(() => mockHostApi.respondToReadRequest(
-                captureAny(), captureAny(), captureAny(),
-              )).captured;
+          final captured =
+              verify(
+                () => mockHostApi.respondToReadRequest(
+                  captureAny(),
+                  captureAny(),
+                  captureAny(),
+                ),
+              ).captured;
 
           expect(captured[1], equals(expectedDto));
         }
       });
 
       test(
-          'propagates gatt-status-failed PlatformException as GattOperationStatusFailedException',
-          () async {
-        when(() => mockHostApi.respondToReadRequest(any(), any(), any()))
-            .thenThrow(PlatformException(
-          code: 'gatt-status-failed',
-          message: 'No pending request for id: 999',
-          details: 0x0A,
-        ));
+        'propagates gatt-status-failed PlatformException as GattOperationStatusFailedException',
+        () async {
+          when(
+            () => mockHostApi.respondToReadRequest(any(), any(), any()),
+          ).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'No pending request for id: 999',
+              details: 0x0A,
+            ),
+          );
 
-        expect(
-          () => server.respondToReadRequest(
-              999, PlatformGattStatus.success, null),
-          throwsA(isA<GattOperationStatusFailedException>()),
-        );
-      });
+          expect(
+            () => server.respondToReadRequest(
+              999,
+              PlatformGattStatus.success,
+              null,
+            ),
+            throwsA(isA<GattOperationStatusFailedException>()),
+          );
+        },
+      );
     });
 
     group('respondToWriteRequest', () {
       test('calls hostApi with correct DTO mapping', () async {
-        when(() => mockHostApi.respondToWriteRequest(any(), any()))
-            .thenAnswer((_) async {});
+        when(
+          () => mockHostApi.respondToWriteRequest(any(), any()),
+        ).thenAnswer((_) async {});
 
-        await server.respondToWriteRequest(
-            2, PlatformGattStatus.success);
+        await server.respondToWriteRequest(2, PlatformGattStatus.success);
 
-        verify(() => mockHostApi.respondToWriteRequest(
-            2, GattStatusDto.success)).called(1);
+        verify(
+          () => mockHostApi.respondToWriteRequest(2, GattStatusDto.success),
+        ).called(1);
       });
     });
 
@@ -358,13 +395,15 @@ void main() {
         final stream = server.readRequests;
         final future = stream.first;
 
-        server.onReadRequest(ReadRequestDto(
-          requestId: 1,
-          centralId: 'central-1',
-          characteristicUuid: '2A37',
-          offset: 0,
-          characteristicHandle: 42,
-        ));
+        server.onReadRequest(
+          ReadRequestDto(
+            requestId: 1,
+            centralId: 'central-1',
+            characteristicUuid: '2A37',
+            offset: 0,
+            characteristicHandle: 42,
+          ),
+        );
 
         final request = await future;
         expect(request.requestId, equals(1));
@@ -380,15 +419,17 @@ void main() {
         final future = stream.first;
 
         final data = Uint8List.fromList([0x01, 0x02]);
-        server.onWriteRequest(WriteRequestDto(
-          requestId: 2,
-          centralId: 'central-1',
-          characteristicUuid: '2A37',
-          value: data,
-          offset: 0,
-          responseNeeded: true,
-          characteristicHandle: 42,
-        ));
+        server.onWriteRequest(
+          WriteRequestDto(
+            requestId: 2,
+            centralId: 'central-1',
+            characteristicUuid: '2A37',
+            value: data,
+            offset: 0,
+            responseNeeded: true,
+            characteristicHandle: 42,
+          ),
+        );
 
         final request = await future;
         expect(request.requestId, equals(2));

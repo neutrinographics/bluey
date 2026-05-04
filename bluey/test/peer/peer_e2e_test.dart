@@ -17,8 +17,14 @@ void main() {
     test('returns all nearby Bluey servers', () async {
       final id1 = ServerId.generate();
       final id2 = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id1);
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id2);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id1,
+      );
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:02',
+        serverId: id2,
+      );
 
       final bluey = Bluey();
       final peers = await bluey.discoverPeers(
@@ -49,7 +55,10 @@ void main() {
 
     test('connect() succeeds against a matching server', () async {
       final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
 
       final bluey = Bluey();
       final peer = bluey.peer(id);
@@ -62,12 +71,13 @@ void main() {
     });
 
     test('connect() throws PeerNotFoundException when no match', () async {
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: ServerId.generate());
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
 
       final bluey = Bluey();
-      final peer = bluey.peer(
-        ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-      );
+      final peer = bluey.peer(ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'));
 
       expect(
         () => peer.connect(scanTimeout: const Duration(milliseconds: 300)),
@@ -101,7 +111,9 @@ void main() {
       // The control service should be hidden from the peer wrapper.
       final services = await peerConn.services();
       final controlServicePresent = services.any(
-        (s) => s.uuid.toString().toLowerCase() == 'b1e70001-0000-1000-8000-00805f9b34fb',
+        (s) =>
+            s.uuid.toString().toLowerCase() ==
+            'b1e70001-0000-1000-8000-00805f9b34fb',
       );
       expect(controlServicePresent, isFalse);
 

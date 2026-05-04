@@ -26,10 +26,10 @@ import '../fakes/test_helpers.dart';
 /// connection.
 void main() {
   Device deviceFor(String address) => Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: address,
-        name: 'Test Device',
-      );
+    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+    address: address,
+    name: 'Test Device',
+  );
 
   /// Android-flavored profile: `platformKind == android` plus every
   /// Android-specific feature flag enabled, so the methods on
@@ -88,8 +88,7 @@ void main() {
       bluey.dispose();
     });
 
-    test('returns the same instance on repeated reads (lazy cache)',
-        () async {
+    test('returns the same instance on repeated reads (lazy cache)', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
       platform.BlueyPlatform.instance = fakePlatform;
 
@@ -106,26 +105,30 @@ void main() {
       bluey.dispose();
     });
 
-    test('android.bond() resolves without throwing on a canBond=true fake',
-        () async {
-      final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
-      platform.BlueyPlatform.instance = fakePlatform;
-
-      fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
-
-      final bluey = Bluey();
-      final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
-
-      // Post-B.3, `connection.bond()` is gone — bonding is reachable
-      // only via `connection.android?.bond()`.
-      await conn.android?.bond();
-
-      await conn.disconnect();
-      bluey.dispose();
-    });
-
     test(
-        'android?.bond() short-circuits to null when platformKind == ios '
+      'android.bond() resolves without throwing on a canBond=true fake',
+      () async {
+        final fakePlatform = FakeBlueyPlatform(capabilities: androidFlavored);
+        platform.BlueyPlatform.instance = fakePlatform;
+
+        fakePlatform.simulatePeripheral(
+          id: TestDeviceIds.device1,
+          name: 'Test',
+        );
+
+        final bluey = Bluey();
+        final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
+
+        // Post-B.3, `connection.bond()` is gone — bonding is reachable
+        // only via `connection.android?.bond()`.
+        await conn.android?.bond();
+
+        await conn.disconnect();
+        bluey.dispose();
+      },
+    );
+
+    test('android?.bond() short-circuits to null when platformKind == ios '
         'and never reaches the platform', () async {
       final fakePlatform = FakeBlueyPlatform(capabilities: iosFlavored);
       platform.BlueyPlatform.instance = fakePlatform;

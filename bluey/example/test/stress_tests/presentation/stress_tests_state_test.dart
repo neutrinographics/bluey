@@ -40,16 +40,20 @@ void main() {
     final base = TestCardState(
       test: StressTest.burstWrite,
       config: const BurstWriteConfig(),
-      result: StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 10)),
+      result: StressTestResult.initial().recordSuccess(
+        latency: const Duration(milliseconds: 10),
+      ),
       isRunning: true,
     );
 
     test('copyWith without passing result PRESERVES the existing result', () {
       final copy = base.copyWith(isRunning: false);
-      expect(copy.result, isNotNull,
-          reason:
-              'The existing result must not be erased by an unrelated copyWith.');
+      expect(
+        copy.result,
+        isNotNull,
+        reason:
+            'The existing result must not be erased by an unrelated copyWith.',
+      );
       expect(copy.isRunning, isFalse);
     });
 

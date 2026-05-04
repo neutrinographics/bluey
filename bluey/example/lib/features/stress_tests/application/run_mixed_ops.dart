@@ -8,10 +8,7 @@ class RunMixedOps {
   final StressTestRunner _runner;
   RunMixedOps(this._runner);
 
-  Stream<StressTestResult> call(
-    MixedOpsConfig config,
-    Connection connection,
-  ) {
+  Stream<StressTestResult> call(MixedOpsConfig config, Connection connection) {
     return _runner.runMixedOps(config, connection);
   }
 }

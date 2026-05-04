@@ -43,8 +43,14 @@ void main() {
   Uint8List notifyEnabled() => Uint8List.fromList([0x01, 0x00]);
   Uint8List notifyDisabled() => Uint8List.fromList([0x00, 0x00]);
 
-  Future<({Connection connection, RemoteCharacteristic charA, RemoteCharacteristic charB})>
-      connectWithTwoNotifyChars() async {
+  Future<
+    ({
+      Connection connection,
+      RemoteCharacteristic charA,
+      RemoteCharacteristic charB,
+    })
+  >
+  connectWithTwoNotifyChars() async {
     fakePlatform.simulatePeripheral(
       id: TestDeviceIds.device1,
       name: 'Two-Notify Peripheral',
@@ -56,17 +62,17 @@ void main() {
             platform.PlatformCharacteristic(
               uuid: charAUuid,
               properties: TestProperties.notifyOnly,
-              descriptors: [platform.PlatformDescriptor(uuid: cccdUuid,
-  handle: 0,
-)],
+              descriptors: [
+                platform.PlatformDescriptor(uuid: cccdUuid, handle: 0),
+              ],
               handle: 0,
             ),
             platform.PlatformCharacteristic(
               uuid: charBUuid,
               properties: TestProperties.notifyOnly,
-              descriptors: [platform.PlatformDescriptor(uuid: cccdUuid,
-  handle: 0,
-)],
+              descriptors: [
+                platform.PlatformDescriptor(uuid: cccdUuid, handle: 0),
+              ],
               handle: 0,
             ),
           ],
@@ -80,11 +86,7 @@ void main() {
     final connection = await bluey.connect(device);
     final services = await connection.services();
     final chars = services.single.characteristics();
-    return (
-      connection: connection,
-      charA: chars[0],
-      charB: chars[1],
-    );
+    return (connection: connection, charA: chars[0], charB: chars[1]);
   }
 
   // Looks up the CCCD handle for [char] and returns its current bytes,
@@ -101,66 +103,63 @@ void main() {
     );
   }
 
-  test(
-    'enabling notifications on charA does not toggle charB CCCD',
-    () async {
-      final (:connection, :charA, :charB) = await connectWithTwoNotifyChars();
+  test('enabling notifications on charA does not toggle charB CCCD', () async {
+    final (:connection, :charA, :charB) = await connectWithTwoNotifyChars();
 
-      // Subscribing triggers `setNotification(true, characteristicHandle: ...)`
-      // on the platform via `BlueyRemoteCharacteristic._onFirstListen`.
-      final sub = charA.notifications.listen((_) {});
-      // Pump the event loop so the fire-and-forget setNotification call
-      // resolves before we assert on CCCD state.
-      await Future<void>.delayed(Duration.zero);
+    // Subscribing triggers `setNotification(true, characteristicHandle: ...)`
+    // on the platform via `BlueyRemoteCharacteristic._onFirstListen`.
+    final sub = charA.notifications.listen((_) {});
+    // Pump the event loop so the fire-and-forget setNotification call
+    // resolves before we assert on CCCD state.
+    await Future<void>.delayed(Duration.zero);
 
-      expect(
-        cccdFor(charA),
-        equals(notifyEnabled()),
-        reason: "charA's CCCD should be enabled (0x0001 LE)",
-      );
-      expect(
-        cccdFor(charB),
-        equals(notifyDisabled()),
-        reason: "charB's CCCD must remain at the default disabled (0x0000) "
-            'state — its slot is keyed by a different descriptor handle',
-      );
+    expect(
+      cccdFor(charA),
+      equals(notifyEnabled()),
+      reason: "charA's CCCD should be enabled (0x0001 LE)",
+    );
+    expect(
+      cccdFor(charB),
+      equals(notifyDisabled()),
+      reason:
+          "charB's CCCD must remain at the default disabled (0x0000) "
+          'state — its slot is keyed by a different descriptor handle',
+    );
 
-      await sub.cancel();
-    },
-  );
+    await sub.cancel();
+  });
 
-  test(
-    'disabling notifications on charA does not affect charB CCCD',
-    () async {
-      final (:connection, :charA, :charB) = await connectWithTwoNotifyChars();
+  test('disabling notifications on charA does not affect charB CCCD', () async {
+    final (:connection, :charA, :charB) = await connectWithTwoNotifyChars();
 
-      // Subscribe to BOTH chars first, so each CCCD is enabled.
-      final subA = charA.notifications.listen((_) {});
-      final subB = charB.notifications.listen((_) {});
-      await Future<void>.delayed(Duration.zero);
+    // Subscribe to BOTH chars first, so each CCCD is enabled.
+    final subA = charA.notifications.listen((_) {});
+    final subB = charB.notifications.listen((_) {});
+    await Future<void>.delayed(Duration.zero);
 
-      expect(cccdFor(charA), equals(notifyEnabled()));
-      expect(cccdFor(charB), equals(notifyEnabled()));
+    expect(cccdFor(charA), equals(notifyEnabled()));
+    expect(cccdFor(charB), equals(notifyEnabled()));
 
-      // Cancelling charA's subscription triggers the
-      // `_onLastCancel` path -> setNotification(false).
-      await subA.cancel();
-      await Future<void>.delayed(Duration.zero);
+    // Cancelling charA's subscription triggers the
+    // `_onLastCancel` path -> setNotification(false).
+    await subA.cancel();
+    await Future<void>.delayed(Duration.zero);
 
-      expect(
-        cccdFor(charA),
-        equals(notifyDisabled()),
-        reason: "charA's CCCD should be cleared after the last subscriber "
-            'cancelled',
-      );
-      expect(
-        cccdFor(charB),
-        equals(notifyEnabled()),
-        reason: "charB's CCCD must remain enabled — its CCCD is a distinct "
-            'attribute with its own handle',
-      );
+    expect(
+      cccdFor(charA),
+      equals(notifyDisabled()),
+      reason:
+          "charA's CCCD should be cleared after the last subscriber "
+          'cancelled',
+    );
+    expect(
+      cccdFor(charB),
+      equals(notifyEnabled()),
+      reason:
+          "charB's CCCD must remain enabled — its CCCD is a distinct "
+          'attribute with its own handle',
+    );
 
-      await subB.cancel();
-    },
-  );
+    await subB.cancel();
+  });
 }

@@ -29,8 +29,7 @@ void main() {
     mockDisconnectDevice = MockDisconnectDevice();
     mockGetServices = MockGetServices();
     mockWatchPeer = MockWatchPeer();
-    when(() => mockWatchPeer(any()))
-        .thenAnswer((_) => const Stream.empty());
+    when(() => mockWatchPeer(any())).thenAnswer((_) => const Stream.empty());
 
     testDevice = Device(
       id: UUID('00000000-0000-0000-0000-000000000001'),
@@ -69,10 +68,12 @@ void main() {
       setUp: () {
         final mockConnection = MockConnection();
         when(() => mockConnection.state).thenReturn(ConnectionState.ready);
-        when(() => mockConnection.stateChanges)
-            .thenAnswer((_) => const Stream.empty());
-        when(() => mockConnection.servicesChanges)
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.stateChanges,
+        ).thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         final initialService = MockRemoteService();
@@ -87,10 +88,12 @@ void main() {
           yield [freshService1, freshService2];
         });
 
-        when(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
-            .thenAnswer((_) async => mockConnection);
-        when(() => mockGetServices(any()))
-            .thenAnswer((_) async => [initialService]);
+        when(
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        ).thenAnswer((_) async => mockConnection);
+        when(
+          () => mockGetServices(any()),
+        ).thenAnswer((_) async => [initialService]);
       },
       build: createCubit,
       act: (cubit) async {
@@ -111,8 +114,9 @@ void main() {
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
-        when(() => mockConnection.servicesChanges)
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         final mockService = MockRemoteService();
@@ -158,17 +162,20 @@ void main() {
       setUp: () {
         final mockConnection = MockConnection();
         when(() => mockConnection.state).thenReturn(ConnectionState.ready);
-        when(() => mockConnection.stateChanges)
-            .thenAnswer((_) => const Stream.empty());
-        when(() => mockConnection.servicesChanges)
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.stateChanges,
+        ).thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         final mockPeer = MockPeerConnection();
         when(() => mockPeer.disconnect()).thenAnswer((_) async {});
 
-        when(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
-            .thenAnswer((_) async => mockConnection);
+        when(
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        ).thenAnswer((_) async => mockConnection);
         when(() => mockGetServices(any())).thenAnswer((_) async => []);
         // Initial null (the bug case), then a peer surfaces — exactly
         // the shape `Bluey.watchPeer` produces after a Service-Changed
@@ -225,8 +232,9 @@ void main() {
         when(
           () => mockConnection.stateChanges,
         ).thenAnswer((_) => const Stream.empty());
-        when(() => mockConnection.servicesChanges)
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
       },
       build: () {
         final cubit = createCubit();
@@ -314,8 +322,9 @@ void main() {
           await Future.delayed(Duration.zero);
           throw Exception('State stream error');
         });
-        when(() => mockConnection.servicesChanges)
-            .thenAnswer((_) => const Stream.empty());
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         when(
@@ -340,18 +349,22 @@ void main() {
 
       final firstConn = MockConnection();
       when(() => firstConn.state).thenReturn(ConnectionState.ready);
-      when(() => firstConn.stateChanges)
-          .thenAnswer((_) => const Stream.empty());
-      when(() => firstConn.servicesChanges)
-          .thenAnswer((_) => const Stream.empty());
+      when(
+        () => firstConn.stateChanges,
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => firstConn.servicesChanges,
+      ).thenAnswer((_) => const Stream.empty());
       when(() => firstConn.disconnect()).thenAnswer((_) async {});
 
       final secondConn = MockConnection();
       when(() => secondConn.state).thenReturn(ConnectionState.ready);
-      when(() => secondConn.stateChanges)
-          .thenAnswer((_) => const Stream.empty());
-      when(() => secondConn.servicesChanges)
-          .thenAnswer((_) => const Stream.empty());
+      when(
+        () => secondConn.stateChanges,
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => secondConn.servicesChanges,
+      ).thenAnswer((_) => const Stream.empty());
       when(() => secondConn.disconnect()).thenAnswer((_) async {});
 
       when(() => mockDisconnectDevice(any())).thenAnswer((_) async {});
@@ -392,10 +405,10 @@ void main() {
 
       final mockConn = MockConnection();
       when(() => mockConn.state).thenReturn(ConnectionState.ready);
-      when(() => mockConn.stateChanges)
-          .thenAnswer((_) => const Stream.empty());
-      when(() => mockConn.servicesChanges)
-          .thenAnswer((_) => const Stream.empty());
+      when(() => mockConn.stateChanges).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockConn.servicesChanges,
+      ).thenAnswer((_) => const Stream.empty());
       when(() => mockConn.disconnect()).thenAnswer((_) async {});
 
       when(
@@ -411,26 +424,29 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       verifyNever(() => mockDisconnectDevice(any()));
-      verify(() => mockConnectToDevice(any(), timeout: any(named: 'timeout')))
-          .called(1);
-
-      await cubit.close();
-    });
-
-    test('settings change while disconnected does not trigger connect',
-        () async {
-      final settingsCubit = ConnectionSettingsCubit();
-      final cubit = createCubit(settingsCubit: settingsCubit);
-
-      // Don't call connect(). Change settings.
-      settingsCubit.setPeerSilenceTimeout(const Duration(seconds: 60));
-      await Future<void>.delayed(Duration.zero);
-
-      verifyNever(
+      verify(
         () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
-      );
+      ).called(1);
 
       await cubit.close();
     });
+
+    test(
+      'settings change while disconnected does not trigger connect',
+      () async {
+        final settingsCubit = ConnectionSettingsCubit();
+        final cubit = createCubit(settingsCubit: settingsCubit);
+
+        // Don't call connect(). Change settings.
+        settingsCubit.setPeerSilenceTimeout(const Duration(seconds: 60));
+        await Future<void>.delayed(Duration.zero);
+
+        verifyNever(
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        );
+
+        await cubit.close();
+      },
+    );
   });
 }

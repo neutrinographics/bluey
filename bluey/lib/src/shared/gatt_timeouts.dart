@@ -54,12 +54,12 @@ class GattTimeouts {
 
   @override
   int get hashCode => Object.hash(
-        discoverServices,
-        readCharacteristic,
-        writeCharacteristic,
-        readDescriptor,
-        writeDescriptor,
-        requestMtu,
-        readRssi,
-      );
+    discoverServices,
+    readCharacteristic,
+    writeCharacteristic,
+    readDescriptor,
+    writeDescriptor,
+    requestMtu,
+    readRssi,
+  );
 }

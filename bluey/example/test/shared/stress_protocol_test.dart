@@ -20,7 +20,10 @@ void main() {
   group('EchoCommand', () {
     test('encode prepends opcode 0x01 to payload', () {
       final cmd = EchoCommand(Uint8List.fromList([0xAA, 0xBB, 0xCC]));
-      expect(cmd.encode(), equals(Uint8List.fromList([0x01, 0xAA, 0xBB, 0xCC])));
+      expect(
+        cmd.encode(),
+        equals(Uint8List.fromList([0x01, 0xAA, 0xBB, 0xCC])),
+      );
     });
 
     test('encode handles empty payload', () {
@@ -46,8 +49,11 @@ void main() {
       final mutable = Uint8List.fromList([1, 2, 3]);
       final cmd = EchoCommand(mutable);
       mutable[0] = 99;
-      expect(cmd.payload[0], equals(1),
-          reason: 'Mutating the caller\'s list must not change the command');
+      expect(
+        cmd.payload[0],
+        equals(1),
+        reason: 'Mutating the caller\'s list must not change the command',
+      );
     });
   });
 
@@ -62,8 +68,13 @@ void main() {
     test('throws on unknown opcode', () {
       expect(
         () => StressCommand.decode(Uint8List.fromList([0xFF])),
-        throwsA(isA<StressProtocolException>()
-            .having((e) => e.opcode, 'opcode', 0xFF)),
+        throwsA(
+          isA<StressProtocolException>().having(
+            (e) => e.opcode,
+            'opcode',
+            0xFF,
+          ),
+        ),
       );
     });
   });

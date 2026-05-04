@@ -73,7 +73,8 @@ sealed class StressCommand {
         if (body.length < 2) {
           throw StressProtocolException(
             opcode: opcode,
-            message: 'SetPayloadSize payload too short (${body.length}, need 2)',
+            message:
+                'SetPayloadSize payload too short (${body.length}, need 2)',
           );
         }
         return SetPayloadSizeCommand(
@@ -86,7 +87,8 @@ sealed class StressCommand {
       default:
         throw StressProtocolException(
           opcode: opcode,
-          message: 'Unknown stress command opcode: 0x${opcode.toRadixString(16).padLeft(2, '0')}',
+          message:
+              'Unknown stress command opcode: 0x${opcode.toRadixString(16).padLeft(2, '0')}',
         );
     }
   }

@@ -55,7 +55,8 @@ class GattOperationDisconnectedException implements Exception {
 
   @override
   bool operator ==(Object other) =>
-      other is GattOperationDisconnectedException && other.operation == operation;
+      other is GattOperationDisconnectedException &&
+      other.operation == operation;
 
   @override
   int get hashCode => operation.hashCode;

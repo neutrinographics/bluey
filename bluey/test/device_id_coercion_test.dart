@@ -44,10 +44,7 @@ void main() {
     test('UUID-format detection requires both length 36 and a hyphen', () {
       // 36-char hyphen-bearing input → treated as UUID, passes through.
       final asUuid = deviceIdToUuid('00000000-0000-0000-0000-aabbccddeeff');
-      expect(
-        asUuid.toString(),
-        equals('00000000-0000-0000-0000-aabbccddeeff'),
-      );
+      expect(asUuid.toString(), equals('00000000-0000-0000-0000-aabbccddeeff'));
     });
   });
 }

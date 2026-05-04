@@ -122,23 +122,25 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     return platform.PlatformService(
       uuid: s.uuid,
       isPrimary: s.isPrimary,
-      characteristics: s.characteristics.map((c) {
-        final charHandle = c.handle != 0 ? c.handle : ++_nextHandle;
-        _charUuidByHandle[charHandle] = c.uuid.toLowerCase();
-        return platform.PlatformCharacteristic(
-          uuid: c.uuid,
-          properties: c.properties,
-          descriptors: c.descriptors.map((d) {
-            final descHandle = d.handle != 0 ? d.handle : ++_nextHandle;
-            _descUuidByHandle[descHandle] = d.uuid.toLowerCase();
-            return platform.PlatformDescriptor(
-              uuid: d.uuid,
-              handle: descHandle,
+      characteristics:
+          s.characteristics.map((c) {
+            final charHandle = c.handle != 0 ? c.handle : ++_nextHandle;
+            _charUuidByHandle[charHandle] = c.uuid.toLowerCase();
+            return platform.PlatformCharacteristic(
+              uuid: c.uuid,
+              properties: c.properties,
+              descriptors:
+                  c.descriptors.map((d) {
+                    final descHandle = d.handle != 0 ? d.handle : ++_nextHandle;
+                    _descUuidByHandle[descHandle] = d.uuid.toLowerCase();
+                    return platform.PlatformDescriptor(
+                      uuid: d.uuid,
+                      handle: descHandle,
+                    );
+                  }).toList(),
+              handle: charHandle,
             );
           }).toList(),
-          handle: charHandle,
-        );
-      }).toList(),
       includedServices: s.includedServices.map(_withMintedHandles).toList(),
     );
   }
@@ -151,7 +153,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     final uuid = _charUuidByHandle[characteristicHandle] ?? '';
     final value = characteristicValues[uuid];
     if (value == null) {
-      throw StateError('Characteristic not found: handle=$characteristicHandle');
+      throw StateError(
+        'Characteristic not found: handle=$characteristicHandle',
+      );
     }
     return value;
   }
@@ -291,7 +295,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   // Server (Peripheral) operations - stub implementations
   @override
-  Future<platform.PlatformLocalService> addService(platform.PlatformLocalService service) async => service;
+  Future<platform.PlatformLocalService> addService(
+    platform.PlatformLocalService service,
+  ) async => service;
 
   @override
   Future<void> removeService(String serviceUuid) async {}
@@ -876,9 +882,9 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [platform.PlatformDescriptor(uuid: descUuid,
-  handle: 0,
-)],
+                descriptors: [
+                  platform.PlatformDescriptor(uuid: descUuid, handle: 0),
+                ],
                 handle: 0,
               ),
             ],
@@ -917,9 +923,9 @@ void main() {
                   canNotify: true,
                   canIndicate: false,
                 ),
-                descriptors: [platform.PlatformDescriptor(uuid: descUuid,
-  handle: 0,
-)],
+                descriptors: [
+                  platform.PlatformDescriptor(uuid: descUuid, handle: 0),
+                ],
                 handle: 0,
               ),
             ],

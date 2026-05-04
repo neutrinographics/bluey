@@ -70,11 +70,14 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'DUR (S)',
             value: c.duration.inSeconds,
-            onChanged: (v) => widget.onChanged(SoakConfig(
-              duration: Duration(seconds: v),
-              interval: c.interval,
-              payloadBytes: c.payloadBytes,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  SoakConfig(
+                    duration: Duration(seconds: v),
+                    interval: c.interval,
+                    payloadBytes: c.payloadBytes,
+                  ),
+                ),
           ),
         ),
         const SizedBox(width: 12),
@@ -82,11 +85,14 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'INT (MS)',
             value: c.interval.inMilliseconds,
-            onChanged: (v) => widget.onChanged(SoakConfig(
-              duration: c.duration,
-              interval: Duration(milliseconds: v),
-              payloadBytes: c.payloadBytes,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  SoakConfig(
+                    duration: c.duration,
+                    interval: Duration(milliseconds: v),
+                    payloadBytes: c.payloadBytes,
+                  ),
+                ),
           ),
         ),
         const SizedBox(width: 12),
@@ -94,11 +100,14 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'BYTES',
             value: c.payloadBytes,
-            onChanged: (v) => widget.onChanged(SoakConfig(
-              duration: c.duration,
-              interval: c.interval,
-              payloadBytes: v,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  SoakConfig(
+                    duration: c.duration,
+                    interval: c.interval,
+                    payloadBytes: v,
+                  ),
+                ),
           ),
         ),
       ],
@@ -109,9 +118,10 @@ class _ConfigFormState extends State<ConfigForm> {
     return _intField(
       label: 'DELAY PAST TIMEOUT (MS)',
       value: c.delayPastTimeout.inSeconds,
-      onChanged: (v) => widget.onChanged(TimeoutProbeConfig(
-        delayPastTimeout: Duration(seconds: v),
-      )),
+      onChanged:
+          (v) => widget.onChanged(
+            TimeoutProbeConfig(delayPastTimeout: Duration(seconds: v)),
+          ),
     );
   }
 
@@ -142,11 +152,14 @@ class _ConfigFormState extends State<ConfigForm> {
               child: _intField(
                 label: 'COUNT',
                 value: c.count,
-                onChanged: (v) => widget.onChanged(BurstWriteConfig(
-                  count: v,
-                  payloadBytes: c.payloadBytes,
-                  withResponse: c.withResponse,
-                )),
+                onChanged:
+                    (v) => widget.onChanged(
+                      BurstWriteConfig(
+                        count: v,
+                        payloadBytes: c.payloadBytes,
+                        withResponse: c.withResponse,
+                      ),
+                    ),
               ),
             ),
             const SizedBox(width: 16),
@@ -154,11 +167,14 @@ class _ConfigFormState extends State<ConfigForm> {
               child: _intField(
                 label: 'BYTES',
                 value: c.payloadBytes,
-                onChanged: (v) => widget.onChanged(BurstWriteConfig(
-                  count: c.count,
-                  payloadBytes: v,
-                  withResponse: c.withResponse,
-                )),
+                onChanged:
+                    (v) => widget.onChanged(
+                      BurstWriteConfig(
+                        count: c.count,
+                        payloadBytes: v,
+                        withResponse: c.withResponse,
+                      ),
+                    ),
               ),
             ),
           ],
@@ -170,13 +186,16 @@ class _ConfigFormState extends State<ConfigForm> {
             children: [
               Checkbox(
                 value: c.withResponse,
-                onChanged: widget.enabled
-                    ? (v) => widget.onChanged(BurstWriteConfig(
-                          count: c.count,
-                          payloadBytes: c.payloadBytes,
-                          withResponse: v ?? true,
-                        ))
-                    : null,
+                onChanged:
+                    widget.enabled
+                        ? (v) => widget.onChanged(
+                          BurstWriteConfig(
+                            count: c.count,
+                            payloadBytes: c.payloadBytes,
+                            withResponse: v ?? true,
+                          ),
+                        )
+                        : null,
               ),
               const SizedBox(width: 4),
               Text(
@@ -202,10 +221,10 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'REQUESTED MTU',
             value: c.requestedMtu,
-            onChanged: (v) => widget.onChanged(MtuProbeConfig(
-              requestedMtu: v,
-              payloadBytes: c.payloadBytes,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  MtuProbeConfig(requestedMtu: v, payloadBytes: c.payloadBytes),
+                ),
           ),
         ),
         const SizedBox(width: 16),
@@ -213,10 +232,10 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'PAYLOAD BYTES',
             value: c.payloadBytes,
-            onChanged: (v) => widget.onChanged(MtuProbeConfig(
-              requestedMtu: c.requestedMtu,
-              payloadBytes: v,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  MtuProbeConfig(requestedMtu: c.requestedMtu, payloadBytes: v),
+                ),
           ),
         ),
       ],
@@ -231,10 +250,13 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'COUNT',
             value: c.count,
-            onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
-              count: v,
-              payloadBytes: c.payloadBytes,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  NotificationThroughputConfig(
+                    count: v,
+                    payloadBytes: c.payloadBytes,
+                  ),
+                ),
           ),
         ),
         const SizedBox(width: 16),
@@ -242,10 +264,10 @@ class _ConfigFormState extends State<ConfigForm> {
           child: _intField(
             label: 'PAYLOAD BYTES',
             value: c.payloadBytes,
-            onChanged: (v) => widget.onChanged(NotificationThroughputConfig(
-              count: c.count,
-              payloadBytes: v,
-            )),
+            onChanged:
+                (v) => widget.onChanged(
+                  NotificationThroughputConfig(count: c.count, payloadBytes: v),
+                ),
           ),
         ),
       ],

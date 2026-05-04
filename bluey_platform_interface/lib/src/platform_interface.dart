@@ -282,15 +282,15 @@ class BlueyConfig {
 
   @override
   int get hashCode => Object.hash(
-        cleanupOnActivityDestroy,
-        discoverServicesTimeoutMs,
-        readCharacteristicTimeoutMs,
-        writeCharacteristicTimeoutMs,
-        readDescriptorTimeoutMs,
-        writeDescriptorTimeoutMs,
-        requestMtuTimeoutMs,
-        readRssiTimeoutMs,
-      );
+    cleanupOnActivityDestroy,
+    discoverServicesTimeoutMs,
+    readCharacteristicTimeoutMs,
+    writeCharacteristicTimeoutMs,
+    readDescriptorTimeoutMs,
+    writeDescriptorTimeoutMs,
+    requestMtuTimeoutMs,
+    readRssiTimeoutMs,
+  );
 }
 
 /// Platform-specific implementation interface.
@@ -503,7 +503,10 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Send an indication to all subscribed centrals, addressed by the
   /// platform-minted handle of a local characteristic. Unlike
   /// notifications, indications require acknowledgment from the central.
-  Future<void> indicateCharacteristic(int characteristicHandle, Uint8List value);
+  Future<void> indicateCharacteristic(
+    int characteristicHandle,
+    Uint8List value,
+  );
 
   /// Send an indication to a specific central, addressed by the
   /// platform-minted handle of a local characteristic. Unlike

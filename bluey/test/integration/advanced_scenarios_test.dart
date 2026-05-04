@@ -274,10 +274,18 @@ void main() {
         // Write 100 bytes (would need fragmentation in real scenario)
         final largeData = Uint8List.fromList(List.generate(100, (i) => i));
 
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', largeData, true, );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          largeData,
+          true,
+        );
 
         // Verify write succeeded
-        final readBack = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
+        final readBack = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
         expect(readBack, equals(largeData));
 
         await connection.disconnect();
@@ -327,7 +335,12 @@ void main() {
           List.generate(500, (i) => i % 256),
         );
 
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', largeData, true, );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          largeData,
+          true,
+        );
 
         await connection.disconnect();
         await bluey.dispose();

@@ -146,7 +146,8 @@ class _ServiceScreenState extends State<ServiceScreen> {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final isLast = index == _service.characteristics().length - 1;
+                    final isLast =
+                        index == _service.characteristics().length - 1;
                     return Padding(
                       padding: EdgeInsets.fromLTRB(
                         24,

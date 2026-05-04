@@ -33,10 +33,9 @@ void main() {
       id: TestDeviceIds.device1,
       name: 'Disconnect Test Device',
       services: [
-        TestServiceBuilder(_serviceUuid)
-            .withWritable(_charUuid)
-            .withNotifiable(TestUuids.customChar2)
-            .build(),
+        TestServiceBuilder(
+          _serviceUuid,
+        ).withWritable(_charUuid).withNotifiable(TestUuids.customChar2).build(),
       ],
     );
 
@@ -199,10 +198,11 @@ void main() {
 
         final received = await errorCompleter.future.timeout(
           const Duration(seconds: 2),
-          onTimeout: () => fail(
-            'Expected _onFirstListen setNotification failure to reach the '
-            'stream consumer, but no error arrived within 2s',
-          ),
+          onTimeout:
+              () => fail(
+                'Expected _onFirstListen setNotification failure to reach the '
+                'stream consumer, but no error arrived within 2s',
+              ),
         );
         expect(received, isA<DisconnectedException>());
 

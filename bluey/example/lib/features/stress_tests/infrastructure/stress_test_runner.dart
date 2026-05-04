@@ -36,8 +36,9 @@ class StressTestRunner {
 
           if (!await _prologue(connection, stressChar)) {
             if (!cancelled && !controller.isClosed) {
-              controller
-                  .add(StressTestResult.initial().finished(elapsed: Duration.zero));
+              controller.add(
+                StressTestResult.initial().finished(elapsed: Duration.zero),
+              );
             }
             if (!controller.isClosed) await controller.close();
             return;
@@ -56,10 +57,13 @@ class StressTestRunner {
                 outcome.typeName == 'DisconnectedException') {
               result = result.markConnectionLost();
             }
-            result = outcome.success
-                ? result.recordSuccess(latency: outcome.latency!)
-                : result.recordFailure(
-                    typeName: outcome.typeName!, status: outcome.status);
+            result =
+                outcome.success
+                    ? result.recordSuccess(latency: outcome.latency!)
+                    : result.recordFailure(
+                      typeName: outcome.typeName!,
+                      status: outcome.status,
+                    );
             controller.add(result);
           }
 
@@ -69,17 +73,20 @@ class StressTestRunner {
             futures.add(() async {
               try {
                 await stressChar.write(cmd, withResponse: config.withResponse);
-                publish(_OpOutcome.success(
-                  latency: Duration(
-                      microseconds:
-                          stopwatch.elapsedMicroseconds - opStart),
-                ));
+                publish(
+                  _OpOutcome.success(
+                    latency: Duration(
+                      microseconds: stopwatch.elapsedMicroseconds - opStart,
+                    ),
+                  ),
+                );
               } catch (e) {
-                publish(_OpOutcome.failure(
-                  typeName: _typeName(e),
-                  status:
-                      e is GattOperationFailedException ? e.status : null,
-                ));
+                publish(
+                  _OpOutcome.failure(
+                    typeName: _typeName(e),
+                    status: e is GattOperationFailedException ? e.status : null,
+                  ),
+                );
               }
             }());
           }
@@ -119,7 +126,8 @@ class StressTestRunner {
           if (!await _prologue(connection, stressChar)) {
             if (!cancelled && !controller.isClosed) {
               controller.add(
-                  StressTestResult.initial().finished(elapsed: Duration.zero));
+                StressTestResult.initial().finished(elapsed: Duration.zero),
+              );
             }
             if (!controller.isClosed) await controller.close();
             return;
@@ -138,10 +146,13 @@ class StressTestRunner {
                 outcome.typeName == 'DisconnectedException') {
               result = result.markConnectionLost();
             }
-            result = outcome.success
-                ? result.recordSuccess(latency: outcome.latency!)
-                : result.recordFailure(
-                    typeName: outcome.typeName!, status: outcome.status);
+            result =
+                outcome.success
+                    ? result.recordSuccess(latency: outcome.latency!)
+                    : result.recordFailure(
+                      typeName: outcome.typeName!,
+                      status: outcome.status,
+                    );
             controller.add(result);
           }
 
@@ -149,26 +160,33 @@ class StressTestRunner {
             final start = stopwatch.elapsedMicroseconds;
             try {
               await op();
-              publish(_OpOutcome.success(
-                latency: Duration(
-                    microseconds: stopwatch.elapsedMicroseconds - start),
-              ));
+              publish(
+                _OpOutcome.success(
+                  latency: Duration(
+                    microseconds: stopwatch.elapsedMicroseconds - start,
+                  ),
+                ),
+              );
             } catch (e) {
-              publish(_OpOutcome.failure(
-                typeName: _typeName(e),
-                status: e is GattOperationFailedException ? e.status : null,
-              ));
+              publish(
+                _OpOutcome.failure(
+                  typeName: _typeName(e),
+                  status: e is GattOperationFailedException ? e.status : null,
+                ),
+              );
             }
           }
 
           final futures = <Future<void>>[];
           for (var i = 0; i < config.iterations; i++) {
-            futures
-                .add(recordOp(() => stressChar.write(cmd, withResponse: true)));
+            futures.add(
+              recordOp(() => stressChar.write(cmd, withResponse: true)),
+            );
             futures.add(recordOp(() => stressChar.read()));
             futures.add(recordOp(() => connection.services(cache: false)));
             futures.add(
-                recordOp(() => connection.requestMtu(Mtu.fromPlatform(247))));
+              recordOp(() => connection.requestMtu(Mtu.fromPlatform(247))),
+            );
           }
           await Future.wait(futures);
           stopwatch.stop();
@@ -233,8 +251,7 @@ class StressTestRunner {
 
       // Wait until next tick or end-of-test, whichever comes first.
       final remaining = endTime - stopwatch.elapsed;
-      final waitFor =
-          remaining < config.interval ? remaining : config.interval;
+      final waitFor = remaining < config.interval ? remaining : config.interval;
       if (waitFor > Duration.zero) {
         await Future<void>.delayed(waitFor);
       }
@@ -271,9 +288,7 @@ class StressTestRunner {
         withResponse: true,
       );
       result = result.recordSuccess(
-        latency: Duration(
-          microseconds: stopwatch.elapsedMicroseconds - start,
-        ),
+        latency: Duration(microseconds: stopwatch.elapsedMicroseconds - start),
       );
     } catch (e) {
       if (e is DisconnectedException) {
@@ -300,7 +315,10 @@ class StressTestRunner {
     }
 
     try {
-      await stressChar.write(const DropNextCommand().encode(), withResponse: true);
+      await stressChar.write(
+        const DropNextCommand().encode(),
+        withResponse: true,
+      );
     } on Object {
       yield StressTestResult.initial().finished(elapsed: Duration.zero);
       return;
@@ -453,7 +471,8 @@ class StressTestRunner {
       // burst start reference, so latency = time since server started emitting.
       burstStartedAt ??= stopwatch.elapsedMicroseconds;
       final latency = Duration(
-          microseconds: stopwatch.elapsedMicroseconds - burstStartedAt!);
+        microseconds: stopwatch.elapsedMicroseconds - burstStartedAt!,
+      );
       (latenciesPerId[id] ??= []).add(latency);
       if (latenciesPerId[id]!.length >= config.count &&
           !completer.isCompleted) {
@@ -466,8 +485,10 @@ class StressTestRunner {
     var writeSucceeded = true;
     try {
       await stressChar.write(
-        BurstMeCommand(count: config.count, payloadSize: config.payloadBytes)
-            .encode(),
+        BurstMeCommand(
+          count: config.count,
+          payloadSize: config.payloadBytes,
+        ).encode(),
         withResponse: true,
       );
     } catch (e) {
@@ -494,8 +515,8 @@ class StressTestRunner {
     // (10 ms × count + 2 s) sizes for the post-I040 iOS-server
     // delivery rate (~2–3 ms / notification, queue-drain bound) with
     // a 5× safety margin.
-    final timeout = config.timeout ??
-        Duration(milliseconds: 10 * config.count + 2000);
+    final timeout =
+        config.timeout ?? Duration(milliseconds: 10 * config.count + 2000);
     try {
       await completer.future.timeout(timeout);
     } on TimeoutException {
@@ -517,9 +538,8 @@ class StressTestRunner {
         bestBurstId = entry.key;
       }
     }
-    final winnerLatencies = bestBurstId != null
-        ? latenciesPerId[bestBurstId]!
-        : <Duration>[];
+    final winnerLatencies =
+        bestBurstId != null ? latenciesPerId[bestBurstId]! : <Duration>[];
     for (final l in winnerLatencies) {
       result = result.recordSuccess(latency: l);
     }
@@ -560,9 +580,7 @@ class StressTestRunner {
     }
   }
 
-  Future<RemoteCharacteristic> _resolveStressChar(
-    Connection connection,
-  ) async {
+  Future<RemoteCharacteristic> _resolveStressChar(Connection connection) async {
     final services = await connection.services();
     final svc = services.firstWhere(
       (s) => s.uuid == UUID(StressProtocol.serviceUuid),

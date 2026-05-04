@@ -78,7 +78,10 @@ void main() {
 
         // Try to read after disconnect - platform should throw
         expect(
-          () => fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', ),
+          () => fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+          ),
           throwsA(isA<Exception>()),
         );
 
@@ -118,7 +121,12 @@ void main() {
         await connection.disconnect();
 
         expect(
-          () => fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01]), true, ),
+          () => fakePlatform.writeCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x01]),
+            true,
+          ),
           throwsA(isA<Exception>()),
         );
 
@@ -191,7 +199,10 @@ void main() {
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
-        final value = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
+        final value = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
 
         expect(value, isEmpty);
 
@@ -237,7 +248,11 @@ void main() {
 
         // Try to notify the disconnected central
         expect(
-          () => fakePlatform.notifyCharacteristicToByUuid('central-1', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List.fromList([0x01]), ),
+          () => fakePlatform.notifyCharacteristicToByUuid(
+            'central-1',
+            '00002a37-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([0x01]),
+          ),
           throwsA(isA<Exception>()),
         );
 
@@ -670,7 +685,12 @@ void main() {
         await bluey.connect(device);
 
         // Write empty data
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', Uint8List(0), true, );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          Uint8List(0),
+          true,
+        );
 
         await bluey.dispose();
       });
@@ -710,10 +730,18 @@ void main() {
         final largeData = Uint8List.fromList(
           List.generate(512, (i) => i % 256),
         );
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', largeData, true, );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+          largeData,
+          true,
+        );
 
         // Verify data was written
-        final readBack = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', '00002a37-0000-1000-8000-00805f9b34fb', );
+        final readBack = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          '00002a37-0000-1000-8000-00805f9b34fb',
+        );
         expect(readBack, equals(largeData));
 
         await bluey.dispose();

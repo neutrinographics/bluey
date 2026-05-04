@@ -16,8 +16,9 @@ final class BlueyIos extends BlueyPlatform {
   final BlueyHostApi _hostApi = BlueyHostApi();
   final _BlueyFlutterApiImpl _flutterApi = _BlueyFlutterApiImpl();
   late final IosScanner _scanner = IosScanner(_hostApi);
-  late final IosConnectionManager _connectionManager =
-      IosConnectionManager(_hostApi);
+  late final IosConnectionManager _connectionManager = IosConnectionManager(
+    _hostApi,
+  );
   late final IosServer _server = IosServer(_hostApi);
 
   final StreamController<BluetoothState> _stateController =
@@ -475,8 +476,10 @@ final class BlueyIos extends BlueyPlatform {
   PlatformLogEvent _mapLogEventDto(LogEventDto dto) {
     return PlatformLogEvent(
       timestamp:
-          DateTime.fromMicrosecondsSinceEpoch(dto.timestampMicros, isUtc: true)
-              .toLocal(),
+          DateTime.fromMicrosecondsSinceEpoch(
+            dto.timestampMicros,
+            isUtc: true,
+          ).toLocal(),
       level: _mapLogLevelFromDto(dto.level),
       context: dto.context,
       message: dto.message,
@@ -541,7 +544,6 @@ final class BlueyIos extends BlueyPlatform {
         return BluetoothState.on;
     }
   }
-
 }
 
 /// Implementation of Flutter API that receives callbacks from platform.

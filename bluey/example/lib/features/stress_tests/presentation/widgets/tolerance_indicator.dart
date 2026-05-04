@@ -44,11 +44,7 @@ class ToleranceIndicator extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(
-              Icons.chevron_right,
-              size: 14,
-              color: Color(0xFF596064),
-            ),
+            const Icon(Icons.chevron_right, size: 14, color: Color(0xFF596064)),
           ],
         ),
       ),

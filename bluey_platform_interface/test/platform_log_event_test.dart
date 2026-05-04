@@ -6,10 +6,22 @@ void main() {
     test('declares severity ordering trace < debug < info < warn < error', () {
       // The enum's index ordering is the canonical ordering used by
       // setLogLevel filters across the platform interface.
-      expect(PlatformLogLevel.trace.index, lessThan(PlatformLogLevel.debug.index));
-      expect(PlatformLogLevel.debug.index, lessThan(PlatformLogLevel.info.index));
-      expect(PlatformLogLevel.info.index, lessThan(PlatformLogLevel.warn.index));
-      expect(PlatformLogLevel.warn.index, lessThan(PlatformLogLevel.error.index));
+      expect(
+        PlatformLogLevel.trace.index,
+        lessThan(PlatformLogLevel.debug.index),
+      );
+      expect(
+        PlatformLogLevel.debug.index,
+        lessThan(PlatformLogLevel.info.index),
+      );
+      expect(
+        PlatformLogLevel.info.index,
+        lessThan(PlatformLogLevel.warn.index),
+      );
+      expect(
+        PlatformLogLevel.warn.index,
+        lessThan(PlatformLogLevel.error.index),
+      );
     });
 
     test('has exactly five levels in expected order', () {
@@ -27,8 +39,10 @@ void main() {
   });
 
   group('PlatformLogEvent', () {
-    final fixedTime =
-        DateTime.fromMicrosecondsSinceEpoch(1_700_000_000_000_000, isUtc: true);
+    final fixedTime = DateTime.fromMicrosecondsSinceEpoch(
+      1_700_000_000_000_000,
+      isUtc: true,
+    );
 
     test('stores all required fields', () {
       final event = PlatformLogEvent(

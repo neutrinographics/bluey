@@ -49,14 +49,16 @@ class BlueyLogger {
   }) {
     if (_disposed) return;
     if (level.index < _minLevel.index) return;
-    _controller.add(BlueyLogEvent(
-      timestamp: DateTime.now(),
-      level: level,
-      context: context,
-      message: message,
-      data: data,
-      errorCode: errorCode,
-    ));
+    _controller.add(
+      BlueyLogEvent(
+        timestamp: DateTime.now(),
+        level: level,
+        context: context,
+        message: message,
+        data: data,
+        errorCode: errorCode,
+      ),
+    );
   }
 
   /// Forwards a structured log event originating in the platform (native)
@@ -69,14 +71,16 @@ class BlueyLogger {
   /// No-op once [dispose] has been called.
   void injectFromPlatform(PlatformLogEvent event) {
     if (_disposed) return;
-    _controller.add(BlueyLogEvent(
-      timestamp: event.timestamp,
-      level: _mapPlatformLevel(event.level),
-      context: event.context,
-      message: event.message,
-      data: event.data,
-      errorCode: event.errorCode,
-    ));
+    _controller.add(
+      BlueyLogEvent(
+        timestamp: event.timestamp,
+        level: _mapPlatformLevel(event.level),
+        context: event.context,
+        message: event.message,
+        data: event.data,
+        errorCode: event.errorCode,
+      ),
+    );
   }
 
   /// Closes the underlying broadcast stream. Subsequent [log] calls are

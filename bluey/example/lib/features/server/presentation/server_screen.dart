@@ -83,7 +83,7 @@ class ServerScreen extends StatelessWidget {
             getServer: getIt<GetServer>(),
             identityStorage: getIt<ServerIdentityStorage>(),
           )..initialize(),
-      child: const ScaffoldMessenger(child: _ServerView()),
+      child: const _ServerView(),
     );
   }
 }

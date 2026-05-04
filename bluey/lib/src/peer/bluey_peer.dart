@@ -48,10 +48,10 @@ class _BlueyPeer implements BlueyPeer {
     required Duration peerSilenceTimeout,
     required BlueyLogger logger,
     EventPublisher? events,
-  })  : _platform = platformApi,
-        _peerSilenceTimeout = peerSilenceTimeout,
-        _logger = logger,
-        _events = events;
+  }) : _platform = platformApi,
+       _peerSilenceTimeout = peerSilenceTimeout,
+       _logger = logger,
+       _events = events;
 
   @override
   Future<PeerConnection> connect({

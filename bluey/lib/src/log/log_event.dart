@@ -59,13 +59,13 @@ class BlueyLogEvent {
 
   @override
   int get hashCode => Object.hash(
-        timestamp,
-        level,
-        context,
-        message,
-        errorCode,
-        _mapHash(data),
-      );
+    timestamp,
+    level,
+    context,
+    message,
+    errorCode,
+    _mapHash(data),
+  );
 
   @override
   String toString() =>
@@ -74,10 +74,7 @@ class BlueyLogEvent {
       '${errorCode == null ? '' : ' errorCode=$errorCode'}'
       ' @$timestamp)';
 
-  static bool _mapEquals(
-    Map<String, Object?> a,
-    Map<String, Object?> b,
-  ) {
+  static bool _mapEquals(Map<String, Object?> a, Map<String, Object?> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
     for (final entry in a.entries) {

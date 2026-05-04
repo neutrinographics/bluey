@@ -251,21 +251,26 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
       final h = _nextLocalHandle++;
       localHandleByCharUuid[c.uuid.toLowerCase()] = h;
       var nextDesc = 1;
-      final populatedDescs = c.descriptors
-          .map((d) => platform.PlatformLocalDescriptor(
-                uuid: d.uuid,
-                permissions: d.permissions,
-                value: d.value,
-                handle: nextDesc++,
-              ))
-          .toList();
-      populatedChars.add(platform.PlatformLocalCharacteristic(
-        uuid: c.uuid,
-        properties: c.properties,
-        permissions: c.permissions,
-        descriptors: populatedDescs,
-        handle: h,
-      ));
+      final populatedDescs =
+          c.descriptors
+              .map(
+                (d) => platform.PlatformLocalDescriptor(
+                  uuid: d.uuid,
+                  permissions: d.permissions,
+                  value: d.value,
+                  handle: nextDesc++,
+                ),
+              )
+              .toList();
+      populatedChars.add(
+        platform.PlatformLocalCharacteristic(
+          uuid: c.uuid,
+          properties: c.properties,
+          permissions: c.permissions,
+          descriptors: populatedDescs,
+          handle: h,
+        ),
+      );
     }
     return platform.PlatformLocalService(
       uuid: s.uuid,
@@ -627,8 +632,11 @@ void main() {
         for (var i = 0; i < 5; i++) {
           await Future<void>.delayed(Duration.zero);
         }
-        expect(done, isFalse,
-            reason: 'removeService resolved before platform completed');
+        expect(
+          done,
+          isFalse,
+          reason: 'removeService resolved before platform completed',
+        );
 
         gate.complete();
         await removeFuture;
@@ -705,21 +713,20 @@ void main() {
         );
       });
 
-      test('startAdvertising does not set manufacturer data when none provided',
-          () async {
-        final server = bluey.server()!;
+      test(
+        'startAdvertising does not set manufacturer data when none provided',
+        () async {
+          final server = bluey.server()!;
 
-        await server.startAdvertising(name: 'Test Device');
+          await server.startAdvertising(name: 'Test Device');
 
-        expect(
-          mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
-          isNull,
-        );
-        expect(
-          mockPlatform.lastAdvertiseConfig?.manufacturerData,
-          isNull,
-        );
-      });
+          expect(
+            mockPlatform.lastAdvertiseConfig?.manufacturerDataCompanyId,
+            isNull,
+          );
+          expect(mockPlatform.lastAdvertiseConfig?.manufacturerData, isNull);
+        },
+      );
 
       test('stopAdvertising stops advertising', () async {
         final server = bluey.server()!;
@@ -783,31 +790,30 @@ void main() {
       test('startAdvertising omits control UUID by default', () async {
         final server = bluey.server()!;
 
-        await server.startAdvertising(
-          services: [UUID.short(0x180F)],
-        );
+        await server.startAdvertising(services: [UUID.short(0x180F)]);
 
         final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
         expect(advertised, hasLength(1));
         expect(advertised, isNot(contains(lifecycle.controlServiceUuid)));
       });
 
-      test('startAdvertising(peerDiscoverable: true) prepends control UUID',
-          () async {
-        final server = bluey.server()!;
-
-        await server.startAdvertising(
-          services: [UUID.short(0x180F)],
-          peerDiscoverable: true,
-        );
-
-        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
-        expect(advertised, hasLength(2));
-        expect(advertised?.first, equals(lifecycle.controlServiceUuid));
-      });
-
       test(
-          'startAdvertising(peerDiscoverable: true) does not duplicate the '
+        'startAdvertising(peerDiscoverable: true) prepends control UUID',
+        () async {
+          final server = bluey.server()!;
+
+          await server.startAdvertising(
+            services: [UUID.short(0x180F)],
+            peerDiscoverable: true,
+          );
+
+          final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
+          expect(advertised, hasLength(2));
+          expect(advertised?.first, equals(lifecycle.controlServiceUuid));
+        },
+      );
+
+      test('startAdvertising(peerDiscoverable: true) does not duplicate the '
           'control UUID when caller already lists it', () async {
         final server = bluey.server()!;
 
@@ -821,8 +827,7 @@ void main() {
         expect(advertised?.single, equals(lifecycle.controlServiceUuid));
       });
 
-      test(
-          'startAdvertising(peerDiscoverable: true) works when the caller '
+      test('startAdvertising(peerDiscoverable: true) works when the caller '
           'passes no app services', () async {
         final server = bluey.server()!;
 
@@ -896,58 +901,26 @@ void main() {
       // signaling "this central speaks the Bluey protocol."
       // Symmetric with the connection-side `tryUpgrade` path.
 
-      test('peerConnections emits when central first sends a heartbeat',
-          () async {
-        final server = bluey.server()!;
+      test(
+        'peerConnections emits when central first sends a heartbeat',
+        () async {
+          final server = bluey.server()!;
 
-        final peers = <PeerClient>[];
-        final sub = server.peerConnections.listen(peers.add);
-        addTearDown(sub.cancel);
+          final peers = <PeerClient>[];
+          final sub = server.peerConnections.listen(peers.add);
+          addTearDown(sub.cancel);
 
-        mockPlatform.emitCentralConnected(
-          const platform.PlatformCentral(id: 'central-1', mtu: 247),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 247),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
 
-        // Connection alone doesn't identify as peer.
-        expect(peers, isEmpty);
+          // Connection alone doesn't identify as peer.
+          expect(peers, isEmpty);
 
-        mockPlatform.emitWriteRequest(
-          platform.PlatformWriteRequest(
-            requestId: 1,
-            centralId: 'central-1',
-            characteristicUuid: lifecycle.heartbeatCharUuid,
-            value: lifecycle.heartbeatValue,
-            offset: 0,
-            responseNeeded: false,
-            characteristicHandle: 0,
-          ),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-
-        expect(peers, hasLength(1),
-            reason: 'first heartbeat from a central should produce '
-                'one PeerClient emission');
-        expect(peers.single.client.mtu, equals(247));
-      });
-
-      test('peerConnections does NOT re-emit on subsequent heartbeats',
-          () async {
-        final server = bluey.server()!;
-
-        final peers = <PeerClient>[];
-        final sub = server.peerConnections.listen(peers.add);
-        addTearDown(sub.cancel);
-
-        mockPlatform.emitCentralConnected(
-          const platform.PlatformCentral(id: 'central-1', mtu: 247),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-
-        for (var i = 0; i < 5; i++) {
           mockPlatform.emitWriteRequest(
             platform.PlatformWriteRequest(
-              requestId: i,
+              requestId: 1,
               centralId: 'central-1',
               characteristicUuid: lifecycle.heartbeatCharUuid,
               value: lifecycle.heartbeatValue,
@@ -957,15 +930,58 @@ void main() {
             ),
           );
           await Future<void>.delayed(const Duration(milliseconds: 10));
-        }
 
-        expect(peers, hasLength(1),
-            reason: 'identification fires once per identification, '
-                'not per heartbeat');
-      });
+          expect(
+            peers,
+            hasLength(1),
+            reason:
+                'first heartbeat from a central should produce '
+                'one PeerClient emission',
+          );
+          expect(peers.single.client.mtu, equals(247));
+        },
+      );
 
-      test('peerConnections does NOT emit for non-Bluey centrals',
-          () async {
+      test(
+        'peerConnections does NOT re-emit on subsequent heartbeats',
+        () async {
+          final server = bluey.server()!;
+
+          final peers = <PeerClient>[];
+          final sub = server.peerConnections.listen(peers.add);
+          addTearDown(sub.cancel);
+
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 247),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+
+          for (var i = 0; i < 5; i++) {
+            mockPlatform.emitWriteRequest(
+              platform.PlatformWriteRequest(
+                requestId: i,
+                centralId: 'central-1',
+                characteristicUuid: lifecycle.heartbeatCharUuid,
+                value: lifecycle.heartbeatValue,
+                offset: 0,
+                responseNeeded: false,
+                characteristicHandle: 0,
+              ),
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+
+          expect(
+            peers,
+            hasLength(1),
+            reason:
+                'identification fires once per identification, '
+                'not per heartbeat',
+          );
+        },
+      );
+
+      test('peerConnections does NOT emit for non-Bluey centrals', () async {
         final server = bluey.server()!;
 
         final peers = <PeerClient>[];
@@ -977,12 +993,14 @@ void main() {
         );
         await Future<void>.delayed(const Duration(milliseconds: 50));
 
-        expect(peers, isEmpty,
-            reason: 'a central that never heartbeats is not a peer');
+        expect(
+          peers,
+          isEmpty,
+          reason: 'a central that never heartbeats is not a peer',
+        );
       });
 
-      test('peerConnections re-emits on reconnect after disconnect',
-          () async {
+      test('peerConnections re-emits on reconnect after disconnect', () async {
         final server = bluey.server()!;
 
         final peers = <PeerClient>[];
@@ -1029,8 +1047,11 @@ void main() {
         );
         await Future<void>.delayed(const Duration(milliseconds: 10));
 
-        expect(peers, hasLength(2),
-            reason: 'reconnect-then-heartbeat re-identifies the peer');
+        expect(
+          peers,
+          hasLength(2),
+          reason: 'reconnect-then-heartbeat re-identifies the peer',
+        );
       });
 
       test('peerConnections is a broadcast stream', () async {
@@ -1358,9 +1379,8 @@ void main() {
         'incoming write-without-response to a non-control-service char resets client liveness timer',
         () {
           fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+            final server =
+                bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
             final userCharUuid = TestUuids.customChar1;
 
@@ -1438,20 +1458,18 @@ void main() {
     });
 
     group('I079 — pending-request tolerance', () {
-      test(
-        'I079 — does not declare client gone while holding a pending '
-        'write-with-response',
-        () {
-          fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+      test('I079 — does not declare client gone while holding a pending '
+          'write-with-response', () {
+        fakeAsync((async) {
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-            final disconnections = <String>[];
-            server.disconnections.listen(disconnections.add);
+          final disconnections = <String>[];
+          server.disconnections.listen(disconnections.add);
 
-            // 1. Track the client by simulating a heartbeat write arrival.
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // 1. Track the client by simulating a heartbeat write arrival.
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 1,
               centralId: 'client-A',
               characteristicUuid: lifecycle.heartbeatCharUuid,
@@ -1459,13 +1477,15 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            // 2. Simulate an app-level write-with-response arriving.
-            WriteRequest? captured;
-            server.writeRequests.listen((r) => captured = r);
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // 2. Simulate an app-level write-with-response arriving.
+          WriteRequest? captured;
+          server.writeRequests.listen((r) => captured = r);
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 99,
               centralId: 'client-A',
               characteristicUuid: '12345678-1234-1234-1234-123456789abc',
@@ -1473,64 +1493,72 @@ void main() {
               responseNeeded: true,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
-            expect(captured, isNotNull);
+            ),
+          );
+          async.flushMicrotasks();
+          expect(captured, isNotNull);
 
-            // 3. App takes 30s to respond. Heartbeat-timeout would normally
-            //    fire at 10s — verify it does NOT.
-            async.elapse(const Duration(seconds: 30));
-            expect(disconnections, isEmpty,
-                reason: 'I079: server must tolerate its own pending response');
+          // 3. App takes 30s to respond. Heartbeat-timeout would normally
+          //    fire at 10s — verify it does NOT.
+          async.elapse(const Duration(seconds: 30));
+          expect(
+            disconnections,
+            isEmpty,
+            reason: 'I079: server must tolerate its own pending response',
+          );
 
-            // 4. App finally responds.
-            unawaited(server.respondToWrite(
+          // 4. App finally responds.
+          unawaited(
+            server.respondToWrite(
               captured!,
               status: GattResponseStatus.success,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            // 5. After response, the heartbeat clock restarts. 11s later,
-            //    no further activity, client times out normally.
-            async.elapse(const Duration(seconds: 11));
-            expect(disconnections, ['client-A']);
+          // 5. After response, the heartbeat clock restarts. 11s later,
+          //    no further activity, client times out normally.
+          async.elapse(const Duration(seconds: 11));
+          expect(disconnections, ['client-A']);
 
-            server.dispose();
-          });
-        },
-      );
+          server.dispose();
+        });
+      });
 
       test(
         'I079 — read request enters pending set, drains on respondToRead',
         () {
           fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+            final server =
+                bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
             final disconnections = <String>[];
             server.disconnections.listen(disconnections.add);
 
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
-              requestId: 1,
-              centralId: 'client-A',
-              characteristicUuid: lifecycle.heartbeatCharUuid,
-              value: lifecycle.heartbeatValue,
-              responseNeeded: false,
-              offset: 0,
-              characteristicHandle: 0,
-            ));
+            mockPlatform.emitWriteRequest(
+              platform.PlatformWriteRequest(
+                requestId: 1,
+                centralId: 'client-A',
+                characteristicUuid: lifecycle.heartbeatCharUuid,
+                value: lifecycle.heartbeatValue,
+                responseNeeded: false,
+                offset: 0,
+                characteristicHandle: 0,
+              ),
+            );
             async.flushMicrotasks();
 
             ReadRequest? captured;
             server.readRequests.listen((r) => captured = r);
-            mockPlatform.emitReadRequest(platform.PlatformReadRequest(
-              requestId: 77,
-              centralId: 'client-A',
-              characteristicUuid: '12345678-1234-1234-1234-123456789abc',
-              offset: 0,
-              characteristicHandle: 0,
-            ));
+            mockPlatform.emitReadRequest(
+              platform.PlatformReadRequest(
+                requestId: 77,
+                centralId: 'client-A',
+                characteristicUuid: '12345678-1234-1234-1234-123456789abc',
+                offset: 0,
+                characteristicHandle: 0,
+              ),
+            );
             async.flushMicrotasks();
             expect(captured, isNotNull);
 
@@ -1538,11 +1566,13 @@ void main() {
             async.elapse(const Duration(seconds: 30));
             expect(disconnections, isEmpty);
 
-            unawaited(server.respondToRead(
-              captured!,
-              status: GattResponseStatus.success,
-              value: Uint8List.fromList([0xCD]),
-            ));
+            unawaited(
+              server.respondToRead(
+                captured!,
+                status: GattResponseStatus.success,
+                value: Uint8List.fromList([0xCD]),
+              ),
+            );
             async.flushMicrotasks();
 
             async.elapse(const Duration(seconds: 11));
@@ -1553,18 +1583,16 @@ void main() {
         },
       );
 
-      test(
-        'I079 — write-without-response uses recordActivity (no pend)',
-        () {
-          fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+      test('I079 — write-without-response uses recordActivity (no pend)', () {
+        fakeAsync((async) {
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-            final disconnections = <String>[];
-            server.disconnections.listen(disconnections.add);
+          final disconnections = <String>[];
+          server.disconnections.listen(disconnections.add);
 
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 1,
               centralId: 'client-A',
               characteristicUuid: lifecycle.heartbeatCharUuid,
@@ -1572,12 +1600,14 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            // 9s later, write-without-response arrives — extends timer.
-            async.elapse(const Duration(seconds: 9));
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // 9s later, write-without-response arrives — extends timer.
+          async.elapse(const Duration(seconds: 9));
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 50,
               centralId: 'client-A',
               characteristicUuid: '12345678-1234-1234-1234-123456789abc',
@@ -1585,37 +1615,38 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            // 9s after the write — total 18s since heartbeat, but only 9s
-            // since the write-without-response refreshed the timer.
-            async.elapse(const Duration(seconds: 9));
-            expect(disconnections, isEmpty,
-                reason: 'recordActivity should reset timer');
+          // 9s after the write — total 18s since heartbeat, but only 9s
+          // since the write-without-response refreshed the timer.
+          async.elapse(const Duration(seconds: 9));
+          expect(
+            disconnections,
+            isEmpty,
+            reason: 'recordActivity should reset timer',
+          );
 
-            // 2s more — past the window from the last activity.
-            async.elapse(const Duration(seconds: 2));
-            expect(disconnections, ['client-A']);
+          // 2s more — past the window from the last activity.
+          async.elapse(const Duration(seconds: 2));
+          expect(disconnections, ['client-A']);
 
-            server.dispose();
-          });
-        },
-      );
+          server.dispose();
+        });
+      });
 
-      test(
-        'I079 — disconnect mid-pending request leaves no leaked state',
-        () {
-          fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+      test('I079 — disconnect mid-pending request leaves no leaked state', () {
+        fakeAsync((async) {
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-            final disconnections = <String>[];
-            server.disconnections.listen(disconnections.add);
+          final disconnections = <String>[];
+          server.disconnections.listen(disconnections.add);
 
-            // Track + arrive a pending write-with-response.
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // Track + arrive a pending write-with-response.
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 1,
               centralId: 'client-A',
               characteristicUuid: lifecycle.heartbeatCharUuid,
@@ -1623,10 +1654,12 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            WriteRequest? captured;
-            server.writeRequests.listen((r) => captured = r);
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+            ),
+          );
+          WriteRequest? captured;
+          server.writeRequests.listen((r) => captured = r);
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 99,
               centralId: 'client-A',
               characteristicUuid: '12345678-1234-1234-1234-123456789abc',
@@ -1634,26 +1667,30 @@ void main() {
               responseNeeded: true,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
-            expect(captured, isNotNull);
+            ),
+          );
+          async.flushMicrotasks();
+          expect(captured, isNotNull);
 
-            // Platform disconnect mid-request.
-            mockPlatform.emitCentralDisconnected('client-A');
-            async.flushMicrotasks();
-            expect(disconnections, ['client-A']);
+          // Platform disconnect mid-request.
+          mockPlatform.emitCentralDisconnected('client-A');
+          async.flushMicrotasks();
+          expect(disconnections, ['client-A']);
 
-            // Late respond from the app — must be a no-op (no throw, no
-            // double-fire of disconnections).
-            unawaited(server.respondToWrite(
+          // Late respond from the app — must be a no-op (no throw, no
+          // double-fire of disconnections).
+          unawaited(
+            server.respondToWrite(
               captured!,
               status: GattResponseStatus.success,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            // Re-track the same client. Heartbeat-timer must run on its
-            // own fresh entry, with no phantom pending state.
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // Re-track the same client. Heartbeat-timer must run on its
+          // own fresh entry, with no phantom pending state.
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 200,
               centralId: 'client-A',
               characteristicUuid: lifecycle.heartbeatCharUuid,
@@ -1661,31 +1698,31 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
+            ),
+          );
+          async.flushMicrotasks();
 
-            async.elapse(const Duration(seconds: 11));
-            expect(disconnections, ['client-A', 'client-A'],
-                reason: 'second timeout fires on the new entry');
+          async.elapse(const Duration(seconds: 11));
+          expect(disconnections, [
+            'client-A',
+            'client-A',
+          ], reason: 'second timeout fires on the new entry');
 
-            server.dispose();
-          });
-        },
-      );
+          server.dispose();
+        });
+      });
 
-      test(
-        'I079 — requestCompleted fires even if platform respond throws',
-        () {
-          fakeAsync((async) {
-            final server = bluey.server(
-              lifecycleInterval: const Duration(seconds: 10),
-            )!;
+      test('I079 — requestCompleted fires even if platform respond throws', () {
+        fakeAsync((async) {
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-            final disconnections = <String>[];
-            server.disconnections.listen(disconnections.add);
+          final disconnections = <String>[];
+          server.disconnections.listen(disconnections.add);
 
-            // Track + arrive a pending write-with-response.
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+          // Track + arrive a pending write-with-response.
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 1,
               centralId: 'client-A',
               characteristicUuid: lifecycle.heartbeatCharUuid,
@@ -1693,10 +1730,12 @@ void main() {
               responseNeeded: false,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            WriteRequest? captured;
-            server.writeRequests.listen((r) => captured = r);
-            mockPlatform.emitWriteRequest(platform.PlatformWriteRequest(
+            ),
+          );
+          WriteRequest? captured;
+          server.writeRequests.listen((r) => captured = r);
+          mockPlatform.emitWriteRequest(
+            platform.PlatformWriteRequest(
               requestId: 99,
               centralId: 'client-A',
               characteristicUuid: '12345678-1234-1234-1234-123456789abc',
@@ -1704,40 +1743,46 @@ void main() {
               responseNeeded: true,
               offset: 0,
               characteristicHandle: 0,
-            ));
-            async.flushMicrotasks();
-            expect(captured, isNotNull);
+            ),
+          );
+          async.flushMicrotasks();
+          expect(captured, isNotNull);
 
-            // Configure the platform to throw on respondToWriteRequest.
-            mockPlatform.throwOnRespondToWriteRequest =
-                StateError('platform respond failed');
+          // Configure the platform to throw on respondToWriteRequest.
+          mockPlatform.throwOnRespondToWriteRequest = StateError(
+            'platform respond failed',
+          );
 
-            // App responds — platform call throws, but pending must already
-            // be drained. Post-I311, withErrorTranslation's defensive backstop
-            // wraps the underlying StateError into a BlueyException; the
-            // original is preserved on `.cause`.
-            Object? thrown;
-            unawaited(server
+          // App responds — platform call throws, but pending must already
+          // be drained. Post-I311, withErrorTranslation's defensive backstop
+          // wraps the underlying StateError into a BlueyException; the
+          // original is preserved on `.cause`.
+          Object? thrown;
+          unawaited(
+            server
                 .respondToWrite(captured!, status: GattResponseStatus.success)
                 .catchError((Object e) {
-              thrown = e;
-            }));
-            async.flushMicrotasks();
-            expect(thrown, isA<BlueyException>());
-            expect((thrown as BlueyPlatformException).cause, isA<StateError>());
+                  thrown = e;
+                }),
+          );
+          async.flushMicrotasks();
+          expect(thrown, isA<BlueyException>());
+          expect((thrown as BlueyPlatformException).cause, isA<StateError>());
 
-            // If pending was drained correctly, the heartbeat clock has
-            // restarted. After the interval elapses, gone fires.
-            async.elapse(const Duration(seconds: 11));
-            expect(disconnections, ['client-A'],
-                reason:
-                    'pending must drain before platform call; otherwise '
-                    'the timer would stay paused forever');
+          // If pending was drained correctly, the heartbeat clock has
+          // restarted. After the interval elapses, gone fires.
+          async.elapse(const Duration(seconds: 11));
+          expect(
+            disconnections,
+            ['client-A'],
+            reason:
+                'pending must drain before platform call; otherwise '
+                'the timer would stay paused forever',
+          );
 
-            server.dispose();
-          });
-        },
-      );
+          server.dispose();
+        });
+      });
     });
 
     group('GattResponseStatus mapping', () {
@@ -1838,17 +1883,16 @@ void main() {
         return captured;
       }
 
-      test(
-          'respondToRead translates GattOperationStatusFailedException to '
+      test('respondToRead translates GattOperationStatusFailedException to '
           'ServerRespondFailedException', () async {
         final server = bluey.server()!;
         final request = await setUpReadRequest(requestId: 42);
 
         mockPlatform.throwOnRespondToReadRequest =
             const platform.GattOperationStatusFailedException(
-          'respondToReadRequest',
-          0x0A,
-        );
+              'respondToReadRequest',
+              0x0A,
+            );
 
         await expectLater(
           () => server.respondToRead(
@@ -1860,11 +1904,7 @@ void main() {
             isA<ServerRespondFailedException>()
                 .having((e) => e.operation, 'operation', 'respondToRead')
                 .having((e) => e.status, 'status', 0x0A)
-                .having(
-                  (e) => e.clientId,
-                  'clientId',
-                  request.client.id,
-                )
+                .having((e) => e.clientId, 'clientId', request.client.id)
                 .having(
                   (e) => e.characteristicId,
                   'characteristicId',
@@ -1874,17 +1914,16 @@ void main() {
         );
       });
 
-      test(
-          'respondToWrite translates GattOperationStatusFailedException to '
+      test('respondToWrite translates GattOperationStatusFailedException to '
           'ServerRespondFailedException', () async {
         final server = bluey.server()!;
         final request = await setUpWriteRequest(requestId: 7);
 
         mockPlatform.throwOnRespondToWriteRequest =
             const platform.GattOperationStatusFailedException(
-          'respondToWriteRequest',
-          0x0A,
-        );
+              'respondToWriteRequest',
+              0x0A,
+            );
 
         await expectLater(
           () => server.respondToWrite(
@@ -1895,11 +1934,7 @@ void main() {
             isA<ServerRespondFailedException>()
                 .having((e) => e.operation, 'operation', 'respondToWrite')
                 .having((e) => e.status, 'status', 0x0A)
-                .having(
-                  (e) => e.clientId,
-                  'clientId',
-                  request.client.id,
-                )
+                .having((e) => e.clientId, 'clientId', request.client.id)
                 .having(
                   (e) => e.characteristicId,
                   'characteristicId',
@@ -1985,8 +2020,11 @@ void main() {
         await expectLater(
           server.notify(UUID.short(0x2A19), data: Uint8List.fromList([1])),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });
@@ -2009,8 +2047,11 @@ void main() {
             data: Uint8List.fromList([1]),
           ),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });
@@ -2028,8 +2069,11 @@ void main() {
         await expectLater(
           server.indicate(UUID.short(0x2A19), data: Uint8List.fromList([1])),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });
@@ -2052,8 +2096,11 @@ void main() {
             data: Uint8List.fromList([1]),
           ),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });
@@ -2092,8 +2139,11 @@ void main() {
             value: Uint8List.fromList([1]),
           ),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });
@@ -2130,8 +2180,11 @@ void main() {
         await expectLater(
           server.respondToWrite(captured, status: GattResponseStatus.success),
           throwsA(
-            isA<BlueyPlatformException>()
-                .having((e) => e.code, 'code', 'bluey-unknown'),
+            isA<BlueyPlatformException>().having(
+              (e) => e.code,
+              'code',
+              'bluey-unknown',
+            ),
           ),
         );
       });

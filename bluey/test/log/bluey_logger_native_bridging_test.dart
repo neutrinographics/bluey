@@ -22,14 +22,16 @@ void main() {
       final sub = bluey.logEvents.listen(received.add);
 
       final timestamp = DateTime.utc(2026, 4, 28, 12, 30, 0);
-      fakePlatform.emitLog(PlatformLogEvent(
-        timestamp: timestamp,
-        level: PlatformLogLevel.warn,
-        context: 'bluey.android.connection',
-        message: 'native ping',
-        data: const {'address': 'AA:BB:CC:DD:EE:FF'},
-        errorCode: 'GATT_133',
-      ));
+      fakePlatform.emitLog(
+        PlatformLogEvent(
+          timestamp: timestamp,
+          level: PlatformLogLevel.warn,
+          context: 'bluey.android.connection',
+          message: 'native ping',
+          data: const {'address': 'AA:BB:CC:DD:EE:FF'},
+          errorCode: 'GATT_133',
+        ),
+      );
 
       // Allow the broadcast stream to deliver.
       await Future<void>.delayed(Duration.zero);
@@ -74,12 +76,14 @@ void main() {
       await bluey.dispose();
 
       // Emitting after dispose must not surface anything to the consumer.
-      fakePlatform.emitLog(PlatformLogEvent(
-        timestamp: DateTime.utc(2026, 4, 28),
-        level: PlatformLogLevel.info,
-        context: 'native',
-        message: 'after dispose',
-      ));
+      fakePlatform.emitLog(
+        PlatformLogEvent(
+          timestamp: DateTime.utc(2026, 4, 28),
+          level: PlatformLogLevel.info,
+          context: 'native',
+          message: 'after dispose',
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       expect(received, isEmpty);

@@ -22,10 +22,7 @@ void main() {
     });
 
     test('two timeouts with the same value are equal', () {
-      expect(
-        SupervisionTimeout(5000),
-        equals(SupervisionTimeout(5000)),
-      );
+      expect(SupervisionTimeout(5000), equals(SupervisionTimeout(5000)));
     });
 
     test('two timeouts with the same value share a hash code', () {
@@ -36,10 +33,7 @@ void main() {
     });
 
     test('two timeouts with different values are not equal', () {
-      expect(
-        SupervisionTimeout(5000),
-        isNot(equals(SupervisionTimeout(6000))),
-      );
+      expect(SupervisionTimeout(5000), isNot(equals(SupervisionTimeout(6000))));
     });
 
     test('toString includes the wrapped value', () {

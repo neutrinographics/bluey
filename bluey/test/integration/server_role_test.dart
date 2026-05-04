@@ -190,10 +190,7 @@ void main() {
         // Assert: 2 app services only (control service no longer advertised)
         expect(fakePlatform.advertiseConfig?.serviceUuids, hasLength(2));
         // No manufacturer data when app doesn't provide any
-        expect(
-          fakePlatform.advertiseConfig?.manufacturerDataCompanyId,
-          isNull,
-        );
+        expect(fakePlatform.advertiseConfig?.manufacturerDataCompanyId, isNull);
 
         await server.dispose();
         await bluey.dispose();
@@ -360,7 +357,6 @@ void main() {
         await server.dispose();
         await bluey.dispose();
       });
-
     });
 
     group('Notifications', () {

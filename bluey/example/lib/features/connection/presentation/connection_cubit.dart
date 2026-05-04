@@ -37,14 +37,13 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
     required GetServices getServices,
     required WatchPeer watchPeer,
     required ConnectionSettingsCubit settingsCubit,
-  })  : _connectToDevice = connectToDevice,
-        _disconnectDevice = disconnectDevice,
-        _getServices = getServices,
-        _watchPeer = watchPeer,
-        _settings = settingsCubit.state,
-        super(ConnectionScreenState(device: device)) {
-    _settingsSubscription =
-        settingsCubit.stream.listen(_handleSettingsChange);
+  }) : _connectToDevice = connectToDevice,
+       _disconnectDevice = disconnectDevice,
+       _getServices = getServices,
+       _watchPeer = watchPeer,
+       _settings = settingsCubit.state,
+       super(ConnectionScreenState(device: device)) {
+    _settingsSubscription = settingsCubit.stream.listen(_handleSettingsChange);
   }
 
   Future<void> _handleSettingsChange(ConnectionSettings newSettings) async {
@@ -114,7 +113,9 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
             } else {
               // Connection lost - emit event for UI to handle
               emit(
-                state.withoutConnection().copyWith(error: 'Device disconnected'),
+                state.withoutConnection().copyWith(
+                  error: 'Device disconnected',
+                ),
               );
             }
           }

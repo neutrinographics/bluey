@@ -16,8 +16,9 @@ void main() {
     });
 
     test('recordSuccess increments attempted and succeeded', () {
-      final r = StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 10));
+      final r = StressTestResult.initial().recordSuccess(
+        latency: const Duration(milliseconds: 10),
+      );
       expect(r.attempted, equals(1));
       expect(r.succeeded, equals(1));
       expect(r.failed, equals(0));
@@ -25,8 +26,9 @@ void main() {
     });
 
     test('recordFailure increments attempted and failed', () {
-      final r = StressTestResult.initial()
-          .recordFailure(typeName: 'GattTimeoutException');
+      final r = StressTestResult.initial().recordFailure(
+        typeName: 'GattTimeoutException',
+      );
       expect(r.attempted, equals(1));
       expect(r.succeeded, equals(0));
       expect(r.failed, equals(1));
@@ -80,40 +82,51 @@ void main() {
       expect(r.elapsed, equals(const Duration(seconds: 3)));
     });
 
-    test('markConnectionLost flips connectionLost to true while preserving counters', () {
-      final base = StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 5))
-          .recordFailure(typeName: 'GattTimeoutException');
-      final lost = base.markConnectionLost();
-      expect(lost.connectionLost, isTrue);
-      expect(lost.attempted, equals(base.attempted));
-      expect(lost.succeeded, equals(base.succeeded));
-      expect(lost.failed, equals(base.failed));
-    });
+    test(
+      'markConnectionLost flips connectionLost to true while preserving counters',
+      () {
+        final base = StressTestResult.initial()
+            .recordSuccess(latency: const Duration(milliseconds: 5))
+            .recordFailure(typeName: 'GattTimeoutException');
+        final lost = base.markConnectionLost();
+        expect(lost.connectionLost, isTrue);
+        expect(lost.attempted, equals(base.attempted));
+        expect(lost.succeeded, equals(base.succeeded));
+        expect(lost.failed, equals(base.failed));
+      },
+    );
 
-    test('recordSuccess called on a connectionLost=true result keeps it true', () {
-      final r = StressTestResult.initial()
-          .markConnectionLost()
-          .recordSuccess(latency: const Duration(milliseconds: 10));
-      expect(r.connectionLost, isTrue);
-    });
+    test(
+      'recordSuccess called on a connectionLost=true result keeps it true',
+      () {
+        final r = StressTestResult.initial().markConnectionLost().recordSuccess(
+          latency: const Duration(milliseconds: 10),
+        );
+        expect(r.connectionLost, isTrue);
+      },
+    );
 
-    test('recordFailure called on a connectionLost=true result keeps it true', () {
-      final r = StressTestResult.initial()
-          .markConnectionLost()
-          .recordFailure(typeName: 'DisconnectedException');
-      expect(r.connectionLost, isTrue);
-    });
+    test(
+      'recordFailure called on a connectionLost=true result keeps it true',
+      () {
+        final r = StressTestResult.initial().markConnectionLost().recordFailure(
+          typeName: 'DisconnectedException',
+        );
+        expect(r.connectionLost, isTrue);
+      },
+    );
 
     test('failuresByType is unmodifiable', () {
-      final r = StressTestResult.initial()
-          .recordFailure(typeName: 'GattTimeoutException');
+      final r = StressTestResult.initial().recordFailure(
+        typeName: 'GattTimeoutException',
+      );
       expect(() => r.failuresByType['X'] = 1, throwsUnsupportedError);
     });
 
     test('latencies is unmodifiable', () {
-      final r = StressTestResult.initial()
-          .recordSuccess(latency: const Duration(milliseconds: 10));
+      final r = StressTestResult.initial().recordSuccess(
+        latency: const Duration(milliseconds: 10),
+      );
       expect(() => r.latencies.add(Duration.zero), throwsUnsupportedError);
     });
 

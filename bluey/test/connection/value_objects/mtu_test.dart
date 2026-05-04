@@ -18,10 +18,7 @@ void main() {
     });
 
     test('throws ArgumentError above Android maximum (518)', () {
-      expect(
-        () => Mtu(518, capabilities: androidCaps),
-        throwsArgumentError,
-      );
+      expect(() => Mtu(518, capabilities: androidCaps), throwsArgumentError);
     });
 
     test('constructs at iOS maximum (185) with iOS capabilities', () {
@@ -31,21 +28,12 @@ void main() {
     });
 
     test('throws ArgumentError above iOS maximum (186)', () {
-      expect(
-        () => Mtu(186, capabilities: iosCaps),
-        throwsArgumentError,
-      );
+      expect(() => Mtu(186, capabilities: iosCaps), throwsArgumentError);
     });
 
     test('throws ArgumentError below BLE minimum (22)', () {
-      expect(
-        () => Mtu(22, capabilities: androidCaps),
-        throwsArgumentError,
-      );
-      expect(
-        () => Mtu(22, capabilities: iosCaps),
-        throwsArgumentError,
-      );
+      expect(() => Mtu(22, capabilities: androidCaps), throwsArgumentError);
+      expect(() => Mtu(22, capabilities: iosCaps), throwsArgumentError);
     });
 
     test('Mtu.minimum.value is 23', () {

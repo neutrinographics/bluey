@@ -70,7 +70,5 @@ void registerServerDependencies(GetIt getIt) {
   getIt.registerFactory<ObserveWriteRequests>(
     () => ObserveWriteRequests(getIt<ServerRepository>()),
   );
-  getIt.registerFactory<GetServer>(
-    () => GetServer(getIt<ServerRepository>()),
-  );
+  getIt.registerFactory<GetServer>(() => GetServer(getIt<ServerRepository>()));
 }

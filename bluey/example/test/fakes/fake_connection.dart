@@ -17,10 +17,7 @@ class FakeConnection implements Connection {
   int _mtu = 23;
   int? _mtuRequest;
 
-  FakeConnection({
-    required this.stressServiceUuid,
-    required this.stressChar,
-  });
+  FakeConnection({required this.stressServiceUuid, required this.stressChar});
 
   @override
   ConnectionState get state => _state;
@@ -46,7 +43,9 @@ class FakeConnection implements Connection {
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
-    return [_FakeService(stressServiceUuid, [stressChar])];
+    return [
+      _FakeService(stressServiceUuid, [stressChar]),
+    ];
   }
 
   @override

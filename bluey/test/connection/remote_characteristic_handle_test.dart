@@ -73,18 +73,18 @@ void main() {
     expect(descriptor.handle.value, greaterThan(0));
   });
 
-  test('handles are stable across services() calls within one connection',
-      () async {
-    final connection = await connectAndDiscover();
-    final firstServices = await connection.services();
-    final firstHandle =
-        firstServices.first.characteristics().first.handle;
-    final secondServices = await connection.services();
-    final secondHandle =
-        secondServices.first.characteristics().first.handle;
+  test(
+    'handles are stable across services() calls within one connection',
+    () async {
+      final connection = await connectAndDiscover();
+      final firstServices = await connection.services();
+      final firstHandle = firstServices.first.characteristics().first.handle;
+      final secondServices = await connection.services();
+      final secondHandle = secondServices.first.characteristics().first.handle;
 
-    expect(secondHandle, equals(firstHandle));
-  });
+      expect(secondHandle, equals(firstHandle));
+    },
+  );
 
   test('distinct characteristics get distinct handles', () async {
     final connection = await connectAndDiscover();

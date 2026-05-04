@@ -35,10 +35,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// e.g. to verify that the domain layer respects `canBond=false` /
   /// `canRequestPhy=false` / `canRequestConnectionParameters=false` and
   /// skips the corresponding platform calls (I035 / I065).
-  FakeBlueyPlatform({
-    Capabilities capabilities = Capabilities.fake,
-  })  : _capabilities = capabilities,
-        super.impl();
+  FakeBlueyPlatform({Capabilities capabilities = Capabilities.fake})
+    : _capabilities = capabilities,
+      super.impl();
 
   // === Configuration ===
   BluetoothState _state = BluetoothState.on;
@@ -238,8 +237,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) {
-    _stateFor(deviceId).charValuesByHandle[characteristicHandle] =
-        Uint8List.fromList(value);
+    _stateFor(
+      deviceId,
+    ).charValuesByHandle[characteristicHandle] = Uint8List.fromList(value);
   }
 
   /// Returns the current per-handle CCCD value for [descriptorHandle]
@@ -606,7 +606,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     final completer = Completer<Uint8List>();
     _pendingReadRequests[requestId] = completer;
 
-    final handle = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    final handle =
+        _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
     _readRequestController.add(
       PlatformReadRequest(
         requestId: requestId,
@@ -636,7 +637,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     final completer = Completer<void>();
     _pendingWriteRequests[requestId] = completer;
 
-    final handle = _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
+    final handle =
+        _localHandleByCharUuid[characteristicUuid.toLowerCase()] ?? 0;
     _writeRequestController.add(
       PlatformWriteRequest(
         requestId: requestId,
@@ -686,7 +688,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   ///
   /// Optionally updates the simulated peripheral's services before firing,
   /// so that the next [discoverServices] call returns [newServices].
-  void simulateServiceChange(String deviceId, {
+  void simulateServiceChange(
+    String deviceId, {
     List<PlatformService>? newServices,
     Map<String, Uint8List>? newCharacteristicValues,
   }) {
@@ -696,9 +699,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         _peripherals[deviceId] = _SimulatedPeripheral(
           device: existingPeripheral.device,
           services: newServices ?? existingPeripheral.services,
-          characteristicValues: newCharacteristicValues != null
-              ? Map.from(newCharacteristicValues)
-              : existingPeripheral.characteristicValues,
+          characteristicValues:
+              newCharacteristicValues != null
+                  ? Map.from(newCharacteristicValues)
+                  : existingPeripheral.characteristicValues,
         );
         // Also update the connected device's peripheral reference
         final connection = _connections[deviceId];
@@ -854,8 +858,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     final state = _stateFor(deviceId);
     final out = <PlatformService>[];
     for (var sIdx = 0; sIdx < services.length; sIdx++) {
-      out.add(_withHandles(state, connection.peripheral, services[sIdx],
-          '$sIdx'));
+      out.add(
+        _withHandles(state, connection.peripheral, services[sIdx], '$sIdx'),
+      );
     }
     return out;
   }
@@ -868,21 +873,25 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   ) {
     final chars = <PlatformCharacteristic>[];
     for (var cIdx = 0; cIdx < service.characteristics.length; cIdx++) {
-      chars.add(_characteristicWithHandle(
-        state,
-        peripheral,
-        service.characteristics[cIdx],
-        '$servicePath/$cIdx',
-      ));
+      chars.add(
+        _characteristicWithHandle(
+          state,
+          peripheral,
+          service.characteristics[cIdx],
+          '$servicePath/$cIdx',
+        ),
+      );
     }
     final included = <PlatformService>[];
     for (var iIdx = 0; iIdx < service.includedServices.length; iIdx++) {
-      included.add(_withHandles(
-        state,
-        peripheral,
-        service.includedServices[iIdx],
-        '$servicePath/i$iIdx',
-      ));
+      included.add(
+        _withHandles(
+          state,
+          peripheral,
+          service.includedServices[iIdx],
+          '$servicePath/i$iIdx',
+        ),
+      );
     }
     return PlatformService(
       uuid: service.uuid,
@@ -906,8 +915,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     // UUID -> handles reverse lookup (multiple handles per UUID for
     // duplicate-UUID peripherals). The list is kept stable in
     // discovery (= tree) order.
-    final handlesForUuid =
-        state.charHandlesByUuid.putIfAbsent(uuidKey, () => <int>[]);
+    final handlesForUuid = state.charHandlesByUuid.putIfAbsent(
+      uuidKey,
+      () => <int>[],
+    );
     if (!handlesForUuid.contains(handle)) {
       handlesForUuid.add(handle);
     }
@@ -919,7 +930,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     // written/seeded against the handle directly. Re-discoveries (e.g.
     // post-Service-Changed with new handles) re-seed under the new
     // handle naturally.
-    final seed = peripheral.characteristicValues[c.uuid] ??
+    final seed =
+        peripheral.characteristicValues[c.uuid] ??
         peripheral.characteristicValues[uuidKey];
     if (seed != null) {
       state.charValuesByHandle.putIfAbsent(
@@ -930,12 +942,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
     final descs = <PlatformDescriptor>[];
     for (var dIdx = 0; dIdx < c.descriptors.length; dIdx++) {
-      descs.add(_descriptorWithHandle(
-        state,
-        handle,
-        c.descriptors[dIdx],
-        '$charPath/$dIdx',
-      ));
+      descs.add(
+        _descriptorWithHandle(
+          state,
+          handle,
+          c.descriptors[dIdx],
+          '$charPath/$dIdx',
+        ),
+      );
     }
     return PlatformCharacteristic(
       uuid: c.uuid,
@@ -982,12 +996,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId,
     int characteristicHandle,
   ) async {
-    readCharacteristicCalls.add(ReadCharacteristicCall(
-      deviceId: deviceId,
-      characteristicHandle: characteristicHandle,
-      characteristicUuid:
-          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
-    ));
+    readCharacteristicCalls.add(
+      ReadCharacteristicCall(
+        deviceId: deviceId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid:
+            _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ??
+            '',
+      ),
+    );
 
     final held = _heldRead;
     if (held != null) {
@@ -1096,14 +1113,17 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     // Record attempts before failure simulation so tests can count
     // "writes the caller asked for" regardless of whether the platform
     // simulates a failure.
-    writeCharacteristicCalls.add(WriteCharacteristicCall(
-      deviceId: deviceId,
-      characteristicHandle: characteristicHandle,
-      characteristicUuid:
-          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '',
-      value: Uint8List.fromList(value),
-      withResponse: withResponse,
-    ));
+    writeCharacteristicCalls.add(
+      WriteCharacteristicCall(
+        deviceId: deviceId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid:
+            _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ??
+            '',
+        value: Uint8List.fromList(value),
+        withResponse: withResponse,
+      ),
+    );
 
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
@@ -1129,8 +1149,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
 
     // Handle is the primary key.
-    _stateFor(deviceId).charValuesByHandle[characteristicHandle] =
-        Uint8List.fromList(value);
+    _stateFor(
+      deviceId,
+    ).charValuesByHandle[characteristicHandle] = Uint8List.fromList(value);
   }
 
   @override
@@ -1168,8 +1189,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     // separately.
     final cccdHandle = state.cccdHandleByCharHandle[characteristicHandle];
     if (cccdHandle != null) {
-      state.descriptorValuesByHandle[cccdHandle] =
-          Uint8List.fromList(enable ? [0x01, 0x00] : [0x00, 0x00]);
+      state.descriptorValuesByHandle[cccdHandle] = Uint8List.fromList(
+        enable ? [0x01, 0x00] : [0x00, 0x00],
+      );
     }
   }
 
@@ -1197,8 +1219,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int descriptorHandle,
     Uint8List value,
   ) async {
-    _stateFor(deviceId).descriptorValuesByHandle[descriptorHandle] =
-        Uint8List.fromList(value);
+    _stateFor(
+      deviceId,
+    ).descriptorValuesByHandle[descriptorHandle] = Uint8List.fromList(value);
   }
 
   @override
@@ -1252,9 +1275,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> bond(String deviceId) async {
     if (!_capabilities.canBond) {
-      throw UnimplementedError(
-        'Fake: bond called on a canBond=false platform',
-      );
+      throw UnimplementedError('Fake: bond called on a canBond=false platform');
     }
   }
 
@@ -1396,21 +1417,26 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       final h = _nextLocalHandle++;
       _localHandleByCharUuid[c.uuid.toLowerCase()] = h;
       var nextDesc = 1;
-      final populatedDescs = c.descriptors
-          .map((d) => PlatformLocalDescriptor(
-                uuid: d.uuid,
-                permissions: d.permissions,
-                value: d.value,
-                handle: nextDesc++,
-              ))
-          .toList();
-      populatedChars.add(PlatformLocalCharacteristic(
-        uuid: c.uuid,
-        properties: c.properties,
-        permissions: c.permissions,
-        descriptors: populatedDescs,
-        handle: h,
-      ));
+      final populatedDescs =
+          c.descriptors
+              .map(
+                (d) => PlatformLocalDescriptor(
+                  uuid: d.uuid,
+                  permissions: d.permissions,
+                  value: d.value,
+                  handle: nextDesc++,
+                ),
+              )
+              .toList();
+      populatedChars.add(
+        PlatformLocalCharacteristic(
+          uuid: c.uuid,
+          properties: c.properties,
+          permissions: c.permissions,
+          descriptors: populatedDescs,
+          handle: h,
+        ),
+      );
     }
     return PlatformLocalService(
       uuid: service.uuid,
@@ -1446,10 +1472,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     // Notify all subscribed centrals. Resolve handle -> UUID for
     // subscription bookkeeping (the fake's central-side fixture tracks
     // subscriptions by UUID).
-    final charUuid = _localHandleByCharUuid.entries
-        .firstWhere((e) => e.value == characteristicHandle,
-            orElse: () => const MapEntry('', 0))
-        .key;
+    final charUuid =
+        _localHandleByCharUuid.entries
+            .firstWhere(
+              (e) => e.value == characteristicHandle,
+              orElse: () => const MapEntry('', 0),
+            )
+            .key;
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
@@ -1476,10 +1505,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     Uint8List value,
   ) async {
-    final charUuid = _localHandleByCharUuid.entries
-        .firstWhere((e) => e.value == characteristicHandle,
-            orElse: () => const MapEntry('', 0))
-        .key;
+    final charUuid =
+        _localHandleByCharUuid.entries
+            .firstWhere(
+              (e) => e.value == characteristicHandle,
+              orElse: () => const MapEntry('', 0),
+            )
+            .key;
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
@@ -1692,10 +1724,7 @@ class RespondWriteCall {
   final int requestId;
   final PlatformGattStatus status;
 
-  RespondWriteCall({
-    required this.requestId,
-    required this.status,
-  });
+  RespondWriteCall({required this.requestId, required this.status});
 }
 
 /// A recorded call to [FakeBlueyPlatform.readCharacteristic].

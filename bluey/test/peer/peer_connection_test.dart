@@ -12,10 +12,8 @@ import '../fakes/test_helpers.dart';
 /// delegation. Only stubs the methods the C.1 PeerConnection actually
 /// invokes; everything else throws [UnimplementedError].
 class _SpyConnection implements Connection {
-  _SpyConnection({
-    UUID? deviceId,
-    this.servicesResult = const [],
-  }) : _deviceId = deviceId ?? UUID.short(0xAAAA);
+  _SpyConnection({UUID? deviceId, this.servicesResult = const []})
+    : _deviceId = deviceId ?? UUID.short(0xAAAA);
 
   final UUID _deviceId;
   final List<RemoteService> servicesResult;
@@ -167,124 +165,131 @@ void main() {
     expect(peerConn.serverId, equals(serverId));
   });
 
-  test('services() / service() / hasService() delegate to wrapped connection', () async {
-    final conn = _SpyConnection();
-    final lifecycle = _SpyLifecycleClient(callLog: []);
-
-    final peerConn = PeerConnection.create(
-      connection: conn,
-      serverId: serverId,
-      lifecycleClient: lifecycle,
-    );
-
-    // services()
-    await peerConn.services();
-    await peerConn.services(cache: true);
-    expect(conn.servicesCacheArgs, equals([false, true]));
-
-    // service()
-    final lookupUuid = UUID.short(0x1234);
-    expect(
-      () => peerConn.service(lookupUuid),
-      throwsA(isA<ServiceNotFoundException>()),
-    );
-    expect(conn.serviceArgs, equals([lookupUuid]));
-
-    // hasService()
-    final hasResult = await peerConn.hasService(lookupUuid);
-    expect(hasResult, isFalse);
-    expect(conn.hasServiceArgs, equals([lookupUuid]));
-  });
-
-  group('control-service filtering (delegated through PeerRemoteServiceView)',
-      () {
-    final controlServiceUuid = UUID(lifecycle.controlServiceUuid);
-    final userUuid = UUID.short(0x180D);
-
-    test('peer.services() excludes the control service', () async {
-      final controlSvc = _StubRemoteService(controlServiceUuid);
-      final userSvc = _StubRemoteService(userUuid);
-      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
-      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+  test(
+    'services() / service() / hasService() delegate to wrapped connection',
+    () async {
+      final conn = _SpyConnection();
+      final lifecycle = _SpyLifecycleClient(callLog: []);
 
       final peerConn = PeerConnection.create(
         connection: conn,
         serverId: serverId,
-        lifecycleClient: lifecycleClient,
+        lifecycleClient: lifecycle,
       );
 
-      final result = await peerConn.services();
-      expect(result.map((s) => s.uuid), [userUuid]);
-    });
+      // services()
+      await peerConn.services();
+      await peerConn.services(cache: true);
+      expect(conn.servicesCacheArgs, equals([false, true]));
 
-    test('peer.connection.services() returns the FULL tree (raw access '
-        'unchanged)', () async {
-      final controlSvc = _StubRemoteService(controlServiceUuid);
-      final userSvc = _StubRemoteService(userUuid);
-      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
-      final lifecycleClient = _SpyLifecycleClient(callLog: []);
-
-      final peerConn = PeerConnection.create(
-        connection: conn,
-        serverId: serverId,
-        lifecycleClient: lifecycleClient,
-      );
-
-      final raw = await peerConn.connection.services();
-      expect(raw.map((s) => s.uuid), [controlServiceUuid, userUuid]);
-    });
-
-    test('peer.service(controlServiceUuid) throws ServiceNotFoundException',
-        () {
-      final controlSvc = _StubRemoteService(controlServiceUuid);
-      final userSvc = _StubRemoteService(userUuid);
-      final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
-      final lifecycleClient = _SpyLifecycleClient(callLog: []);
-
-      final peerConn = PeerConnection.create(
-        connection: conn,
-        serverId: serverId,
-        lifecycleClient: lifecycleClient,
-      );
-
+      // service()
+      final lookupUuid = UUID.short(0x1234);
       expect(
-        () => peerConn.service(controlServiceUuid),
+        () => peerConn.service(lookupUuid),
         throwsA(isA<ServiceNotFoundException>()),
       );
-    });
+      expect(conn.serviceArgs, equals([lookupUuid]));
 
-    test('peer.hasService(controlServiceUuid) returns false', () async {
-      final controlSvc = _StubRemoteService(controlServiceUuid);
-      final conn = _SpyConnection(servicesResult: [controlSvc]);
-      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+      // hasService()
+      final hasResult = await peerConn.hasService(lookupUuid);
+      expect(hasResult, isFalse);
+      expect(conn.hasServiceArgs, equals([lookupUuid]));
+    },
+  );
 
-      final peerConn = PeerConnection.create(
-        connection: conn,
-        serverId: serverId,
-        lifecycleClient: lifecycleClient,
+  group(
+    'control-service filtering (delegated through PeerRemoteServiceView)',
+    () {
+      final controlServiceUuid = UUID(lifecycle.controlServiceUuid);
+      final userUuid = UUID.short(0x180D);
+
+      test('peer.services() excludes the control service', () async {
+        final controlSvc = _StubRemoteService(controlServiceUuid);
+        final userSvc = _StubRemoteService(userUuid);
+        final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+        final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+        final peerConn = PeerConnection.create(
+          connection: conn,
+          serverId: serverId,
+          lifecycleClient: lifecycleClient,
+        );
+
+        final result = await peerConn.services();
+        expect(result.map((s) => s.uuid), [userUuid]);
+      });
+
+      test('peer.connection.services() returns the FULL tree (raw access '
+          'unchanged)', () async {
+        final controlSvc = _StubRemoteService(controlServiceUuid);
+        final userSvc = _StubRemoteService(userUuid);
+        final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+        final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+        final peerConn = PeerConnection.create(
+          connection: conn,
+          serverId: serverId,
+          lifecycleClient: lifecycleClient,
+        );
+
+        final raw = await peerConn.connection.services();
+        expect(raw.map((s) => s.uuid), [controlServiceUuid, userUuid]);
+      });
+
+      test(
+        'peer.service(controlServiceUuid) throws ServiceNotFoundException',
+        () {
+          final controlSvc = _StubRemoteService(controlServiceUuid);
+          final userSvc = _StubRemoteService(userUuid);
+          final conn = _SpyConnection(servicesResult: [controlSvc, userSvc]);
+          final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+          final peerConn = PeerConnection.create(
+            connection: conn,
+            serverId: serverId,
+            lifecycleClient: lifecycleClient,
+          );
+
+          expect(
+            () => peerConn.service(controlServiceUuid),
+            throwsA(isA<ServiceNotFoundException>()),
+          );
+        },
       );
 
-      expect(await peerConn.hasService(controlServiceUuid), isFalse);
-    });
+      test('peer.hasService(controlServiceUuid) returns false', () async {
+        final controlSvc = _StubRemoteService(controlServiceUuid);
+        final conn = _SpyConnection(servicesResult: [controlSvc]);
+        final lifecycleClient = _SpyLifecycleClient(callLog: []);
 
-    test('peer.service(userUuid) and peer.hasService(userUuid) delegate '
-        'to the underlying connection', () async {
-      final userSvc = _StubRemoteService(userUuid);
-      final conn = _SpyConnection(servicesResult: [userSvc]);
-      final lifecycleClient = _SpyLifecycleClient(callLog: []);
+        final peerConn = PeerConnection.create(
+          connection: conn,
+          serverId: serverId,
+          lifecycleClient: lifecycleClient,
+        );
 
-      final peerConn = PeerConnection.create(
-        connection: conn,
-        serverId: serverId,
-        lifecycleClient: lifecycleClient,
-      );
+        expect(await peerConn.hasService(controlServiceUuid), isFalse);
+      });
 
-      expect(identical(peerConn.service(userUuid), userSvc), isTrue);
-      expect(await peerConn.hasService(userUuid), isTrue);
-      expect(conn.serviceArgs, equals([userUuid]));
-      expect(conn.hasServiceArgs, equals([userUuid]));
-    });
-  });
+      test('peer.service(userUuid) and peer.hasService(userUuid) delegate '
+          'to the underlying connection', () async {
+        final userSvc = _StubRemoteService(userUuid);
+        final conn = _SpyConnection(servicesResult: [userSvc]);
+        final lifecycleClient = _SpyLifecycleClient(callLog: []);
+
+        final peerConn = PeerConnection.create(
+          connection: conn,
+          serverId: serverId,
+          lifecycleClient: lifecycleClient,
+        );
+
+        expect(identical(peerConn.service(userUuid), userSvc), isTrue);
+        expect(await peerConn.hasService(userUuid), isTrue);
+        expect(conn.serviceArgs, equals([userUuid]));
+        expect(conn.hasServiceArgs, equals([userUuid]));
+      });
+    },
+  );
 
   test(
     'disconnect() calls lifecycle.sendDisconnectCommand THEN '
@@ -307,10 +312,7 @@ void main() {
 
       expect(
         callLog,
-        equals([
-          'lifecycle.sendDisconnectCommand',
-          'connection.disconnect',
-        ]),
+        equals(['lifecycle.sendDisconnectCommand', 'connection.disconnect']),
       );
 
       // Also verify conn (the unused one) was not touched.
@@ -324,48 +326,58 @@ void main() {
   // that disconnect the raw connection without going through
   // `peer.disconnect()` leak heartbeat traffic for ~30 seconds until
   // the LifecycleClient's own peer-silence timeout fires.
-  test('stops LifecycleClient when underlying Connection disconnects',
-      () async {
-    final conn = _SpyConnection();
-    addTearDown(conn.dispose);
-    final lifecycle = _SpyLifecycleClient(callLog: []);
+  test(
+    'stops LifecycleClient when underlying Connection disconnects',
+    () async {
+      final conn = _SpyConnection();
+      addTearDown(conn.dispose);
+      final lifecycle = _SpyLifecycleClient(callLog: []);
 
-    PeerConnection.create(
-      connection: conn,
-      serverId: serverId,
-      lifecycleClient: lifecycle,
-    );
+      PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycle,
+      );
 
-    expect(lifecycle.stopCalled, isFalse);
+      expect(lifecycle.stopCalled, isFalse);
 
-    conn.simulateState(ConnectionState.disconnected);
-    await pumpEventQueue();
+      conn.simulateState(ConnectionState.disconnected);
+      await pumpEventQueue();
 
-    expect(lifecycle.stopCalled, isTrue,
-        reason: 'LifecycleClient.stop should fire on connection disconnect');
-  });
+      expect(
+        lifecycle.stopCalled,
+        isTrue,
+        reason: 'LifecycleClient.stop should fire on connection disconnect',
+      );
+    },
+  );
 
-  test('does NOT stop LifecycleClient on non-disconnected state changes',
-      () async {
-    final conn = _SpyConnection();
-    addTearDown(conn.dispose);
-    final lifecycle = _SpyLifecycleClient(callLog: []);
+  test(
+    'does NOT stop LifecycleClient on non-disconnected state changes',
+    () async {
+      final conn = _SpyConnection();
+      addTearDown(conn.dispose);
+      final lifecycle = _SpyLifecycleClient(callLog: []);
 
-    PeerConnection.create(
-      connection: conn,
-      serverId: serverId,
-      lifecycleClient: lifecycle,
-    );
+      PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycle,
+      );
 
-    conn.simulateState(ConnectionState.connecting);
-    conn.simulateState(ConnectionState.linked);
-    conn.simulateState(ConnectionState.ready);
-    conn.simulateState(ConnectionState.disconnecting);
-    await pumpEventQueue();
+      conn.simulateState(ConnectionState.connecting);
+      conn.simulateState(ConnectionState.linked);
+      conn.simulateState(ConnectionState.ready);
+      conn.simulateState(ConnectionState.disconnecting);
+      await pumpEventQueue();
 
-    expect(lifecycle.stopCalled, isFalse,
-        reason: 'Only the disconnected state should trigger stop');
-  });
+      expect(
+        lifecycle.stopCalled,
+        isFalse,
+        reason: 'Only the disconnected state should trigger stop',
+      );
+    },
+  );
 }
 
 /// Minimal RemoteService stub for the control-service filtering tests.
@@ -387,8 +399,7 @@ class _StubRemoteService implements RemoteService {
   List<RemoteService> get includedServices => const [];
 
   @override
-  RemoteCharacteristic characteristic(UUID uuid) =>
-      throw UnimplementedError();
+  RemoteCharacteristic characteristic(UUID uuid) => throw UnimplementedError();
 }
 
 /// Minimal connection stub that records 'connection.disconnect' into a

@@ -33,21 +33,23 @@ void main() {
       expect(result, 42);
     });
 
-    test('translates thrown platform exception to typed domain exception',
-        () async {
-      await expectLater(
-        withErrorTranslation<void>(
-          () async {
-            throw const platform.GattOperationTimeoutException(
-              'readCharacteristic',
-            );
-          },
-          operation: 'readCharacteristic',
-          deviceId: testDeviceId,
-        ),
-        throwsA(isA<GattTimeoutException>()),
-      );
-    });
+    test(
+      'translates thrown platform exception to typed domain exception',
+      () async {
+        await expectLater(
+          withErrorTranslation<void>(
+            () async {
+              throw const platform.GattOperationTimeoutException(
+                'readCharacteristic',
+              );
+            },
+            operation: 'readCharacteristic',
+            deviceId: testDeviceId,
+          ),
+          throwsA(isA<GattTimeoutException>()),
+        );
+      },
+    );
 
     test('lifecycle hooks fire in order on success', () async {
       final spy = _SpyLifecycleClient();
@@ -61,19 +63,13 @@ void main() {
 
       expect(
         spy.calls,
-        equals([
-          'markUserOpStarted',
-          'recordActivity',
-          'markUserOpEnded',
-        ]),
+        equals(['markUserOpStarted', 'recordActivity', 'markUserOpEnded']),
       );
     });
 
-    test(
-        'lifecycle hooks fire in order on failure; recordUserOpFailure '
+    test('lifecycle hooks fire in order on failure; recordUserOpFailure '
         'receives the ORIGINAL platform exception (not the translated '
-        'domain exception) so the I097 type-filter still works',
-        () async {
+        'domain exception) so the I097 type-filter still works', () async {
       final spy = _SpyLifecycleClient();
       const original = platform.GattOperationTimeoutException(
         'readCharacteristic',
@@ -93,24 +89,20 @@ void main() {
 
       expect(
         spy.calls,
-        equals([
-          'markUserOpStarted',
-          'recordUserOpFailure',
-          'markUserOpEnded',
-        ]),
+        equals(['markUserOpStarted', 'recordUserOpFailure', 'markUserOpEnded']),
       );
       expect(
         spy.lastFailureArgument,
         same(original),
-        reason: 'must pass the ORIGINAL platform exception, not the '
+        reason:
+            'must pass the ORIGINAL platform exception, not the '
             'translated domain one — the I097 filter inside '
             'recordUserOpFailure does an `is GattOperationTimeoutException` '
             'check that would not match the translated GattTimeoutException.',
       );
     });
 
-    test(
-        'no lifecycle hooks fire when lifecycleClient is null — pure '
+    test('no lifecycle hooks fire when lifecycleClient is null — pure '
         'translation only', () async {
       // Success path: just verify it returns without crashing.
       final result = await withErrorTranslation<int>(
@@ -121,12 +113,9 @@ void main() {
 
       // Failure path: still translates.
       await expectLater(
-        withErrorTranslation<void>(
-          () async {
-            throw const platform.GattOperationTimeoutException('connect');
-          },
-          operation: 'connect',
-        ),
+        withErrorTranslation<void>(() async {
+          throw const platform.GattOperationTimeoutException('connect');
+        }, operation: 'connect'),
         throwsA(isA<GattTimeoutException>()),
       );
     });
@@ -138,13 +127,13 @@ void main() {
 /// type) so the helper's `LifecycleClient?` parameter accepts it.
 class _SpyLifecycleClient extends LifecycleClient {
   _SpyLifecycleClient()
-      : super(
-          platformApi: FakeBlueyPlatform(),
-          connectionId: 'spy-connection-id',
-          peerSilenceTimeout: const Duration(seconds: 30),
-          onServerUnreachable: _noop,
-          logger: testLogger(),
-        );
+    : super(
+        platformApi: FakeBlueyPlatform(),
+        connectionId: 'spy-connection-id',
+        peerSilenceTimeout: const Duration(seconds: 30),
+        onServerUnreachable: _noop,
+        logger: testLogger(),
+      );
 
   static void _noop() {}
 

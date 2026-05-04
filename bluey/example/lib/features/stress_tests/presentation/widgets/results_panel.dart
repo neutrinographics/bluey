@@ -73,9 +73,10 @@ class ResultsPanel extends StatelessWidget {
                 Expanded(
                   child: _StatCell(
                     label: 'MEDIAN',
-                    value: r.latencies.isNotEmpty
-                        ? '${r.medianLatency.inMilliseconds}ms'
-                        : '—',
+                    value:
+                        r.latencies.isNotEmpty
+                            ? '${r.medianLatency.inMilliseconds}ms'
+                            : '—',
                     valueColor: _kDark,
                     valueFontSize: 16,
                     bold: false,
@@ -85,9 +86,10 @@ class ResultsPanel extends StatelessWidget {
                 Expanded(
                   child: _StatCell(
                     label: 'P95',
-                    value: r.latencies.isNotEmpty
-                        ? '${r.p95Latency.inMilliseconds}ms'
-                        : '—',
+                    value:
+                        r.latencies.isNotEmpty
+                            ? '${r.p95Latency.inMilliseconds}ms'
+                            : '—',
                     valueColor: _kDark,
                     valueFontSize: 16,
                     bold: false,
@@ -154,17 +156,18 @@ class _StatCell extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: bold
-              ? GoogleFonts.manrope(
-                  fontSize: valueFontSize,
-                  fontWeight: FontWeight.w700,
-                  color: valueColor,
-                )
-              : GoogleFonts.manrope(
-                  fontSize: valueFontSize,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor,
-                ),
+          style:
+              bold
+                  ? GoogleFonts.manrope(
+                    fontSize: valueFontSize,
+                    fontWeight: FontWeight.w700,
+                    color: valueColor,
+                  )
+                  : GoogleFonts.manrope(
+                    fontSize: valueFontSize,
+                    fontWeight: FontWeight.w600,
+                    color: valueColor,
+                  ),
           textAlign: TextAlign.center,
         ),
       ],

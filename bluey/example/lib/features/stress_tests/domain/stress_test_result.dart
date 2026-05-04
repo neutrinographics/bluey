@@ -43,16 +43,16 @@ class StressTestResult {
   });
 
   factory StressTestResult.initial() => const StressTestResult._(
-        attempted: 0,
-        succeeded: 0,
-        failed: 0,
-        failuresByType: {},
-        statusCounts: {},
-        latencies: [],
-        elapsed: Duration.zero,
-        isRunning: true,
-        connectionLost: false,
-      );
+    attempted: 0,
+    succeeded: 0,
+    failed: 0,
+    failuresByType: {},
+    statusCounts: {},
+    latencies: [],
+    elapsed: Duration.zero,
+    isRunning: true,
+    connectionLost: false,
+  );
 
   StressTestResult recordSuccess({required Duration latency}) {
     return StressTestResult._(
@@ -68,10 +68,7 @@ class StressTestResult {
     );
   }
 
-  StressTestResult recordFailure({
-    required String typeName,
-    int? status,
-  }) {
+  StressTestResult recordFailure({required String typeName, int? status}) {
     final newFailures = Map<String, int>.from(failuresByType);
     newFailures[typeName] = (newFailures[typeName] ?? 0) + 1;
     final newStatusCounts = Map<int, int>.from(statusCounts);

@@ -62,32 +62,36 @@ void main() {
   }
 
   group('RemoteService.characteristic(uuid)', () {
-    test('throws AmbiguousAttributeException when two chars share UUID',
-        () async {
-      final service = await connectAndGetServiceWith(
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: charDupUuid,
-            properties: TestProperties.readWrite,
-            descriptors: [],
-            handle: 0,
-          ),
-          platform.PlatformCharacteristic(
-            uuid: charDupUuid,
-            properties: TestProperties.readWrite,
-            descriptors: [],
-            handle: 0,
-          ),
-        ],
-      );
+    test(
+      'throws AmbiguousAttributeException when two chars share UUID',
+      () async {
+        final service = await connectAndGetServiceWith(
+          characteristics: const [
+            platform.PlatformCharacteristic(
+              uuid: charDupUuid,
+              properties: TestProperties.readWrite,
+              descriptors: [],
+              handle: 0,
+            ),
+            platform.PlatformCharacteristic(
+              uuid: charDupUuid,
+              properties: TestProperties.readWrite,
+              descriptors: [],
+              handle: 0,
+            ),
+          ],
+        );
 
-      expect(
-        () => service.characteristic(UUID(charDupUuid)),
-        throwsA(isA<AmbiguousAttributeException>()
-            .having((e) => e.uuid, 'uuid', equals(UUID(charDupUuid)))
-            .having((e) => e.matchCount, 'matchCount', equals(2))),
-      );
-    });
+        expect(
+          () => service.characteristic(UUID(charDupUuid)),
+          throwsA(
+            isA<AmbiguousAttributeException>()
+                .having((e) => e.uuid, 'uuid', equals(UUID(charDupUuid)))
+                .having((e) => e.matchCount, 'matchCount', equals(2)),
+          ),
+        );
+      },
+    );
 
     test('throws CharacteristicNotFoundException when no match', () async {
       final service = await connectAndGetServiceWith(
@@ -125,38 +129,40 @@ void main() {
   });
 
   group('RemoteService.characteristics({uuid})', () {
-    test('returns all duplicate-UUID matches when filter is supplied',
-        () async {
-      final service = await connectAndGetServiceWith(
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: charDupUuid,
-            properties: TestProperties.readWrite,
-            descriptors: [],
-            handle: 0,
-          ),
-          platform.PlatformCharacteristic(
-            uuid: charDupUuid,
-            properties: TestProperties.readWrite,
-            descriptors: [],
-            handle: 0,
-          ),
-          platform.PlatformCharacteristic(
-            uuid: charUniqueUuid,
-            properties: TestProperties.readOnly,
-            descriptors: [],
-            handle: 0,
-          ),
-        ],
-      );
+    test(
+      'returns all duplicate-UUID matches when filter is supplied',
+      () async {
+        final service = await connectAndGetServiceWith(
+          characteristics: const [
+            platform.PlatformCharacteristic(
+              uuid: charDupUuid,
+              properties: TestProperties.readWrite,
+              descriptors: [],
+              handle: 0,
+            ),
+            platform.PlatformCharacteristic(
+              uuid: charDupUuid,
+              properties: TestProperties.readWrite,
+              descriptors: [],
+              handle: 0,
+            ),
+            platform.PlatformCharacteristic(
+              uuid: charUniqueUuid,
+              properties: TestProperties.readOnly,
+              descriptors: [],
+              handle: 0,
+            ),
+          ],
+        );
 
-      final dupes = service.characteristics(uuid: UUID(charDupUuid));
-      expect(dupes, hasLength(2));
-      expect(dupes.every((c) => c.uuid == UUID(charDupUuid)), isTrue);
-      // The handles must be distinct — that's the whole point of the
-      // disambiguation.
-      expect(dupes[0].handle, isNot(equals(dupes[1].handle)));
-    });
+        final dupes = service.characteristics(uuid: UUID(charDupUuid));
+        expect(dupes, hasLength(2));
+        expect(dupes.every((c) => c.uuid == UUID(charDupUuid)), isTrue);
+        // The handles must be distinct — that's the whole point of the
+        // disambiguation.
+        expect(dupes[0].handle, isNot(equals(dupes[1].handle)));
+      },
+    );
 
     test('returns all characteristics when no filter is supplied', () async {
       final service = await connectAndGetServiceWith(
@@ -188,42 +194,45 @@ void main() {
   });
 
   group('Connection.service(uuid)', () {
-    test('throws AmbiguousAttributeException when two services share UUID',
-        () async {
-      fakePlatform.simulatePeripheral(
-        id: TestDeviceIds.device1,
-        name: 'Two-Service Peripheral',
-        services: const [
-          platform.PlatformService(
-            uuid: sharedServiceUuid,
-            isPrimary: true,
-            characteristics: [],
-            includedServices: [],
-          ),
-          platform.PlatformService(
-            uuid: sharedServiceUuid,
-            isPrimary: true,
-            characteristics: [],
-            includedServices: [],
-          ),
-        ],
-      );
-      final bluey = Bluey();
-      final device = await scanFirstDevice(bluey);
-      final connection = await bluey.connect(device);
-      // Trigger discovery so the cache is populated.
-      await connection.services();
+    test(
+      'throws AmbiguousAttributeException when two services share UUID',
+      () async {
+        fakePlatform.simulatePeripheral(
+          id: TestDeviceIds.device1,
+          name: 'Two-Service Peripheral',
+          services: const [
+            platform.PlatformService(
+              uuid: sharedServiceUuid,
+              isPrimary: true,
+              characteristics: [],
+              includedServices: [],
+            ),
+            platform.PlatformService(
+              uuid: sharedServiceUuid,
+              isPrimary: true,
+              characteristics: [],
+              includedServices: [],
+            ),
+          ],
+        );
+        final bluey = Bluey();
+        final device = await scanFirstDevice(bluey);
+        final connection = await bluey.connect(device);
+        // Trigger discovery so the cache is populated.
+        await connection.services();
 
-      expect(
-        () => connection.service(UUID(sharedServiceUuid)),
-        throwsA(isA<AmbiguousAttributeException>()
-            .having((e) => e.uuid, 'uuid', equals(UUID(sharedServiceUuid)))
-            .having((e) => e.matchCount, 'matchCount', equals(2))),
-      );
-    });
+        expect(
+          () => connection.service(UUID(sharedServiceUuid)),
+          throwsA(
+            isA<AmbiguousAttributeException>()
+                .having((e) => e.uuid, 'uuid', equals(UUID(sharedServiceUuid)))
+                .having((e) => e.matchCount, 'matchCount', equals(2)),
+          ),
+        );
+      },
+    );
 
-    test('returns the single match when exactly one service matches',
-        () async {
+    test('returns the single match when exactly one service matches', () async {
       fakePlatform.simulatePeripheral(
         id: TestDeviceIds.device1,
         name: 'Single-Service Peripheral',
@@ -253,87 +262,83 @@ void main() {
   });
 
   group('RemoteCharacteristic.descriptor(uuid)', () {
-    test('throws AmbiguousAttributeException when two descriptors share UUID',
-        () async {
-      final service = await connectAndGetServiceWith(
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: charUniqueUuid,
-            properties: TestProperties.readOnly,
-            descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid,
-  handle: 0,
-),
-              platform.PlatformDescriptor(uuid: descDupUuid,
-  handle: 0,
-),
-            ],
-            handle: 0,
-          ),
-        ],
-      );
-      final char = service.characteristic(UUID(charUniqueUuid));
+    test(
+      'throws AmbiguousAttributeException when two descriptors share UUID',
+      () async {
+        final service = await connectAndGetServiceWith(
+          characteristics: const [
+            platform.PlatformCharacteristic(
+              uuid: charUniqueUuid,
+              properties: TestProperties.readOnly,
+              descriptors: [
+                platform.PlatformDescriptor(uuid: descDupUuid, handle: 0),
+                platform.PlatformDescriptor(uuid: descDupUuid, handle: 0),
+              ],
+              handle: 0,
+            ),
+          ],
+        );
+        final char = service.characteristic(UUID(charUniqueUuid));
 
-      expect(
-        () => char.descriptor(UUID(descDupUuid)),
-        throwsA(isA<AmbiguousAttributeException>()
-            .having((e) => e.uuid, 'uuid', equals(UUID(descDupUuid)))
-            .having((e) => e.matchCount, 'matchCount', equals(2))),
-      );
-    });
-
-    test('returns the single match when exactly one descriptor matches',
-        () async {
-      final service = await connectAndGetServiceWith(
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: charUniqueUuid,
-            properties: TestProperties.readOnly,
-            descriptors: [
-              platform.PlatformDescriptor(uuid: descUniqueUuid,
-  handle: 0,
-),
-            ],
-            handle: 0,
+        expect(
+          () => char.descriptor(UUID(descDupUuid)),
+          throwsA(
+            isA<AmbiguousAttributeException>()
+                .having((e) => e.uuid, 'uuid', equals(UUID(descDupUuid)))
+                .having((e) => e.matchCount, 'matchCount', equals(2)),
           ),
-        ],
-      );
-      final char = service.characteristic(UUID(charUniqueUuid));
-      final desc = char.descriptor(UUID(descUniqueUuid));
-      expect(desc.uuid, equals(UUID(descUniqueUuid)));
-    });
+        );
+      },
+    );
+
+    test(
+      'returns the single match when exactly one descriptor matches',
+      () async {
+        final service = await connectAndGetServiceWith(
+          characteristics: const [
+            platform.PlatformCharacteristic(
+              uuid: charUniqueUuid,
+              properties: TestProperties.readOnly,
+              descriptors: [
+                platform.PlatformDescriptor(uuid: descUniqueUuid, handle: 0),
+              ],
+              handle: 0,
+            ),
+          ],
+        );
+        final char = service.characteristic(UUID(charUniqueUuid));
+        final desc = char.descriptor(UUID(descUniqueUuid));
+        expect(desc.uuid, equals(UUID(descUniqueUuid)));
+      },
+    );
   });
 
   group('RemoteCharacteristic.descriptors({uuid})', () {
-    test('returns all duplicate-UUID descriptors when filter is supplied',
-        () async {
-      final service = await connectAndGetServiceWith(
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: charUniqueUuid,
-            properties: TestProperties.readOnly,
-            descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid,
-  handle: 0,
-),
-              platform.PlatformDescriptor(uuid: descDupUuid,
-  handle: 0,
-),
-              platform.PlatformDescriptor(uuid: descUniqueUuid,
-  handle: 0,
-),
-            ],
-            handle: 0,
-          ),
-        ],
-      );
-      final char = service.characteristic(UUID(charUniqueUuid));
+    test(
+      'returns all duplicate-UUID descriptors when filter is supplied',
+      () async {
+        final service = await connectAndGetServiceWith(
+          characteristics: const [
+            platform.PlatformCharacteristic(
+              uuid: charUniqueUuid,
+              properties: TestProperties.readOnly,
+              descriptors: [
+                platform.PlatformDescriptor(uuid: descDupUuid, handle: 0),
+                platform.PlatformDescriptor(uuid: descDupUuid, handle: 0),
+                platform.PlatformDescriptor(uuid: descUniqueUuid, handle: 0),
+              ],
+              handle: 0,
+            ),
+          ],
+        );
+        final char = service.characteristic(UUID(charUniqueUuid));
 
-      final dupes = char.descriptors(uuid: UUID(descDupUuid));
-      expect(dupes, hasLength(2));
-      expect(dupes.every((d) => d.uuid == UUID(descDupUuid)), isTrue);
-      expect(dupes[0].handle, isNot(equals(dupes[1].handle)));
-    });
+        final dupes = char.descriptors(uuid: UUID(descDupUuid));
+        expect(dupes, hasLength(2));
+        expect(dupes.every((d) => d.uuid == UUID(descDupUuid)), isTrue);
+        expect(dupes[0].handle, isNot(equals(dupes[1].handle)));
+      },
+    );
 
     test('returns all descriptors when no filter is supplied', () async {
       final service = await connectAndGetServiceWith(
@@ -342,12 +347,8 @@ void main() {
             uuid: charUniqueUuid,
             properties: TestProperties.readOnly,
             descriptors: [
-              platform.PlatformDescriptor(uuid: descDupUuid,
-  handle: 0,
-),
-              platform.PlatformDescriptor(uuid: descUniqueUuid,
-  handle: 0,
-),
+              platform.PlatformDescriptor(uuid: descDupUuid, handle: 0),
+              platform.PlatformDescriptor(uuid: descUniqueUuid, handle: 0),
             ],
             handle: 0,
           ),
@@ -359,30 +360,32 @@ void main() {
     });
   });
 
-  test('AmbiguousAttributeException message points at plural accessor',
-      () async {
-    final service = await connectAndGetServiceWith(
-      characteristics: const [
-        platform.PlatformCharacteristic(
-          uuid: charDupUuid,
-          properties: TestProperties.readWrite,
-          descriptors: [],
-          handle: 0,
-        ),
-        platform.PlatformCharacteristic(
-          uuid: charDupUuid,
-          properties: TestProperties.readWrite,
-          descriptors: [],
-          handle: 0,
-        ),
-      ],
-    );
+  test(
+    'AmbiguousAttributeException message points at plural accessor',
+    () async {
+      final service = await connectAndGetServiceWith(
+        characteristics: const [
+          platform.PlatformCharacteristic(
+            uuid: charDupUuid,
+            properties: TestProperties.readWrite,
+            descriptors: [],
+            handle: 0,
+          ),
+          platform.PlatformCharacteristic(
+            uuid: charDupUuid,
+            properties: TestProperties.readWrite,
+            descriptors: [],
+            handle: 0,
+          ),
+        ],
+      );
 
-    try {
-      service.characteristic(UUID(charDupUuid));
-      fail('expected AmbiguousAttributeException');
-    } on AmbiguousAttributeException catch (e) {
-      expect(e.toString(), contains('characteristics(uuid:'));
-    }
-  });
+      try {
+        service.characteristic(UUID(charDupUuid));
+        fail('expected AmbiguousAttributeException');
+      } on AmbiguousAttributeException catch (e) {
+        expect(e.toString(), contains('characteristics(uuid:'));
+      }
+    },
+  );
 }

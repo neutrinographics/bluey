@@ -59,27 +59,29 @@ void main() {
   });
 
   group('LifecycleServer', () {
-    test('handleWriteRequest returns false for non-control characteristics',
-        () {
-      final gone = <String>[];
-      final server = LifecycleServer(
-        platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
-        serverId: ServerId.generate(),
-        onClientGone: gone.add,
-        logger: testLogger(),
-      );
+    test(
+      'handleWriteRequest returns false for non-control characteristics',
+      () {
+        final gone = <String>[];
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
+          onClientGone: gone.add,
+          logger: testLogger(),
+        );
 
-      final req = _writeReq(
-        characteristicUuid: _otherCharUuid,
-        value: [0x01],
-      );
+        final req = _writeReq(
+          characteristicUuid: _otherCharUuid,
+          value: [0x01],
+        );
 
-      expect(server.handleWriteRequest(req), isFalse);
-      expect(gone, isEmpty);
+        expect(server.handleWriteRequest(req), isFalse);
+        expect(gone, isEmpty);
 
-      server.dispose();
-    });
+        server.dispose();
+      },
+    );
 
     test('handleWriteRequest returns true and resets timer for heartbeat', () {
       fakeAsync((async) {
@@ -157,56 +159,59 @@ void main() {
       server.dispose();
     });
 
-    test('handleWriteRequest does NOT auto-respond when responseNeeded is false',
-        () {
-      final server = LifecycleServer(
-        platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
-        serverId: ServerId.generate(),
-        onClientGone: (_) {},
-        logger: testLogger(),
-      );
+    test(
+      'handleWriteRequest does NOT auto-respond when responseNeeded is false',
+      () {
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
+          onClientGone: (_) {},
+          logger: testLogger(),
+        );
 
-      server.handleWriteRequest(
-        _writeReq(
-          characteristicUuid: _heartbeatCharUuid,
-          value: [0x01],
-          responseNeeded: false,
-        ),
-      );
+        server.handleWriteRequest(
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: [0x01],
+            responseNeeded: false,
+          ),
+        );
 
-      expect(fakePlatform.respondWriteCalls, isEmpty);
+        expect(fakePlatform.respondWriteCalls, isEmpty);
 
-      server.dispose();
-    });
+        server.dispose();
+      },
+    );
 
     test(
-        'handleReadRequest responds with encoded interval for interval characteristic',
-        () {
-      final server = LifecycleServer(
-        platformApi: fakePlatform,
-        interval: const Duration(seconds: 15),
-        serverId: ServerId.generate(),
-        onClientGone: (_) {},
-        logger: testLogger(),
-      );
+      'handleReadRequest responds with encoded interval for interval characteristic',
+      () {
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 15),
+          serverId: ServerId.generate(),
+          onClientGone: (_) {},
+          logger: testLogger(),
+        );
 
-      final handled = server.handleReadRequest(
-        _readReq(characteristicUuid: _intervalCharUuid, requestId: 7),
-      );
+        final handled = server.handleReadRequest(
+          _readReq(characteristicUuid: _intervalCharUuid, requestId: 7),
+        );
 
-      expect(handled, isTrue);
-      expect(fakePlatform.respondReadCalls, hasLength(1));
-      final call = fakePlatform.respondReadCalls.single;
-      expect(call.requestId, 7);
-      expect(call.status, PlatformGattStatus.success);
-      expect(
-        call.value,
-        lifecycle.encodeInterval(const Duration(seconds: 15)),
-      );
+        expect(handled, isTrue);
+        expect(fakePlatform.respondReadCalls, hasLength(1));
+        final call = fakePlatform.respondReadCalls.single;
+        expect(call.requestId, 7);
+        expect(call.status, PlatformGattStatus.success);
+        expect(
+          call.value,
+          lifecycle.encodeInterval(const Duration(seconds: 15)),
+        );
 
-      server.dispose();
-    });
+        server.dispose();
+      },
+    );
 
     test('handleReadRequest returns false for non-control characteristics', () {
       final server = LifecycleServer(
@@ -320,8 +325,7 @@ void main() {
       server.dispose();
     });
 
-    test(
-        'onHeartbeatReceived also fires on disconnect command '
+    test('onHeartbeatReceived also fires on disconnect command '
         '(tracks before disconnect)', () {
       final gone = <String>[];
       final heartbeats = <String>[];
@@ -372,44 +376,49 @@ void main() {
       });
     });
 
-    test('addControlServiceIfNeeded is a no-op when interval is null', () async {
-      final server = LifecycleServer(
-        platformApi: fakePlatform,
-        interval: null,
-        serverId: ServerId.generate(),
-        onClientGone: (_) {},
-        logger: testLogger(),
-      );
+    test(
+      'addControlServiceIfNeeded is a no-op when interval is null',
+      () async {
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: null,
+          serverId: ServerId.generate(),
+          onClientGone: (_) {},
+          logger: testLogger(),
+        );
 
-      await server.addControlServiceIfNeeded();
+        await server.addControlServiceIfNeeded();
 
-      expect(fakePlatform.localServices, isEmpty);
+        expect(fakePlatform.localServices, isEmpty);
 
-      server.dispose();
-    });
+        server.dispose();
+      },
+    );
 
-    test('addControlServiceIfNeeded adds the control service exactly once',
-        () async {
-      final server = LifecycleServer(
-        platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
-        serverId: ServerId.generate(),
-        onClientGone: (_) {},
-        logger: testLogger(),
-      );
+    test(
+      'addControlServiceIfNeeded adds the control service exactly once',
+      () async {
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
+          onClientGone: (_) {},
+          logger: testLogger(),
+        );
 
-      await server.addControlServiceIfNeeded();
-      await server.addControlServiceIfNeeded();
-      await server.addControlServiceIfNeeded();
+        await server.addControlServiceIfNeeded();
+        await server.addControlServiceIfNeeded();
+        await server.addControlServiceIfNeeded();
 
-      expect(fakePlatform.localServices, hasLength(1));
-      expect(
-        fakePlatform.localServices.single.uuid,
-        lifecycle.controlServiceUuid,
-      );
+        expect(fakePlatform.localServices, hasLength(1));
+        expect(
+          fakePlatform.localServices.single.uuid,
+          lifecycle.controlServiceUuid,
+        );
 
-      server.dispose();
-    });
+        server.dispose();
+      },
+    );
 
     test('responds to serverId read with encoded bytes', () {
       final id = ServerId.generate();
@@ -421,13 +430,15 @@ void main() {
         logger: testLogger(),
       );
 
-      final handled = server.handleReadRequest(PlatformReadRequest(
-        requestId: 1,
-        centralId: 'central-1',
-        characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
-        offset: 0,
-        characteristicHandle: 0,
-      ));
+      final handled = server.handleReadRequest(
+        PlatformReadRequest(
+          requestId: 1,
+          centralId: 'central-1',
+          characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+          offset: 0,
+          characteristicHandle: 0,
+        ),
+      );
       expect(handled, isTrue);
 
       expect(fakePlatform.respondReadCalls, hasLength(1));
@@ -452,15 +463,17 @@ void main() {
         const clientId = 'test-client';
 
         // Prime the server by receiving a heartbeat from the client.
-        server.handleWriteRequest(PlatformWriteRequest(
-          requestId: 1,
-          centralId: clientId,
-          characteristicUuid: lifecycle.heartbeatCharUuid,
-          value: lifecycle.heartbeatValue,
-          responseNeeded: false,
-          offset: 0,
-          characteristicHandle: 0,
-        ));
+        server.handleWriteRequest(
+          PlatformWriteRequest(
+            requestId: 1,
+            centralId: clientId,
+            characteristicUuid: lifecycle.heartbeatCharUuid,
+            value: lifecycle.heartbeatValue,
+            responseNeeded: false,
+            offset: 0,
+            characteristicHandle: 0,
+          ),
+        );
 
         // Advance 9s — just under the timeout.
         async.elapse(const Duration(seconds: 9));
@@ -472,7 +485,11 @@ void main() {
         // Advance another 9s — total 18s since first heartbeat, but only
         // 9s since recordActivity, so still within the window.
         async.elapse(const Duration(seconds: 9));
-        expect(events, isEmpty, reason: 'recordActivity should reset the timer');
+        expect(
+          events,
+          isEmpty,
+          reason: 'recordActivity should reset the timer',
+        );
 
         // Another 2s → past the timer from recordActivity → should fire.
         async.elapse(const Duration(seconds: 2));
@@ -482,45 +499,49 @@ void main() {
       });
     });
 
-    test('recordActivity is a no-op when lifecycle is disabled (null interval)',
-        () {
-      final server = LifecycleServer(
-        platformApi: FakeBlueyPlatform(),
-        interval: null,
-        serverId: ServerId.generate(),
-        onClientGone: (_) => fail('no client should expire'),
-        logger: testLogger(),
-      );
-
-      // Calling recordActivity when lifecycle is disabled should be safe
-      // and do nothing.
-      expect(() => server.recordActivity('client'), returnsNormally);
-
-      server.dispose();
-    });
-
-    test('recordActivity is ignored for an untracked (non-lifecycle) client',
-        () {
-      fakeAsync((async) {
-        final events = <String>[];
+    test(
+      'recordActivity is a no-op when lifecycle is disabled (null interval)',
+      () {
         final server = LifecycleServer(
           platformApi: FakeBlueyPlatform(),
-          interval: const Duration(seconds: 10),
+          interval: null,
           serverId: ServerId.generate(),
-          onClientGone: (id) => events.add('gone:$id'),
+          onClientGone: (_) => fail('no client should expire'),
           logger: testLogger(),
         );
 
-        // Client never sent a heartbeat — activity alone must not start
-        // tracking them. Otherwise a generic BLE central reading a hosted
-        // service would be spuriously flagged as "gone" after the interval.
-        server.recordActivity('stranger');
-        async.elapse(const Duration(seconds: 20));
-        expect(events, isEmpty);
+        // Calling recordActivity when lifecycle is disabled should be safe
+        // and do nothing.
+        expect(() => server.recordActivity('client'), returnsNormally);
 
         server.dispose();
-      });
-    });
+      },
+    );
+
+    test(
+      'recordActivity is ignored for an untracked (non-lifecycle) client',
+      () {
+        fakeAsync((async) {
+          final events = <String>[];
+          final server = LifecycleServer(
+            platformApi: FakeBlueyPlatform(),
+            interval: const Duration(seconds: 10),
+            serverId: ServerId.generate(),
+            onClientGone: (id) => events.add('gone:$id'),
+            logger: testLogger(),
+          );
+
+          // Client never sent a heartbeat — activity alone must not start
+          // tracking them. Otherwise a generic BLE central reading a hosted
+          // service would be spuriously flagged as "gone" after the interval.
+          server.recordActivity('stranger');
+          async.elapse(const Duration(seconds: 20));
+          expect(events, isEmpty);
+
+          server.dispose();
+        });
+      },
+    );
 
     test('pending request suppresses heartbeat timeout', () {
       fakeAsync((async) {
@@ -643,9 +664,13 @@ void main() {
         server.requestCompleted(_clientId, 1);
 
         async.elapse(const Duration(seconds: 30));
-        expect(gone, isEmpty,
-            reason: 'cancelTimer cleared the entry; '
-                'requestCompleted must not re-arm the timer');
+        expect(
+          gone,
+          isEmpty,
+          reason:
+              'cancelTimer cleared the entry; '
+              'requestCompleted must not re-arm the timer',
+        );
 
         server.dispose();
       });

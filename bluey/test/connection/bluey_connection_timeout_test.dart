@@ -68,29 +68,26 @@ void main() {
       },
     );
 
-    test(
-      'thrown GattTimeoutException is also a BlueyException',
-      () async {
-        final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-          address: TestDeviceIds.device1,
-          name: 'Timeout Test Device',
-        );
-        final conn = await bluey.connect(device);
-        final services = await conn.services();
-        final svc = services.first;
-        final char = svc.characteristic(UUID(_charUuid));
+    test('thrown GattTimeoutException is also a BlueyException', () async {
+      final device = Device(
+        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+        address: TestDeviceIds.device1,
+        name: 'Timeout Test Device',
+      );
+      final conn = await bluey.connect(device);
+      final services = await conn.services();
+      final svc = services.first;
+      final char = svc.characteristic(UUID(_charUuid));
 
-        fakePlatform.simulateWriteTimeout = true;
+      fakePlatform.simulateWriteTimeout = true;
 
-        expect(
-          () => char.write(Uint8List.fromList([0x01])),
-          throwsA(isA<BlueyException>()),
-        );
+      expect(
+        () => char.write(Uint8List.fromList([0x01])),
+        throwsA(isA<BlueyException>()),
+      );
 
-        fakePlatform.simulateWriteTimeout = false;
-        await conn.disconnect();
-      },
-    );
+      fakePlatform.simulateWriteTimeout = false;
+      await conn.disconnect();
+    });
   });
 }

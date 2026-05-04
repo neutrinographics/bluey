@@ -18,32 +18,40 @@ void main() {
   });
 
   group('BlueyPeer', () {
-    test('connect() returns a PeerConnection with control service hidden',
-        () async {
-      final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
+    test(
+      'connect() returns a PeerConnection with control service hidden',
+      () async {
+        final id = ServerId.generate();
+        fakePlatform.simulateBlueyServer(
+          address: 'AA:BB:CC:DD:EE:01',
+          serverId: id,
+        );
 
-      final peer = createBlueyPeer(
-        platformApi: fakePlatform,
-        serverId: id,
-        logger: testLogger(),
-      );
-      final peerConn = await peer.connect();
+        final peer = createBlueyPeer(
+          platformApi: fakePlatform,
+          serverId: id,
+          logger: testLogger(),
+        );
+        final peerConn = await peer.connect();
 
-      expect(peerConn, isA<PeerConnection>());
-      expect(peerConn.serverId, equals(id));
-      expect(peerConn.connection.state, ConnectionState.ready);
-      final services = await peerConn.services();
-      expect(
-        services.any((s) => s.uuid.toString() == controlServiceUuid),
-        isFalse,
-      );
+        expect(peerConn, isA<PeerConnection>());
+        expect(peerConn.serverId, equals(id));
+        expect(peerConn.connection.state, ConnectionState.ready);
+        final services = await peerConn.services();
+        expect(
+          services.any((s) => s.uuid.toString() == controlServiceUuid),
+          isFalse,
+        );
 
-      await peerConn.disconnect();
-    });
+        await peerConn.disconnect();
+      },
+    );
 
     test('connect() throws PeerNotFoundException if no match', () async {
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: ServerId.generate());
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
@@ -60,7 +68,10 @@ void main() {
     test('disconnects when heartbeat write fails', () {
       fakeAsync((async) {
         final id = ServerId.generate();
-        fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
+        fakePlatform.simulateBlueyServer(
+          address: 'AA:BB:CC:DD:EE:01',
+          serverId: id,
+        );
 
         // Post-C.6 the LifecycleClient lives inside `_BlueyPeer.connect`'s
         // wrapper (no longer attached to `BlueyConnection`). It is started
@@ -114,7 +125,10 @@ void main() {
 
     test('concurrent connect() throws StateError', () async {
       final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,

@@ -183,11 +183,7 @@ class _StatPillsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: stats.map(_pill).toList(),
-    );
+    return Wrap(spacing: 6, runSpacing: 6, children: stats.map(_pill).toList());
   }
 
   Widget _pill(HelpStat stat) {
@@ -223,51 +219,49 @@ class _StatPillsRow extends StatelessWidget {
   }
 
   Color _pillColor(HelpStat stat) => switch (stat) {
-        HelpStat.attempted => _kAccent,
-        HelpStat.succeeded => _kGreen,
-        HelpStat.failed => _kRed,
-        HelpStat.median || HelpStat.p95 || HelpStat.elapsed => _kMid,
-      };
+    HelpStat.attempted => _kAccent,
+    HelpStat.succeeded => _kGreen,
+    HelpStat.failed => _kRed,
+    HelpStat.median || HelpStat.p95 || HelpStat.elapsed => _kMid,
+  };
 
   String _pillLabel(HelpStat stat) => switch (stat) {
-        HelpStat.attempted => 'ATTEMPTED',
-        HelpStat.succeeded => 'SUCCEEDED',
-        HelpStat.failed => 'FAILED',
-        HelpStat.median => 'MEDIAN',
-        HelpStat.p95 => 'P95',
-        HelpStat.elapsed => 'ELAPSED',
-      };
+    HelpStat.attempted => 'ATTEMPTED',
+    HelpStat.succeeded => 'SUCCEEDED',
+    HelpStat.failed => 'FAILED',
+    HelpStat.median => 'MEDIAN',
+    HelpStat.p95 => 'P95',
+    HelpStat.elapsed => 'ELAPSED',
+  };
 }
 
 // ─── Icon helpers (mirrors test_card.dart _StressTestMeta) ───────────────────
 
 IconData _icon(StressTest test) => switch (test) {
-      StressTest.burstWrite => Icons.bolt,
-      StressTest.mixedOps => Icons.swap_horiz,
-      StressTest.soak => Icons.timer_outlined,
-      StressTest.timeoutProbe => Icons.alarm_outlined,
-      StressTest.failureInjection => Icons.bug_report_outlined,
-      StressTest.mtuProbe => Icons.settings_ethernet,
-      StressTest.notificationThroughput => Icons.notifications_outlined,
-    };
+  StressTest.burstWrite => Icons.bolt,
+  StressTest.mixedOps => Icons.swap_horiz,
+  StressTest.soak => Icons.timer_outlined,
+  StressTest.timeoutProbe => Icons.alarm_outlined,
+  StressTest.failureInjection => Icons.bug_report_outlined,
+  StressTest.mtuProbe => Icons.settings_ethernet,
+  StressTest.notificationThroughput => Icons.notifications_outlined,
+};
 
 Color _iconBg(StressTest test) => switch (test) {
-      StressTest.burstWrite => const Color(0x4DAFD2FD),
-      StressTest.mixedOps => const Color(0x4DD3E4FE),
-      StressTest.soak => const Color(0x3369F6B8),
-      StressTest.timeoutProbe => const Color(0x33FA746F),
-      StressTest.failureInjection => const Color(0x33FA746F),
-      StressTest.mtuProbe => const Color(0x4DAFD2FD),
-      StressTest.notificationThroughput => const Color(0x4DD3E4FE),
-    };
+  StressTest.burstWrite => const Color(0x4DAFD2FD),
+  StressTest.mixedOps => const Color(0x4DD3E4FE),
+  StressTest.soak => const Color(0x3369F6B8),
+  StressTest.timeoutProbe => const Color(0x33FA746F),
+  StressTest.failureInjection => const Color(0x33FA746F),
+  StressTest.mtuProbe => const Color(0x4DAFD2FD),
+  StressTest.notificationThroughput => const Color(0x4DD3E4FE),
+};
 
 Color _iconColor(StressTest test) => switch (test) {
-      StressTest.burstWrite ||
-      StressTest.mixedOps ||
-      StressTest.mtuProbe ||
-      StressTest.notificationThroughput =>
-        _kAccent,
-      StressTest.soak => _kGreen,
-      StressTest.timeoutProbe || StressTest.failureInjection => _kRed,
-    };
-
+  StressTest.burstWrite ||
+  StressTest.mixedOps ||
+  StressTest.mtuProbe ||
+  StressTest.notificationThroughput => _kAccent,
+  StressTest.soak => _kGreen,
+  StressTest.timeoutProbe || StressTest.failureInjection => _kRed,
+};

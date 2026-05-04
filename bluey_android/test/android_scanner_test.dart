@@ -44,10 +44,7 @@ void main() {
       test('returns the scan stream', () {
         when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
 
-        final config = PlatformScanConfig(
-          serviceUuids: [],
-          timeoutMs: null,
-        );
+        final config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
 
         final stream = scanner.scan(config);
 
@@ -59,10 +56,7 @@ void main() {
       test('emits device to scan stream with correct mapping', () async {
         when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
 
-        final config = PlatformScanConfig(
-          serviceUuids: [],
-          timeoutMs: null,
-        );
+        final config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
 
         final stream = scanner.scan(config);
         final future = stream.first;
@@ -89,10 +83,7 @@ void main() {
       test('maps manufacturer data correctly', () async {
         when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
 
-        final config = PlatformScanConfig(
-          serviceUuids: [],
-          timeoutMs: null,
-        );
+        final config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
 
         final stream = scanner.scan(config);
         final future = stream.first;

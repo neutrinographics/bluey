@@ -143,16 +143,19 @@ void main() {
       expect(c.canAdvertiseManufacturerData, isFalse);
     });
 
-    test('two Capabilities differing only in canAdvertiseManufacturerData are not equal', () {
-      const a = Capabilities(
-        platformKind: PlatformKind.other,
-        canAdvertiseManufacturerData: true,
-      );
-      const b = Capabilities(
-        platformKind: PlatformKind.other,
-        canAdvertiseManufacturerData: false,
-      );
-      expect(a == b, isFalse);
-    });
+    test(
+      'two Capabilities differing only in canAdvertiseManufacturerData are not equal',
+      () {
+        const a = Capabilities(
+          platformKind: PlatformKind.other,
+          canAdvertiseManufacturerData: true,
+        );
+        const b = Capabilities(
+          platformKind: PlatformKind.other,
+          canAdvertiseManufacturerData: false,
+        );
+        expect(a == b, isFalse);
+      },
+    );
   });
 }

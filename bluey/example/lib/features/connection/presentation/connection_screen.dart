@@ -639,13 +639,13 @@ class _DeviceInfoCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => StressTestsScreen(
-                      connection: connection,
+                onTap:
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder:
+                            (_) => StressTestsScreen(connection: connection),
+                      ),
                     ),
-                  ),
-                ),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 14),

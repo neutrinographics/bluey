@@ -33,10 +33,7 @@ void main() {
     });
 
     test('two intervals with different values are not equal', () {
-      expect(
-        ConnectionInterval(30),
-        isNot(equals(ConnectionInterval(31))),
-      );
+      expect(ConnectionInterval(30), isNot(equals(ConnectionInterval(31))));
     });
 
     test('toString includes the wrapped value', () {

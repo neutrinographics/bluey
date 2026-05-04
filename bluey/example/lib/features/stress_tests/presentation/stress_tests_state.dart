@@ -28,9 +28,10 @@ class TestCardState extends Equatable {
     return TestCardState(
       test: test,
       config: config ?? this.config,
-      result: identical(result, _absent)
-          ? this.result
-          : result as StressTestResult?,
+      result:
+          identical(result, _absent)
+              ? this.result
+              : result as StressTestResult?,
       isRunning: isRunning ?? this.isRunning,
     );
   }
@@ -48,43 +49,47 @@ class StressTestsState extends Equatable {
   const StressTestsState({required this.cards});
 
   factory StressTestsState.initial() {
-    return StressTestsState(cards: {
-      StressTest.burstWrite: const TestCardState(
-        test: StressTest.burstWrite,
-        config: BurstWriteConfig(),
-      ),
-      StressTest.mixedOps: const TestCardState(
-        test: StressTest.mixedOps,
-        config: MixedOpsConfig(),
-      ),
-      StressTest.soak: const TestCardState(
-        test: StressTest.soak,
-        config: SoakConfig(),
-      ),
-      StressTest.timeoutProbe: const TestCardState(
-        test: StressTest.timeoutProbe,
-        config: TimeoutProbeConfig(),
-      ),
-      StressTest.failureInjection: const TestCardState(
-        test: StressTest.failureInjection,
-        config: FailureInjectionConfig(),
-      ),
-      StressTest.mtuProbe: const TestCardState(
-        test: StressTest.mtuProbe,
-        config: MtuProbeConfig(),
-      ),
-      StressTest.notificationThroughput: const TestCardState(
-        test: StressTest.notificationThroughput,
-        config: NotificationThroughputConfig(),
-      ),
-    });
+    return StressTestsState(
+      cards: {
+        StressTest.burstWrite: const TestCardState(
+          test: StressTest.burstWrite,
+          config: BurstWriteConfig(),
+        ),
+        StressTest.mixedOps: const TestCardState(
+          test: StressTest.mixedOps,
+          config: MixedOpsConfig(),
+        ),
+        StressTest.soak: const TestCardState(
+          test: StressTest.soak,
+          config: SoakConfig(),
+        ),
+        StressTest.timeoutProbe: const TestCardState(
+          test: StressTest.timeoutProbe,
+          config: TimeoutProbeConfig(),
+        ),
+        StressTest.failureInjection: const TestCardState(
+          test: StressTest.failureInjection,
+          config: FailureInjectionConfig(),
+        ),
+        StressTest.mtuProbe: const TestCardState(
+          test: StressTest.mtuProbe,
+          config: MtuProbeConfig(),
+        ),
+        StressTest.notificationThroughput: const TestCardState(
+          test: StressTest.notificationThroughput,
+          config: NotificationThroughputConfig(),
+        ),
+      },
+    );
   }
 
   StressTestsState updateCard(StressTest test, TestCardState newState) {
-    return StressTestsState(cards: {
-      for (final entry in cards.entries)
-        entry.key: entry.key == test ? newState : entry.value,
-    });
+    return StressTestsState(
+      cards: {
+        for (final entry in cards.entries)
+          entry.key: entry.key == test ? newState : entry.value,
+      },
+    );
   }
 
   @override

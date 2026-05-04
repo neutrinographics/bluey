@@ -113,10 +113,13 @@ void main() {
     group('Convenience getters', () {
       test('canWriteAny returns true if any write is supported', () {
         const writeOnly = CharacteristicProperties(canWrite: true);
-        const writeNoRespOnly =
-            CharacteristicProperties(canWriteWithoutResponse: true);
+        const writeNoRespOnly = CharacteristicProperties(
+          canWriteWithoutResponse: true,
+        );
         const both = CharacteristicProperties(
-            canWrite: true, canWriteWithoutResponse: true);
+          canWrite: true,
+          canWriteWithoutResponse: true,
+        );
         const neither = CharacteristicProperties(canRead: true);
 
         expect(writeOnly.canWriteAny, isTrue);
@@ -128,8 +131,10 @@ void main() {
       test('canSubscribe returns true if notify or indicate is supported', () {
         const notifyOnly = CharacteristicProperties(canNotify: true);
         const indicateOnly = CharacteristicProperties(canIndicate: true);
-        const both =
-            CharacteristicProperties(canNotify: true, canIndicate: true);
+        const both = CharacteristicProperties(
+          canNotify: true,
+          canIndicate: true,
+        );
         const neither = CharacteristicProperties(canRead: true);
 
         expect(notifyOnly.canSubscribe, isTrue);

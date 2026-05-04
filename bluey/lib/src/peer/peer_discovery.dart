@@ -43,9 +43,9 @@ class PeerDiscovery {
     required platform.BlueyPlatform platformApi,
     required BlueyLogger logger,
     EventPublisher? events,
-  })  : _platform = platformApi,
-        _logger = logger,
-        _events = events;
+  }) : _platform = platformApi,
+       _logger = logger,
+       _events = events;
 
   /// Scans for Bluey servers, briefly connects to each to read its
   /// [ServerId], and returns a deduplicated list.
@@ -80,20 +80,14 @@ class PeerDiscovery {
           BlueyLogLevel.info,
           'bluey.peer.discovery',
           'discoverPeers probe success',
-          data: {
-            'deviceId': address,
-            'serverId': id.toString(),
-          },
+          data: {'deviceId': address, 'serverId': id.toString()},
         );
       } catch (e) {
         _logger.log(
           BlueyLogLevel.debug,
           'bluey.peer.discovery',
           'discoverPeers probe failure',
-          data: {
-            'deviceId': address,
-            'exception': e.runtimeType.toString(),
-          },
+          data: {'deviceId': address, 'exception': e.runtimeType.toString()},
         );
         // Skip candidates that fail to connect or read.
       }
@@ -102,10 +96,7 @@ class PeerDiscovery {
       BlueyLogLevel.info,
       'bluey.peer.discovery',
       'discoverPeers stopped',
-      data: {
-        'candidates': candidates.length,
-        'matched': ids.length,
-      },
+      data: {'candidates': candidates.length, 'matched': ids.length},
     );
     return ids.toList();
   }
@@ -161,10 +152,9 @@ class PeerDiscovery {
       serviceUuids: [lifecycle.controlServiceUuid],
       timeoutMs: timeout.inMilliseconds,
     );
-    await for (final result in _platform.scan(scanConfig).timeout(
-          timeout,
-          onTimeout: (sink) => sink.close(),
-        )) {
+    await for (final result in _platform
+        .scan(scanConfig)
+        .timeout(timeout, onTimeout: (sink) => sink.close())) {
       addresses.add(result.id);
     }
     await _platform.stopScan();
@@ -198,18 +188,17 @@ class PeerDiscovery {
     // Find the serverId characteristic in the control service tree —
     // platform reads are now keyed by handle (D.13), so we resolve
     // here from the discovery output rather than passing UUID.
-    final controlService = services
-        .where((s) =>
-            s.uuid.toLowerCase() == lifecycle.controlServiceUuid)
-        .firstOrNull;
+    final controlService =
+        services
+            .where((s) => s.uuid.toLowerCase() == lifecycle.controlServiceUuid)
+            .firstOrNull;
     if (controlService == null) {
-      throw StateError(
-        'peer probe: control service not present on $address',
-      );
+      throw StateError('peer probe: control service not present on $address');
     }
-    final serverIdChar = controlService.characteristics
-        .where((c) => c.uuid.toLowerCase() == lifecycle.serverIdCharUuid)
-        .firstOrNull;
+    final serverIdChar =
+        controlService.characteristics
+            .where((c) => c.uuid.toLowerCase() == lifecycle.serverIdCharUuid)
+            .firstOrNull;
     if (serverIdChar == null) {
       throw StateError(
         'peer probe: serverId characteristic not present on $address',
@@ -221,5 +210,4 @@ class PeerDiscovery {
     );
     return lifecycle.decodeServerId(bytes);
   }
-
 }

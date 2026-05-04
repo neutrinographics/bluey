@@ -10,9 +10,9 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
 Object? _extractReplyValueOrThrow(
-    List<Object?>? replyList,
-    String channelName, {
-    required bool isNullValid,
+  List<Object?>? replyList,
+  String channelName, {
+  required bool isNullValid,
 }) {
   if (replyList == null) {
     throw PlatformException(
@@ -34,8 +34,11 @@ Object? _extractReplyValueOrThrow(
   return replyList.firstOrNull;
 }
 
-
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
   if (empty) {
     return <Object?>[];
   }
@@ -44,6 +47,7 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   }
   return <Object?>[error.code, error.message, error.details];
 }
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) {
     return true;
@@ -56,8 +60,9 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -106,31 +111,14 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
-
 /// Bluetooth adapter state (DTO for platform channel).
-enum BluetoothStateDto {
-  unknown,
-  unsupported,
-  unauthorized,
-  off,
-  on,
-}
+enum BluetoothStateDto { unknown, unsupported, unauthorized, off, on }
 
 /// Connection state (DTO for platform channel).
-enum ConnectionStateDto {
-  disconnected,
-  connecting,
-  connected,
-  disconnecting,
-}
+enum ConnectionStateDto { disconnected, connecting, connected, disconnecting }
 
 /// GATT permission flags (DTO for platform channel).
-enum GattPermissionDto {
-  read,
-  readEncrypted,
-  write,
-  writeEncrypted,
-}
+enum GattPermissionDto { read, readEncrypted, write, writeEncrypted }
 
 /// Advertising mode for Android.
 ///
@@ -141,9 +129,11 @@ enum AdvertiseModeDto {
   /// Lowest power consumption, 1000ms advertising interval.
   /// Best for background advertising where quick discovery isn't critical.
   lowPower,
+
   /// Balanced power consumption, 250ms advertising interval.
   /// Good default for most use cases.
   balanced,
+
   /// Lowest latency, 100ms advertising interval.
   /// Fastest discovery but highest power consumption.
   lowLatency,
@@ -162,20 +152,11 @@ enum GattStatusDto {
 }
 
 /// Severity for a structured log event (DTO for platform channel).
-enum LogLevelDto {
-  trace,
-  debug,
-  info,
-  warn,
-  error,
-}
+enum LogLevelDto { trace, debug, info, warn, error }
 
 /// Scan configuration (DTO for platform channel).
 class ScanConfigDto {
-  ScanConfigDto({
-    required this.serviceUuids,
-    this.timeoutMs,
-  });
+  ScanConfigDto({required this.serviceUuids, this.timeoutMs});
 
   /// Service UUIDs to filter by.
   List<String> serviceUuids;
@@ -184,14 +165,12 @@ class ScanConfigDto {
   int? timeoutMs;
 
   List<Object?> _toList() {
-    return <Object?>[
-      serviceUuids,
-      timeoutMs,
-    ];
+    return <Object?>[serviceUuids, timeoutMs];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static ScanConfigDto decode(Object result) {
     result as List<Object?>;
@@ -210,7 +189,8 @@ class ScanConfigDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(serviceUuids, other.serviceUuids) && _deepEquals(timeoutMs, other.timeoutMs);
+    return _deepEquals(serviceUuids, other.serviceUuids) &&
+        _deepEquals(timeoutMs, other.timeoutMs);
   }
 
   @override
@@ -220,10 +200,7 @@ class ScanConfigDto {
 
 /// Connect configuration (DTO for platform channel).
 class ConnectConfigDto {
-  ConnectConfigDto({
-    this.timeoutMs,
-    this.mtu,
-  });
+  ConnectConfigDto({this.timeoutMs, this.mtu});
 
   /// Connection timeout in milliseconds.
   int? timeoutMs;
@@ -232,14 +209,12 @@ class ConnectConfigDto {
   int? mtu;
 
   List<Object?> _toList() {
-    return <Object?>[
-      timeoutMs,
-      mtu,
-    ];
+    return <Object?>[timeoutMs, mtu];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static ConnectConfigDto decode(Object result) {
     result as List<Object?>;
@@ -258,7 +233,8 @@ class ConnectConfigDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(timeoutMs, other.timeoutMs) && _deepEquals(mtu, other.mtu);
+    return _deepEquals(timeoutMs, other.timeoutMs) &&
+        _deepEquals(mtu, other.mtu);
   }
 
   @override
@@ -307,7 +283,8 @@ class DeviceDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static DeviceDto decode(Object result) {
     result as List<Object?>;
@@ -330,7 +307,15 @@ class DeviceDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(id, other.id) && _deepEquals(name, other.name) && _deepEquals(rssi, other.rssi) && _deepEquals(serviceUuids, other.serviceUuids) && _deepEquals(manufacturerDataCompanyId, other.manufacturerDataCompanyId) && _deepEquals(manufacturerData, other.manufacturerData);
+    return _deepEquals(id, other.id) &&
+        _deepEquals(name, other.name) &&
+        _deepEquals(rssi, other.rssi) &&
+        _deepEquals(serviceUuids, other.serviceUuids) &&
+        _deepEquals(
+          manufacturerDataCompanyId,
+          other.manufacturerDataCompanyId,
+        ) &&
+        _deepEquals(manufacturerData, other.manufacturerData);
   }
 
   @override
@@ -340,24 +325,19 @@ class DeviceDto {
 
 /// Connection state event (DTO for platform channel).
 class ConnectionStateEventDto {
-  ConnectionStateEventDto({
-    required this.deviceId,
-    required this.state,
-  });
+  ConnectionStateEventDto({required this.deviceId, required this.state});
 
   String deviceId;
 
   ConnectionStateDto state;
 
   List<Object?> _toList() {
-    return <Object?>[
-      deviceId,
-      state,
-    ];
+    return <Object?>[deviceId, state];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static ConnectionStateEventDto decode(Object result) {
     result as List<Object?>;
@@ -376,7 +356,8 @@ class ConnectionStateEventDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(deviceId, other.deviceId) && _deepEquals(state, other.state);
+    return _deepEquals(deviceId, other.deviceId) &&
+        _deepEquals(state, other.state);
   }
 
   @override
@@ -415,7 +396,8 @@ class CharacteristicPropertiesDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static CharacteristicPropertiesDto decode(Object result) {
     result as List<Object?>;
@@ -431,13 +413,18 @@ class CharacteristicPropertiesDto {
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! CharacteristicPropertiesDto || other.runtimeType != runtimeType) {
+    if (other is! CharacteristicPropertiesDto ||
+        other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(canRead, other.canRead) && _deepEquals(canWrite, other.canWrite) && _deepEquals(canWriteWithoutResponse, other.canWriteWithoutResponse) && _deepEquals(canNotify, other.canNotify) && _deepEquals(canIndicate, other.canIndicate);
+    return _deepEquals(canRead, other.canRead) &&
+        _deepEquals(canWrite, other.canWrite) &&
+        _deepEquals(canWriteWithoutResponse, other.canWriteWithoutResponse) &&
+        _deepEquals(canNotify, other.canNotify) &&
+        _deepEquals(canIndicate, other.canIndicate);
   }
 
   @override
@@ -447,31 +434,23 @@ class CharacteristicPropertiesDto {
 
 /// A descriptor on a remote device (DTO for platform channel).
 class DescriptorDto {
-  DescriptorDto({
-    required this.uuid,
-    required this.handle,
-  });
+  DescriptorDto({required this.uuid, required this.handle});
 
   String uuid;
 
   int handle;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      handle,
-    ];
+    return <Object?>[uuid, handle];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static DescriptorDto decode(Object result) {
     result as List<Object?>;
-    return DescriptorDto(
-      uuid: result[0]! as String,
-      handle: result[1]! as int,
-    );
+    return DescriptorDto(uuid: result[0]! as String, handle: result[1]! as int);
   }
 
   @override
@@ -509,16 +488,12 @@ class CharacteristicDto {
   int handle;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      properties,
-      descriptors,
-      handle,
-    ];
+    return <Object?>[uuid, properties, descriptors, handle];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static CharacteristicDto decode(Object result) {
     result as List<Object?>;
@@ -539,7 +514,10 @@ class CharacteristicDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(descriptors, other.descriptors) && _deepEquals(handle, other.handle);
+    return _deepEquals(uuid, other.uuid) &&
+        _deepEquals(properties, other.properties) &&
+        _deepEquals(descriptors, other.descriptors) &&
+        _deepEquals(handle, other.handle);
   }
 
   @override
@@ -565,16 +543,12 @@ class ServiceDto {
   List<ServiceDto> includedServices;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      isPrimary,
-      characteristics,
-      includedServices,
-    ];
+    return <Object?>[uuid, isPrimary, characteristics, includedServices];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static ServiceDto decode(Object result) {
     result as List<Object?>;
@@ -595,7 +569,10 @@ class ServiceDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(isPrimary, other.isPrimary) && _deepEquals(characteristics, other.characteristics) && _deepEquals(includedServices, other.includedServices);
+    return _deepEquals(uuid, other.uuid) &&
+        _deepEquals(isPrimary, other.isPrimary) &&
+        _deepEquals(characteristics, other.characteristics) &&
+        _deepEquals(includedServices, other.includedServices);
   }
 
   @override
@@ -618,15 +595,12 @@ class NotificationEventDto {
   Uint8List value;
 
   List<Object?> _toList() {
-    return <Object?>[
-      deviceId,
-      characteristicUuid,
-      value,
-    ];
+    return <Object?>[deviceId, characteristicUuid, value];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static NotificationEventDto decode(Object result) {
     result as List<Object?>;
@@ -646,7 +620,9 @@ class NotificationEventDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(deviceId, other.deviceId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(value, other.value);
+    return _deepEquals(deviceId, other.deviceId) &&
+        _deepEquals(characteristicUuid, other.characteristicUuid) &&
+        _deepEquals(value, other.value);
   }
 
   @override
@@ -656,24 +632,19 @@ class NotificationEventDto {
 
 /// MTU changed event (DTO for platform channel).
 class MtuChangedEventDto {
-  MtuChangedEventDto({
-    required this.deviceId,
-    required this.mtu,
-  });
+  MtuChangedEventDto({required this.deviceId, required this.mtu});
 
   String deviceId;
 
   int mtu;
 
   List<Object?> _toList() {
-    return <Object?>[
-      deviceId,
-      mtu,
-    ];
+    return <Object?>[deviceId, mtu];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static MtuChangedEventDto decode(Object result) {
     result as List<Object?>;
@@ -718,16 +689,12 @@ class LocalDescriptorDto {
   int handle;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      permissions,
-      value,
-      handle,
-    ];
+    return <Object?>[uuid, permissions, value, handle];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static LocalDescriptorDto decode(Object result) {
     result as List<Object?>;
@@ -748,7 +715,10 @@ class LocalDescriptorDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(permissions, other.permissions) && _deepEquals(value, other.value) && _deepEquals(handle, other.handle);
+    return _deepEquals(uuid, other.uuid) &&
+        _deepEquals(permissions, other.permissions) &&
+        _deepEquals(value, other.value) &&
+        _deepEquals(handle, other.handle);
   }
 
   @override
@@ -777,17 +747,12 @@ class LocalCharacteristicDto {
   int handle;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      properties,
-      permissions,
-      descriptors,
-      handle,
-    ];
+    return <Object?>[uuid, properties, permissions, descriptors, handle];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static LocalCharacteristicDto decode(Object result) {
     result as List<Object?>;
@@ -809,7 +774,11 @@ class LocalCharacteristicDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(properties, other.properties) && _deepEquals(permissions, other.permissions) && _deepEquals(descriptors, other.descriptors) && _deepEquals(handle, other.handle);
+    return _deepEquals(uuid, other.uuid) &&
+        _deepEquals(properties, other.properties) &&
+        _deepEquals(permissions, other.permissions) &&
+        _deepEquals(descriptors, other.descriptors) &&
+        _deepEquals(handle, other.handle);
   }
 
   @override
@@ -835,23 +804,20 @@ class LocalServiceDto {
   List<LocalServiceDto> includedServices;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-      isPrimary,
-      characteristics,
-      includedServices,
-    ];
+    return <Object?>[uuid, isPrimary, characteristics, includedServices];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static LocalServiceDto decode(Object result) {
     result as List<Object?>;
     return LocalServiceDto(
       uuid: result[0]! as String,
       isPrimary: result[1]! as bool,
-      characteristics: (result[2]! as List<Object?>).cast<LocalCharacteristicDto>(),
+      characteristics:
+          (result[2]! as List<Object?>).cast<LocalCharacteristicDto>(),
       includedServices: (result[3]! as List<Object?>).cast<LocalServiceDto>(),
     );
   }
@@ -865,7 +831,10 @@ class LocalServiceDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid) && _deepEquals(isPrimary, other.isPrimary) && _deepEquals(characteristics, other.characteristics) && _deepEquals(includedServices, other.includedServices);
+    return _deepEquals(uuid, other.uuid) &&
+        _deepEquals(isPrimary, other.isPrimary) &&
+        _deepEquals(characteristics, other.characteristics) &&
+        _deepEquals(includedServices, other.includedServices);
   }
 
   @override
@@ -914,7 +883,8 @@ class AdvertiseConfigDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AdvertiseConfigDto decode(Object result) {
     result as List<Object?>;
@@ -937,7 +907,15 @@ class AdvertiseConfigDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(name, other.name) && _deepEquals(serviceUuids, other.serviceUuids) && _deepEquals(manufacturerDataCompanyId, other.manufacturerDataCompanyId) && _deepEquals(manufacturerData, other.manufacturerData) && _deepEquals(timeoutMs, other.timeoutMs) && _deepEquals(mode, other.mode);
+    return _deepEquals(name, other.name) &&
+        _deepEquals(serviceUuids, other.serviceUuids) &&
+        _deepEquals(
+          manufacturerDataCompanyId,
+          other.manufacturerDataCompanyId,
+        ) &&
+        _deepEquals(manufacturerData, other.manufacturerData) &&
+        _deepEquals(timeoutMs, other.timeoutMs) &&
+        _deepEquals(mode, other.mode);
   }
 
   @override
@@ -947,31 +925,23 @@ class AdvertiseConfigDto {
 
 /// A connected central device (DTO for platform channel).
 class CentralDto {
-  CentralDto({
-    required this.id,
-    required this.mtu,
-  });
+  CentralDto({required this.id, required this.mtu});
 
   String id;
 
   int mtu;
 
   List<Object?> _toList() {
-    return <Object?>[
-      id,
-      mtu,
-    ];
+    return <Object?>[id, mtu];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static CentralDto decode(Object result) {
     result as List<Object?>;
-    return CentralDto(
-      id: result[0]! as String,
-      mtu: result[1]! as int,
-    );
+    return CentralDto(id: result[0]! as String, mtu: result[1]! as int);
   }
 
   @override
@@ -1022,7 +992,8 @@ class ReadRequestDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static ReadRequestDto decode(Object result) {
     result as List<Object?>;
@@ -1044,7 +1015,11 @@ class ReadRequestDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(offset, other.offset) && _deepEquals(characteristicHandle, other.characteristicHandle);
+    return _deepEquals(requestId, other.requestId) &&
+        _deepEquals(centralId, other.centralId) &&
+        _deepEquals(characteristicUuid, other.characteristicUuid) &&
+        _deepEquals(offset, other.offset) &&
+        _deepEquals(characteristicHandle, other.characteristicHandle);
   }
 
   @override
@@ -1091,7 +1066,8 @@ class WriteRequestDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static WriteRequestDto decode(Object result) {
     result as List<Object?>;
@@ -1115,7 +1091,13 @@ class WriteRequestDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(requestId, other.requestId) && _deepEquals(centralId, other.centralId) && _deepEquals(characteristicUuid, other.characteristicUuid) && _deepEquals(value, other.value) && _deepEquals(offset, other.offset) && _deepEquals(responseNeeded, other.responseNeeded) && _deepEquals(characteristicHandle, other.characteristicHandle);
+    return _deepEquals(requestId, other.requestId) &&
+        _deepEquals(centralId, other.centralId) &&
+        _deepEquals(characteristicUuid, other.characteristicUuid) &&
+        _deepEquals(value, other.value) &&
+        _deepEquals(offset, other.offset) &&
+        _deepEquals(responseNeeded, other.responseNeeded) &&
+        _deepEquals(characteristicHandle, other.characteristicHandle);
   }
 
   @override
@@ -1156,18 +1138,12 @@ class LogEventDto {
   int timestampMicros;
 
   List<Object?> _toList() {
-    return <Object?>[
-      context,
-      level,
-      message,
-      data,
-      errorCode,
-      timestampMicros,
-    ];
+    return <Object?>[context, level, message, data, errorCode, timestampMicros];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static LogEventDto decode(Object result) {
     result as List<Object?>;
@@ -1190,7 +1166,12 @@ class LogEventDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(context, other.context) && _deepEquals(level, other.level) && _deepEquals(message, other.message) && _deepEquals(data, other.data) && _deepEquals(errorCode, other.errorCode) && _deepEquals(timestampMicros, other.timestampMicros);
+    return _deepEquals(context, other.context) &&
+        _deepEquals(level, other.level) &&
+        _deepEquals(message, other.message) &&
+        _deepEquals(data, other.data) &&
+        _deepEquals(errorCode, other.errorCode) &&
+        _deepEquals(timestampMicros, other.timestampMicros);
   }
 
   @override
@@ -1250,7 +1231,8 @@ class BlueyConfigDto {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static BlueyConfigDto decode(Object result) {
     result as List<Object?>;
@@ -1275,14 +1257,32 @@ class BlueyConfigDto {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(cleanupOnActivityDestroy, other.cleanupOnActivityDestroy) && _deepEquals(discoverServicesTimeoutMs, other.discoverServicesTimeoutMs) && _deepEquals(readCharacteristicTimeoutMs, other.readCharacteristicTimeoutMs) && _deepEquals(writeCharacteristicTimeoutMs, other.writeCharacteristicTimeoutMs) && _deepEquals(readDescriptorTimeoutMs, other.readDescriptorTimeoutMs) && _deepEquals(writeDescriptorTimeoutMs, other.writeDescriptorTimeoutMs) && _deepEquals(requestMtuTimeoutMs, other.requestMtuTimeoutMs) && _deepEquals(readRssiTimeoutMs, other.readRssiTimeoutMs);
+    return _deepEquals(
+          cleanupOnActivityDestroy,
+          other.cleanupOnActivityDestroy,
+        ) &&
+        _deepEquals(
+          discoverServicesTimeoutMs,
+          other.discoverServicesTimeoutMs,
+        ) &&
+        _deepEquals(
+          readCharacteristicTimeoutMs,
+          other.readCharacteristicTimeoutMs,
+        ) &&
+        _deepEquals(
+          writeCharacteristicTimeoutMs,
+          other.writeCharacteristicTimeoutMs,
+        ) &&
+        _deepEquals(readDescriptorTimeoutMs, other.readDescriptorTimeoutMs) &&
+        _deepEquals(writeDescriptorTimeoutMs, other.writeDescriptorTimeoutMs) &&
+        _deepEquals(requestMtuTimeoutMs, other.requestMtuTimeoutMs) &&
+        _deepEquals(readRssiTimeoutMs, other.readRssiTimeoutMs);
   }
 
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
 }
-
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -1291,79 +1291,79 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is BluetoothStateDto) {
+    } else if (value is BluetoothStateDto) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is ConnectionStateDto) {
+    } else if (value is ConnectionStateDto) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    }    else if (value is GattPermissionDto) {
+    } else if (value is GattPermissionDto) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    }    else if (value is AdvertiseModeDto) {
+    } else if (value is AdvertiseModeDto) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    }    else if (value is GattStatusDto) {
+    } else if (value is GattStatusDto) {
       buffer.putUint8(133);
       writeValue(buffer, value.index);
-    }    else if (value is LogLevelDto) {
+    } else if (value is LogLevelDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    }    else if (value is ScanConfigDto) {
+    } else if (value is ScanConfigDto) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
-    }    else if (value is ConnectConfigDto) {
+    } else if (value is ConnectConfigDto) {
       buffer.putUint8(136);
       writeValue(buffer, value.encode());
-    }    else if (value is DeviceDto) {
+    } else if (value is DeviceDto) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    }    else if (value is ConnectionStateEventDto) {
+    } else if (value is ConnectionStateEventDto) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicPropertiesDto) {
+    } else if (value is CharacteristicPropertiesDto) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    }    else if (value is DescriptorDto) {
+    } else if (value is DescriptorDto) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    }    else if (value is CharacteristicDto) {
+    } else if (value is CharacteristicDto) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    }    else if (value is ServiceDto) {
+    } else if (value is ServiceDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    }    else if (value is NotificationEventDto) {
+    } else if (value is NotificationEventDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    }    else if (value is MtuChangedEventDto) {
+    } else if (value is MtuChangedEventDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalDescriptorDto) {
+    } else if (value is LocalDescriptorDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalCharacteristicDto) {
+    } else if (value is LocalCharacteristicDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    }    else if (value is LocalServiceDto) {
+    } else if (value is LocalServiceDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    }    else if (value is AdvertiseConfigDto) {
+    } else if (value is AdvertiseConfigDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    }    else if (value is CentralDto) {
+    } else if (value is CentralDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    }    else if (value is ReadRequestDto) {
+    } else if (value is ReadRequestDto) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    }    else if (value is WriteRequestDto) {
+    } else if (value is WriteRequestDto) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    }    else if (value is LogEventDto) {
+    } else if (value is LogEventDto) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    }    else if (value is BlueyConfigDto) {
+    } else if (value is BlueyConfigDto) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
     } else {
@@ -1441,9 +1441,12 @@ class BlueyHostApi {
   /// Constructor for [BlueyHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  BlueyHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  BlueyHostApi({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix =
+           messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -1455,26 +1458,29 @@ class BlueyHostApi {
   /// Call this early in your app lifecycle to customize plugin behavior.
   /// See [BlueyConfigDto] for available options.
   Future<void> configure(BlueyConfigDto config) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.configure$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.configure$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[config]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[config],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Get current Bluetooth state.
   Future<BluetoothStateDto> getState() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.getState$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.getState$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1484,18 +1490,18 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as BluetoothStateDto;
   }
 
   /// Request to enable Bluetooth.
   /// Returns true if enabled, false if user declined.
   Future<bool> requestEnable() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.requestEnable$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.requestEnable$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1505,18 +1511,18 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as bool;
   }
 
   /// Request Bluetooth permissions from the user.
   /// Returns true if all required permissions were granted, false otherwise.
   Future<bool> authorize() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.authorize$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.authorize$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1526,17 +1532,17 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as bool;
   }
 
   /// Open system Bluetooth settings.
   Future<void> openSettings() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.openSettings$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.openSettings$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1546,35 +1552,37 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Start scanning.
   Future<void> startScan(ScanConfigDto config) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.startScan$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.startScan$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[config]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[config],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Stop scanning.
   Future<void> stopScan() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.stopScan$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.stopScan$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1584,274 +1592,321 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Connect to a device.
   /// Returns connection handle.
   Future<String> connect(String deviceId, ConnectConfigDto config) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.connect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.connect$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, config]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, config],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as String;
   }
 
   /// Disconnect from a device.
   Future<void> disconnect(String deviceId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.disconnect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.disconnect$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Discover services on a connected device.
   /// Services are cached after first discovery.
   Future<List<ServiceDto>> discoverServices(String deviceId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.discoverServices$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.discoverServices$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return (pigeonVar_replyValue! as List<Object?>).cast<ServiceDto>();
   }
 
   /// Read a characteristic value by platform-minted handle.
-  Future<Uint8List> readCharacteristic(String deviceId, int characteristicHandle) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
+  Future<Uint8List> readCharacteristic(
+    String deviceId,
+    int characteristicHandle,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, characteristicHandle],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as Uint8List;
   }
 
   /// Write a characteristic value by platform-minted handle.
-  Future<void> writeCharacteristic(String deviceId, int characteristicHandle, Uint8List value, bool withResponse) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
+  Future<void> writeCharacteristic(
+    String deviceId,
+    int characteristicHandle,
+    Uint8List value,
+    bool withResponse,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, value, withResponse]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, characteristicHandle, value, withResponse],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Enable or disable notifications for a characteristic by handle.
-  Future<void> setNotification(String deviceId, int characteristicHandle, bool enable) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.setNotification$pigeonVar_messageChannelSuffix';
+  Future<void> setNotification(
+    String deviceId,
+    int characteristicHandle,
+    bool enable,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.setNotification$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, enable]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, characteristicHandle, enable],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Read a descriptor value by platform-minted handle.
-  Future<Uint8List> readDescriptor(String deviceId, int characteristicHandle, int descriptorHandle) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
+  Future<Uint8List> readDescriptor(
+    String deviceId,
+    int characteristicHandle,
+    int descriptorHandle,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, descriptorHandle]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, characteristicHandle, descriptorHandle],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as Uint8List;
   }
 
   /// Write a descriptor value by platform-minted handle.
-  Future<void> writeDescriptor(String deviceId, int characteristicHandle, int descriptorHandle, Uint8List value) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
+  Future<void> writeDescriptor(
+    String deviceId,
+    int characteristicHandle,
+    int descriptorHandle,
+    Uint8List value,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, characteristicHandle, descriptorHandle, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, characteristicHandle, descriptorHandle, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Request a specific MTU.
   /// Returns the negotiated MTU.
   Future<int> requestMtu(String deviceId, int mtu) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.requestMtu$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.requestMtu$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, mtu]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId, mtu],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as int;
   }
 
   /// Read the current RSSI for a connected device.
   Future<int> readRssi(String deviceId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readRssi$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.readRssi$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[deviceId],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as int;
   }
 
   /// Add a service to the GATT server. Returns the service with all
   /// characteristic and descriptor handles populated.
   Future<LocalServiceDto> addService(LocalServiceDto service) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.addService$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.addService$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[service]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[service],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as LocalServiceDto;
   }
 
   /// Remove a service from the GATT server.
   Future<void> removeService(String serviceUuid) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.removeService$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.removeService$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[serviceUuid]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[serviceUuid],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Start advertising.
   Future<void> startAdvertising(AdvertiseConfigDto config) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.startAdvertising$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.startAdvertising$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[config]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[config],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Stop advertising.
   Future<void> stopAdvertising() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.stopAdvertising$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.stopAdvertising$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1861,96 +1916,118 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Send a notification to all subscribed centrals, addressed by the
   /// platform-minted handle of a local characteristic.
-  Future<void> notifyCharacteristic(int characteristicHandle, Uint8List value) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristic$pigeonVar_messageChannelSuffix';
+  Future<void> notifyCharacteristic(
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[characteristicHandle, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[characteristicHandle, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Send a notification to a specific central, addressed by the
   /// platform-minted handle of a local characteristic.
-  Future<void> notifyCharacteristicTo(String centralId, int characteristicHandle, Uint8List value) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristicTo$pigeonVar_messageChannelSuffix';
+  Future<void> notifyCharacteristicTo(
+    String centralId,
+    int characteristicHandle,
+    Uint8List value,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.notifyCharacteristicTo$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[centralId, characteristicHandle, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[centralId, characteristicHandle, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Respond to a read request.
-  Future<void> respondToReadRequest(int requestId, GattStatusDto status, Uint8List? value) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToReadRequest$pigeonVar_messageChannelSuffix';
+  Future<void> respondToReadRequest(
+    int requestId,
+    GattStatusDto status,
+    Uint8List? value,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToReadRequest$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[requestId, status, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[requestId, status, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Respond to a write request.
-  Future<void> respondToWriteRequest(int requestId, GattStatusDto status) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToWriteRequest$pigeonVar_messageChannelSuffix';
+  Future<void> respondToWriteRequest(
+    int requestId,
+    GattStatusDto status,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.respondToWriteRequest$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[requestId, status]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[requestId, status],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Close the GATT server and disconnect all centrals.
   /// Call this when the server is no longer needed to release resources
   /// and properly terminate BLE connections.
   Future<void> closeServer() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.closeServer$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.closeServer$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -1960,11 +2037,10 @@ class BlueyHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Set the minimum severity level for native log events forwarded to Dart.
@@ -1972,21 +2048,23 @@ class BlueyHostApi {
   /// Events strictly below [level] are dropped on the native side before
   /// being marshalled across the platform channel.
   Future<void> setLogLevel(LogLevelDto level) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.setLogLevel$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_android.BlueyHostApi.setLogLevel$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[level]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[level],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 }
 
@@ -2028,7 +2106,10 @@ abstract class BlueyFlutterApi {
   void onCharacteristicSubscribed(String centralId, String characteristicUuid);
 
   /// A central unsubscribed from notifications for a characteristic.
-  void onCharacteristicUnsubscribed(String centralId, String characteristicUuid);
+  void onCharacteristicUnsubscribed(
+    String centralId,
+    String characteristicUuid,
+  );
 
   /// Remote device's GATT services changed (service added/removed on the server).
   void onServicesChanged(String deviceId);
@@ -2036,12 +2117,19 @@ abstract class BlueyFlutterApi {
   /// A structured log event was emitted by the native platform.
   void onLog(LogEventDto event);
 
-  static void setUp(BlueyFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(
+    BlueyFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onStateChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onStateChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2053,16 +2141,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onDeviceDiscovered$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onDeviceDiscovered$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2074,16 +2166,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onScanComplete$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onScanComplete$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2093,58 +2189,72 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onConnectionStateChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onConnectionStateChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           final List<Object?> args = message! as List<Object?>;
-          final ConnectionStateEventDto arg_event = args[0]! as ConnectionStateEventDto;
+          final ConnectionStateEventDto arg_event =
+              args[0]! as ConnectionStateEventDto;
           try {
             api.onConnectionStateChanged(arg_event);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onNotification$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onNotification$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           final List<Object?> args = message! as List<Object?>;
-          final NotificationEventDto arg_event = args[0]! as NotificationEventDto;
+          final NotificationEventDto arg_event =
+              args[0]! as NotificationEventDto;
           try {
             api.onNotification(arg_event);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onMtuChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2156,16 +2266,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralConnected$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralConnected$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2177,16 +2291,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralDisconnected$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralDisconnected$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2198,16 +2316,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onReadRequest$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onReadRequest$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2219,16 +2341,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onWriteRequest$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onWriteRequest$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2240,16 +2366,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicSubscribed$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicSubscribed$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2258,20 +2388,27 @@ abstract class BlueyFlutterApi {
           final String arg_centralId = args[0]! as String;
           final String arg_characteristicUuid = args[1]! as String;
           try {
-            api.onCharacteristicSubscribed(arg_centralId, arg_characteristicUuid);
+            api.onCharacteristicSubscribed(
+              arg_centralId,
+              arg_characteristicUuid,
+            );
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicUnsubscribed$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCharacteristicUnsubscribed$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2280,20 +2417,27 @@ abstract class BlueyFlutterApi {
           final String arg_centralId = args[0]! as String;
           final String arg_characteristicUuid = args[1]! as String;
           try {
-            api.onCharacteristicUnsubscribed(arg_centralId, arg_characteristicUuid);
+            api.onCharacteristicUnsubscribed(
+              arg_centralId,
+              arg_characteristicUuid,
+            );
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onServicesChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onServicesChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2305,16 +2449,20 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onLog$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onLog$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -2326,8 +2474,10 @@ abstract class BlueyFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }

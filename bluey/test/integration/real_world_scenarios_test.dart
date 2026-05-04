@@ -131,7 +131,10 @@ void main() {
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
-        final location = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', bodySensorLocationUuid, );
+        final location = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          bodySensorLocationUuid,
+        );
 
         // 0x01 = Chest
         expect(location, equals(Uint8List.fromList([0x01])));
@@ -171,7 +174,11 @@ void main() {
         await bluey.connect(device);
 
         // Enable notifications
-        await fakePlatform.setNotificationByUuid('AA:BB:CC:DD:EE:01', heartRateMeasurementUuid, true, );
+        await fakePlatform.setNotificationByUuid(
+          'AA:BB:CC:DD:EE:01',
+          heartRateMeasurementUuid,
+          true,
+        );
 
         final heartRates = <int>[];
         final subscription = fakePlatform
@@ -265,7 +272,11 @@ void main() {
         expect(mtu, equals(Mtu.fromPlatform(256)));
 
         // Enable notifications on control point
-        await fakePlatform.setNotificationByUuid('AA:BB:CC:DD:EE:01', dfuControlPointUuid, true, );
+        await fakePlatform.setNotificationByUuid(
+          'AA:BB:CC:DD:EE:01',
+          dfuControlPointUuid,
+          true,
+        );
 
         // Simulate sending firmware packets
         final firmwareChunks = [
@@ -350,8 +361,14 @@ void main() {
         final readings = <Map<String, Uint8List>>[];
 
         for (var i = 0; i < 3; i++) {
-          final temp = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', temperatureUuid, );
-          final humidity = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', humidityUuid, );
+          final temp = await fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            temperatureUuid,
+          );
+          final humidity = await fakePlatform.readCharacteristicByUuid(
+            'AA:BB:CC:DD:EE:01',
+            humidityUuid,
+          );
           readings.add({'temp': temp, 'humidity': humidity});
         }
 
@@ -417,11 +434,19 @@ void main() {
         await bluey.connect(device);
 
         // Read current lock state
-        var lockState = await fakePlatform.readCharacteristicByUuid('AA:BB:CC:DD:EE:01', lockStateUuid, );
+        var lockState = await fakePlatform.readCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          lockStateUuid,
+        );
         expect(lockState[0], equals(0x01)); // Locked
 
         // Send unlock command (0x02 = Unlock)
-        await fakePlatform.writeCharacteristicByUuid('AA:BB:CC:DD:EE:01', lockCommandUuid, Uint8List.fromList([0x02]), true, );
+        await fakePlatform.writeCharacteristicByUuid(
+          'AA:BB:CC:DD:EE:01',
+          lockCommandUuid,
+          Uint8List.fromList([0x02]),
+          true,
+        );
 
         await bluey.dispose();
       });
@@ -457,7 +482,11 @@ void main() {
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
-        await fakePlatform.setNotificationByUuid('AA:BB:CC:DD:EE:01', lockStateUuid, true, );
+        await fakePlatform.setNotificationByUuid(
+          'AA:BB:CC:DD:EE:01',
+          lockStateUuid,
+          true,
+        );
 
         final stateChanges = <int>[];
         final subscription = fakePlatform
@@ -600,10 +629,17 @@ void main() {
         fakePlatform.simulateCentralConnection(centralId: 'phone-2');
 
         // Send notification to all
-        await fakePlatform.notifyCharacteristicByUuid(charUuid, Uint8List.fromList([0x01, 0x02, 0x03]), );
+        await fakePlatform.notifyCharacteristicByUuid(
+          charUuid,
+          Uint8List.fromList([0x01, 0x02, 0x03]),
+        );
 
         // Send notification to specific central
-        await fakePlatform.notifyCharacteristicToByUuid('phone-1', charUuid, Uint8List.fromList([0x04, 0x05]), );
+        await fakePlatform.notifyCharacteristicToByUuid(
+          'phone-1',
+          charUuid,
+          Uint8List.fromList([0x04, 0x05]),
+        );
 
         await server.dispose();
         await bluey.dispose();

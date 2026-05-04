@@ -35,16 +35,17 @@ class StressTestsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => StressTestsCubit(
-        runBurstWrite: getIt<RunBurstWrite>(),
-        runMixedOps: getIt<RunMixedOps>(),
-        runSoak: getIt<RunSoak>(),
-        runTimeoutProbe: getIt<RunTimeoutProbe>(),
-        runFailureInjection: getIt<RunFailureInjection>(),
-        runMtuProbe: getIt<RunMtuProbe>(),
-        runNotificationThroughput: getIt<RunNotificationThroughput>(),
-        connection: connection,
-      ),
+      create:
+          (_) => StressTestsCubit(
+            runBurstWrite: getIt<RunBurstWrite>(),
+            runMixedOps: getIt<RunMixedOps>(),
+            runSoak: getIt<RunSoak>(),
+            runTimeoutProbe: getIt<RunTimeoutProbe>(),
+            runFailureInjection: getIt<RunFailureInjection>(),
+            runMtuProbe: getIt<RunMtuProbe>(),
+            runNotificationThroughput: getIt<RunNotificationThroughput>(),
+            connection: connection,
+          ),
       child: Scaffold(
         backgroundColor: _kBg,
         // Tap anywhere outside an interactive widget to dismiss the
@@ -67,33 +68,36 @@ class StressTestsScreen extends StatelessWidget {
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final entry = entries[index];
-                              final isLast = index == entries.length - 1;
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: isLast ? 128 : 24,
-                                ),
-                                child: TestCard(
-                                  test: entry.key,
-                                  config: entry.value.config,
-                                  result: entry.value.result,
-                                  isRunning: entry.value.isRunning,
-                                  anyRunning: state.anyRunning,
-                                  onRun: () => context
-                                      .read<StressTestsCubit>()
-                                      .run(entry.key),
-                                  onStop: () =>
-                                      context.read<StressTestsCubit>().stop(),
-                                  onConfigChanged: (cfg) => context
-                                      .read<StressTestsCubit>()
-                                      .updateConfig(entry.key, cfg),
-                                ),
-                              );
-                            },
-                            childCount: entries.length,
-                          ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final entry = entries[index];
+                            final isLast = index == entries.length - 1;
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: isLast ? 128 : 24,
+                              ),
+                              child: TestCard(
+                                test: entry.key,
+                                config: entry.value.config,
+                                result: entry.value.result,
+                                isRunning: entry.value.isRunning,
+                                anyRunning: state.anyRunning,
+                                onRun:
+                                    () => context.read<StressTestsCubit>().run(
+                                      entry.key,
+                                    ),
+                                onStop:
+                                    () =>
+                                        context.read<StressTestsCubit>().stop(),
+                                onConfigChanged:
+                                    (cfg) => context
+                                        .read<StressTestsCubit>()
+                                        .updateConfig(entry.key, cfg),
+                              ),
+                            );
+                          }, childCount: entries.length),
                         ),
                       ),
                     ],
@@ -144,11 +148,11 @@ class _TopBar extends StatelessWidget {
               const Spacer(),
               BlocProvider<ConnectionSettingsCubit>.value(
                 value: getIt<ConnectionSettingsCubit>(),
-                child: BlocBuilder<ConnectionSettingsCubit,
-                    ConnectionSettings>(
-                  builder: (context, settings) => ToleranceIndicator(
-                    peerSilenceTimeout: settings.peerSilenceTimeout,
-                  ),
+                child: BlocBuilder<ConnectionSettingsCubit, ConnectionSettings>(
+                  builder:
+                      (context, settings) => ToleranceIndicator(
+                        peerSilenceTimeout: settings.peerSilenceTimeout,
+                      ),
                 ),
               ),
             ],
@@ -158,4 +162,3 @@ class _TopBar extends StatelessWidget {
     );
   }
 }
-

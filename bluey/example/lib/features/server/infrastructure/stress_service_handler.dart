@@ -60,9 +60,10 @@ class StressServiceHandler {
         for (var i = 0; i < count; i++) {
           if (_abortBurst) break;
           final pattern = _generatePattern(payloadSize);
-          final framed = Uint8List(pattern.length + 1)
-            ..[0] = thisBurstId
-            ..setRange(1, pattern.length + 1, pattern);
+          final framed =
+              Uint8List(pattern.length + 1)
+                ..[0] = thisBurstId
+                ..setRange(1, pattern.length + 1, pattern);
           await server.notify(UUID(StressProtocol.charUuid), data: framed);
         }
 

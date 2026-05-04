@@ -161,8 +161,10 @@ void main() {
       final sub = l.events.listen(captured.add);
       await l.dispose();
       // Stream is closed; the listener should have received onDone.
-      expect(() => l.log(BlueyLogLevel.error, 'ctx', 'after dispose'),
-          returnsNormally);
+      expect(
+        () => l.log(BlueyLogLevel.error, 'ctx', 'after dispose'),
+        returnsNormally,
+      );
       // Nothing was emitted after dispose.
       expect(captured, isEmpty);
       await sub.cancel();

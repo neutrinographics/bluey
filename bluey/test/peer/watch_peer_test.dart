@@ -31,11 +31,7 @@ void main() {
   });
 
   Device deviceFromAddress(String address, {String? name}) {
-    return Device(
-      id: deviceIdToUuid(address),
-      address: address,
-      name: name,
-    );
+    return Device(id: deviceIdToUuid(address), address: address, name: name);
   }
 
   // Build a control-service tree that mirrors what `simulateBlueyServer`
@@ -44,54 +40,55 @@ void main() {
   // registers its lifecycle service after the central has already
   // discovered an empty-of-bluey-services tree.
   platform.PlatformService controlServiceTree() => platform.PlatformService(
-        uuid: lifecycle.controlServiceUuid,
-        isPrimary: true,
-        characteristics: const [
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: false,
-              canWrite: true,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-            handle: 0,
-          ),
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: true,
-              canWrite: false,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-            handle: 0,
-          ),
-          platform.PlatformCharacteristic(
-            uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
-            properties: platform.PlatformCharacteristicProperties(
-              canRead: true,
-              canWrite: false,
-              canWriteWithoutResponse: false,
-              canNotify: false,
-              canIndicate: false,
-            ),
-            descriptors: [],
-            handle: 0,
-          ),
-        ],
-        includedServices: [],
-      );
+    uuid: lifecycle.controlServiceUuid,
+    isPrimary: true,
+    characteristics: const [
+      platform.PlatformCharacteristic(
+        uuid: 'b1e70002-0000-1000-8000-00805f9b34fb',
+        properties: platform.PlatformCharacteristicProperties(
+          canRead: false,
+          canWrite: true,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: [],
+        handle: 0,
+      ),
+      platform.PlatformCharacteristic(
+        uuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+        properties: platform.PlatformCharacteristicProperties(
+          canRead: true,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: [],
+        handle: 0,
+      ),
+      platform.PlatformCharacteristic(
+        uuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+        properties: platform.PlatformCharacteristicProperties(
+          canRead: true,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: false,
+          canIndicate: false,
+        ),
+        descriptors: [],
+        handle: 0,
+      ),
+    ],
+    includedServices: [],
+  );
 
   Map<String, Uint8List> controlServiceCharValues(ServerId id) => {
-        'b1e70003-0000-1000-8000-00805f9b34fb':
-            lifecycle.encodeInterval(const Duration(seconds: 10)),
-        'b1e70004-0000-1000-8000-00805f9b34fb': id.toBytes(),
-      };
+    'b1e70003-0000-1000-8000-00805f9b34fb': lifecycle.encodeInterval(
+      const Duration(seconds: 10),
+    ),
+    'b1e70004-0000-1000-8000-00805f9b34fb': id.toBytes(),
+  };
 
   group('Bluey.watchPeer', () {
     test('yields PeerConnection and completes when the device is already '
@@ -127,10 +124,9 @@ void main() {
 
       final emissions = <PeerConnection?>[];
       bool completed = false;
-      final sub = bluey.watchPeer(conn).listen(
-            emissions.add,
-            onDone: () => completed = true,
-          );
+      final sub = bluey
+          .watchPeer(conn)
+          .listen(emissions.add, onDone: () => completed = true);
       addTearDown(sub.cancel);
 
       // Initial tryUpgrade resolves null.
@@ -149,8 +145,11 @@ void main() {
       expect(emissions, hasLength(2));
       expect(emissions[1], isNotNull);
       expect(emissions[1]!.serverId, equals(id));
-      expect(completed, isTrue,
-          reason: 'stream completes after first non-null peer emission');
+      expect(
+        completed,
+        isTrue,
+        reason: 'stream completes after first non-null peer emission',
+      );
 
       await conn.disconnect();
     });
@@ -165,10 +164,9 @@ void main() {
 
       final emissions = <PeerConnection?>[];
       bool completed = false;
-      final sub = bluey.watchPeer(conn).listen(
-            emissions.add,
-            onDone: () => completed = true,
-          );
+      final sub = bluey
+          .watchPeer(conn)
+          .listen(emissions.add, onDone: () => completed = true);
       addTearDown(sub.cancel);
 
       await pumpEventQueue();
@@ -226,22 +224,24 @@ void main() {
       final conn = await bluey.connect(deviceFromAddress(address));
 
       bool completed = false;
-      final sub = bluey.watchPeer(conn).listen(
-            (_) {},
-            onDone: () => completed = true,
-          );
+      final sub = bluey
+          .watchPeer(conn)
+          .listen((_) {}, onDone: () => completed = true);
       addTearDown(sub.cancel);
 
       await pumpEventQueue();
-      expect(completed, isFalse,
-          reason: 'still waiting on servicesChanges');
+      expect(completed, isFalse, reason: 'still waiting on servicesChanges');
 
       await conn.disconnect();
       await pumpEventQueue();
 
-      expect(completed, isTrue,
-          reason: 'stream must complete when connection closes so '
-              'subscribers do not leak');
+      expect(
+        completed,
+        isTrue,
+        reason:
+            'stream must complete when connection closes so '
+            'subscribers do not leak',
+      );
     });
   });
 }

@@ -35,11 +35,11 @@ class LifecycleServer {
     required BlueyLogger logger,
     this.onHeartbeatReceived,
     EventPublisher? events,
-  })  : _platform = platformApi,
-        _interval = interval,
-        _serverId = serverId,
-        _logger = logger,
-        _events = events;
+  }) : _platform = platformApi,
+       _interval = interval,
+       _serverId = serverId,
+       _logger = logger,
+       _events = events;
 
   /// Whether lifecycle management is enabled (interval is non-null).
   bool get isEnabled => _interval != null;
@@ -59,14 +59,13 @@ class LifecycleServer {
         BlueyLogLevel.trace,
         'bluey.server.lifecycle',
         'addControlServiceIfNeeded skipped',
-        data: {
-          'reason': _interval == null ? 'disabled' : 'already-added',
-        },
+        data: {'reason': _interval == null ? 'disabled' : 'already-added'},
       );
       return null;
     }
-    final populated =
-        await _platform.addService(lifecycle.buildControlService());
+    final populated = await _platform.addService(
+      lifecycle.buildControlService(),
+    );
     _controlServiceAdded = true;
     return populated;
   }
@@ -195,10 +194,7 @@ class LifecycleServer {
       BlueyLogLevel.debug,
       'bluey.server.lifecycle',
       'requestStarted',
-      data: {
-        'clientId': clientId,
-        'requestId': requestId,
-      },
+      data: {'clientId': clientId, 'requestId': requestId},
     );
     final wasIdle = state.pendingRequests.isEmpty;
     state.pendingRequests.add(requestId);
@@ -206,10 +202,12 @@ class LifecycleServer {
       // Transition from no-pending-requests to one-pending — the
       // timer is about to be paused by _resetTimer. Diagnostic event
       // fires once per pause edge, not on every subsequent request.
-      _events?.emit(LifecyclePausedForPendingRequestEvent(
-        clientId: clientId,
-        source: 'LifecycleServer',
-      ));
+      _events?.emit(
+        LifecyclePausedForPendingRequestEvent(
+          clientId: clientId,
+          source: 'LifecycleServer',
+        ),
+      );
     }
     _resetTimer(clientId);
   }
@@ -230,10 +228,7 @@ class LifecycleServer {
       BlueyLogLevel.debug,
       'bluey.server.lifecycle',
       'requestEnded',
-      data: {
-        'clientId': clientId,
-        'requestId': requestId,
-      },
+      data: {'clientId': clientId, 'requestId': requestId},
     );
     if (state.pendingRequests.isEmpty) {
       _resetTimer(clientId);
@@ -269,10 +264,12 @@ class LifecycleServer {
         data: {'clientId': clientId},
       );
       _clients.remove(clientId);
-      _events?.emit(ClientLifecycleTimeoutEvent(
-        clientId: clientId,
-        source: 'LifecycleServer',
-      ));
+      _events?.emit(
+        ClientLifecycleTimeoutEvent(
+          clientId: clientId,
+          source: 'LifecycleServer',
+        ),
+      );
       onClientGone(clientId);
     });
   }

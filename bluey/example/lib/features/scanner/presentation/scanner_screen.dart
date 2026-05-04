@@ -74,7 +74,7 @@ class ScannerScreen extends StatelessWidget {
             requestPermissions: getIt<RequestPermissions>(),
             requestEnable: getIt<RequestEnable>(),
           )..initialize(),
-      child: const ScaffoldMessenger(child: _ScannerView()),
+      child: const _ScannerView(),
     );
   }
 }
@@ -170,7 +170,6 @@ class _TopBar extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // -- Main scanner content --

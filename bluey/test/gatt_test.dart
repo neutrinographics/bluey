@@ -13,7 +13,7 @@ class MockRemoteDescriptor implements RemoteDescriptor {
   Uint8List _value = Uint8List(0);
 
   MockRemoteDescriptor(this.uuid, {AttributeHandle? handle})
-      : handle = handle ?? AttributeHandle(1);
+    : handle = handle ?? AttributeHandle(1);
 
   @override
   Future<Uint8List> read() async => _value;
@@ -43,8 +43,8 @@ class MockRemoteCharacteristic implements RemoteCharacteristic {
     required this.properties,
     List<RemoteDescriptor> descriptors = const [],
     AttributeHandle? handle,
-  })  : _descriptors = descriptors,
-        handle = handle ?? AttributeHandle(1);
+  }) : _descriptors = descriptors,
+       handle = handle ?? AttributeHandle(1);
 
   @override
   List<RemoteDescriptor> descriptors({UUID? uuid}) {
@@ -217,8 +217,9 @@ void main() {
     test('can write value without response when supported', () async {
       final characteristic = MockRemoteCharacteristic(
         uuid: UUID.short(0x2A37),
-        properties:
-            const CharacteristicProperties(canWriteWithoutResponse: true),
+        properties: const CharacteristicProperties(
+          canWriteWithoutResponse: true,
+        ),
       );
 
       await characteristic.write(

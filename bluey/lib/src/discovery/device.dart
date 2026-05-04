@@ -26,19 +26,14 @@ class Device {
   /// Advertised device name, if available.
   final String? name;
 
-  Device({
-    required this.id,
-    String? address,
-    this.name,
-  }) : address = address ?? id.toString();
+  Device({required this.id, String? address, this.name})
+    : address = address ?? id.toString();
 
   /// Creates a copy with updated fields.
   ///
   /// To explicitly set [name] to null, pass null. To keep the existing value,
   /// don't pass the parameter.
-  Device copyWith({
-    Object? name = _sentinel,
-  }) {
+  Device copyWith({Object? name = _sentinel}) {
     return Device(
       id: id,
       address: address,

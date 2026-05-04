@@ -56,10 +56,7 @@ void main() {
         timeoutMs: 10000,
       );
 
-      expect(
-        () => connectionParametersFromPlatform(dto),
-        throwsArgumentError,
-      );
+      expect(() => connectionParametersFromPlatform(dto), throwsArgumentError);
     });
 
     test('throws ArgumentError when latency is negative', () {
@@ -69,10 +66,7 @@ void main() {
         timeoutMs: 4000,
       );
 
-      expect(
-        () => connectionParametersFromPlatform(dto),
-        throwsArgumentError,
-      );
+      expect(() => connectionParametersFromPlatform(dto), throwsArgumentError);
     });
 
     test('throws ArgumentError when timeoutMs is below spec range', () {
@@ -82,10 +76,7 @@ void main() {
         timeoutMs: 50, // < 100 ms spec minimum
       );
 
-      expect(
-        () => connectionParametersFromPlatform(dto),
-        throwsArgumentError,
-      );
+      expect(() => connectionParametersFromPlatform(dto), throwsArgumentError);
     });
 
     test('throws ArgumentError on cross-field invariant violation', () {
@@ -96,10 +87,7 @@ void main() {
         timeoutMs: 10000,
       );
 
-      expect(
-        () => connectionParametersFromPlatform(dto),
-        throwsArgumentError,
-      );
+      expect(() => connectionParametersFromPlatform(dto), throwsArgumentError);
     });
   });
 
@@ -111,8 +99,9 @@ void main() {
         timeout: SupervisionTimeout(4000),
       );
 
-      final roundTripped =
-          connectionParametersFromPlatform(connectionParametersToPlatform(original));
+      final roundTripped = connectionParametersFromPlatform(
+        connectionParametersToPlatform(original),
+      );
 
       expect(roundTripped, equals(original));
     });

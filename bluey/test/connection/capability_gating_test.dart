@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
-import 'package:bluey_platform_interface/bluey_platform_interface.dart' as platform;
+import 'package:bluey_platform_interface/bluey_platform_interface.dart'
+    as platform;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
@@ -9,10 +10,10 @@ import '../fakes/test_helpers.dart';
 
 void main() {
   Device deviceFor(String address) => Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: address,
-        name: 'Test Device',
-      );
+    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+    address: address,
+    name: 'Test Device',
+  );
 
   Future<({Connection conn, Bluey bluey})> connectWith(
     platform.Capabilities caps,
@@ -51,11 +52,13 @@ void main() {
     });
 
     test('platformKind=other exposes neither extension', () async {
-      final r = await connectWith(const platform.Capabilities(
-        platformKind: platform.PlatformKind.other,
-        canScan: true,
-        canConnect: true,
-      ));
+      final r = await connectWith(
+        const platform.Capabilities(
+          platformKind: platform.PlatformKind.other,
+          canScan: true,
+          canConnect: true,
+        ),
+      );
       expect(r.conn.android, isNull);
       expect(r.conn.ios, isNull);
       await r.conn.disconnect();
@@ -64,23 +67,26 @@ void main() {
   });
 
   group('BlueyConnection.requestMtu gating', () {
-    test('throws UnsupportedOperationException when canRequestMtu=false', () async {
-      final r = await connectWith(platform.Capabilities.iOS);
-      // requestMtu is `async`, so the gate's synchronous throw surfaces
-      // as a Future rejection. Use expectLater to await the assertion.
-      // 185 is iOS's maxMtu, so Mtu's pre-validation passes; the gate
-      // fires before the value is consumed by the platform.
-      await expectLater(
-        r.conn.requestMtu(
-          Mtu(185, capabilities: platform.Capabilities.iOS),
-        ),
-        throwsA(isA<UnsupportedOperationException>()
-            .having((e) => e.operation, 'operation', 'requestMtu')
-            .having((e) => e.platform, 'platform', 'ios')),
-      );
-      await r.conn.disconnect();
-      r.bluey.dispose();
-    });
+    test(
+      'throws UnsupportedOperationException when canRequestMtu=false',
+      () async {
+        final r = await connectWith(platform.Capabilities.iOS);
+        // requestMtu is `async`, so the gate's synchronous throw surfaces
+        // as a Future rejection. Use expectLater to await the assertion.
+        // 185 is iOS's maxMtu, so Mtu's pre-validation passes; the gate
+        // fires before the value is consumed by the platform.
+        await expectLater(
+          r.conn.requestMtu(Mtu(185, capabilities: platform.Capabilities.iOS)),
+          throwsA(
+            isA<UnsupportedOperationException>()
+                .having((e) => e.operation, 'operation', 'requestMtu')
+                .having((e) => e.platform, 'platform', 'ios'),
+          ),
+        );
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      },
+    );
 
     test('succeeds when canRequestMtu=true', () async {
       final r = await connectWith(platform.Capabilities.android);
@@ -99,26 +105,30 @@ void main() {
       bool canBond = true,
       bool canRequestPhy = true,
       bool canRequestConnectionParameters = true,
-    }) =>
-        platform.Capabilities(
-          platformKind: platform.PlatformKind.android,
-          canScan: true,
-          canConnect: true,
-          canAdvertise: true,
-          canRequestMtu: true,
-          maxMtu: 517,
-          canBond: canBond,
-          canRequestPhy: canRequestPhy,
-          canRequestConnectionParameters: canRequestConnectionParameters,
-        );
+    }) => platform.Capabilities(
+      platformKind: platform.PlatformKind.android,
+      canScan: true,
+      canConnect: true,
+      canAdvertise: true,
+      canRequestMtu: true,
+      maxMtu: 517,
+      canBond: canBond,
+      canRequestPhy: canRequestPhy,
+      canRequestConnectionParameters: canRequestConnectionParameters,
+    );
 
     group('canBond=false', () {
       test('bond() throws', () async {
         final r = await connectWith(androidWith(canBond: false));
         expect(
           () => r.conn.android!.bond(),
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'bond')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'bond',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
@@ -128,8 +138,13 @@ void main() {
         final r = await connectWith(androidWith(canBond: false));
         expect(
           () => r.conn.android!.removeBond(),
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'removeBond')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'removeBond',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
@@ -139,8 +154,13 @@ void main() {
         final r = await connectWith(androidWith(canBond: false));
         expect(
           () => r.conn.android!.bondState,
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'bondState')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'bondState',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
@@ -150,8 +170,13 @@ void main() {
         final r = await connectWith(androidWith(canBond: false));
         expect(
           () => r.conn.android!.bondStateChanges,
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'bondStateChanges')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'bondStateChanges',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
@@ -163,8 +188,13 @@ void main() {
         final r = await connectWith(androidWith(canRequestPhy: false));
         expect(
           () => r.conn.android!.requestPhy(),
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'requestPhy')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'requestPhy',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
@@ -191,8 +221,9 @@ void main() {
 
     group('canRequestConnectionParameters=false', () {
       test('requestConnectionParameters() throws', () async {
-        final r =
-            await connectWith(androidWith(canRequestConnectionParameters: false));
+        final r = await connectWith(
+          androidWith(canRequestConnectionParameters: false),
+        );
         expect(
           () => r.conn.android!.requestConnectionParameters(
             ConnectionParameters(
@@ -201,16 +232,22 @@ void main() {
               timeout: SupervisionTimeout(4000),
             ),
           ),
-          throwsA(isA<UnsupportedOperationException>()
-              .having((e) => e.operation, 'operation', 'requestConnectionParameters')),
+          throwsA(
+            isA<UnsupportedOperationException>().having(
+              (e) => e.operation,
+              'operation',
+              'requestConnectionParameters',
+            ),
+          ),
         );
         await r.conn.disconnect();
         r.bluey.dispose();
       });
 
       test('connectionParameters getter throws synchronously', () async {
-        final r =
-            await connectWith(androidWith(canRequestConnectionParameters: false));
+        final r = await connectWith(
+          androidWith(canRequestConnectionParameters: false),
+        );
         expect(
           () => r.conn.android!.connectionParameters,
           throwsA(isA<UnsupportedOperationException>()),
@@ -222,21 +259,25 @@ void main() {
   });
 
   group('Bluey.bondedDevices — canBond gate', () {
-    test('throws UnsupportedOperationException when canBond=false (iOS)',
-        () async {
-      final fakePlatform = FakeBlueyPlatform(
-        capabilities: platform.Capabilities.iOS,
-      );
-      platform.BlueyPlatform.instance = fakePlatform;
-      final bluey = Bluey();
-      expect(
-        () => bluey.bondedDevices,
-        throwsA(isA<UnsupportedOperationException>()
-            .having((e) => e.operation, 'operation', 'bondedDevices')
-            .having((e) => e.platform, 'platform', 'ios')),
-      );
-      bluey.dispose();
-    });
+    test(
+      'throws UnsupportedOperationException when canBond=false (iOS)',
+      () async {
+        final fakePlatform = FakeBlueyPlatform(
+          capabilities: platform.Capabilities.iOS,
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
+        final bluey = Bluey();
+        expect(
+          () => bluey.bondedDevices,
+          throwsA(
+            isA<UnsupportedOperationException>()
+                .having((e) => e.operation, 'operation', 'bondedDevices')
+                .having((e) => e.platform, 'platform', 'ios'),
+          ),
+        );
+        bluey.dispose();
+      },
+    );
 
     test('succeeds (returns a list) when canBond=true (Android)', () async {
       final fakePlatform = FakeBlueyPlatform(
@@ -279,13 +320,15 @@ void main() {
             Uint8List.fromList([1, 2, 3]),
           ),
         ),
-        throwsA(isA<UnsupportedOperationException>()
-            .having(
-              (e) => e.operation,
-              'operation',
-              'startAdvertising(manufacturerData)',
-            )
-            .having((e) => e.platform, 'platform', 'ios')),
+        throwsA(
+          isA<UnsupportedOperationException>()
+              .having(
+                (e) => e.operation,
+                'operation',
+                'startAdvertising(manufacturerData)',
+              )
+              .having((e) => e.platform, 'platform', 'ios'),
+        ),
       );
       r.bluey.dispose();
     });

@@ -54,16 +54,26 @@ void main() {
 
   group('Descriptors', () {
     test('has standard descriptor UUIDs', () {
-      expect(Descriptors.characteristicExtendedProperties,
-          equals(UUID.short(0x2900)));
-      expect(Descriptors.characteristicUserDescription,
-          equals(UUID.short(0x2901)));
-      expect(Descriptors.clientCharacteristicConfiguration,
-          equals(UUID.short(0x2902)));
-      expect(Descriptors.serverCharacteristicConfiguration,
-          equals(UUID.short(0x2903)));
-      expect(Descriptors.characteristicPresentationFormat,
-          equals(UUID.short(0x2904)));
+      expect(
+        Descriptors.characteristicExtendedProperties,
+        equals(UUID.short(0x2900)),
+      );
+      expect(
+        Descriptors.characteristicUserDescription,
+        equals(UUID.short(0x2901)),
+      );
+      expect(
+        Descriptors.clientCharacteristicConfiguration,
+        equals(UUID.short(0x2902)),
+      );
+      expect(
+        Descriptors.serverCharacteristicConfiguration,
+        equals(UUID.short(0x2903)),
+      );
+      expect(
+        Descriptors.characteristicPresentationFormat,
+        equals(UUID.short(0x2904)),
+      );
     });
   });
 }

@@ -18,7 +18,10 @@ void main() {
 
   group('PeerDiscovery.discover', () {
     test('returns empty when no Bluey servers advertising', () async {
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 200),
       );
@@ -28,10 +31,19 @@ void main() {
     test('returns one entry per unique ServerId', () async {
       final id1 = ServerId.generate();
       final id2 = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id1);
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id2);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id1,
+      );
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:02',
+        serverId: id2,
+      );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );
@@ -40,10 +52,19 @@ void main() {
 
     test('deduplicates by ServerId', () async {
       final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: id);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:02',
+        serverId: id,
+      );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );
@@ -54,9 +75,15 @@ void main() {
   group('PeerDiscovery.connectTo', () {
     test('returns a Connection when a match is found', () async {
       final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: id);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final connection = await discovery.connectTo(
         id,
         scanTimeout: const Duration(milliseconds: 500),
@@ -70,8 +97,14 @@ void main() {
     });
 
     test('throws PeerNotFoundException when no match within timeout', () async {
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: ServerId.generate());
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final target = ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
 
       expect(
@@ -86,10 +119,19 @@ void main() {
     test('skips non-matching candidates and finds the correct one', () async {
       final wrongId = ServerId.generate();
       final target = ServerId.generate();
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:01', serverId: wrongId);
-      fakePlatform.simulateBlueyServer(address: 'AA:BB:CC:DD:EE:02', serverId: target);
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: wrongId,
+      );
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:02',
+        serverId: target,
+      );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final connection = await discovery.connectTo(
         target,
         scanTimeout: const Duration(milliseconds: 500),
@@ -170,7 +212,10 @@ void main() {
         characteristicValues: {},
       );
 
-      final discovery = PeerDiscovery(platformApi: fakePlatform, logger: testLogger());
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        logger: testLogger(),
+      );
       final ids = await discovery.discover(
         timeout: const Duration(milliseconds: 500),
       );
@@ -227,8 +272,7 @@ void main() {
   // I056: probe-connect must use a short bounded timeout so a single
   // unresponsive candidate doesn't stall the whole discovery session.
   group('PeerDiscovery probe timeout (I056)', () {
-    test('discover uses 3s default probe timeout when none provided',
-        () async {
+    test('discover uses 3s default probe timeout when none provided', () async {
       fakePlatform.simulateBlueyServer(
         address: 'AA:BB:CC:DD:EE:01',
         serverId: ServerId.generate(),
@@ -242,43 +286,47 @@ void main() {
       expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(3000));
     });
 
-    test('discover threads custom probeTimeout through to platform connect',
-        () async {
-      fakePlatform.simulateBlueyServer(
-        address: 'AA:BB:CC:DD:EE:01',
-        serverId: ServerId.generate(),
-      );
-      final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
-        logger: testLogger(),
-      );
-      await discovery.discover(
-        timeout: const Duration(milliseconds: 200),
-        probeTimeout: const Duration(milliseconds: 750),
-      );
+    test(
+      'discover threads custom probeTimeout through to platform connect',
+      () async {
+        fakePlatform.simulateBlueyServer(
+          address: 'AA:BB:CC:DD:EE:01',
+          serverId: ServerId.generate(),
+        );
+        final discovery = PeerDiscovery(
+          platformApi: fakePlatform,
+          logger: testLogger(),
+        );
+        await discovery.discover(
+          timeout: const Duration(milliseconds: 200),
+          probeTimeout: const Duration(milliseconds: 750),
+        );
 
-      expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(750));
-    });
+        expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(750));
+      },
+    );
 
-    test('connectTo threads custom probeTimeout through to platform connect',
-        () async {
-      final id = ServerId.generate();
-      fakePlatform.simulateBlueyServer(
-        address: 'AA:BB:CC:DD:EE:01',
-        serverId: id,
-      );
-      final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
-        logger: testLogger(),
-      );
-      final connection = await discovery.connectTo(
-        id,
-        scanTimeout: const Duration(milliseconds: 500),
-        probeTimeout: const Duration(milliseconds: 1500),
-      );
+    test(
+      'connectTo threads custom probeTimeout through to platform connect',
+      () async {
+        final id = ServerId.generate();
+        fakePlatform.simulateBlueyServer(
+          address: 'AA:BB:CC:DD:EE:01',
+          serverId: id,
+        );
+        final discovery = PeerDiscovery(
+          platformApi: fakePlatform,
+          logger: testLogger(),
+        );
+        final connection = await discovery.connectTo(
+          id,
+          scanTimeout: const Duration(milliseconds: 500),
+          probeTimeout: const Duration(milliseconds: 1500),
+        );
 
-      expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(1500));
-      await connection.disconnect();
-    });
+        expect(fakePlatform.lastConnectConfig?.timeoutMs, equals(1500));
+        await connection.disconnect();
+      },
+    );
   });
 }

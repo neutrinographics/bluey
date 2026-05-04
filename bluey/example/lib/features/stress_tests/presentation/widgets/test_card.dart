@@ -23,35 +23,34 @@ const _kUuidBg = Color(0xFFF0F4F7);
 
 extension _StressTestMeta on StressTest {
   IconData get _icon => switch (this) {
-        StressTest.burstWrite => Icons.bolt,
-        StressTest.mixedOps => Icons.swap_horiz,
-        StressTest.soak => Icons.timer_outlined,
-        StressTest.timeoutProbe => Icons.alarm_outlined,
-        StressTest.failureInjection => Icons.bug_report_outlined,
-        StressTest.mtuProbe => Icons.settings_ethernet,
-        StressTest.notificationThroughput => Icons.notifications_outlined,
-      };
+    StressTest.burstWrite => Icons.bolt,
+    StressTest.mixedOps => Icons.swap_horiz,
+    StressTest.soak => Icons.timer_outlined,
+    StressTest.timeoutProbe => Icons.alarm_outlined,
+    StressTest.failureInjection => Icons.bug_report_outlined,
+    StressTest.mtuProbe => Icons.settings_ethernet,
+    StressTest.notificationThroughput => Icons.notifications_outlined,
+  };
 
   Color get _iconBg => switch (this) {
-        StressTest.burstWrite => const Color(0x4DAFD2FD),
-        StressTest.mixedOps => const Color(0x4DD3E4FE),
-        StressTest.soak => const Color(0x3369F6B8),
-        StressTest.timeoutProbe => const Color(0x33FA746F),
-        StressTest.failureInjection => const Color(0x33FA746F),
-        StressTest.mtuProbe => const Color(0x4DAFD2FD),
-        StressTest.notificationThroughput => const Color(0x4DD3E4FE),
-      };
+    StressTest.burstWrite => const Color(0x4DAFD2FD),
+    StressTest.mixedOps => const Color(0x4DD3E4FE),
+    StressTest.soak => const Color(0x3369F6B8),
+    StressTest.timeoutProbe => const Color(0x33FA746F),
+    StressTest.failureInjection => const Color(0x33FA746F),
+    StressTest.mtuProbe => const Color(0x4DAFD2FD),
+    StressTest.notificationThroughput => const Color(0x4DD3E4FE),
+  };
 
   Color get _iconColor => switch (this) {
-        StressTest.burstWrite => _kAccent,
-        StressTest.mixedOps => _kAccent,
-        StressTest.soak => _kGreen,
-        StressTest.timeoutProbe => _kRed,
-        StressTest.failureInjection => _kRed,
-        StressTest.mtuProbe => _kAccent,
-        StressTest.notificationThroughput => _kAccent,
-      };
-
+    StressTest.burstWrite => _kAccent,
+    StressTest.mixedOps => _kAccent,
+    StressTest.soak => _kGreen,
+    StressTest.timeoutProbe => _kRed,
+    StressTest.failureInjection => _kRed,
+    StressTest.mtuProbe => _kAccent,
+    StressTest.notificationThroughput => _kAccent,
+  };
 }
 
 // ─── TestCard ─────────────────────────────────────────────────────────────────
@@ -219,25 +218,27 @@ class _ActionRow extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                gradient: canRun
-                    ? const LinearGradient(
-                        begin: Alignment(-0.7, -0.5),
-                        end: Alignment(0.7, 0.5),
-                        colors: [Color(0xFF3F6187), Color(0xFF32557A)],
-                      )
-                    : null,
+                gradient:
+                    canRun
+                        ? const LinearGradient(
+                          begin: Alignment(-0.7, -0.5),
+                          end: Alignment(0.7, 0.5),
+                          colors: [Color(0xFF3F6187), Color(0xFF32557A)],
+                        )
+                        : null,
                 color: canRun ? null : _kStopBg,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: canRun
-                    ? [
-                        BoxShadow(
-                          color: _kAccent.withValues(alpha: 0.1),
-                          blurRadius: 15,
-                          offset: const Offset(0, 10),
-                          spreadRadius: -3,
-                        ),
-                      ]
-                    : null,
+                boxShadow:
+                    canRun
+                        ? [
+                          BoxShadow(
+                            color: _kAccent.withValues(alpha: 0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 10),
+                            spreadRadius: -3,
+                          ),
+                        ]
+                        : null,
               ),
               alignment: Alignment.center,
               child: Text(

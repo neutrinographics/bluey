@@ -160,10 +160,7 @@ void main() {
 
     group('Construction', () {
       test('creates with all fields', () {
-        final device = Device(
-          id: testUuid,
-          name: 'Heart Monitor',
-        );
+        final device = Device(id: testUuid, name: 'Heart Monitor');
 
         expect(device.id, equals(testUuid));
         expect(device.name, equals('Heart Monitor'));
@@ -177,10 +174,7 @@ void main() {
 
       test('address can be set explicitly (e.g., MAC address on Android)', () {
         const macAddress = 'AA:BB:CC:DD:EE:FF';
-        final device = Device(
-          id: testUuid,
-          address: macAddress,
-        );
+        final device = Device(id: testUuid, address: macAddress);
 
         expect(device.address, equals(macAddress));
         expect(device.id, equals(testUuid)); // id is still the UUID
@@ -195,15 +189,9 @@ void main() {
 
     group('Equality', () {
       test('equality based on ID only', () {
-        final device1 = Device(
-          id: testUuid,
-          name: 'Device 1',
-        );
+        final device1 = Device(id: testUuid, name: 'Device 1');
 
-        final device2 = Device(
-          id: testUuid,
-          name: 'Device 2',
-        );
+        final device2 = Device(id: testUuid, name: 'Device 2');
 
         // Same ID = equal devices (entity equality)
         expect(device1, equals(device2));
@@ -221,10 +209,7 @@ void main() {
 
     group('Immutability', () {
       test('device is immutable value', () {
-        final device = Device(
-          id: testUuid,
-          name: 'Test',
-        );
+        final device = Device(id: testUuid, name: 'Test');
 
         // All fields are final - this is enforced at compile time
         expect(device.id, equals(testUuid));
@@ -233,10 +218,7 @@ void main() {
 
     group('CopyWith', () {
       test('creates copy with updated name', () {
-        final original = Device(
-          id: testUuid,
-          name: 'Original',
-        );
+        final original = Device(id: testUuid, name: 'Original');
 
         final updated = original.copyWith(name: 'Updated');
 
@@ -245,10 +227,7 @@ void main() {
       });
 
       test('copyWith without arguments returns equal device', () {
-        final original = Device(
-          id: testUuid,
-          name: 'Test',
-        );
+        final original = Device(id: testUuid, name: 'Test');
 
         final copy = original.copyWith();
 
@@ -257,10 +236,7 @@ void main() {
       });
 
       test('copyWith can clear name', () {
-        final original = Device(
-          id: testUuid,
-          name: 'Test',
-        );
+        final original = Device(id: testUuid, name: 'Test');
 
         final updated = original.copyWith(name: null);
 

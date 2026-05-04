@@ -121,15 +121,21 @@ void main() {
           onSilent: () {},
         )..start();
         // No activity yet → returns activityWindow.
-        expect(monitor.timeUntilNextProbe(),
-            equals(const Duration(seconds: 5)));
+        expect(
+          monitor.timeUntilNextProbe(),
+          equals(const Duration(seconds: 5)),
+        );
         monitor.recordActivity();
         async.elapse(const Duration(seconds: 2));
-        expect(monitor.timeUntilNextProbe(),
-            equals(const Duration(seconds: 3)));
+        expect(
+          monitor.timeUntilNextProbe(),
+          equals(const Duration(seconds: 3)),
+        );
         monitor.updateActivityWindow(const Duration(seconds: 10));
-        expect(monitor.timeUntilNextProbe(),
-            equals(const Duration(seconds: 8)));
+        expect(
+          monitor.timeUntilNextProbe(),
+          equals(const Duration(seconds: 8)),
+        );
         monitor.stop();
       });
     });

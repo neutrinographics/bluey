@@ -79,11 +79,12 @@ void main() {
     });
 
     test('toString includes interval, latency, and timeout', () {
-      final s = ConnectionParameters(
-        interval: ConnectionInterval(30),
-        latency: PeripheralLatency(0),
-        timeout: SupervisionTimeout(4000),
-      ).toString();
+      final s =
+          ConnectionParameters(
+            interval: ConnectionInterval(30),
+            latency: PeripheralLatency(0),
+            timeout: SupervisionTimeout(4000),
+          ).toString();
       expect(s, contains('30'));
       expect(s, contains('0'));
       expect(s, contains('4000'));
