@@ -187,3 +187,30 @@ class PlatformPermissionDeniedException implements Exception {
   @override
   int get hashCode => Object.hash(operation, permission, message);
 }
+
+/// Raised when the platform's advertising stack rejects an advertisement
+/// because it exceeds the legacy 31-byte primary-AD budget (Android's
+/// `ADVERTISE_FAILED_DATA_TOO_LARGE`, error code 1).
+///
+/// The domain layer translates this to `AdvertisingException(
+/// AdvertisingFailureReason.dataTooBig)`. Surface this typed form
+/// instead of generic `bluey-unknown` so apps can react (e.g., shorten
+/// the device name, drop a UUID, or move it to scan response).
+class PlatformAdvertiseDataTooLargeException implements Exception {
+  final String message;
+
+  const PlatformAdvertiseDataTooLargeException(this.message);
+
+  @override
+  String toString() =>
+      'PlatformAdvertiseDataTooLargeException: $message';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlatformAdvertiseDataTooLargeException &&
+          other.message == message;
+
+  @override
+  int get hashCode => message.hashCode;
+}

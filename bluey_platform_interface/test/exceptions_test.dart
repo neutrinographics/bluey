@@ -102,4 +102,19 @@ void main() {
       expect(a, equals(b));
     });
   });
+
+  group('PlatformAdvertiseDataTooLargeException', () {
+    test('toString includes the message', () {
+      const e = PlatformAdvertiseDataTooLargeException('AD payload exceeded 31 bytes');
+      expect(e.toString(), contains('PlatformAdvertiseDataTooLargeException'));
+      expect(e.toString(), contains('AD payload exceeded 31 bytes'));
+    });
+
+    test('two instances with the same message are equal', () {
+      const a = PlatformAdvertiseDataTooLargeException('msg');
+      const b = PlatformAdvertiseDataTooLargeException('msg');
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+  });
 }
