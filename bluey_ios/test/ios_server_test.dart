@@ -23,7 +23,9 @@ void main() {
         includedServices: [],
       ),
     );
-    registerFallbackValue(AdvertiseConfigDto(serviceUuids: []));
+    registerFallbackValue(
+      AdvertiseConfigDto(serviceUuids: [], scanResponseServiceUuids: []),
+    );
     registerFallbackValue(GattStatusDto.success);
     registerFallbackValue(Uint8List(0));
   });
@@ -141,6 +143,28 @@ void main() {
         expect(captured.manufacturerDataCompanyId, equals(0x004C));
         expect(captured.manufacturerData, equals([0x02, 0x15]));
         expect(captured.timeoutMs, equals(10000));
+      });
+
+      test('forwards scanResponseServiceUuids to the Pigeon DTO', () async {
+        when(
+          () => mockHostApi.startAdvertising(any()),
+        ).thenAnswer((_) async {});
+
+        final config = PlatformAdvertiseConfig(
+          serviceUuids: const ['svc-1'],
+          scanResponseServiceUuids: const ['scan-1'],
+        );
+
+        await server.startAdvertising(config);
+
+        final captured =
+            verify(
+                  () => mockHostApi.startAdvertising(captureAny()),
+                ).captured.single
+                as AdvertiseConfigDto;
+
+        expect(captured.serviceUuids, equals(['svc-1']));
+        expect(captured.scanResponseServiceUuids, equals(['scan-1']));
       });
     });
 

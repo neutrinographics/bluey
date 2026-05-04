@@ -160,6 +160,7 @@ class PeripheralManagerImpl: NSObject {
     func startAdvertising(config: AdvertiseConfigDto, completion: @escaping (Result<Void, Error>) -> Void) {
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "startAdvertising",
                             data: ["serviceUuidCount": config.serviceUuids.count,
+                                   "scanResponseServiceUuidCount": config.scanResponseServiceUuids.count,
                                    "hasName": config.name != nil])
         var advertisement: [String: Any] = [:]
 
@@ -167,9 +168,16 @@ class PeripheralManagerImpl: NSObject {
             advertisement[CBAdvertisementDataLocalNameKey] = name
         }
 
-        if !config.serviceUuids.isEmpty {
-            let uuids = config.serviceUuids.map { $0.toCBUUID() }
-            advertisement[CBAdvertisementDataServiceUUIDsKey] = uuids
+        // I313: CoreBluetooth doesn't expose a separate scan-response slot.
+        // We fold scanResponseServiceUuids into the unified advertisement
+        // UUID list, prepending so the peer-discovery UUID retains
+        // primary-slot priority via CoreBluetooth's overflow ordering. The
+        // wire-level intent matches Android (where the same UUIDs go to
+        // scan response): cross-platform scanners filtering on the
+        // peer-discovery UUID see this peripheral.
+        let combinedUuids = config.scanResponseServiceUuids + config.serviceUuids
+        if !combinedUuids.isEmpty {
+            advertisement[CBAdvertisementDataServiceUUIDsKey] = combinedUuids.map { $0.toCBUUID() }
         }
 
         // Note: iOS does not support manufacturer data in advertising
