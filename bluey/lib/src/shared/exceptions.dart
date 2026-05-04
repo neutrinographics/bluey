@@ -330,6 +330,29 @@ class ServerRespondFailedException extends BlueyException {
        );
 }
 
+/// The platform plugin no longer has the `requestId` referenced in a
+/// `respondToReadRequest` / `respondToWriteRequest` call.
+///
+/// Indicates an *expected race*: the most likely cause is a duplicate
+/// response on the Dart side (e.g. the platform's broadcast
+/// `readRequests` stream had two subscribers, both invoked
+/// `respondToReadRequest` with the same id; the second one hits "not
+/// found"). The lifecycle server logs this at warn level and continues.
+/// Apps should not need to react to it directly. See I322 for the
+/// duplicate-response root-cause investigation.
+class RespondNotFoundException extends BlueyException {
+  const RespondNotFoundException(String message)
+    : super(
+        'Server respond failed: $message',
+        action:
+            'Likely a duplicate response on the Dart side (broadcast '
+            'stream multi-subscription); safe to log and continue.',
+      );
+
+  @override
+  String toString() => 'RespondNotFoundException: $message';
+}
+
 /// Reasons why advertising might fail.
 enum AdvertisingFailureReason {
   alreadyAdvertising,

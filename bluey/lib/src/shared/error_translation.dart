@@ -59,6 +59,9 @@ BlueyException translatePlatformException(
   if (error is platform.PlatformAdvertiseDataTooLargeException) {
     return AdvertisingException(AdvertisingFailureReason.dataTooBig);
   }
+  if (error is platform.PlatformRespondToRequestNotFoundException) {
+    return RespondNotFoundException(error.message);
+  }
   if (error is PlatformException) {
     return BlueyPlatformException(
       error.message ?? 'platform error (${error.code})',

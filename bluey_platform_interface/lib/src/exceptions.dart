@@ -214,3 +214,40 @@ class PlatformAdvertiseDataTooLargeException implements Exception {
   @override
   int get hashCode => message.hashCode;
 }
+
+/// Raised when a server-side `respondToReadRequest` or
+/// `respondToWriteRequest` call references a `requestId` the platform
+/// plugin no longer has on file.
+///
+/// On iOS this is the surface of `BlueyError.notFound` from
+/// `PeripheralManagerImpl.respondToReadRequest` (or `respondToWriteRequest`)
+/// when the corresponding entry has already been removed from
+/// `pendingReadRequests` / `pendingWriteRequests`. Common cause: a
+/// duplicate response on the Dart side (a request was emitted on
+/// the platform's broadcast `readRequests` stream, two subscribers
+/// both responded; the second one hits "not found"). Less commonly,
+/// a `closeServer` raced an in-flight respond.
+///
+/// The domain layer translates this to `RespondNotFoundException`. Surface
+/// this typed form instead of generic `bluey-unknown` so the lifecycle
+/// server can distinguish the *expected race* (warn-and-move-on) from
+/// *unexpected respond failures* (error-level, surface for triage).
+class PlatformRespondToRequestNotFoundException implements Exception {
+  /// Human-readable description of the missing request id, if the
+  /// underlying platform plugin provided one.
+  final String message;
+
+  const PlatformRespondToRequestNotFoundException(this.message);
+
+  @override
+  String toString() =>
+      'PlatformRespondToRequestNotFoundException: $message';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlatformRespondToRequestNotFoundException &&
+          other.message == message;
+
+  @override
+  int get hashCode => message.hashCode;
+}

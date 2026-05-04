@@ -293,7 +293,7 @@ class PeripheralManagerImpl: NSObject {
             BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "respondToReadRequest: requestId not found",
                                 data: ["requestId": requestId],
                                 errorCode: "not-found")
-            completion(.failure(BlueyError.notFound.toServerPigeonError()))
+            completion(.failure(BlueyError.pendingRequestNotFound.toServerPigeonError()))
             return
         }
 
@@ -313,7 +313,7 @@ class PeripheralManagerImpl: NSObject {
             BlueyLog.shared.log(.warn, "bluey.ios.peripheral", "respondToWriteRequest: requestId not found",
                                 data: ["requestId": requestId],
                                 errorCode: "not-found")
-            completion(.failure(BlueyError.notFound.toServerPigeonError()))
+            completion(.failure(BlueyError.pendingRequestNotFound.toServerPigeonError()))
             return
         }
 

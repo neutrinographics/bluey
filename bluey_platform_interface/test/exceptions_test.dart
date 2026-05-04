@@ -133,4 +133,35 @@ void main() {
       expect(e, isA<Exception>());
     });
   });
+
+  group('PlatformRespondToRequestNotFoundException', () {
+    test('toString includes the message and class name', () {
+      const e = PlatformRespondToRequestNotFoundException('requestId 42 not found');
+      expect(e.toString(), contains('PlatformRespondToRequestNotFoundException'));
+      expect(e.toString(), contains('requestId 42 not found'));
+    });
+
+    test('two instances with the same message are equal', () {
+      const a = PlatformRespondToRequestNotFoundException('msg');
+      const b = PlatformRespondToRequestNotFoundException('msg');
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('differs by message', () {
+      const a = PlatformRespondToRequestNotFoundException('a');
+      const b = PlatformRespondToRequestNotFoundException('b');
+      expect(a, isNot(equals(b)));
+    });
+
+    test('exposes the message via the public field', () {
+      const e = PlatformRespondToRequestNotFoundException('boom');
+      expect(e.message, equals('boom'));
+    });
+
+    test('is catchable as Exception', () {
+      const e = PlatformRespondToRequestNotFoundException('whatever');
+      expect(e, isA<Exception>());
+    });
+  });
 }

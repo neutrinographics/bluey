@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
@@ -132,16 +133,29 @@ class IosServer {
   // === Request Handling ===
 
   /// Responds to a read request from a central.
+  ///
+  /// Translates the Pigeon `'bluey-not-found'` error code (raised by the
+  /// iOS plugin when the requestId is no longer in `pendingReadRequests`
+  /// — typically a duplicate-response race; see I322) to the typed
+  /// [PlatformRespondToRequestNotFoundException]. Other
+  /// [PlatformException]s propagate unchanged.
   Future<void> respondToReadRequest(
     int requestId,
     PlatformGattStatus status,
     Uint8List? value,
   ) async {
-    await _hostApi.respondToReadRequest(
-      requestId,
-      _mapGattStatusToDto(status),
-      value,
-    );
+    try {
+      await _hostApi.respondToReadRequest(
+        requestId,
+        _mapGattStatusToDto(status),
+        value,
+      );
+    } on PlatformException catch (e) {
+      if (e.code == 'bluey-not-found') {
+        throw PlatformRespondToRequestNotFoundException(e.message ?? '');
+      }
+      rethrow;
+    }
   }
 
   /// Responds to a write request from a central.
