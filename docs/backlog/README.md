@@ -115,7 +115,7 @@ Ordered by recommended sequence. Bundles preferred where the underlying concerns
 - ~~**Server-API polish** (I058 + I059)~~ — DONE ([`6ebcf53`](#)). `AdvertiseMode` enum threaded through `Server.startAdvertising`; `Server.removeService` now returns `Future<void>` and propagates errors (breaking).
 - ~~**Peer-discovery polish** (I055 + I056)~~ — DONE ([`4abcba9`](#)). Control-UUID scan filter on the client; `peerDiscoverable` opt-in on the server (default `false` pending I313 — Android scan-response slot — so the budget doesn't bite app advertising). 3 s default `probeTimeout` exposed on `Bluey.discoverPeers` / `BlueyPeer.connect`. Breaking rename of `BlueyPeer.connect.timeout` → `probeTimeout` (the old name was a no-op).
 - ~~**Diagnostic events** (I054 + I068)~~ — DONE ([`14bae42`](#) + [`d2fb012`](#)). Five GATT-op events emitted from `BlueyConnection` / `BlueyRemoteCharacteristic`; six lifecycle-protocol events emitted from `LifecycleClient` / `LifecycleServer`. New `EventPublisher` port introduced; existing-consumer migration filed as I317.
-- **iOS NSError mapping cleanups** (I091 + I093) — unmapped `CBATTError` codes / `notFound` mapping. I091 was implicated in the `bluey-unknown` results from the 2026-04-29 stress-test session.
+- ~~**iOS NSError mapping cleanups** (I091 + I093)~~ — DONE ([`8875f4c`](#)). I091: dropped the `CBATTError` allowlist; any `CBATTErrorDomain` error now preserves its numeric status byte, mirroring Android's `statusFailedError`. I093: closed as obsolete-by-I088 (the original characteristic-miss premise is gone; remaining `peripherals[deviceId]` misses left as `gatt-disconnected` intentionally).
 
 #### Remaining iOS one-offs
 
@@ -193,8 +193,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I047](I047-ios-pending-write-requests-batch.md) | `respondToWriteRequest` only responds to first of batched ATT requests | medium |
 | [I048](I048-ios-no-state-restoration.md) | iOS managers initialized without restore identifier; state restoration disabled | medium |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
-| [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | Unmapped `CBATTError` codes silently become `bluey-unknown` | medium |
-| [I093](I093-ios-notfound-maps-to-wrong-error.md) | `notFound` for unknown characteristic maps to `gatt-disconnected` | medium |
 | [I315](I315-ios-pending-notification-stale-entries-on-disconnect.md) | `PendingNotificationQueue` (post-I040) may hold stale entries for centrals that disconnect mid-burst — bounded by cap + `closeServer` | low |
 
 ### Open — cross-platform unimplemented features
@@ -283,6 +281,8 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I068](I068-event-bus-missing-lifecycle-events.md) | Lifecycle protocol state transitions surface on `bluey.events`: HeartbeatSent / Acknowledged / Failed (with isDeadPeerSignal) / PeerDeclaredUnreachable on the client side; LifecyclePausedForPendingRequest / ClientLifecycleTimeout on the server side | `d2fb012` |
 | [I317](I317-migrate-existing-consumers-to-event-publisher.md) | `BlueyServer` / `BlueyScanner` migrated from concrete `BlueyEventBus` to abstract `EventPublisher` dependency; finishes the I054 / I068 port-extraction. Two-line refactor | `84a04dd` |
 | [I302](I302-ubiquitous-language-glossary.md) | Per-term Glossary table added to `CLAUDE.md` (Device / Connection / Server / Client / Peer / PeerConnection / ServerId / Central-Peripheral / AttributeHandle, each tagged with bounded context). Three Domain ↔ Platform seam comments anchored at the actual translation sites in `bluey_server.dart` and `bluey.dart` | `1c34d90` |
+| [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | iOS `NSError → PigeonError` translation now passes any `CBATTErrorDomain` status byte through unchanged; no allowlist | `8875f4c` |
+| [I093](I093-ios-notfound-maps-to-wrong-error.md) | Original characteristic/descriptor-miss premise resolved by I088 handle rewrite; remaining `peripherals[deviceId]` miss sites reviewed and left as `gatt-disconnected` intentionally | `8875f4c` |
 
 ### Wontfix — documented platform limitations & superseded premises
 
