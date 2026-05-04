@@ -154,7 +154,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | ID | Title | Severity |
 |---|---|---|
 | [I013](I013-scan-failure-error-code-not-propagated.md) | Scan failure error code discarded | medium |
-| [I313](I313-android-control-uuid-in-scan-response.md) | Android scan-response slot unused; blocks `peerDiscoverable: true` default (I055 follow-up) | medium |
 | [I014](I014-manufacturer-data-only-first-entry.md) | Manufacturer data only first entry returned | low |
 | [I015](I015-gatt-server-close-order-on-engine-detach.md) | GATT server close order on engine detach | low |
 | [I063](I063-android-late-callback-misroute-after-timeout.md) | Late GATT callback misrouted after app-level timeout | medium |
@@ -286,6 +285,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I302](I302-ubiquitous-language-glossary.md) | Per-term Glossary table added to `CLAUDE.md` (Device / Connection / Server / Client / Peer / PeerConnection / ServerId / Central-Peripheral / AttributeHandle, each tagged with bounded context). Three Domain ↔ Platform seam comments anchored at the actual translation sites in `bluey_server.dart` and `bluey.dart` | `1c34d90` |
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | iOS `NSError → PigeonError` translation now passes any `CBATTErrorDomain` status byte through unchanged; no allowlist | `8875f4c` |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | Original characteristic/descriptor-miss premise resolved by I088 handle rewrite; remaining `peripherals[deviceId]` miss sites reviewed and left as `gatt-disconnected` intentionally | `8875f4c` |
+| [I313](I313-android-control-uuid-in-scan-response.md) | Auto-include control UUID in Android scan response so peerDiscoverable can default to true; iOS folds `scanResponseServiceUuids` into the unified advertisement; `ADVERTISE_FAILED_DATA_TOO_LARGE` now surfaces as typed `AdvertisingException(AdvertisingFailureReason.dataTooBig)` | `c91d32b` |
 
 ### Wontfix — documented platform limitations & superseded premises
 

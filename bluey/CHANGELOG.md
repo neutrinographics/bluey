@@ -2,6 +2,21 @@
 
 ## 0.4.0
 
+**Peer-discovery scan-response slot (I313):**
+
+- Android `Server.startAdvertising(peerDiscoverable: true)` now routes the
+  Bluey lifecycle control UUID through the scan-response slot instead of
+  the primary advertisement, freeing the 31-byte primary-AD budget for
+  app-supplied UUIDs. Cross-platform peer discovery (Android server →
+  iOS central) no longer fails with `ADVERTISE_FAILED_DATA_TOO_LARGE`.
+- `ADVERTISE_FAILED_DATA_TOO_LARGE` now surfaces as the typed
+  `AdvertisingException(AdvertisingFailureReason.dataTooBig)` instead
+  of generic `bluey-unknown`.
+- iOS plugin folds `scanResponseServiceUuids` into
+  `CBAdvertisementDataServiceUUIDsKey` (prepended for primary-slot
+  priority via overflow ordering) so cross-platform discovery works in
+  both directions.
+
 **Breaking changes:**
 
 - `Capabilities` constructor now requires a `platformKind: PlatformKind`
