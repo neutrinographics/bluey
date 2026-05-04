@@ -283,4 +283,21 @@ void main() {
       expect(e.code, isNull);
     });
   });
+
+  group('RespondNotFoundException', () {
+    test('extends BlueyException', () {
+      const e = RespondNotFoundException('requestId 42');
+      expect(e, isA<BlueyException>());
+    });
+
+    test('toString includes the operation context', () {
+      const e = RespondNotFoundException('requestId 42 missing');
+      expect(e.toString(), contains('RespondNotFoundException'));
+    });
+
+    test('exposes the message via the public field', () {
+      const e = RespondNotFoundException('requestId 42 missing');
+      expect(e.message, contains('requestId 42 missing'));
+    });
+  });
 }
