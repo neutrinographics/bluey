@@ -24,7 +24,9 @@ void main() {
         includedServices: [],
       ),
     );
-    registerFallbackValue(AdvertiseConfigDto(serviceUuids: []));
+    registerFallbackValue(
+      AdvertiseConfigDto(serviceUuids: [], scanResponseServiceUuids: []),
+    );
     registerFallbackValue(GattStatusDto.success);
     registerFallbackValue(Uint8List(0));
   });
