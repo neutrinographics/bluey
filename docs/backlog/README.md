@@ -148,6 +148,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I322](I322-duplicate-respond-to-request.md) | `LifecycleServer.handleReadRequest` invoked twice for the same request id; defensive containment shipped, root cause pending | medium |
 
 ### Open — Android native
 
