@@ -96,9 +96,14 @@ final class CBErrorPigeonTests: XCTestCase {
     XCTAssertEqual(pe.code, "bluey-unknown")
   }
 
-  func testUnknownCBATTErrorCode_mapsToBlueyUnknown() {
+  func testUnknownCBATTErrorCode_preservesNumericStatus() {
+    // Forward-compat: any CBATTErrorDomain code we don't explicitly know
+    // by name should still surface as gatt-status-failed with the numeric
+    // status byte preserved, so callers can react to future Apple-added
+    // codes without a Bluey release.
     let err = NSError(domain: CBATTErrorDomain, code: 0xFF, userInfo: nil)
     let pe = err.toPigeonError()
-    XCTAssertEqual(pe.code, "bluey-unknown")
+    XCTAssertEqual(pe.code, "gatt-status-failed")
+    XCTAssertEqual(pe.details as? Int, 0xFF)
   }
 }
