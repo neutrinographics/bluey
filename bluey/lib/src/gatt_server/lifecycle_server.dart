@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -9,6 +10,8 @@ import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../peer/server_id.dart';
+import '../shared/error_translation.dart';
+import '../shared/exceptions.dart';
 
 /// Server-side lifecycle management.
 ///
@@ -143,10 +146,10 @@ class LifecycleServer {
     final uuid = req.characteristicUuid.toLowerCase();
 
     if (uuid == lifecycle.serverIdCharUuid) {
-      _platform.respondToReadRequest(
-        req.requestId,
-        platform.PlatformGattStatus.success,
-        lifecycle.lifecycleCodec.encodeAdvertisedIdentity(_serverId),
+      _respondAndContain(
+        req: req,
+        branch: 'serverId',
+        value: lifecycle.lifecycleCodec.encodeAdvertisedIdentity(_serverId),
       );
       return true;
     }
@@ -156,13 +159,86 @@ class LifecycleServer {
     }
 
     final interval = _interval ?? lifecycle.defaultLifecycleInterval;
-    _platform.respondToReadRequest(
-      req.requestId,
-      platform.PlatformGattStatus.success,
-      lifecycle.encodeInterval(interval),
+    _respondAndContain(
+      req: req,
+      branch: 'interval',
+      value: lifecycle.encodeInterval(interval),
     );
 
     return true;
+  }
+
+  /// Issues a fire-and-forget read response and contains failures.
+  ///
+  /// `RespondNotFoundException` (translated from the platform's typed
+  /// not-found code) is the *expected race* — duplicate response on the
+  /// Dart side (see I322); logged at warn. Any other failure is
+  /// unexpected and logged at error so it shows up in observability.
+  ///
+  /// Always returns synchronously (the underlying respond future is
+  /// `unawaited` to preserve the synchronous `handleReadRequest`
+  /// contract). The trace log on entry carries `requestId`,
+  /// `characteristicUuid`, and `branch` so a future maintainer
+  /// investigating I322 can correlate by id.
+  void _respondAndContain({
+    required platform.PlatformReadRequest req,
+    required String branch,
+    required Uint8List value,
+  }) {
+    _logger.log(
+      BlueyLogLevel.trace,
+      'bluey.server.lifecycle',
+      'respond entered',
+      data: {
+        'requestId': req.requestId,
+        'characteristicUuid': req.characteristicUuid,
+        'branch': branch,
+      },
+    );
+    unawaited(
+      _platform
+          .respondToReadRequest(
+            req.requestId,
+            platform.PlatformGattStatus.success,
+            value,
+          )
+          .then(
+            (_) {},
+            onError: (Object e, StackTrace st) {
+              final translated = translatePlatformException(
+                e,
+                operation: 'respondToReadRequest',
+              );
+              if (translated is RespondNotFoundException) {
+                _logger.log(
+                  BlueyLogLevel.warn,
+                  'bluey.server.lifecycle',
+                  'respond skipped — request id not found '
+                      '(likely duplicate response; see I322)',
+                  data: {
+                    'requestId': req.requestId,
+                    'characteristicUuid': req.characteristicUuid,
+                    'branch': branch,
+                  },
+                  errorCode: 'respond-not-found',
+                );
+                return;
+              }
+              _logger.log(
+                BlueyLogLevel.error,
+                'bluey.server.lifecycle',
+                'respond failed unexpectedly',
+                data: {
+                  'requestId': req.requestId,
+                  'characteristicUuid': req.characteristicUuid,
+                  'branch': branch,
+                  'exception': translated.runtimeType.toString(),
+                },
+                errorCode: translated.runtimeType.toString(),
+              );
+            },
+          ),
+    );
   }
 
   /// Cancels the heartbeat timer for a specific client and clears any

@@ -301,6 +301,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [respondToReadRequest] in order.
   final List<RespondReadCall> respondReadCalls = [];
 
+  /// Test seam: when non-null, the next [respondToReadRequest] call
+  /// completes with this error (then resets to null). Lets tests verify
+  /// the lifecycle server's catchError path without contriving a real
+  /// Pigeon failure.
+  Object? respondToReadFailure;
+
   /// Records every call to [respondToWriteRequest] in order.
   final List<RespondWriteCall> respondWriteCalls = [];
 
@@ -1559,6 +1565,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     PlatformGattStatus status,
     Uint8List? value,
   ) async {
+    final injectedFailure = respondToReadFailure;
+    if (injectedFailure != null) {
+      respondToReadFailure = null; // one-shot
+      throw injectedFailure;
+    }
     respondReadCalls.add(
       RespondReadCall(requestId: requestId, status: status, value: value),
     );

@@ -2,7 +2,11 @@ import 'dart:typed_data';
 
 import 'package:bluey/src/gatt_server/lifecycle_server.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
+import 'package:bluey/src/log/bluey_logger.dart';
+import 'package:bluey/src/log/log_event.dart';
+import 'package:bluey/src/log/log_level.dart';
 import 'package:bluey/src/peer/server_id.dart';
+import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -733,6 +737,121 @@ void main() {
 
         server.dispose();
       });
+    });
+
+    group('respond fire-and-forget — error containment (I322)', () {
+      test(
+        'serverId read: RespondNotFoundException is caught and logged at warn, no crash',
+        () async {
+          fakePlatform.respondToReadFailure = const RespondNotFoundException(
+            'requestId 42 not found',
+          );
+
+          final logger = BlueyLogger(level: BlueyLogLevel.trace);
+          final logs = <BlueyLogEvent>[];
+          logger.events.listen(logs.add);
+
+          final server = LifecycleServer(
+            platformApi: fakePlatform,
+            interval: const Duration(seconds: 5),
+            serverId: ServerId.generate(),
+            onClientGone: (_) {},
+            logger: logger,
+          );
+
+          server.handleReadRequest(
+            _readReq(
+              characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+            ),
+          );
+          await Future<void>.delayed(Duration.zero);
+
+          final warns = logs
+              .where((e) => e.level == BlueyLogLevel.warn)
+              .toList();
+          expect(
+            warns,
+            isNotEmpty,
+            reason: 'RespondNotFoundException must be logged at warn level',
+          );
+          expect(warns.last.context, equals('bluey.server.lifecycle'));
+          expect(warns.last.message.toLowerCase(), contains('respond'));
+
+          server.dispose();
+        },
+      );
+
+      test('interval read: same warn-and-continue path', () async {
+        fakePlatform.respondToReadFailure = const RespondNotFoundException(
+          'requestId 99 not found',
+        );
+
+        final logger = BlueyLogger(level: BlueyLogLevel.trace);
+        final logs = <BlueyLogEvent>[];
+        logger.events.listen(logs.add);
+
+        final server = LifecycleServer(
+          platformApi: fakePlatform,
+          interval: const Duration(seconds: 5),
+          serverId: ServerId.generate(),
+          onClientGone: (_) {},
+          logger: logger,
+        );
+
+        server.handleReadRequest(
+          _readReq(
+            characteristicUuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        final warns = logs
+            .where((e) => e.level == BlueyLogLevel.warn)
+            .toList();
+        expect(warns, isNotEmpty);
+
+        server.dispose();
+      });
+
+      test(
+        'unexpected (non-RespondNotFound) error logs at error level, no crash',
+        () async {
+          fakePlatform.respondToReadFailure = BlueyPlatformException(
+            'native crashed mid-flight',
+            code: 'bluey-unknown',
+          );
+
+          final logger = BlueyLogger(level: BlueyLogLevel.trace);
+          final logs = <BlueyLogEvent>[];
+          logger.events.listen(logs.add);
+
+          final server = LifecycleServer(
+            platformApi: fakePlatform,
+            interval: const Duration(seconds: 5),
+            serverId: ServerId.generate(),
+            onClientGone: (_) {},
+            logger: logger,
+          );
+
+          server.handleReadRequest(
+            _readReq(
+              characteristicUuid: 'b1e70004-0000-1000-8000-00805f9b34fb',
+            ),
+          );
+          await Future<void>.delayed(Duration.zero);
+
+          final errors = logs
+              .where((e) => e.level == BlueyLogLevel.error)
+              .toList();
+          expect(
+            errors,
+            isNotEmpty,
+            reason: 'unexpected respond failure must surface at error level',
+          );
+
+          server.dispose();
+        },
+      );
     });
   });
 }
