@@ -90,8 +90,7 @@ class AndroidServer {
     final dto = AdvertiseConfigDto(
       name: config.name,
       serviceUuids: config.serviceUuids,
-      // TODO(I313): wire from config.scanResponseServiceUuids in Task 7.
-      scanResponseServiceUuids: const [],
+      scanResponseServiceUuids: config.scanResponseServiceUuids,
       manufacturerDataCompanyId: config.manufacturerDataCompanyId,
       manufacturerData: config.manufacturerData,
       timeoutMs: config.timeoutMs,
