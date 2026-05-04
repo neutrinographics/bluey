@@ -119,6 +119,24 @@ void main() {
       expect(advertising.reason, AdvertisingFailureReason.dataTooBig);
     });
 
+    test(
+      'PlatformRespondToRequestNotFoundException -> RespondNotFoundException',
+      () {
+        const platformError = platform.PlatformRespondToRequestNotFoundException(
+          'requestId 42 not found',
+        );
+        final translated = translatePlatformException(
+          platformError,
+          operation: 'respondToReadRequest',
+        );
+        expect(translated, isA<RespondNotFoundException>());
+        expect(
+          (translated as RespondNotFoundException).message,
+          contains('requestId 42 not found'),
+        );
+      },
+    );
+
     test('PlatformPermissionDeniedException → PermissionDeniedException '
         'wrapping the single denied permission', () {
       final result = translatePlatformException(
