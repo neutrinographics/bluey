@@ -195,6 +195,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I048](I048-ios-no-state-restoration.md) | iOS managers initialized without restore identifier; state restoration disabled | medium |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I315](I315-ios-pending-notification-stale-entries-on-disconnect.md) | `PendingNotificationQueue` (post-I040) may hold stale entries for centrals that disconnect mid-burst — bounded by cap + `closeServer` | low |
+| [I321](I321-ios-bond-mismatch-opaque-error.md) | `connect` surfaces `CBError.peerRemovedPairingInformation` (code 14) as opaque `BlueyPlatformException`; no actionable UX path for stale-bond recovery | medium |
 
 ### Open — cross-platform unimplemented features
 
