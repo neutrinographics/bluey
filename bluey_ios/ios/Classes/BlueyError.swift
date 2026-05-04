@@ -17,6 +17,14 @@ enum BlueyError: Error {
     /// caller is holding a stale reference. Distinct from `notFound`,
     /// which is the legacy null-handle / UUID-miss path.
     case handleInvalidated
+    /// Server-side bookkeeping miss: a `respondToReadRequest` /
+    /// `respondToWriteRequest` call referenced a `requestId` that is no
+    /// longer in `pendingReadRequests` / `pendingWriteRequests`.
+    /// Distinct from `.notFound` (which means "attribute not registered
+    /// in the hosted-service tree"). Surfaces to Dart as the typed
+    /// `PlatformRespondToRequestNotFoundException` for the lifecycle
+    /// server's defense-in-depth race handling (see I322).
+    case pendingRequestNotFound
 }
 
 extension BlueyError: LocalizedError {
@@ -34,6 +42,8 @@ extension BlueyError: LocalizedError {
             return "Operation timed out"
         case .handleInvalidated:
             return "GATT attribute handle invalidated by Service Changed"
+        case .pendingRequestNotFound:
+            return "Pending request not found"
         }
     }
 }
@@ -64,6 +74,14 @@ extension BlueyError {
                                details: nil)
         case .handleInvalidated:
             return PigeonError(code: "gatt-handle-invalidated",
+                               message: self.errorDescription,
+                               details: nil)
+        case .pendingRequestNotFound:
+            // Defensive: this case is server-side semantics and shouldn't
+            // fire on the client. Map to bluey-unknown so an accidental
+            // client-side raise still surfaces an exception rather than
+            // being silently dropped.
+            return PigeonError(code: "bluey-unknown",
                                message: self.errorDescription,
                                details: nil)
         }
@@ -100,6 +118,18 @@ extension BlueyError {
             // AttributeHandleInvalidatedException, same as the client
             // side.
             return PigeonError(code: "gatt-handle-invalidated",
+                               message: self.errorDescription,
+                               details: nil)
+        case .pendingRequestNotFound:
+            // I322 — `respondToReadRequest` / `respondToWriteRequest`
+            // referenced a requestId that is no longer in the pending
+            // map (typically a duplicate-response race). Surface as the
+            // typed bluey-not-found code so the Dart adapter converts
+            // it into PlatformRespondToRequestNotFoundException.
+            // Distinct from `.notFound`, which retains its
+            // ATTRIBUTE_NOT_FOUND (0x0A) mapping for the
+            // attribute-not-registered semantic.
+            return PigeonError(code: "bluey-not-found",
                                message: self.errorDescription,
                                details: nil)
         }
