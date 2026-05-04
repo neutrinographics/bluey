@@ -125,10 +125,44 @@ Two distinct issues compound:
    dartdoc on the new exception (Settings → Bluetooth → Forget; or
    restart iOS device; or unpair from the peripheral side).
 
-2. Investigate Android-side equivalents. When iOS unpairs from Android,
-   does Android surface `GATT_INSUF_AUTHENTICATION` (status 5) or
-   `GATT_INSUFFICIENT_ENCRYPTION` on subsequent reads? Audit and add
-   typed translation for those if not already in place.
+2. **Server-side detection on Android: not feasible from user-space.**
+   When iOS rejects SMP and tears down the link, Android's
+   `BluetoothGattServerCallback.onConnectionStateChange` fires with
+   `status=0, newState=0` (clean disconnect). The SMP rejection happens
+   at the link layer inside `bluetoothd`/`bt_btm`; no GATT-level error
+   code surfaces to user-space. The pattern "central connects, then
+   cleanly disconnects ~200 ms later, with no GATT activity in between"
+   is the only signal Bluey's Android server has that something went
+   wrong. Original suggestion to look for `GATT_INSUF_AUTHENTICATION`
+   (status 5) or `GATT_INSUFFICIENT_ENCRYPTION` is incorrect for this
+   case — those statuses surface when the central tries to *access* an
+   encrypted attribute, not when SMP fails before any GATT op runs.
+
+   *Verified empirically* — Android log captured during the failure:
+
+   ```
+   22:02:34.391  onConnectionStateChange {newState: 2}   ← STATE_CONNECTED
+   22:02:34.392  central connected
+   22:02:34.602  onConnectionStateChange {newState: 0}   ← STATE_DISCONNECTED (status=0, 210ms later)
+   22:02:34.603  central disconnected
+   ```
+
+   The corresponding iOS-side `didFailToConnect (CBError 14)` fires at
+   `22:02:34.619` — same 200 ms window. Detection on the Android server
+   side would have to be heuristic (rapid connect/disconnect with no
+   intervening GATT activity), and even then can't distinguish bond
+   mismatch from an unrelated disconnect. Recommend leaving the server
+   side as-is and concentrating the typed-error UX work on the iOS
+   central side (Part A).
+
+   *(Optional follow-on if signal value is high enough to justify the
+   heuristic): emit a domain event like
+   `ClientConnectedThenDisconnectedQuicklyEvent(centralId, gapMs)` from
+   `BlueyServer` when a freshly-connected client disconnects within
+   ~500 ms with no read/write/notify activity. App code can use it to
+   aggregate "suspicious connect-disconnect" telemetry for ops
+   visibility, but the event itself is intentionally non-actionable —
+   it doesn't claim to know SMP failed.)
 
 3. Audit whether bluey itself triggers bonding anywhere. The lifecycle
    control service uses plain `read`/`write` permissions (verified in
