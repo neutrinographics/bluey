@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Typed iOS `CBATTError` translation (I091).** Any `NSError` with `domain == CBATTErrorDomain` now surfaces as `GattOperationStatusFailedException` carrying the numeric ATT status byte. The codes that previously dropped to `GattOperationUnknownPlatformException` (0x09 `prepareQueueFull`, 0x0C `insufficientEncryptionKeySize`, 0x0E `unlikelyError`, 0x10 `unsupportedGroupType`) and any future Apple-added codes are now typed end-to-end. Mirrors Android's `ConnectionManager.statusFailedError` pattern.
+
 ## 0.4.0
 
 **Breaking changes:**
