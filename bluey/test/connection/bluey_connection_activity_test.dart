@@ -89,6 +89,7 @@ void main() {
       final lc = LifecycleClient(
         platformApi: fakePlatform,
         connectionId: TestDeviceIds.device1,
+        localIdentity: TestServerIds.localIdentity,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
         logger: testLogger(),
@@ -270,6 +271,7 @@ void main() {
       return LifecycleClient(
         platformApi: fakePlatform,
         connectionId: TestDeviceIds.device1,
+        localIdentity: TestServerIds.localIdentity,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
         logger: testLogger(),

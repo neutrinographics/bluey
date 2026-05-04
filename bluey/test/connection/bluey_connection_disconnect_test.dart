@@ -30,7 +30,7 @@ void main() {
         serverId: ServerId.generate(),
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final peerConn = await bluey.connectAsPeer(
         Device(
           id: UUID('00000000-0000-0000-0000-aabbccddee01'),

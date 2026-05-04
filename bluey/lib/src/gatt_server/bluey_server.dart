@@ -85,7 +85,7 @@ class BlueyServer implements Server {
       interval: lifecycleInterval,
       serverId: _serverId,
       onClientGone: _handleClientDisconnected,
-      onHeartbeatReceived: _trackClientIfNeeded,
+      onPeerIdentified: _trackPeerClient,
       logger: logger,
       events: _eventBus,
     );
@@ -604,11 +604,19 @@ class BlueyServer implements Server {
     _connectedClients.clear();
   }
 
-  /// Tracks a client if not already known. The platform may not always report
-  /// connections (Android can miss onConnectionStateChange for cached
-  /// connections, iOS has no connection callback at all). A control service
-  /// write proves the client is connected.
-  void _trackClientIfNeeded(String clientId) {
+  /// Tracks a peer client identified through a lifecycle write.
+  ///
+  /// The platform may not always report connections (Android can miss
+  /// onConnectionStateChange for cached connections, iOS has no
+  /// connection callback at all). A control-service write proves the
+  /// client is connected and — after the I-series wire-format change —
+  /// also carries the central's stable [ServerId].
+  ///
+  /// [PeerClient] is emitted exactly once per identification; subsequent
+  /// heartbeats from the same client are no-ops here. The identification
+  /// set is cleared in [_handleClientDisconnected] so a reconnect-then-
+  /// heartbeat re-identifies.
+  void _trackPeerClient(String clientId, ServerId senderId) {
     final wasNew = !_connectedClients.containsKey(clientId);
     if (wasNew) {
       _emitEvent(
@@ -622,20 +630,17 @@ class BlueyServer implements Server {
       _connectionsController.add(client);
     }
 
-    // Peer identification: this hook fires on every lifecycle heartbeat
-    // write, but [PeerClient] is emitted exactly once per identification.
-    // Subsequent heartbeats from the same client are no-ops here. The
-    // identification set is cleared in [_handleClientDisconnected] so a
-    // reconnect-then-heartbeat re-identifies.
     if (_identifiedPeerClientIds.add(clientId)) {
       final client = _connectedClients[clientId]!;
       _logger.log(
         BlueyLogLevel.info,
         'bluey.server',
         'central identified as Bluey peer',
-        data: {'clientId': clientId},
+        data: {'clientId': clientId, 'senderId': senderId.toString()},
       );
-      _peerConnectionsController.add(PeerClient.create(client: client));
+      _peerConnectionsController.add(
+        PeerClient.create(client: client, serverId: senderId),
+      );
     }
   }
 

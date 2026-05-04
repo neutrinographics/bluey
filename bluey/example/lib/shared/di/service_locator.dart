@@ -9,9 +9,17 @@ import '../../features/stress_tests/di/stress_tests_module.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> setupServiceLocator() async {
-  // Core dependency
-  getIt.registerLazySingleton<Bluey>(() => Bluey());
+/// Wires the shared [Bluey] singleton (with the persisted server
+/// identity) and registers all per-feature dependencies.
+///
+/// [localIdentity] must be loaded before this is called — the central
+/// side's peer-protocol upgrade path (`Bluey.tryUpgrade` /
+/// `Bluey.watchPeer`) requires it, and the same identity is used for
+/// the local server. Loading it eagerly at startup keeps a single
+/// `Bluey` instance shared across all bounded contexts.
+Future<void> setupServiceLocator({required ServerId localIdentity}) async {
+  // Core dependency: identity-bound Bluey shared across all features.
+  getIt.registerLazySingleton<Bluey>(() => Bluey(localIdentity: localIdentity));
 
   // Bounded context registrations
   registerScannerDependencies(getIt);

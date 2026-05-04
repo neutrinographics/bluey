@@ -6,6 +6,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 /// Tests for the C.4 APIs: `Bluey.connectAsPeer` and `Bluey.tryUpgrade`.
 ///
@@ -20,7 +21,7 @@ void main() {
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = Bluey(localIdentity: TestServerIds.localIdentity);
   });
 
   tearDown(() async {
@@ -93,8 +94,8 @@ void main() {
                       w.deviceId == address &&
                       w.characteristicUuid.toLowerCase() ==
                           lifecycle.heartbeatCharUuid &&
-                      w.value.length == 1 &&
-                      w.value.first == 0x00,
+                      w.value.length == 18 &&
+                      w.value[1] == 0x00,
                 )
                 .toList();
         expect(

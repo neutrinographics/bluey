@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 // ignore: implementation_imports
+import 'package:bluey/src/lifecycle.dart' as lifecycle;
+// ignore: implementation_imports
 import 'package:bluey/src/log/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
@@ -67,6 +69,32 @@ class TestHandles {
   static final descriptor1 = AttributeHandle(100);
   static final descriptor2 = AttributeHandle(101);
 }
+
+/// Stable [ServerId]s for tests that need a deterministic local
+/// identity to thread through `Bluey(localIdentity: ...)`,
+/// `LifecycleClient(localIdentity: ...)`, or simulated heartbeat
+/// payloads.
+class TestServerIds {
+  static final localIdentity = ServerId('aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa');
+  static final remoteIdentity = ServerId(
+    'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+  );
+  static final thirdParty = ServerId('cccccccc-cccc-4ccc-cccc-cccccccccccc');
+}
+
+/// Encodes a lifecycle heartbeat payload for the given sender.
+///
+/// Convenience for tests that simulate write requests to the heartbeat
+/// characteristic — replaces the legacy `lifecycle.heartbeatValue`
+/// constant, which no longer carries enough information now that the
+/// wire format is `version | marker | senderId(16)`.
+Uint8List heartbeatPayloadFrom(ServerId senderId) =>
+    lifecycle.lifecycleCodec.encodeMessage(lifecycle.Heartbeat(senderId));
+
+/// Encodes a lifecycle courtesy-disconnect payload for the given sender.
+Uint8List courtesyDisconnectPayloadFrom(ServerId senderId) => lifecycle
+    .lifecycleCodec
+    .encodeMessage(lifecycle.CourtesyDisconnect(senderId));
 
 /// Common device IDs used in tests (MAC address format).
 class TestDeviceIds {

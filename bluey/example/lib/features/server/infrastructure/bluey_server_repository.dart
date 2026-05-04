@@ -5,22 +5,29 @@ import 'package:bluey/bluey.dart';
 import '../domain/server_repository.dart';
 
 /// Implementation of [ServerRepository] using the Bluey library.
+///
+/// Shares the app-wide [Bluey] singleton, which is constructed at app
+/// startup with the persisted local identity (see
+/// `service_locator.dart` and `main.dart`). [setIdentity] is therefore
+/// only meaningful when the requested identity already matches the
+/// shared instance's `localIdentity`; rotating identity at runtime
+/// requires an app restart.
 class BlueyServerRepository implements ServerRepository {
   final Bluey _bluey;
   Server? _server;
-
-  ServerId? _identity;
 
   BlueyServerRepository(this._bluey);
 
   @override
   void setIdentity(ServerId identity) {
-    _identity = identity;
+    // No-op at the repository level: identity is fixed at Bluey
+    // construction time. The cubit persists the new value through
+    // [ServerIdentityStorage] so the next app launch picks it up.
   }
 
   @override
   Server? getServer() {
-    _server ??= _bluey.server(identity: _identity);
+    _server ??= _bluey.server();
     return _server;
   }
 
@@ -131,10 +138,13 @@ class BlueyServerRepository implements ServerRepository {
 
   @override
   Future<Server?> resetServer({required ServerId identity}) async {
+    // Identity is fixed at Bluey construction time. The cubit has
+    // already persisted the new identity; an app restart is required
+    // to apply it. Dispose the current server to leave the runtime in
+    // a clean state until then.
     await _server?.dispose();
     _server = null;
-    _identity = identity;
-    return getServer();
+    return null;
   }
 
   @override

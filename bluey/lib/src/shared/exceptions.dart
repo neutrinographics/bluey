@@ -387,6 +387,24 @@ class NotABlueyPeerException extends BlueyException {
       'Bluey peer (no lifecycle control service)';
 }
 
+/// Thrown when a peer-protocol API is called on a [Bluey] instance
+/// that was constructed without a `localIdentity`.
+///
+/// The lifecycle protocol requires both sides of a connection to
+/// announce their stable [ServerId]; a [Bluey] without a configured
+/// identity cannot participate. Construct `Bluey(localIdentity: ...)`
+/// to fix.
+class LocalIdentityRequiredException extends BlueyException {
+  const LocalIdentityRequiredException(String operation)
+    : super(
+        'Bluey was constructed without a localIdentity but $operation '
+        'requires one.',
+        action:
+            'Construct Bluey(localIdentity: ServerId.generate()) — or a '
+            'persisted ServerId — and reuse it across sessions.',
+      );
+}
+
 /// The peer's [ServerId] did not match the expected value.
 class PeerIdentityMismatchException extends BlueyException {
   final ServerId expected;

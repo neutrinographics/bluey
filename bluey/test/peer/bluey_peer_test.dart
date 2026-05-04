@@ -30,6 +30,7 @@ void main() {
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
           serverId: id,
+          localIdentity: TestServerIds.localIdentity,
           logger: testLogger(),
         );
         final peerConn = await peer.connect();
@@ -56,6 +57,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+        localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),
       );
 
@@ -80,6 +82,7 @@ void main() {
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
           serverId: id,
+          localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 8),
           logger: testLogger(),
         );
@@ -118,6 +121,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: id,
+        localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),
       );
       expect(peer.serverId, equals(id));
@@ -133,6 +137,7 @@ void main() {
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
         serverId: id,
+        localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),
       );
 

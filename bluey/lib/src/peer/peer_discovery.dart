@@ -208,6 +208,6 @@ class PeerDiscovery {
       address,
       serverIdChar.handle,
     );
-    return lifecycle.decodeServerId(bytes);
+    return lifecycle.lifecycleCodec.decodeAdvertisedIdentity(bytes);
   }
 }

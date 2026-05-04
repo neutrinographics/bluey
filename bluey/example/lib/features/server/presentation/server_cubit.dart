@@ -333,8 +333,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
     emit(state.copyWith(error: null));
   }
 
-  /// Resets the server identity, re-initialises the server, and
-  /// re-subscribes to all streams.
+  /// Persists a fresh server identity and tears down the current
+  /// server. The new identity takes effect on the next app launch —
+  /// the shared [Bluey] instance binds its `localIdentity` at
+  /// construction time, so live rotation requires a restart.
   Future<void> resetIdentity() async {
     // Cancel existing subscriptions before disposing the server.
     await _connectionSubscription?.cancel();
@@ -353,10 +355,11 @@ class ServerCubit extends Cubit<ServerScreenState> {
         blueyPeerClientIds: const {},
       ),
     );
-    _addLog('Server', 'Identity reset: ${newId.value.substring(0, 8)}...');
-
-    // Re-subscribe and re-add services.
-    await _resubscribeAndSetup();
+    _addLog(
+      'Server',
+      'Identity reset: ${newId.value.substring(0, 8)}... — restart the app '
+          'to apply.',
+    );
   }
 
   void _refreshConnectedClients() {

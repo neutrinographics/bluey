@@ -38,12 +38,6 @@ final intervalCharUuid = _intervalCharUuidString;
 /// stable [ServerId] as 16 raw bytes).
 final serverIdCharUuid = _serverIdCharUuidString;
 
-/// Value written by the client as a periodic heartbeat.
-final heartbeatValue = Uint8List.fromList([0x01]);
-
-/// Value written by the client before disconnecting.
-final disconnectValue = Uint8List.fromList([0x00]);
-
 /// Default lifecycle interval.
 const defaultLifecycleInterval = Duration(seconds: 10);
 
@@ -80,11 +74,139 @@ Uint8List encodeInterval(Duration interval) {
   return bytes.buffer.asUint8List();
 }
 
-/// Encodes a [ServerId] as 16 raw bytes for the serverId characteristic.
-Uint8List encodeServerId(ServerId id) => id.toBytes();
+/// Current wire-format version for all lifecycle protocol payloads
+/// (heartbeat / disconnect writes and the advertised-identity read).
+///
+/// Bump this when an incompatible change is made; decoders reject payloads
+/// whose leading byte does not equal the version they understand.
+const protocolVersion = 0x01;
 
-/// Decodes a 16-byte serverId characteristic value.
-ServerId decodeServerId(Uint8List bytes) => ServerId.fromBytes(bytes);
+const _markerHeartbeat = 0x01;
+const _markerCourtesyDisconnect = 0x00;
+
+/// A message exchanged on the lifecycle control characteristic.
+///
+/// The published-language type for the Bluey peer protocol's heartbeat
+/// channel: a sealed family with one variant per wire intent. The
+/// [senderId] field carries the writer's stable [ServerId] so the
+/// receiver learns who is on the other end of the link.
+sealed class LifecycleMessage {
+  const LifecycleMessage(this.senderId);
+
+  /// The stable [ServerId] of the sender — i.e., the central writing
+  /// the heartbeat or disconnect.
+  final ServerId senderId;
+}
+
+/// Periodic liveness write from a connected central.
+class Heartbeat extends LifecycleMessage {
+  const Heartbeat(super.senderId);
+}
+
+/// Cooperative shutdown write sent by a central before tearing down
+/// the link, so the server can release resources without waiting for
+/// the heartbeat-silence timeout.
+class CourtesyDisconnect extends LifecycleMessage {
+  const CourtesyDisconnect(super.senderId);
+}
+
+/// Thrown when a lifecycle payload cannot be parsed (wrong length,
+/// unknown marker, etc.). Distinct from [UnsupportedLifecycleProtocolVersion]
+/// so callers can decide whether to log-and-drop or surface the error.
+class MalformedLifecycleMessage implements Exception {
+  const MalformedLifecycleMessage(this.reason);
+  final String reason;
+
+  @override
+  String toString() => 'MalformedLifecycleMessage: $reason';
+}
+
+/// Thrown when a lifecycle payload's version byte does not match the
+/// version this build understands.
+class UnsupportedLifecycleProtocolVersion implements Exception {
+  const UnsupportedLifecycleProtocolVersion(this.version);
+  final int version;
+
+  @override
+  String toString() =>
+      'UnsupportedLifecycleProtocolVersion: 0x'
+      '${version.toRadixString(16).padLeft(2, '0')}';
+}
+
+/// Encoder/decoder for the lifecycle protocol's wire format.
+///
+/// Stateless. Keep encoding/decoding co-located so wire-format changes
+/// are a single-file edit and unit-tested in one place.
+class LifecycleCodec {
+  const LifecycleCodec();
+
+  /// Encodes a [LifecycleMessage] as `version | marker | senderId(16)`
+  /// (18 bytes total). Suitable for writing to the heartbeat
+  /// characteristic.
+  Uint8List encodeMessage(LifecycleMessage message) {
+    final buf = Uint8List(18);
+    buf[0] = protocolVersion;
+    buf[1] = switch (message) {
+      Heartbeat _ => _markerHeartbeat,
+      CourtesyDisconnect _ => _markerCourtesyDisconnect,
+    };
+    buf.setRange(2, 18, message.senderId.toBytes());
+    return buf;
+  }
+
+  /// Decodes an 18-byte heartbeat-channel write into a [LifecycleMessage].
+  ///
+  /// Throws [MalformedLifecycleMessage] for wrong-length or unknown-marker
+  /// payloads, [UnsupportedLifecycleProtocolVersion] for an unrecognized
+  /// version byte.
+  LifecycleMessage decodeMessage(Uint8List bytes) {
+    if (bytes.length != 18) {
+      throw MalformedLifecycleMessage('expected 18 bytes, got ${bytes.length}');
+    }
+    if (bytes[0] != protocolVersion) {
+      throw UnsupportedLifecycleProtocolVersion(bytes[0]);
+    }
+    final senderId = ServerId.fromBytes(
+      Uint8List.fromList(bytes.sublist(2, 18)),
+    );
+    return switch (bytes[1]) {
+      _markerHeartbeat => Heartbeat(senderId),
+      _markerCourtesyDisconnect => CourtesyDisconnect(senderId),
+      final m =>
+        throw MalformedLifecycleMessage(
+          'unknown marker 0x${m.toRadixString(16).padLeft(2, '0')}',
+        ),
+    };
+  }
+
+  /// Encodes a server's stable identity as `version | serverId(16)`
+  /// (17 bytes total). Returned from the advertised-identity read
+  /// characteristic.
+  Uint8List encodeAdvertisedIdentity(ServerId id) {
+    final buf = Uint8List(17);
+    buf[0] = protocolVersion;
+    buf.setRange(1, 17, id.toBytes());
+    return buf;
+  }
+
+  /// Decodes a 17-byte advertised-identity payload into a [ServerId].
+  ///
+  /// Throws [MalformedLifecycleMessage] for wrong-length payloads,
+  /// [UnsupportedLifecycleProtocolVersion] for an unrecognized version byte.
+  ServerId decodeAdvertisedIdentity(Uint8List bytes) {
+    if (bytes.length != 17) {
+      throw MalformedLifecycleMessage('expected 17 bytes, got ${bytes.length}');
+    }
+    if (bytes[0] != protocolVersion) {
+      throw UnsupportedLifecycleProtocolVersion(bytes[0]);
+    }
+    return ServerId.fromBytes(Uint8List.fromList(bytes.sublist(1, 17)));
+  }
+}
+
+/// Default singleton codec instance. The codec is stateless; reuse
+/// this rather than constructing your own.
+const lifecycleCodec = LifecycleCodec();
 
 /// Decodes a 4-byte little-endian interval value (in milliseconds) from the
 /// interval characteristic.

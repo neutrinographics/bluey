@@ -4,6 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -26,7 +27,7 @@ void main() {
         serverId: id2,
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final peers = await bluey.discoverPeers(
         timeout: const Duration(milliseconds: 500),
       );
@@ -35,7 +36,7 @@ void main() {
     });
 
     test('returns empty list when no Bluey servers advertising', () async {
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final peers = await bluey.discoverPeers(
         timeout: const Duration(milliseconds: 200),
       );
@@ -46,7 +47,7 @@ void main() {
 
   group('bluey.peer', () {
     test('returns a BlueyPeer with the given serverId', () {
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final id = ServerId.generate();
       final peer = bluey.peer(id);
       expect(peer.serverId, equals(id));
@@ -60,7 +61,7 @@ void main() {
         serverId: id,
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final peer = bluey.peer(id);
       final peerConn = await peer.connect();
       expect(peerConn, isA<PeerConnection>());
@@ -76,7 +77,7 @@ void main() {
         serverId: ServerId.generate(),
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final peer = bluey.peer(ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'));
 
       expect(
@@ -97,7 +98,7 @@ void main() {
         serverId: id,
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: 'AA:BB:CC:DD:EE:01',
@@ -135,7 +136,7 @@ void main() {
         ],
       );
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: 'AA:BB:CC:DD:EE:01',

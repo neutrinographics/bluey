@@ -25,11 +25,12 @@ PlatformWriteRequest _writeReq({
   int requestId = 1,
   bool responseNeeded = false,
 }) {
+  final bytes = value is Uint8List ? value : Uint8List.fromList(value);
   return PlatformWriteRequest(
     requestId: requestId,
     centralId: centralId,
     characteristicUuid: characteristicUuid,
-    value: Uint8List.fromList(value),
+    value: bytes,
     offset: 0,
     responseNeeded: responseNeeded,
     characteristicHandle: 0,
@@ -73,7 +74,7 @@ void main() {
 
         final req = _writeReq(
           characteristicUuid: _otherCharUuid,
-          value: [0x01],
+          value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
         );
 
         expect(server.handleWriteRequest(req), isFalse);
@@ -95,7 +96,10 @@ void main() {
         );
 
         final handled = server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
         expect(handled, isTrue);
 
@@ -122,7 +126,10 @@ void main() {
       );
 
       final handled = server.handleWriteRequest(
-        _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x00]),
+        _writeReq(
+          characteristicUuid: _heartbeatCharUuid,
+          value: courtesyDisconnectPayloadFrom(TestServerIds.remoteIdentity),
+        ),
       );
 
       expect(handled, isTrue);
@@ -143,7 +150,7 @@ void main() {
       server.handleWriteRequest(
         _writeReq(
           characteristicUuid: _heartbeatCharUuid,
-          value: [0x01],
+          value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
           requestId: 42,
           responseNeeded: true,
         ),
@@ -173,7 +180,7 @@ void main() {
         server.handleWriteRequest(
           _writeReq(
             characteristicUuid: _heartbeatCharUuid,
-            value: [0x01],
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
             responseNeeded: false,
           ),
         );
@@ -267,7 +274,10 @@ void main() {
 
         // Start a timer.
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
 
         server.cancelTimer(_clientId);
@@ -292,7 +302,10 @@ void main() {
 
         // Start a timer via a heartbeat write.
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
 
         server.dispose();
@@ -304,47 +317,53 @@ void main() {
       });
     });
 
-    test('onHeartbeatReceived fires on heartbeat writes', () {
+    test('onPeerIdentified fires on heartbeat writes with sender identity', () {
       final gone = <String>[];
-      final heartbeats = <String>[];
+      final identifications = <(String, ServerId)>[];
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: gone.add,
-        onHeartbeatReceived: heartbeats.add,
+        onPeerIdentified: (id, sender) => identifications.add((id, sender)),
         logger: testLogger(),
       );
 
       server.handleWriteRequest(
-        _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+        _writeReq(
+          characteristicUuid: _heartbeatCharUuid,
+          value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+        ),
       );
 
-      expect(heartbeats, [_clientId]);
+      expect(identifications, [(_clientId, TestServerIds.remoteIdentity)]);
 
       server.dispose();
     });
 
-    test('onHeartbeatReceived also fires on disconnect command '
+    test('onPeerIdentified also fires on disconnect command '
         '(tracks before disconnect)', () {
       final gone = <String>[];
-      final heartbeats = <String>[];
+      final identifications = <(String, ServerId)>[];
       final server = LifecycleServer(
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
         onClientGone: gone.add,
-        onHeartbeatReceived: heartbeats.add,
+        onPeerIdentified: (id, sender) => identifications.add((id, sender)),
         logger: testLogger(),
       );
 
       server.handleWriteRequest(
-        _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x00]),
+        _writeReq(
+          characteristicUuid: _heartbeatCharUuid,
+          value: courtesyDisconnectPayloadFrom(TestServerIds.remoteIdentity),
+        ),
       );
 
-      // Callback fires BEFORE onClientGone so an untracked client still gets
-      // tracked before being removed.
-      expect(heartbeats, [_clientId]);
+      // Callback fires BEFORE onClientGone so an untracked client still
+      // gets tracked before being removed.
+      expect(identifications, [(_clientId, TestServerIds.remoteIdentity)]);
       expect(gone, [_clientId]);
 
       server.dispose();
@@ -362,7 +381,10 @@ void main() {
         );
 
         final handled = server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
 
         // Write is still handled (returns true) — the control service just
@@ -444,7 +466,10 @@ void main() {
       expect(fakePlatform.respondReadCalls, hasLength(1));
       final call = fakePlatform.respondReadCalls.single;
       expect(call.status, PlatformGattStatus.success);
-      expect(call.value, equals(id.toBytes()));
+      expect(
+        call.value,
+        equals(lifecycle.lifecycleCodec.encodeAdvertisedIdentity(id)),
+      );
 
       server.dispose();
     });
@@ -468,7 +493,7 @@ void main() {
             requestId: 1,
             centralId: clientId,
             characteristicUuid: lifecycle.heartbeatCharUuid,
-            value: lifecycle.heartbeatValue,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
             responseNeeded: false,
             offset: 0,
             characteristicHandle: 0,
@@ -556,7 +581,10 @@ void main() {
 
         // Track the client via a heartbeat write.
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
 
         // App-level request begins. Server is now holding it.
@@ -584,7 +612,10 @@ void main() {
         );
 
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
         server.requestStarted(_clientId, 42);
 
@@ -619,7 +650,10 @@ void main() {
         );
 
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
 
         server.requestStarted(_clientId, 1);
@@ -653,7 +687,10 @@ void main() {
         );
 
         server.handleWriteRequest(
-          _writeReq(characteristicUuid: _heartbeatCharUuid, value: [0x01]),
+          _writeReq(
+            characteristicUuid: _heartbeatCharUuid,
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+          ),
         );
         server.requestStarted(_clientId, 1);
 

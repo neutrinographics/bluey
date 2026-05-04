@@ -563,7 +563,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       ],
       characteristicValues: {
         'b1e70003-0000-1000-8000-00805f9b34fb': encodeInterval(intervalValue),
-        'b1e70004-0000-1000-8000-00805f9b34fb': serverId.toBytes(),
+        'b1e70004-0000-1000-8000-00805f9b34fb': lifecycleCodec
+            .encodeAdvertisedIdentity(serverId),
       },
     );
   }

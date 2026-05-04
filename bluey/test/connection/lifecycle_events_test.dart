@@ -9,6 +9,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 /// I068 — pins the contract that lifecycle-protocol state transitions
 /// surface on `bluey.events` for programmatic monitoring.
@@ -46,7 +47,7 @@ void main() {
           intervalValue: const Duration(seconds: 10),
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -104,7 +105,7 @@ void main() {
           intervalValue: const Duration(seconds: 10),
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -151,7 +152,7 @@ void main() {
           intervalValue: const Duration(seconds: 10),
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -195,7 +196,7 @@ void main() {
           intervalValue: const Duration(seconds: 10),
         );
 
-        final bluey = Bluey();
+        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -236,7 +237,7 @@ void main() {
       final fakePlatform = FakeBlueyPlatform();
       platform.BlueyPlatform.instance = fakePlatform;
 
-      final bluey = Bluey();
+      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
       final server = bluey.server()!;
 
       const clientId = '00000000-0000-0000-0000-000000000001';
@@ -270,7 +271,7 @@ void main() {
       await fakePlatform.simulateWriteRequest(
         centralId: clientId,
         characteristicUuid: lifecycle.heartbeatCharUuid,
-        value: Uint8List.fromList([0x01]),
+        value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
         responseNeeded: true,
       );
       await Future<void>.delayed(Duration.zero);
@@ -315,7 +316,7 @@ void main() {
         final fakePlatform = FakeBlueyPlatform();
         platform.BlueyPlatform.instance = fakePlatform;
 
-        final bluey = Bluey();
+        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         // Short interval so the timer expires quickly under fakeAsync.
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
@@ -342,7 +343,7 @@ void main() {
         fakePlatform.simulateWriteRequest(
           centralId: clientId,
           characteristicUuid: lifecycle.heartbeatCharUuid,
-          value: Uint8List.fromList([0x01]),
+          value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
           responseNeeded: true,
         );
         async.flushMicrotasks();

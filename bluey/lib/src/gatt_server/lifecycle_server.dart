@@ -20,7 +20,7 @@ class LifecycleServer {
   final Duration? _interval;
   final ServerId _serverId;
   final void Function(String clientId) onClientGone;
-  final void Function(String clientId)? onHeartbeatReceived;
+  final void Function(String clientId, ServerId senderId)? onPeerIdentified;
   final BlueyLogger _logger;
   final EventPublisher? _events;
 
@@ -33,7 +33,7 @@ class LifecycleServer {
     required ServerId serverId,
     required this.onClientGone,
     required BlueyLogger logger,
-    this.onHeartbeatReceived,
+    this.onPeerIdentified,
     EventPublisher? events,
   }) : _platform = platformApi,
        _interval = interval,
@@ -87,31 +87,51 @@ class LifecycleServer {
 
     final clientId = req.centralId;
 
-    // Notify that we have a live client sending a control-service write.
-    // This fires for BOTH heartbeats and disconnect commands so that a
+    final lifecycle.LifecycleMessage message;
+    try {
+      message = lifecycle.lifecycleCodec.decodeMessage(req.value);
+    } on lifecycle.MalformedLifecycleMessage catch (e) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.server.lifecycle',
+        'malformed lifecycle write — dropping',
+        data: {'clientId': clientId, 'reason': e.reason},
+      );
+      return true;
+    } on lifecycle.UnsupportedLifecycleProtocolVersion catch (e) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.server.lifecycle',
+        'unsupported lifecycle protocol version — dropping',
+        data: {'clientId': clientId, 'version': e.version},
+      );
+      return true;
+    }
+
+    // Notify that this central has identified itself as a Bluey peer.
+    // Fires for BOTH heartbeats and disconnect commands so that a
     // disconnect from an un-tracked client still tracks them first (so the
     // disconnection event has a client to remove).
-    onHeartbeatReceived?.call(clientId);
+    onPeerIdentified?.call(clientId, message.senderId);
 
-    if (req.value.isNotEmpty && req.value[0] == lifecycle.disconnectValue[0]) {
-      // Client is disconnecting cleanly
-      _logger.log(
-        BlueyLogLevel.info,
-        'bluey.server.lifecycle',
-        'disconnect command received',
-        data: {'clientId': clientId},
-      );
-      cancelTimer(clientId);
-      onClientGone(clientId);
-    } else {
-      _logger.log(
-        BlueyLogLevel.debug,
-        'bluey.server.lifecycle',
-        'heartbeat received',
-        data: {'clientId': clientId},
-      );
-      // Heartbeat — reset the timer
-      _resetTimer(clientId);
+    switch (message) {
+      case lifecycle.CourtesyDisconnect():
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.server.lifecycle',
+          'disconnect command received',
+          data: {'clientId': clientId},
+        );
+        cancelTimer(clientId);
+        onClientGone(clientId);
+      case lifecycle.Heartbeat():
+        _logger.log(
+          BlueyLogLevel.debug,
+          'bluey.server.lifecycle',
+          'heartbeat received',
+          data: {'clientId': clientId},
+        );
+        _resetTimer(clientId);
     }
 
     return true;
@@ -126,7 +146,7 @@ class LifecycleServer {
       _platform.respondToReadRequest(
         req.requestId,
         platform.PlatformGattStatus.success,
-        lifecycle.encodeServerId(_serverId),
+        lifecycle.lifecycleCodec.encodeAdvertisedIdentity(_serverId),
       );
       return true;
     }

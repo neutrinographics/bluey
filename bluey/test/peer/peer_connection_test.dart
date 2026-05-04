@@ -104,6 +104,7 @@ class _SpyLifecycleClient extends LifecycleClient {
     : super(
         platformApi: FakeBlueyPlatform(),
         connectionId: 'spy-connection-id',
+        localIdentity: TestServerIds.localIdentity,
         peerSilenceTimeout: const Duration(seconds: 30),
         onServerUnreachable: _noop,
         logger: _spyLogger,

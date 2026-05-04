@@ -208,7 +208,8 @@ void main() {
       expect(
         bottomSheet.showDragHandle,
         isTrue,
-        reason: 'Help sheet should opt into the Material drag-handle affordance',
+        reason:
+            'Help sheet should opt into the Material drag-handle affordance',
       );
     });
   });

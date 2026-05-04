@@ -10,6 +10,7 @@ import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
+import '../peer/server_id.dart';
 import '../shared/uuid.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
@@ -25,6 +26,7 @@ import 'value_objects/attribute_handle.dart';
 class LifecycleClient {
   final platform.BlueyPlatform _platform;
   final String _connectionId;
+  final ServerId _localIdentity;
   final Duration _peerSilenceTimeout;
   final void Function() onServerUnreachable;
   final BlueyLogger _logger;
@@ -63,6 +65,7 @@ class LifecycleClient {
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
+    required ServerId localIdentity,
     required Duration peerSilenceTimeout,
     required this.onServerUnreachable,
     required BlueyLogger logger,
@@ -71,6 +74,7 @@ class LifecycleClient {
     UUID? deviceId,
   }) : _platform = platformApi,
        _connectionId = connectionId,
+       _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
        _events = events,
@@ -322,7 +326,9 @@ class LifecycleClient {
       await _platform.writeCharacteristic(
         _connectionId,
         charHandle.value,
-        lifecycle.disconnectValue,
+        lifecycle.lifecycleCodec.encodeMessage(
+          lifecycle.CourtesyDisconnect(_localIdentity),
+        ),
         true,
       );
     } catch (_) {
@@ -519,7 +525,9 @@ class LifecycleClient {
         .writeCharacteristic(
           _connectionId,
           charHandle.value,
-          lifecycle.heartbeatValue,
+          lifecycle.lifecycleCodec.encodeMessage(
+            lifecycle.Heartbeat(_localIdentity),
+          ),
           true,
         )
         .then((_) {

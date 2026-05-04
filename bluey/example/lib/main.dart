@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bluey/bluey.dart';
 
+import 'features/server/infrastructure/server_identity_storage.dart';
 import 'shared/di/service_locator.dart';
 import 'app.dart';
 
@@ -32,8 +33,13 @@ void main() async {
     return true;
   };
 
+  // Load the persisted server identity before constructing Bluey so
+  // that both the central-side peer-protocol upgrade path and the
+  // local server can share a single identity-bound instance.
+  final localIdentity = await ServerIdentityStorage().loadOrGenerate();
+
   // Initialize dependency injection
-  await setupServiceLocator();
+  await setupServiceLocator(localIdentity: localIdentity);
 
   // Set up Bluey event logging. Errors no longer have a dedicated stream;
   // they surface as typed BlueyException at the call sites that throw them

@@ -8,6 +8,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 /// Tests for `Bluey.watchPeer` — the streaming convenience over
 /// `tryUpgrade` + `connection.servicesChanges`. Motivated by a real-device
@@ -23,7 +24,7 @@ void main() {
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = Bluey(localIdentity: TestServerIds.localIdentity);
   });
 
   tearDown(() async {
@@ -87,7 +88,8 @@ void main() {
     'b1e70003-0000-1000-8000-00805f9b34fb': lifecycle.encodeInterval(
       const Duration(seconds: 10),
     ),
-    'b1e70004-0000-1000-8000-00805f9b34fb': id.toBytes(),
+    'b1e70004-0000-1000-8000-00805f9b34fb': lifecycle.lifecycleCodec
+        .encodeAdvertisedIdentity(id),
   };
 
   group('Bluey.watchPeer', () {

@@ -18,6 +18,7 @@ import 'server_id.dart';
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
   required ServerId serverId,
+  required ServerId localIdentity,
   required BlueyLogger logger,
   Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   EventPublisher? events,
@@ -25,6 +26,7 @@ BlueyPeer createBlueyPeer({
   return _BlueyPeer(
     platformApi: platformApi,
     serverId: serverId,
+    localIdentity: localIdentity,
     peerSilenceTimeout: peerSilenceTimeout,
     logger: logger,
     events: events,
@@ -33,6 +35,7 @@ BlueyPeer createBlueyPeer({
 
 class _BlueyPeer implements BlueyPeer {
   final platform.BlueyPlatform _platform;
+  final ServerId _localIdentity;
   final Duration _peerSilenceTimeout;
   final BlueyLogger _logger;
   final EventPublisher? _events;
@@ -45,10 +48,12 @@ class _BlueyPeer implements BlueyPeer {
   _BlueyPeer({
     required platform.BlueyPlatform platformApi,
     required this.serverId,
+    required ServerId localIdentity,
     required Duration peerSilenceTimeout,
     required BlueyLogger logger,
     EventPublisher? events,
   }) : _platform = platformApi,
+       _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
        _events = events;
@@ -110,6 +115,7 @@ class _BlueyPeer implements BlueyPeer {
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
         connectionId: blueyConnection.connectionId,
+        localIdentity: _localIdentity,
         peerSilenceTimeout: _peerSilenceTimeout,
         onServerUnreachable: () {
           blueyConnection.disconnect().catchError((_) {});

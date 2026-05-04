@@ -7,6 +7,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_platform.dart';
+import 'fakes/test_helpers.dart';
 
 // Control service UUIDs (must match lifecycle.dart)
 const _controlServiceUuid = 'b1e70001-0000-1000-8000-00805f9b34fb';
@@ -109,7 +110,7 @@ void main() {
       await fakePlatform.simulateWriteRequest(
         centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
-        value: Uint8List.fromList([0x01]),
+        value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
         responseNeeded: true,
       );
       await Future.delayed(Duration.zero);
@@ -152,7 +153,7 @@ void main() {
           fakePlatform.simulateWriteRequest(
             centralId: _clientId1,
             characteristicUuid: _heartbeatCharUuid,
-            value: Uint8List.fromList([0x01]),
+            value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
             responseNeeded: true,
           );
           async.elapse(Duration.zero);
@@ -189,7 +190,7 @@ void main() {
         fakePlatform.simulateWriteRequest(
           centralId: _clientId1,
           characteristicUuid: _heartbeatCharUuid,
-          value: Uint8List.fromList([0x01]),
+          value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
           responseNeeded: true,
         );
         async.elapse(Duration.zero);
@@ -224,7 +225,7 @@ void main() {
       await fakePlatform.simulateWriteRequest(
         centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
-        value: Uint8List.fromList([0x00]),
+        value: courtesyDisconnectPayloadFrom(TestServerIds.remoteIdentity),
         responseNeeded: true,
       );
       await Future.delayed(Duration.zero);
@@ -355,11 +356,11 @@ void main() {
       expect(serverIdChar.properties.canWrite, isFalse);
     });
 
-    test('encodeServerId/decodeServerId round-trip', () {
+    test('LifecycleCodec advertised-identity round-trip', () {
       final id = ServerId.generate();
-      final bytes = encodeServerId(id);
-      expect(bytes, hasLength(16));
-      expect(decodeServerId(bytes), equals(id));
+      final bytes = lifecycleCodec.encodeAdvertisedIdentity(id);
+      expect(bytes, hasLength(17));
+      expect(lifecycleCodec.decodeAdvertisedIdentity(bytes), equals(id));
     });
 
     test(
@@ -396,8 +397,8 @@ void main() {
 
     test('respects an app-supplied identity', () {
       final id = ServerId('11111111-2222-3333-4444-555555555555');
-      final bluey = Bluey();
-      final server = bluey.server(identity: id)!;
+      final bluey = Bluey(localIdentity: id);
+      final server = bluey.server()!;
       expect(server.serverId, equals(id));
       server.dispose();
       bluey.dispose();
@@ -407,8 +408,8 @@ void main() {
       'server responds to serverId reads with the configured identity',
       () async {
         final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-        final bluey = Bluey();
-        final server = bluey.server(identity: id)!;
+        final bluey = Bluey(localIdentity: id);
+        final server = bluey.server()!;
         await server.startAdvertising();
 
         fakePlatform.simulateCentralConnection(centralId: _clientId1);
@@ -422,7 +423,7 @@ void main() {
 
         expect(fakePlatform.respondReadCalls, isNotEmpty);
         final call = fakePlatform.respondReadCalls.last;
-        expect(call.value, equals(id.toBytes()));
+        expect(call.value, equals(lifecycleCodec.encodeAdvertisedIdentity(id)));
 
         await server.dispose();
         await bluey.dispose();
@@ -524,7 +525,7 @@ void main() {
       await fakePlatform.simulateWriteRequest(
         centralId: _clientId1,
         characteristicUuid: _heartbeatCharUuid,
-        value: Uint8List.fromList([0x01]),
+        value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
         responseNeeded: true,
       );
       await Future.delayed(Duration.zero);

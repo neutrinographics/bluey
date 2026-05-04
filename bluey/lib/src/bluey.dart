@@ -86,6 +86,7 @@ class Bluey {
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
   final BlueyLogger _logger = BlueyLogger();
+  final ServerId? _localIdentity;
 
   StreamSubscription? _stateSubscription;
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
@@ -100,10 +101,17 @@ class Bluey {
   ///
   /// Use this constructor when you need multiple isolated Bluey instances.
   ///
+  /// [localIdentity] is the stable [ServerId] this instance announces to
+  /// remote peers in lifecycle heartbeats and uses as the default identity
+  /// for any local [server]. Required when calling [peer] or
+  /// [discoverPeers] (those throw [LocalIdentityRequiredException]
+  /// otherwise) — pure scanner / GATT-client consumers may omit it.
+  ///
   /// Call [dispose] when done to release resources.
-  Bluey()
+  Bluey({ServerId? localIdentity})
     : _platform = platform.BlueyPlatform.instance,
-      _eventBus = BlueyEventBus() {
+      _eventBus = BlueyEventBus(),
+      _localIdentity = localIdentity {
     _stateSubscription = _platform.stateStream.listen(
       (state) {
         _currentState = _mapState(state);
@@ -598,6 +606,7 @@ class Bluey {
     Connection rawConnection, {
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) async {
+    final localIdentity = _requireLocalIdentity('peer-protocol upgrade');
     try {
       _logger.log(
         BlueyLogLevel.debug,
@@ -638,7 +647,7 @@ class Bluey {
       if (serverIdChar != null) {
         try {
           final bytes = await serverIdChar.read();
-          serverId = lifecycle.decodeServerId(bytes);
+          serverId = lifecycle.lifecycleCodec.decodeAdvertisedIdentity(bytes);
         } catch (_) {
           // ServerId read failed — fall through with a generated id so
           // the peer wrapper still installs the lifecycle heartbeat.
@@ -657,6 +666,7 @@ class Bluey {
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
         connectionId: connectionId,
+        localIdentity: localIdentity,
         peerSilenceTimeout: peerSilenceTimeout,
         onServerUnreachable: () {
           rawConnection.disconnect().catchError((_) {});
@@ -749,10 +759,7 @@ class Bluey {
   ///   await server.startAdvertising(name: 'My Device');
   /// }
   /// ```
-  Server? server({
-    Duration? lifecycleInterval = const Duration(seconds: 10),
-    ServerId? identity,
-  }) {
+  Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
@@ -760,7 +767,7 @@ class Bluey {
       _platform,
       _eventBus,
       lifecycleInterval: lifecycleInterval,
-      identity: identity,
+      identity: _localIdentity,
       logger: _logger,
     );
   }
@@ -779,9 +786,11 @@ class Bluey {
     ServerId serverId, {
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) {
+    final identity = _requireLocalIdentity('peer()');
     return createBlueyPeer(
       platformApi: _platform,
       serverId: serverId,
+      localIdentity: identity,
       peerSilenceTimeout: peerSilenceTimeout,
       logger: _logger,
       events: _eventBus,
@@ -802,6 +811,7 @@ class Bluey {
     Duration timeout = const Duration(seconds: 5),
     Duration probeTimeout = PeerDiscovery.defaultProbeTimeout,
   }) async {
+    final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
       platformApi: _platform,
       logger: _logger,
@@ -816,11 +826,20 @@ class Bluey {
           (id) => createBlueyPeer(
             platformApi: _platform,
             serverId: id,
+            localIdentity: identity,
             logger: _logger,
             events: _eventBus,
           ),
         )
         .toList(growable: false);
+  }
+
+  ServerId _requireLocalIdentity(String operation) {
+    final id = _localIdentity;
+    if (id == null) {
+      throw LocalIdentityRequiredException(operation);
+    }
+    return id;
   }
 
   /// Release all resources.

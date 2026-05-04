@@ -52,6 +52,7 @@ _setUpConnectedClient({
   final client = LifecycleClient(
     platformApi: fakePlatform,
     connectionId: _deviceAddress,
+    localIdentity: TestServerIds.localIdentity,
     peerSilenceTimeout: peerSilenceTimeout,
     onServerUnreachable: onServerUnreachable,
     logger: testLogger(),
@@ -100,6 +101,7 @@ void main() {
       final client = LifecycleClient(
         platformApi: fakePlatform,
         connectionId: _deviceAddress,
+        localIdentity: TestServerIds.localIdentity,
         peerSilenceTimeout: const Duration(seconds: 20),
         onServerUnreachable: () {},
         logger: testLogger(),
@@ -163,6 +165,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
           logger: testLogger(),
@@ -228,8 +231,8 @@ void main() {
         final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
           (call) =>
               call.characteristicUuid == lifecycle.heartbeatCharUuid &&
-              call.value.length == 1 &&
-              call.value[0] == 0x01,
+              call.value.length == 18 &&
+              call.value[1] == 0x01,
         );
         expect(
           heartbeatWrites,
@@ -270,7 +273,7 @@ void main() {
         final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
           (call) =>
               call.characteristicUuid == lifecycle.heartbeatCharUuid &&
-              call.value[0] == 0x01,
+              call.value[1] == 0x01,
         );
         expect(
           heartbeatWrites,
@@ -322,8 +325,8 @@ void main() {
                 .where(
                   (c) =>
                       c.characteristicUuid == lifecycle.heartbeatCharUuid &&
-                      c.value.length == 1 &&
-                      c.value[0] == 0x01,
+                      c.value.length == 18 &&
+                      c.value[1] == 0x01,
                 )
                 .length;
         expect(
@@ -342,8 +345,8 @@ void main() {
                 .where(
                   (c) =>
                       c.characteristicUuid == lifecycle.heartbeatCharUuid &&
-                      c.value.length == 1 &&
-                      c.value[0] == 0x01,
+                      c.value.length == 18 &&
+                      c.value[1] == 0x01,
                 )
                 .length;
         expect(
@@ -400,6 +403,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
           servicesChanges: servicesChangesController.stream,
@@ -516,6 +520,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
           logger: testLogger(),
@@ -533,7 +538,7 @@ void main() {
         final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
           (call) =>
               call.characteristicUuid == lifecycle.heartbeatCharUuid &&
-              call.value[0] == 0x01,
+              call.value[1] == 0x01,
         );
         expect(
           heartbeatWrites,
@@ -604,6 +609,7 @@ void main() {
           final client = LifecycleClient(
             platformApi: fakePlatform,
             connectionId: _deviceAddress,
+            localIdentity: TestServerIds.localIdentity,
             peerSilenceTimeout: const Duration(seconds: 20),
             onServerUnreachable: () {},
             logger: testLogger(),
@@ -621,7 +627,7 @@ void main() {
           final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
             (call) =>
                 call.characteristicUuid == lifecycle.heartbeatCharUuid &&
-                call.value[0] == 0x01,
+                call.value[1] == 0x01,
           );
           expect(
             heartbeatWrites,
@@ -681,8 +687,8 @@ void main() {
         final disconnectWrites = fakePlatform.writeCharacteristicCalls.where(
           (call) =>
               call.characteristicUuid == lifecycle.heartbeatCharUuid &&
-              call.value.length == 1 &&
-              call.value[0] == 0x00 &&
+              call.value.length == 18 &&
+              call.value[1] == 0x00 &&
               call.withResponse == true,
         );
         expect(
@@ -1709,6 +1715,7 @@ void main() {
         final client = LifecycleClient(
           platformApi: fakePlatform,
           connectionId: _deviceAddress,
+          localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 20),
           onServerUnreachable: () {},
           logger: testLogger(),
