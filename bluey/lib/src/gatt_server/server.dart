@@ -136,13 +136,15 @@ abstract class Server {
   /// [peerDiscoverable] - When `true`, the Bluey lifecycle control service
   /// UUID is included in the advertising payload so other Bluey clients
   /// can find this server via `bluey.discoverPeers()`. Defaults to
-  /// `false`. On Android, including the control UUID consumes ~18 bytes
-  /// from the 31-byte legacy advertising budget; combine carefully with
-  /// [services] and [manufacturerData] or you'll exceed the limit and
-  /// `startAdvertising` will fail. On iOS, 128-bit service UUIDs that
-  /// overflow the primary advertisement are auto-promoted to the
-  /// overflow area, so the cost competes only with other 128-bit
-  /// service UUIDs you advertise.
+  /// `false`. On Android the control UUID rides in the scan-response
+  /// packet (a separate 31-byte buffer transmitted in response to active
+  /// scans), leaving the primary 31-byte advertisement budget for
+  /// [services] and [manufacturerData] (I313). On iOS the control UUID
+  /// is folded into the unified advertisement and competes with
+  /// [services] for primary-slot priority via CoreBluetooth's overflow
+  /// ordering — the peer-discovery UUID is prepended so it stays in
+  /// primary while user UUIDs land in overflow when the primary AD is
+  /// full.
   ///
   /// Throws [AdvertisingException] if advertising fails.
   Future<void> startAdvertising({
