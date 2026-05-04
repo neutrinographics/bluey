@@ -81,11 +81,11 @@ class Advertiser(
 
         val settings = settingsBuilder.build()
 
-        // Build advertise data - keep it minimal, put service UUIDs here
+        // Build primary advertise data — keep it minimal, put the user's
+        // service UUIDs here.
         val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false) // Don't include name in main packet to save space
 
-        // Add service UUIDs to main advertise data
         for (uuidString in config.serviceUuids) {
             try {
                 val uuid = UUID.fromString(normalizeUuid(uuidString))
@@ -104,9 +104,20 @@ class Advertiser(
 
         val advertiseData = dataBuilder.build()
 
-        // Build scan response - put device name here
+        // Build scan response — device name plus any caller-supplied
+        // scan-response UUIDs (I313: the Bluey lifecycle control UUID
+        // routes here when peerDiscoverable=true).
         val scanResponseBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(config.name != null)
+
+        for (uuidString in config.scanResponseServiceUuids) {
+            try {
+                val uuid = UUID.fromString(normalizeUuid(uuidString))
+                scanResponseBuilder.addServiceUuid(ParcelUuid(uuid))
+            } catch (e: IllegalArgumentException) {
+                // Invalid UUID, skip
+            }
+        }
 
         val scanResponse = scanResponseBuilder.build()
 
@@ -139,15 +150,21 @@ class Advertiser(
 
             override fun onStartFailure(errorCode: Int) {
                 isAdvertising = false
-                val errorMessage = when (errorCode) {
-                    ADVERTISE_FAILED_DATA_TOO_LARGE -> "Advertise data too large"
-                    ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Too many advertisers"
-                    ADVERTISE_FAILED_ALREADY_STARTED -> "Already started"
-                    ADVERTISE_FAILED_INTERNAL_ERROR -> "Internal error"
-                    ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "Feature unsupported"
-                    else -> "Unknown error: $errorCode"
+                val error: BlueyAndroidError = when (errorCode) {
+                    ADVERTISE_FAILED_DATA_TOO_LARGE ->
+                        BlueyAndroidError.AdvertiseDataTooLarge("Advertise data too large")
+                    ADVERTISE_FAILED_TOO_MANY_ADVERTISERS ->
+                        BlueyAndroidError.AdvertisingStartFailed("Too many advertisers")
+                    ADVERTISE_FAILED_ALREADY_STARTED ->
+                        BlueyAndroidError.AdvertisingStartFailed("Already started")
+                    ADVERTISE_FAILED_INTERNAL_ERROR ->
+                        BlueyAndroidError.AdvertisingStartFailed("Internal error")
+                    ADVERTISE_FAILED_FEATURE_UNSUPPORTED ->
+                        BlueyAndroidError.AdvertisingStartFailed("Feature unsupported")
+                    else ->
+                        BlueyAndroidError.AdvertisingStartFailed("Unknown error: $errorCode")
                 }
-                callback(Result.failure(BlueyAndroidError.AdvertisingStartFailed(errorMessage)))
+                callback(Result.failure(error))
             }
         }
 

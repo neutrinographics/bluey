@@ -798,7 +798,8 @@ void main() {
       });
 
       test(
-        'startAdvertising(peerDiscoverable: true) prepends control UUID',
+        'startAdvertising(peerDiscoverable: true) routes control UUID to '
+        'scan response, leaving primary UUIDs untouched (I313)',
         () async {
           final server = bluey.server()!;
 
@@ -807,9 +808,19 @@ void main() {
             peerDiscoverable: true,
           );
 
-          final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
-          expect(advertised, hasLength(2));
-          expect(advertised?.first, equals(lifecycle.controlServiceUuid));
+          final last = mockPlatform.lastAdvertiseConfig!;
+          // Primary AD carries only the user's UUID — the control UUID
+          // moves to scan response so we don't blow the 31-byte budget on
+          // Android.
+          expect(last.serviceUuids, hasLength(1));
+          expect(
+            last.serviceUuids.first,
+            equals(UUID.short(0x180F).toString().toLowerCase()),
+          );
+          expect(
+            last.scanResponseServiceUuids,
+            equals([lifecycle.controlServiceUuid]),
+          );
         },
       );
 
@@ -833,9 +844,90 @@ void main() {
 
         await server.startAdvertising(peerDiscoverable: true);
 
-        final advertised = mockPlatform.lastAdvertiseConfig?.serviceUuids;
-        expect(advertised, equals([lifecycle.controlServiceUuid]));
+        // I313: with no user services, primary AD is empty and the
+        // control UUID rides alone in scan response.
+        final last = mockPlatform.lastAdvertiseConfig!;
+        expect(last.serviceUuids, isEmpty);
+        expect(
+          last.scanResponseServiceUuids,
+          equals([lifecycle.controlServiceUuid]),
+        );
       });
+
+      // I313: on Android the primary advertising packet is 31 bytes; a
+      // 128-bit user UUID and the 128-bit lifecycle control UUID together
+      // overflow the budget. Routing the control UUID into the scan
+      // response (a separate 31-byte packet) keeps user UUIDs in the
+      // primary AD and avoids ADVERTISE_FAILED_DATA_TOO_LARGE.
+      test(
+        'startAdvertising(peerDiscoverable: true) routes control UUID to '
+        'scanResponseServiceUuids, leaves user UUIDs in primary',
+        () async {
+          final server = bluey.server()!;
+          await server.addService(
+            HostedService(
+              uuid: UUID('12345678-1234-1234-1234-123456789abc'),
+              isPrimary: true,
+              characteristics: const [],
+            ),
+          );
+          await server.startAdvertising(
+            services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
+            peerDiscoverable: true,
+          );
+
+          final last = mockPlatform.lastAdvertiseConfig!;
+          expect(
+            last.serviceUuids,
+            equals(['f0000000-0000-1000-8000-00805f9b34fb']),
+            reason: 'user UUIDs stay in primary AD',
+          );
+          expect(
+            last.scanResponseServiceUuids,
+            equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
+            reason: 'control UUID routes to scan response (I313)',
+          );
+        },
+      );
+
+      test(
+        'startAdvertising(peerDiscoverable: false) leaves '
+        'scanResponseServiceUuids empty',
+        () async {
+          final server = bluey.server()!;
+          await server.startAdvertising(
+            services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
+            peerDiscoverable: false,
+          );
+
+          final last = mockPlatform.lastAdvertiseConfig!;
+          expect(
+            last.serviceUuids,
+            equals(['f0000000-0000-1000-8000-00805f9b34fb']),
+          );
+          expect(last.scanResponseServiceUuids, isEmpty);
+        },
+      );
+
+      test(
+        'startAdvertising(peerDiscoverable: true) does not duplicate '
+        'control UUID across primary and scan response when caller '
+        'already lists it explicitly',
+        () async {
+          final server = bluey.server()!;
+          await server.startAdvertising(
+            services: [UUID('b1e70001-0000-1000-8000-00805f9b34fb')],
+            peerDiscoverable: true,
+          );
+
+          final last = mockPlatform.lastAdvertiseConfig!;
+          expect(
+            last.serviceUuids,
+            equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
+          );
+          expect(last.scanResponseServiceUuids, isEmpty);
+        },
+      );
     });
 
     group('Central Connections', () {

@@ -831,6 +831,19 @@ struct LocalServiceDto: Hashable {
 struct AdvertiseConfigDto: Hashable {
   var name: String? = nil
   var serviceUuids: [String]
+  /// Service UUIDs flagged for routing to the platform's secondary
+  /// advertising slot.
+  ///
+  /// On iOS this maps to "prepend into the unified
+  /// `CBAdvertisementDataServiceUUIDsKey` list" so the UUID retains
+  /// primary-slot priority via CoreBluetooth's overflow ordering —
+  /// CoreBluetooth doesn't expose scan response separately, and
+  /// overflow handles the equivalent secondary visibility for iOS-side
+  /// scanners (foreground iOS-to-iOS works) while Android scanners see
+  /// the UUID in the primary AD packet (see I313). The field name
+  /// matches `bluey_android` for DTO symmetry; the intent is
+  /// platform-independent.
+  var scanResponseServiceUuids: [String]
   var manufacturerDataCompanyId: Int64? = nil
   var manufacturerData: FlutterStandardTypedData? = nil
   var timeoutMs: Int64? = nil
@@ -840,13 +853,15 @@ struct AdvertiseConfigDto: Hashable {
   static func fromList(_ pigeonVar_list: [Any?]) -> AdvertiseConfigDto? {
     let name: String? = nilOrValue(pigeonVar_list[0])
     let serviceUuids = pigeonVar_list[1] as! [String]
-    let manufacturerDataCompanyId: Int64? = nilOrValue(pigeonVar_list[2])
-    let manufacturerData: FlutterStandardTypedData? = nilOrValue(pigeonVar_list[3])
-    let timeoutMs: Int64? = nilOrValue(pigeonVar_list[4])
+    let scanResponseServiceUuids = pigeonVar_list[2] as! [String]
+    let manufacturerDataCompanyId: Int64? = nilOrValue(pigeonVar_list[3])
+    let manufacturerData: FlutterStandardTypedData? = nilOrValue(pigeonVar_list[4])
+    let timeoutMs: Int64? = nilOrValue(pigeonVar_list[5])
 
     return AdvertiseConfigDto(
       name: name,
       serviceUuids: serviceUuids,
+      scanResponseServiceUuids: scanResponseServiceUuids,
       manufacturerDataCompanyId: manufacturerDataCompanyId,
       manufacturerData: manufacturerData,
       timeoutMs: timeoutMs
@@ -856,6 +871,7 @@ struct AdvertiseConfigDto: Hashable {
     return [
       name,
       serviceUuids,
+      scanResponseServiceUuids,
       manufacturerDataCompanyId,
       manufacturerData,
       timeoutMs,
@@ -865,13 +881,14 @@ struct AdvertiseConfigDto: Hashable {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.name, rhs.name) && deepEqualsMessages(lhs.serviceUuids, rhs.serviceUuids) && deepEqualsMessages(lhs.manufacturerDataCompanyId, rhs.manufacturerDataCompanyId) && deepEqualsMessages(lhs.manufacturerData, rhs.manufacturerData) && deepEqualsMessages(lhs.timeoutMs, rhs.timeoutMs)
+    return deepEqualsMessages(lhs.name, rhs.name) && deepEqualsMessages(lhs.serviceUuids, rhs.serviceUuids) && deepEqualsMessages(lhs.scanResponseServiceUuids, rhs.scanResponseServiceUuids) && deepEqualsMessages(lhs.manufacturerDataCompanyId, rhs.manufacturerDataCompanyId) && deepEqualsMessages(lhs.manufacturerData, rhs.manufacturerData) && deepEqualsMessages(lhs.timeoutMs, rhs.timeoutMs)
   }
 
   func hash(into hasher: inout Hasher) {
     hasher.combine("AdvertiseConfigDto")
     deepHashMessages(value: name, hasher: &hasher)
     deepHashMessages(value: serviceUuids, hasher: &hasher)
+    deepHashMessages(value: scanResponseServiceUuids, hasher: &hasher)
     deepHashMessages(value: manufacturerDataCompanyId, hasher: &hasher)
     deepHashMessages(value: manufacturerData, hasher: &hasher)
     deepHashMessages(value: timeoutMs, hasher: &hasher)

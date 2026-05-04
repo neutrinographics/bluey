@@ -106,6 +106,19 @@ void main() {
       expect(platformExc.code, 'bluey-some-future-code');
     });
 
+    test('PlatformAdvertiseDataTooLargeException → '
+        'AdvertisingException(dataTooBig)', () {
+      final result = translatePlatformException(
+        const platform.PlatformAdvertiseDataTooLargeException(
+          'AD payload exceeded 31 bytes',
+        ),
+        operation: 'startAdvertising',
+      );
+      expect(result, isA<AdvertisingException>());
+      final advertising = result as AdvertisingException;
+      expect(advertising.reason, AdvertisingFailureReason.dataTooBig);
+    });
+
     test('PlatformPermissionDeniedException → PermissionDeniedException '
         'wrapping the single denied permission', () {
       final result = translatePlatformException(

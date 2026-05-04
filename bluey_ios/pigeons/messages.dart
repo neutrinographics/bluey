@@ -208,6 +208,21 @@ class LocalServiceDto {
 class AdvertiseConfigDto {
   final String? name;
   final List<String> serviceUuids;
+
+  /// Service UUIDs flagged for routing to the platform's secondary
+  /// advertising slot.
+  ///
+  /// On iOS this maps to "prepend into the unified
+  /// `CBAdvertisementDataServiceUUIDsKey` list" so the UUID retains
+  /// primary-slot priority via CoreBluetooth's overflow ordering —
+  /// CoreBluetooth doesn't expose scan response separately, and
+  /// overflow handles the equivalent secondary visibility for iOS-side
+  /// scanners (foreground iOS-to-iOS works) while Android scanners see
+  /// the UUID in the primary AD packet (see I313). The field name
+  /// matches `bluey_android` for DTO symmetry; the intent is
+  /// platform-independent.
+  final List<String> scanResponseServiceUuids;
+
   final int? manufacturerDataCompanyId;
   final Uint8List? manufacturerData;
   final int? timeoutMs;
@@ -215,6 +230,7 @@ class AdvertiseConfigDto {
   AdvertiseConfigDto({
     this.name,
     required this.serviceUuids,
+    this.scanResponseServiceUuids = const [],
     this.manufacturerDataCompanyId,
     this.manufacturerData,
     this.timeoutMs,

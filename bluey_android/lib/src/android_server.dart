@@ -86,16 +86,28 @@ class AndroidServer {
   // === Advertising ===
 
   /// Starts advertising with the given configuration.
+  ///
+  /// Translates the Pigeon `'bluey-advertise-data-too-large'` error code
+  /// to the typed [PlatformAdvertiseDataTooLargeException]; other
+  /// `PlatformException`s propagate unchanged.
   Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
     final dto = AdvertiseConfigDto(
       name: config.name,
       serviceUuids: config.serviceUuids,
+      scanResponseServiceUuids: config.scanResponseServiceUuids,
       manufacturerDataCompanyId: config.manufacturerDataCompanyId,
       manufacturerData: config.manufacturerData,
       timeoutMs: config.timeoutMs,
       mode: _mapAdvertiseModeToDto(config.mode),
     );
-    await _hostApi.startAdvertising(dto);
+    try {
+      await _hostApi.startAdvertising(dto);
+    } on PlatformException catch (e) {
+      if (e.code == 'bluey-advertise-data-too-large') {
+        throw PlatformAdvertiseDataTooLargeException(e.message ?? '');
+      }
+      rethrow;
+    }
   }
 
   /// Stops advertising.

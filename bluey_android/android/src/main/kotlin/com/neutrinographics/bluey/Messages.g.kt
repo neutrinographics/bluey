@@ -942,6 +942,13 @@ data class LocalServiceDto (
 data class AdvertiseConfigDto (
   val name: String? = null,
   val serviceUuids: List<String>,
+  /**
+   * Service UUIDs to put in the scan-response packet.
+   *
+   * See `bluey_platform_interface`'s `PlatformAdvertiseConfig` for the
+   * rationale (I313).
+   */
+  val scanResponseServiceUuids: List<String>,
   val manufacturerDataCompanyId: Long? = null,
   val manufacturerData: ByteArray? = null,
   val timeoutMs: Long? = null,
@@ -960,17 +967,19 @@ data class AdvertiseConfigDto (
     fun fromList(pigeonVar_list: List<Any?>): AdvertiseConfigDto {
       val name = pigeonVar_list[0] as String?
       val serviceUuids = pigeonVar_list[1] as List<String>
-      val manufacturerDataCompanyId = pigeonVar_list[2] as Long?
-      val manufacturerData = pigeonVar_list[3] as ByteArray?
-      val timeoutMs = pigeonVar_list[4] as Long?
-      val mode = pigeonVar_list[5] as AdvertiseModeDto?
-      return AdvertiseConfigDto(name, serviceUuids, manufacturerDataCompanyId, manufacturerData, timeoutMs, mode)
+      val scanResponseServiceUuids = pigeonVar_list[2] as List<String>
+      val manufacturerDataCompanyId = pigeonVar_list[3] as Long?
+      val manufacturerData = pigeonVar_list[4] as ByteArray?
+      val timeoutMs = pigeonVar_list[5] as Long?
+      val mode = pigeonVar_list[6] as AdvertiseModeDto?
+      return AdvertiseConfigDto(name, serviceUuids, scanResponseServiceUuids, manufacturerDataCompanyId, manufacturerData, timeoutMs, mode)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       name,
       serviceUuids,
+      scanResponseServiceUuids,
       manufacturerDataCompanyId,
       manufacturerData,
       timeoutMs,
@@ -985,13 +994,14 @@ data class AdvertiseConfigDto (
       return true
     }
     val other = other as AdvertiseConfigDto
-    return MessagesPigeonUtils.deepEquals(this.name, other.name) && MessagesPigeonUtils.deepEquals(this.serviceUuids, other.serviceUuids) && MessagesPigeonUtils.deepEquals(this.manufacturerDataCompanyId, other.manufacturerDataCompanyId) && MessagesPigeonUtils.deepEquals(this.manufacturerData, other.manufacturerData) && MessagesPigeonUtils.deepEquals(this.timeoutMs, other.timeoutMs) && MessagesPigeonUtils.deepEquals(this.mode, other.mode)
+    return MessagesPigeonUtils.deepEquals(this.name, other.name) && MessagesPigeonUtils.deepEquals(this.serviceUuids, other.serviceUuids) && MessagesPigeonUtils.deepEquals(this.scanResponseServiceUuids, other.scanResponseServiceUuids) && MessagesPigeonUtils.deepEquals(this.manufacturerDataCompanyId, other.manufacturerDataCompanyId) && MessagesPigeonUtils.deepEquals(this.manufacturerData, other.manufacturerData) && MessagesPigeonUtils.deepEquals(this.timeoutMs, other.timeoutMs) && MessagesPigeonUtils.deepEquals(this.mode, other.mode)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
     result = 31 * result + MessagesPigeonUtils.deepHash(this.name)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.serviceUuids)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.scanResponseServiceUuids)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.manufacturerDataCompanyId)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.manufacturerData)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.timeoutMs)

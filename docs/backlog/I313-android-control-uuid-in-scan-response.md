@@ -4,8 +4,9 @@ title: Auto-include control UUID in Android scan response so peerDiscoverable ca
 category: unimplemented
 severity: medium
 platform: android
-status: open
-last_verified: 2026-05-01
+status: fixed
+last_verified: 2026-05-04
+fixed_in: c91d32b
 related: [I055, I051]
 ---
 

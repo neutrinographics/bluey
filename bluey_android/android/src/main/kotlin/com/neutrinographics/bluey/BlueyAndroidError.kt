@@ -85,6 +85,15 @@ internal sealed class BlueyAndroidError(message: String) : Exception(message) {
 
     data class AdvertisingStartFailed(val reason: String) : BlueyAndroidError(reason)
 
+    /**
+     * The Android BLE stack rejected the advertisement payload because it
+     * exceeded the 31-byte (or 31 + 31-byte scan response) limit. Surfaces
+     * as `bluey-advertise-data-too-large` so the Dart adapter can throw the
+     * typed `PlatformAdvertiseDataTooLargeException`, which the domain
+     * layer translates to `AdvertisingException(AdvertisingFailureReason.dataTooBig)`.
+     */
+    data class AdvertiseDataTooLarge(val reason: String) : BlueyAndroidError(reason)
+
     data class NotInitialized(val component: String) :
         BlueyAndroidError("$component not initialized")
 

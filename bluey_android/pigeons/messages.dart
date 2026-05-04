@@ -226,6 +226,13 @@ enum AdvertiseModeDto {
 class AdvertiseConfigDto {
   final String? name;
   final List<String> serviceUuids;
+
+  /// Service UUIDs to put in the scan-response packet.
+  ///
+  /// See `bluey_platform_interface`'s `PlatformAdvertiseConfig` for the
+  /// rationale (I313).
+  final List<String> scanResponseServiceUuids;
+
   final int? manufacturerDataCompanyId;
   final Uint8List? manufacturerData;
   final int? timeoutMs;
@@ -241,6 +248,7 @@ class AdvertiseConfigDto {
   AdvertiseConfigDto({
     this.name,
     required this.serviceUuids,
+    this.scanResponseServiceUuids = const [],
     this.manufacturerDataCompanyId,
     this.manufacturerData,
     this.timeoutMs,

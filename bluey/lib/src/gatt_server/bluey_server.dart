@@ -327,15 +327,25 @@ class BlueyServer implements Server {
       }
     }
 
-    final advertisedUuids =
+    final primaryUuids =
         services?.map((u) => u.toString().toLowerCase()).toList() ?? [];
-    if (peerDiscoverable &&
-        !advertisedUuids.contains(lifecycle.controlServiceUuid)) {
-      advertisedUuids.insert(0, lifecycle.controlServiceUuid);
-    }
+    // I313: route the lifecycle control UUID to scan-response (Android's
+    // separate 31-byte buffer) so it doesn't compete with the user's UUIDs
+    // for the primary-AD budget. iOS ignores scanResponseServiceUuids —
+    // CoreBluetooth's overflow area already handles the equivalent.
+    //
+    // If the caller listed the control UUID explicitly in `services`, we
+    // honour that and skip scan-response promotion to avoid emitting the
+    // same UUID twice.
+    final scanResponseUuids = <String>[
+      if (peerDiscoverable &&
+          !primaryUuids.contains(lifecycle.controlServiceUuid))
+        lifecycle.controlServiceUuid,
+    ];
     final config = platform.PlatformAdvertiseConfig(
       name: name,
-      serviceUuids: advertisedUuids,
+      serviceUuids: primaryUuids,
+      scanResponseServiceUuids: scanResponseUuids,
       manufacturerDataCompanyId: manufacturerData?.companyId,
       manufacturerData: manufacturerData?.data,
       timeoutMs: timeout?.inMilliseconds,

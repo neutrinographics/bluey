@@ -677,6 +677,21 @@ enum PlatformAdvertiseMode {
 class PlatformAdvertiseConfig {
   final String? name;
   final List<String> serviceUuids;
+
+  /// Service UUIDs to put in the scan-response packet (Android only).
+  ///
+  /// Android exposes a separate 31-byte scan-response buffer transmitted
+  /// in response to active scans. Routing the Bluey lifecycle control
+  /// UUID here keeps it out of the primary 31-byte budget so the user's
+  /// app UUIDs aren't crowded out (see I313). Active scanners — including
+  /// iOS CoreBluetooth's default centrals and Android's own scanner —
+  /// receive scan-response data alongside the primary advertisement.
+  ///
+  /// Ignored on iOS: CoreBluetooth doesn't expose scan-response separately
+  /// and its overflow area already provides the equivalent secondary slot.
+  /// Defaults to an empty list.
+  final List<String> scanResponseServiceUuids;
+
   final int? manufacturerDataCompanyId;
   final Uint8List? manufacturerData;
   final int? timeoutMs;
@@ -692,6 +707,7 @@ class PlatformAdvertiseConfig {
   const PlatformAdvertiseConfig({
     this.name,
     required this.serviceUuids,
+    this.scanResponseServiceUuids = const [],
     this.manufacturerDataCompanyId,
     this.manufacturerData,
     this.timeoutMs,
