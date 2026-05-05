@@ -106,6 +106,21 @@ abstract class Server {
   /// Currently connected clients.
   List<Client> get connectedClients;
 
+  /// Whether a client with [address] is currently attached to this server.
+  ///
+  /// [address] is the platform-level identifier — MAC on Android,
+  /// `CBPeer.identifier` UUID string on iOS — and matches both
+  /// `Client.id` (peripheral side) and `Device.address` (central side)
+  /// for the same physical peer. Apps performing bidirectional discovery
+  /// can call `server.isClientConnected(device.address)` before
+  /// `bluey.connectAsPeer(device)` to avoid opening a redundant central
+  /// link to a device already attached as a client.
+  ///
+  /// On iOS this is critical: see I324 / `docs/cross-platform-quirks.md`.
+  /// Returns true regardless of whether the client has identified itself
+  /// as a Bluey peer via the lifecycle protocol.
+  bool isClientConnected(String address);
+
   /// Add a service to the GATT database.
   ///
   /// Must be called before [startAdvertising].

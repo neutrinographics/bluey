@@ -985,6 +985,77 @@ void main() {
 
         expect(server.connectedClients, isEmpty);
       });
+
+      // I323: address-keyed lookup so consumers can guard `connectAsPeer`
+      // against the iOS dual-role peer-merge trap (I324). The clientId
+      // observed peripheral-side and the `Device.address` observed
+      // central-side are the same identifier per platform (MAC on
+      // Android, CBPeer.identifier UUID on iOS), so an address-equality
+      // check answers "is this device already attached to me?".
+      group('isClientConnected', () {
+        test('returns false before any connection', () {
+          final server = bluey.server()!;
+
+          expect(server.isClientConnected('central-1'), isFalse);
+        });
+
+        test('returns true once the central has connected', () async {
+          final server = bluey.server()!;
+          server.connections.listen((_) {});
+
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 512),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+
+          expect(server.isClientConnected('central-1'), isTrue);
+        });
+
+        test(
+          'returns true regardless of whether the central has identified '
+          'as a Bluey peer',
+          () async {
+            final server = bluey.server()!;
+            server.connections.listen((_) {});
+
+            mockPlatform.emitCentralConnected(
+              const platform.PlatformCentral(id: 'central-1', mtu: 512),
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+
+            // No heartbeat written, so the central has not been promoted
+            // to a PeerClient — but it is still connected and the guard
+            // must report it as such.
+            expect(server.isClientConnected('central-1'), isTrue);
+          },
+        );
+
+        test('returns false after the central disconnects', () async {
+          final server = bluey.server()!;
+          server.connections.listen((_) {});
+
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 512),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          mockPlatform.emitCentralDisconnected('central-1');
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+
+          expect(server.isClientConnected('central-1'), isFalse);
+        });
+
+        test('does not match other connected centrals by address', () async {
+          final server = bluey.server()!;
+          server.connections.listen((_) {});
+
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 512),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+
+          expect(server.isClientConnected('central-2'), isFalse);
+        });
+      });
     });
 
     group('Peer Identification', () {

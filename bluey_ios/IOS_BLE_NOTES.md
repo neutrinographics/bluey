@@ -138,6 +138,18 @@ This is an intentional Apple design decision, not a bug.
 
 **Recommended workaround:** For applications that need reliable cross-platform disconnect, use an application-level disconnect protocol — have the client write a "disconnect command" to a custom characteristic, and let the server initiate the disconnection from its side. The server's `LL_TERMINATE_IND` is always sent because the server owns the connection.
 
+### Single LL Connection Per Peer Across Roles (CBPeer Shared Identity)
+
+Apple's `CBPeer` is the parent class of both `CBCentral` and `CBPeripheral`, with a single stable `identifier` UUID per peer regardless of GAP role. CoreBluetooth multiplexes a **single LL connection per peer pair**; the central / peripheral types are roles over that one link, not separate links.
+
+**Concrete consequence.** If a remote device A is connected as a central to our `CBPeripheralManager` (we are peripheral), and we later call `centralManager.connect(peripheralForA)` to attach as central, CoreBluetooth does not open a second link — it returns a `CBPeripheral` handle that shares the existing physical connection. A subsequent `cancelPeripheralConnection` on that handle tears down the **only** link, which also invalidates the peripheral-side handle.
+
+**Comparison with Android.** Android opens two independent LL connections in the equivalent scenario (one per direction). Disconnecting one has no effect on the other. iOS's behavior is qualitatively different and cannot be hidden by the platform abstraction.
+
+**Implication for bluey.** `BlueyServer.disconnectCentral` and `Connection.disconnect` (issued via `cancelPeripheralConnection` / `cancelPeripheralConnection`-equivalent) cannot be assumed to affect only the role they were issued from when the same peer is attached in both roles. The user-facing fix is the address-keyed dedup pattern documented in `bluey/docs/cross-platform-quirks.md` and surfaced as `Server.isClientConnected(address)`.
+
+**Verification:** reproduced 2026-05-05 on iOS 18 + Android 14 in the gossip_chat dogfood app.
+
 ### BLE Address Rotation
 
 iOS uses random resolvable BLE addresses for privacy. Each time an iOS device connects to a peripheral, it may use a different random MAC address. This means:

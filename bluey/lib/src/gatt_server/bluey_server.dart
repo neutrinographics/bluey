@@ -192,6 +192,10 @@ class BlueyServer implements Server {
   List<Client> get connectedClients => _connectedClients.values.toList();
 
   @override
+  bool isClientConnected(String address) =>
+      _connectedClients.containsKey(address);
+
+  @override
   Future<void> addService(HostedService service) async {
     _logger.log(
       BlueyLogLevel.info,

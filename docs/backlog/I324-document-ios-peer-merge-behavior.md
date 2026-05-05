@@ -4,10 +4,23 @@ title: Document iOS CoreBluetooth peer-merge behavior on dual-role connections
 category: docs
 severity: low
 platform: ios
-status: open
+status: fixed
 last_verified: 2026-05-05
 related: [I323]
 ---
+
+## Resolution (2026-05-05)
+
+Documentation landed in five places:
+
+- **`Bluey.connectAsPeer`** doc-comment (`bluey/lib/src/bluey.dart`) — iOS caveat paragraph with pointer to `Server.isClientConnected` as the suggested guard.
+- **`Bluey.tryUpgrade`** doc-comment (`bluey/lib/src/bluey.dart`) — same caveat, since the trap is at `cancelPeripheralConnection`-time regardless of how the connection was acquired.
+- **`PeerConnection.disconnect`** doc-comment (`bluey/lib/src/peer/peer_connection.dart`) — short note that on iOS this tears down the shared LL link with any peripheral-side handle for the same peer.
+- **`bluey/docs/cross-platform-quirks.md`** (new) — consumer-facing reference that explains the `CBPeer` shared-identifier behavior, the recommended dedup pattern, and why `tryUpgrade` is also affected. Linked from top-level `CLAUDE.md`.
+- **`bluey_ios/IOS_BLE_NOTES.md`** — maintainer-flavored entry under "Central Role" titled "Single LL Connection Per Peer Across Roles (CBPeer Shared Identity)", explaining the CoreBluetooth-level mechanism for platform-package maintainers.
+
+The consumer-facing `cross-platform-quirks.md` and the maintainer-facing `IOS_BLE_NOTES.md` deliberately serve different audiences — they cross-reference rather than duplicate.
+
 
 ## Symptom
 

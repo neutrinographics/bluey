@@ -440,6 +440,18 @@ class Bluey {
   /// Throws [NotABlueyPeerException] if the device connected but does
   /// not host the Bluey control service. The underlying connection has
   /// already been disconnected when this is thrown.
+  ///
+  /// **iOS caveat (bidirectional discovery).** On iOS, Core Bluetooth
+  /// represents a peer device as a single `CBPeer` regardless of GAP
+  /// role, with one underlying LL connection per pair. If your app
+  /// already holds a peripheral-side handle for [device] (i.e. that
+  /// device previously connected to your local [Server]), do **not**
+  /// call [connectAsPeer] for it: the new central-role connection will
+  /// share the same physical link, and disconnecting it will tear down
+  /// the existing peripheral handle as well — typically producing an
+  /// infinite reconnect loop. Guard with
+  /// `server.isClientConnected(device.address)` before calling. See
+  /// `bluey/docs/cross-platform-quirks.md` for background.
   Future<PeerConnection> connectAsPeer(
     Device device, {
     Duration? timeout,
@@ -484,6 +496,15 @@ class Bluey {
   /// available a moment later. Callers that want to track peer status
   /// across the connection's lifetime should use [watchPeer], which
   /// retries the upgrade on each Service Changed re-discovery.
+  ///
+  /// **iOS caveat (bidirectional discovery).** The same Core Bluetooth
+  /// link-sharing trap that affects [connectAsPeer] applies here once
+  /// the wrapped connection has been established: if a peripheral-side
+  /// handle for the same peer already exists, disconnecting the
+  /// resulting [PeerConnection] will tear down the shared LL link.
+  /// Guard the upstream connect call (not [tryUpgrade] itself) with
+  /// `server.isClientConnected(...)`. See
+  /// `bluey/docs/cross-platform-quirks.md`.
   Future<PeerConnection?> tryUpgrade(Connection connection) async {
     _logger.log(
       BlueyLogLevel.debug,

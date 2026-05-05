@@ -308,6 +308,9 @@ class MockServer implements Server {
   @override
   List<Client> get connectedClients => [];
 
+  @override
+  bool isClientConnected(String address) => false;
+
   List<HostedService> get services => _services;
 
   @override

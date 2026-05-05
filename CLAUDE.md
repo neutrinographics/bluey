@@ -163,5 +163,6 @@ When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `te
 - `bluey_ios/pigeons/messages.dart` - Pigeon API definition for iOS (generates `Messages.g.swift` + `messages.g.dart`)
 - `docs/backlog/README.md` - living index of known bugs, no-op stubs, and unimplemented features; start here for outstanding work
 - `docs/old/` - historical references (`BUGS_ANALYSIS.md`, `ANDROID_IMPLEMENTATION_COMPARISON.md`, `IOS_IMPLEMENTATION_COMPARISON.md`, all dated January 2026 and superseded by `docs/backlog/`)
-- `bluey_android/ANDROID_BLE_NOTES.md` - Android BLE gotchas (threading, lifecycle, force-kill behavior)
-- `bluey_ios/IOS_BLE_NOTES.md` - iOS BLE quirks and operational notes
+- `bluey/docs/cross-platform-quirks.md` - consumer-facing behavioral differences between Android and iOS that bluey cannot hide (e.g. iOS `CBPeer` shared-link trap on bidirectional discovery). Read before designing apps that scan and advertise simultaneously.
+- `bluey_android/ANDROID_BLE_NOTES.md` - Android BLE gotchas for platform-package maintainers (threading, lifecycle, force-kill behavior)
+- `bluey_ios/IOS_BLE_NOTES.md` - iOS BLE quirks for platform-package maintainers (CBPeripheralManager workarounds, etc.)

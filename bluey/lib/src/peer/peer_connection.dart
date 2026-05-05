@@ -73,6 +73,15 @@ abstract class PeerConnection {
   ///
   /// Callers who want a raw GATT disconnect with no peer-protocol
   /// involvement can call `peer.connection.disconnect()` directly.
+  ///
+  /// **iOS caveat.** On iOS, Core Bluetooth shares a single LL
+  /// connection per peer pair across GAP roles. If the same physical
+  /// peer is also attached as a client to the local [Server] (i.e. you
+  /// hold *both* a `PeerConnection` to it *and* a `PeerClient` for it),
+  /// `disconnect()` will tear down the shared link and invalidate the
+  /// peripheral-side handle as well. Avoid this by guarding
+  /// `connectAsPeer` with `server.isClientConnected(device.address)`
+  /// rather than relying on disconnect-side dedup.
   Future<void> disconnect();
 }
 

@@ -4,10 +4,26 @@ title: `Bluey.connectAsPeer` does not detect device already connected in the oth
 category: enhancement
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-05-05
 related: [I324]
 ---
+
+## Resolution (2026-05-05)
+
+Added `Server.isClientConnected(String address) -> bool` (`bluey/lib/src/gatt_server/server.dart`, implemented in `BlueyServer` as an O(1) `_connectedClients.containsKey` lookup). The ticket's original `Bluey.isPeerKnown` framing turned out to be infeasible — `Bluey.server()` is a factory that returns a fresh server each call, so `Bluey` does not hold a canonical reference to "the" server and cannot answer the question. The knowledge lives on the `Server` instance the app already owns; the helper was placed there.
+
+The `connectAsPeer` self-check option was deliberately skipped — opinionated, would force a `Server` reference into `Bluey`, and consumers can build the same guard in one line on top of `isClientConnected`.
+
+App-side usage:
+
+```dart
+if (server.isClientConnected(device.address)) return;
+final peer = await bluey.connectAsPeer(device);
+```
+
+Tests in `bluey/test/bluey_server_test.dart` (group "isClientConnected") cover: not-connected, connected-as-client, connected-without-peer-identification, post-disconnect, and address-mismatch cases.
+
 
 ## Symptom
 
