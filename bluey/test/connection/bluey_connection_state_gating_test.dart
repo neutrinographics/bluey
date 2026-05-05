@@ -107,6 +107,19 @@ void main() {
       );
     });
 
+    test(
+      'maxWritePayload after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
+
+        await expectLater(
+          ctx.connection.maxWritePayload(withResponse: false),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
+
     test('services after disconnect throws DisconnectedException', () async {
       final ctx = await establishWithChar();
       await ctx.connection.disconnect();

@@ -96,9 +96,15 @@ abstract class AndroidConnectionExtensions {
   /// connection. Wrapped as an [Mtu] value object; access the
   /// wire-level integer via [Mtu.value].
   ///
-  /// Note: for sizing chunked writes, prefer [Connection.maxWritePayload]
+  /// Note: for sizing chunked writes, prefer `Connection.maxWritePayload`
   /// which is portable and authoritative on both platforms. `mtu` is
   /// useful for diagnostics, logging, or non-write ATT operations.
+  ///
+  /// **Staleness caveat (I326).** This getter reflects only the value
+  /// last observed by an explicit [requestMtu] call. The platform-emitted
+  /// `onMtuChanged` event (which fires on peer-initiated renegotiation)
+  /// is not yet wired into this cache. `Connection.maxWritePayload`
+  /// round-trips to the platform on every call and is unaffected.
   Mtu get mtu;
 
   /// Request a specific MTU.
