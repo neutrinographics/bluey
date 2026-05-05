@@ -1241,6 +1241,44 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     return mtu;
   }
 
+  /// Per-device override for the value returned from
+  /// [getMaximumWriteLength]. Tests that need to assert on
+  /// platform-asymmetry between writes-with-response and
+  /// writes-without-response can populate both keys; tests that don't
+  /// care fall back to the simulated peripheral's MTU minus 3.
+  final Map<String, ({int withResponse, int withoutResponse})>
+      _maxWriteOverrides = {};
+
+  /// Override the value returned from [getMaximumWriteLength] for
+  /// [deviceId]. Used by tests that need explicit control over the
+  /// platform-reported payload limit.
+  void setMaxWriteLengthOverride(
+    String deviceId, {
+    required int withResponse,
+    required int withoutResponse,
+  }) {
+    _maxWriteOverrides[deviceId] = (
+      withResponse: withResponse,
+      withoutResponse: withoutResponse,
+    );
+  }
+
+  @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async {
+    final override = _maxWriteOverrides[deviceId];
+    if (override != null) {
+      return withResponse ? override.withResponse : override.withoutResponse;
+    }
+    final connection = _connections[deviceId];
+    if (connection == null) {
+      throw Exception('Not connected to device: $deviceId');
+    }
+    return connection.mtu - 3;
+  }
+
   @override
   Future<int> readRssi(String deviceId) async {
     final connection = _connections[deviceId];

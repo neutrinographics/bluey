@@ -262,6 +262,15 @@ final class BlueyIos extends BlueyPlatform {
   }
 
   @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) {
+    // TODO(I325): implement via iOS connection manager in Task 3.
+    throw UnimplementedError('getMaximumWriteLength not yet wired on iOS');
+  }
+
+  @override
   Future<int> readRssi(String deviceId) async {
     _ensureInitialized();
     return await _connectionManager.readRssi(deviceId);

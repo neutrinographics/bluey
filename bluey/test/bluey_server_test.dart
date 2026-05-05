@@ -172,6 +172,16 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<int> requestMtu(String deviceId, int mtu) async => mtu;
 
   @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async {
+    // Default: simulate a reasonable payload limit. Tests that exercise
+    // this path should override.
+    return withResponse ? 100 : 182;
+  }
+
+  @override
   Future<int> readRssi(String deviceId) async => -60;
 
   // Bonding operations - stub implementations
