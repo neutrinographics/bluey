@@ -282,9 +282,12 @@ final class BlueyAndroid extends BlueyPlatform {
   Future<int> getMaximumWriteLength(
     String deviceId, {
     required bool withResponse,
-  }) {
-    // TODO(I325): implement via Android connection manager in Task 4.
-    throw UnimplementedError('getMaximumWriteLength not yet wired on Android');
+  }) async {
+    _ensureInitialized();
+    return await _connectionManager.getMaximumWriteLength(
+      deviceId,
+      withResponse: withResponse,
+    );
   }
 
   @override

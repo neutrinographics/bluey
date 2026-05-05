@@ -35,6 +35,12 @@ class ConnectionManager(
     private val queues = mutableMapOf<String, GattOpQueue>()
     private val handler = Handler(Looper.getMainLooper())
 
+    // I325 — cache the negotiated MTU per device. BluetoothGatt has no
+    // public getMtu() getter, so we must mirror the value from the
+    // onMtuChanged callback ourselves. Initialized to the BLE-spec default
+    // (23) on connect; updated on every successful MTU negotiation.
+    private val negotiatedMtu = mutableMapOf<String, Int>()
+
     // Pending connect callback. GATT ops route through GattOpQueue; only
     // connect-phase still uses a top-level callback because the queue is
     // created on STATE_CONNECTED and doesn't exist yet when connect() is
@@ -506,6 +512,28 @@ class ConnectionManager(
         queue.enqueue(RequestMtuOp(mtu.toInt(), callback, requestMtuTimeoutMs))
     }
 
+    /**
+     * I325 — return the maximum single-write payload limit for the active
+     * connection to [deviceId]. Derived from the cached negotiated MTU
+     * minus 3 (ATT opcode 1 byte + handle 2 bytes). Android does not
+     * distinguish write types at the ATT layer; [withResponse] is preserved
+     * for API symmetry with iOS but does not affect the result.
+     */
+    fun getMaximumWriteLength(
+        deviceId: String,
+        @Suppress("UNUSED_PARAMETER") withResponse: Boolean,
+        callback: (Result<Long>) -> Unit
+    ) {
+        val mtu = negotiatedMtu[deviceId]
+        if (mtu == null) {
+            callback(
+                Result.failure(IllegalStateException("Not connected: $deviceId"))
+            )
+            return
+        }
+        callback(Result.success((mtu - 3).toLong()))
+    }
+
     fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
         val gatt = connections[deviceId]
         if (gatt == null) {
@@ -636,6 +664,7 @@ class ConnectionManager(
                             // Create the queue on the main thread to preserve
                             // GattOpQueue's single-threaded invariant.
                             queues[deviceId] = GattOpQueue(gatt, handler)
+                            negotiatedMtu[deviceId] = 23  // BLE default until renegotiated
                             pendingConnections.remove(deviceId)?.invoke(Result.success(deviceId))
                         }
                     }
@@ -682,6 +711,7 @@ class ConnectionManager(
                                 cb(Result.success(Unit))
                             }
                             connections.remove(deviceId)
+                            negotiatedMtu.remove(deviceId)
                             // I088 — drop the per-device handle lookup
                             // tables; the attribute database is gone.
                             characteristicByHandle.remove(deviceId)
@@ -866,6 +896,11 @@ class ConnectionManager(
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 handler.post {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        // I325 — update cache before notifying listeners so any
+                        // synchronous read of getMaximumWriteLength sees the new value.
+                        negotiatedMtu[deviceId] = mtu
+                    }
                     val result: Result<Any?> = if (status == BluetoothGatt.GATT_SUCCESS) {
                         Result.success(mtu.toLong())
                     } else {

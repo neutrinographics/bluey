@@ -1779,6 +1779,30 @@ class BlueyHostApi {
     return pigeonVar_replyValue! as int;
   }
 
+  /// Largest single ATT write payload the platform will accept for the
+  /// active connection. On Android this is derived from the cached
+  /// negotiated MTU; the [withResponse] parameter is preserved for API
+  /// symmetry with iOS but does not affect the value (Android's ATT
+  /// MTU does not distinguish write types).
+  Future<int> getMaximumWriteLength(String deviceId, bool withResponse) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.getMaximumWriteLength$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[deviceId, withResponse]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
+    return pigeonVar_replyValue! as int;
+  }
+
   /// Read the current RSSI for a connected device.
   Future<int> readRssi(String deviceId) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluey_android.BlueyHostApi.readRssi$pigeonVar_messageChannelSuffix';
