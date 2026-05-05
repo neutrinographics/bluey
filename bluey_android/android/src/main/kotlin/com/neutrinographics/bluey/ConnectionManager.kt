@@ -524,11 +524,18 @@ class ConnectionManager(
         @Suppress("UNUSED_PARAMETER") withResponse: Boolean,
         callback: (Result<Long>) -> Unit
     ) {
-        val mtu = negotiatedMtu[deviceId]
-        if (mtu == null) {
+        // Check `connections` rather than `negotiatedMtu` for the
+        // not-connected predicate — `connections` is the canonical source
+        // of truth used by every other op in this file, and `cleanup()`
+        // can clear it while the MTU cache lags. Falling back to the BLE
+        // default (23) if the cache is somehow missing despite a live
+        // connection covers the racy "STATE_CONNECTED has fired but the
+        // initial assignment hasn't run yet" window.
+        if (connections[deviceId] == null) {
             callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
+        val mtu = negotiatedMtu[deviceId] ?: 23
         callback(Result.success((mtu - 3).toLong()))
     }
 
@@ -611,6 +618,12 @@ class ConnectionManager(
             }
         }
         connections.clear()
+
+        // 6. Clear the negotiated-MTU cache so getMaximumWriteLength does
+        //    not return a stale payload after cleanup. Without this, the
+        //    cache would survive past the connections map, and a racy
+        //    post-cleanup call would falsely report a live MTU.
+        negotiatedMtu.clear()
     }
 
     /** Resolves the [GattOpQueue] for [deviceId], or null if no connection exists. */

@@ -26,6 +26,7 @@ void main() {
 
   tearDown(() async {
     await bluey.dispose();
+    await fakePlatform.dispose();
   });
 
   group('Connection.maxWritePayload', () {
