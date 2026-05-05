@@ -255,6 +255,19 @@ class IosConnectionManager {
     );
   }
 
+  /// Largest single ATT write payload the platform will accept for the
+  /// active connection. Forwards to
+  /// `CBPeripheral.maximumWriteValueLength(for:)` via Pigeon.
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async {
+    return _translateGattPlatformError(
+      'getMaximumWriteLength',
+      () => _hostApi.getMaximumWriteLength(deviceId, withResponse),
+    );
+  }
+
   // === Bonding (iOS handles automatically) ===
 
   /// iOS does not expose bond state; always returns [PlatformBondState.none].
