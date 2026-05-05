@@ -10,6 +10,7 @@ export 'value_objects/connection_interval.dart';
 export 'value_objects/mtu.dart';
 export 'value_objects/peripheral_latency.dart';
 export 'value_objects/supervision_timeout.dart';
+export 'value_objects/write_payload_limit.dart';
 export 'value_objects/connection_parameters.dart' show ConnectionParameters;
 
 /// Bonding state of a device.
