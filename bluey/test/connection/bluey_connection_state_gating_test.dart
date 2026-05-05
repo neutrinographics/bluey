@@ -73,7 +73,9 @@ void main() {
   }
 
   setUp(() {
-    fakePlatform = FakeBlueyPlatform();
+    fakePlatform = FakeBlueyPlatform(
+      capabilities: platform.Capabilities.android,
+    );
     platform.BlueyPlatform.instance = fakePlatform;
     bluey = Bluey();
   });
@@ -88,7 +90,7 @@ void main() {
       await ctx.connection.disconnect();
 
       await expectLater(
-        ctx.connection.requestMtu(
+        ctx.connection.android!.requestMtu(
           Mtu(247, capabilities: platform.Capabilities.android),
         ),
         throwsA(isA<DisconnectedException>()),
@@ -190,7 +192,7 @@ void main() {
         await ctx.connection.disconnect();
 
         try {
-          await ctx.connection.requestMtu(
+          await ctx.connection.android!.requestMtu(
             Mtu(247, capabilities: platform.Capabilities.android),
           );
           fail('expected DisconnectedException');
@@ -205,7 +207,7 @@ void main() {
       final ctx = await establishWithChar();
 
       // None of these should throw.
-      await ctx.connection.requestMtu(
+      await ctx.connection.android!.requestMtu(
         Mtu(247, capabilities: platform.Capabilities.android),
       );
       await ctx.char.read();

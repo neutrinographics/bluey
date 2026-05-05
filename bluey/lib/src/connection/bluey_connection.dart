@@ -298,21 +298,6 @@ class BlueyConnection implements Connection {
     throw DisconnectedException(deviceId, DisconnectReason.unknown);
   }
 
-  /// Throws [UnsupportedOperationException] when [flag] is false.
-  ///
-  /// Used to gate cross-platform methods whose underlying platform call
-  /// may not be supported. Callers compose this with [_ensureConnected]
-  /// — capability check fires first since "this op never works" is a
-  /// stronger statement than "you are not currently connected."
-  void _requireCapability(bool flag, String op) {
-    if (!flag) {
-      throw UnsupportedOperationException(
-        op,
-        _platform.capabilities.platformKind.name,
-      );
-    }
-  }
-
   /// Wraps [body] so that a Service Changed event fired while the call
   /// is in flight surfaces the typed [AttributeHandleInvalidatedException]
   /// on the original future, even if the platform layer never produces
@@ -415,8 +400,9 @@ class BlueyConnection implements Connection {
   Stream<List<RemoteService>> get servicesChanges =>
       _servicesChangesController.stream;
 
-  @override
-  Mtu get mtu => Mtu.fromPlatform(_mtu);
+  // I325 — relocated to AndroidConnectionExtensions; private accessor
+  // is used by _AndroidConnectionExtensionsImpl.
+  Mtu get _mtuValue => Mtu.fromPlatform(_mtu);
 
   @override
   RemoteService service(UUID uuid) {
@@ -513,9 +499,9 @@ class BlueyConnection implements Connection {
     return svcs.any((s) => s.uuid == uuid);
   }
 
-  @override
-  Future<Mtu> requestMtu(Mtu mtu) async {
-    _requireCapability(_platform.capabilities.canRequestMtu, 'requestMtu');
+  // I325 — relocated to AndroidConnectionExtensions; private impl is
+  // used by _AndroidConnectionExtensionsImpl.
+  Future<Mtu> _requestMtuImpl(Mtu mtu) async {
     _ensureConnected();
     final requested = mtu.value;
     _mtu = await _trackInFlight(
@@ -1351,6 +1337,15 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
       'requestConnectionParameters',
     );
     return _conn._requestConnectionParametersImpl(params);
+  }
+
+  @override
+  Mtu get mtu => _conn._mtuValue;
+
+  @override
+  Future<Mtu> requestMtu(Mtu desired) {
+    _requireCapability(_conn._platform.capabilities.canRequestMtu, 'requestMtu');
+    return _conn._requestMtuImpl(desired);
   }
 }
 

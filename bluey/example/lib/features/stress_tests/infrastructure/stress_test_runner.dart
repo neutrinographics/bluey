@@ -184,9 +184,12 @@ class StressTestRunner {
             );
             futures.add(recordOp(() => stressChar.read()));
             futures.add(recordOp(() => connection.services(cache: false)));
-            futures.add(
-              recordOp(() => connection.requestMtu(Mtu.fromPlatform(247))),
-            );
+            final android = connection.android;
+            if (android != null) {
+              futures.add(
+                recordOp(() => android.requestMtu(Mtu.fromPlatform(247))),
+              );
+            }
           }
           await Future.wait(futures);
           stopwatch.stop();
@@ -372,25 +375,29 @@ class StressTestRunner {
     final stopwatch = Stopwatch()..start();
     yield result;
 
-    // Negotiate MTU.
-    final mtuStart = stopwatch.elapsedMicroseconds;
-    try {
-      await connection.requestMtu(Mtu.fromPlatform(config.requestedMtu));
-      result = result.recordSuccess(
-        latency: Duration(
-          microseconds: stopwatch.elapsedMicroseconds - mtuStart,
-        ),
-      );
-    } catch (e) {
-      if (e is DisconnectedException) {
-        result = result.markConnectionLost();
+    // Negotiate MTU. Android only — iOS auto-negotiates and exposes no
+    // requestMtu API, so the probe simply skips the request there.
+    final android = connection.android;
+    if (android != null) {
+      final mtuStart = stopwatch.elapsedMicroseconds;
+      try {
+        await android.requestMtu(Mtu.fromPlatform(config.requestedMtu));
+        result = result.recordSuccess(
+          latency: Duration(
+            microseconds: stopwatch.elapsedMicroseconds - mtuStart,
+          ),
+        );
+      } catch (e) {
+        if (e is DisconnectedException) {
+          result = result.markConnectionLost();
+        }
+        result = result.recordFailure(
+          typeName: _typeName(e),
+          status: e is GattOperationFailedException ? e.status : null,
+        );
+        yield result.finished(elapsed: stopwatch.elapsed);
+        return;
       }
-      result = result.recordFailure(
-        typeName: _typeName(e),
-        status: e is GattOperationFailedException ? e.status : null,
-      );
-      yield result.finished(elapsed: stopwatch.elapsed);
-      return;
     }
 
     // Tell server to return payloadBytes-sized reads.
@@ -566,10 +573,13 @@ class StressTestRunner {
     Connection connection,
     RemoteCharacteristic stressChar,
   ) async {
-    try {
-      await connection.requestMtu(Mtu.fromPlatform(247));
-    } catch (_) {
-      // Swallow — MTU upgrade is best-effort.
+    final android = connection.android;
+    if (android != null) {
+      try {
+        await android.requestMtu(Mtu.fromPlatform(247));
+      } catch (_) {
+        // Swallow — MTU upgrade is best-effort.
+      }
     }
 
     try {

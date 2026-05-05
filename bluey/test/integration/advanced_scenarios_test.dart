@@ -293,6 +293,11 @@ void main() {
       });
 
       test('requests larger MTU before large write', () async {
+        // I325 — MTU lives on Android-only extensions; pin to Android.
+        fakePlatform = FakeBlueyPlatform(
+          capabilities: platform.Capabilities.android,
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
         fakePlatform.simulatePeripheral(
           id: 'AA:BB:CC:DD:EE:01',
           name: 'Test Device',
@@ -324,11 +329,11 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Request larger MTU
-        final negotiatedMtu = await connection.requestMtu(
+        final negotiatedMtu = await connection.android!.requestMtu(
           Mtu(512, capabilities: platform.Capabilities.android),
         );
         expect(negotiatedMtu, equals(Mtu.fromPlatform(512)));
-        expect(connection.mtu, equals(Mtu.fromPlatform(512)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(512)));
 
         // Now write large data (512 - 3 = 509 byte payload possible)
         final largeData = Uint8List.fromList(

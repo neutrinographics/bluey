@@ -3,7 +3,6 @@ import '../shared/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'connection_state.dart';
 import 'ios_connection_extensions.dart';
-import 'value_objects/mtu.dart';
 import 'value_objects/write_payload_limit.dart';
 
 export 'connection_state.dart';
@@ -118,14 +117,6 @@ abstract class Connection {
   /// Broadcast stream — multiple consumers may subscribe.
   Stream<List<RemoteService>> get servicesChanges;
 
-  /// Current MTU (Maximum Transmission Unit).
-  ///
-  /// The MTU determines the maximum size of data that can be sent in a
-  /// single write operation. The default is typically 23 bytes. Wrapped
-  /// as an [Mtu] value object; access the wire-level integer via
-  /// [Mtu.value].
-  Mtu get mtu;
-
   /// Get a service by UUID.
   ///
   /// Services are discovered lazily on first access.
@@ -150,17 +141,6 @@ abstract class Connection {
   /// Returns true if the device has a service with the given UUID.
   /// Triggers service discovery if not already done.
   Future<bool> hasService(UUID uuid);
-
-  /// Request a specific MTU.
-  ///
-  /// Returns the negotiated MTU, which may be different from the requested
-  /// value. The actual MTU depends on what both the device and the platform
-  /// support. Both the parameter and the returned future are wrapped as
-  /// [Mtu] value objects; the wire-level integer is available via
-  /// [Mtu.value].
-  ///
-  /// Throws [DisconnectedException] if not connected.
-  Future<Mtu> requestMtu(Mtu mtu);
 
   /// Largest single ATT write payload the platform will accept on this
   /// connection.

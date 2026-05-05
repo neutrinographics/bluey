@@ -85,10 +85,6 @@ class _SpyConnection implements Connection {
   @override
   Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
   @override
-  Mtu get mtu => throw UnimplementedError();
-  @override
-  Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
-  @override
   Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
       throw UnimplementedError();
   @override
@@ -428,16 +424,12 @@ class _OrderingSpyConnection implements Connection {
   @override
   Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
   @override
-  Mtu get mtu => throw UnimplementedError();
-  @override
   RemoteService service(UUID uuid) => throw UnimplementedError();
   @override
   Future<List<RemoteService>> services({bool cache = false}) =>
       throw UnimplementedError();
   @override
   Future<bool> hasService(UUID uuid) => throw UnimplementedError();
-  @override
-  Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
   @override
   Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
       throw UnimplementedError();
