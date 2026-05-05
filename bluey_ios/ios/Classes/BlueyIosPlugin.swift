@@ -108,7 +108,7 @@ class BlueyHostApiImpl: BlueyHostApi {
     }
 
     func getMaximumWriteLength(deviceId: String, withResponse: Bool) throws -> Int64 {
-        return centralManager.getMaximumWriteLength(deviceId: deviceId, withResponse: withResponse)
+        return try centralManager.getMaximumWriteLength(deviceId: deviceId, withResponse: withResponse)
     }
 
     func readRssi(deviceId: String, completion: @escaping (Result<Int64, any Error>) -> Void) {

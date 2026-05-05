@@ -1610,6 +1610,14 @@ interface BlueyHostApi {
    * Returns the negotiated MTU.
    */
   fun requestMtu(deviceId: String, mtu: Long, callback: (Result<Long>) -> Unit)
+  /**
+   * Largest single ATT write payload the platform will accept for the
+   * active connection. On Android this is derived from the cached
+   * negotiated MTU; the [withResponse] parameter is preserved for API
+   * symmetry with iOS but does not affect the value (Android's ATT
+   * MTU does not distinguish write types).
+   */
+  fun getMaximumWriteLength(deviceId: String, withResponse: Boolean, callback: (Result<Long>) -> Unit)
   /** Read the current RSSI for a connected device. */
   fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit)
   /**
@@ -1962,6 +1970,27 @@ interface BlueyHostApi {
             val deviceIdArg = args[0] as String
             val mtuArg = args[1] as Long
             api.requestMtu(deviceIdArg, mtuArg) { result: Result<Long> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.getMaximumWriteLength$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val deviceIdArg = args[0] as String
+            val withResponseArg = args[1] as Boolean
+            api.getMaximumWriteLength(deviceIdArg, withResponseArg) { result: Result<Long> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))

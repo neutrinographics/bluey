@@ -427,6 +427,16 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Request a specific MTU.
   Future<int> requestMtu(String deviceId, int mtu);
 
+  /// Largest single ATT write payload the platform will accept for the
+  /// active connection to [deviceId]. Platform-honest counterpart to
+  /// [requestMtu] — on iOS the negotiated MTU is not exposed but this
+  /// limit is, via `CBPeripheral.maximumWriteValueLength(for:)`. On
+  /// Android the value is derived from the cached negotiated MTU.
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  });
+
   /// Read the current RSSI for a connected device.
   Future<int> readRssi(String deviceId);
 

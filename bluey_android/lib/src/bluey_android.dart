@@ -279,6 +279,18 @@ final class BlueyAndroid extends BlueyPlatform {
   }
 
   @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async {
+    _ensureInitialized();
+    return await _connectionManager.getMaximumWriteLength(
+      deviceId,
+      withResponse: withResponse,
+    );
+  }
+
+  @override
   Future<int> readRssi(String deviceId) async {
     _ensureInitialized();
     return await _connectionManager.readRssi(deviceId);

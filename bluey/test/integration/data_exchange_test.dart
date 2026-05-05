@@ -417,6 +417,15 @@ void main() {
     });
 
     group('MTU negotiation', () {
+      // MTU lives on Android-only extensions post-I325, so the tests
+      // need an Android-flavored fake to surface `connection.android`.
+      setUp(() {
+        fakePlatform = FakeBlueyPlatform(
+          capabilities: platform.Capabilities.android,
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
+      });
+
       test('requests larger MTU', () async {
         fakePlatform.simulatePeripheral(
           id: 'AA:BB:CC:DD:EE:01',
@@ -428,7 +437,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Act
-        final mtu = await connection.requestMtu(
+        final mtu = await connection.android!.requestMtu(
           Mtu(512, capabilities: platform.Capabilities.android),
         );
 
@@ -450,15 +459,15 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Initially default MTU
-        expect(connection.mtu, equals(Mtu.fromPlatform(23)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(23)));
 
         // Request larger MTU
-        await connection.requestMtu(
+        await connection.android!.requestMtu(
           Mtu(256, capabilities: platform.Capabilities.android),
         );
 
         // Assert MTU property updated
-        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(256)));
 
         await connection.disconnect();
         await bluey.dispose();

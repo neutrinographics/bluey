@@ -4,6 +4,53 @@ import 'package:bluey/bluey.dart';
 
 import 'fake_remote_characteristic.dart';
 
+/// Fake [AndroidConnectionExtensions] used by [FakeConnection] to host
+/// MTU state. Mirrors the test pattern in
+/// `bluey/test/connection_test.dart:MockAndroidConnectionExtensions`.
+class _FakeAndroidConnectionExtensions implements AndroidConnectionExtensions {
+  Mtu _mtu = Mtu.fromPlatform(23);
+  int? _mtuRequest;
+
+  @override
+  Mtu get mtu => _mtu;
+
+  @override
+  Future<Mtu> requestMtu(Mtu desired) async {
+    _mtuRequest = desired.value;
+    _mtu = desired;
+    return _mtu;
+  }
+
+  /// Records what mtu was most recently requested.
+  int? get lastRequestedMtu => _mtuRequest;
+
+  // Stub all other AndroidConnectionExtensions members.
+  @override
+  BondState get bondState => BondState.none;
+  @override
+  Stream<BondState> get bondStateChanges => const Stream.empty();
+  @override
+  Future<void> bond() async {}
+  @override
+  Future<void> removeBond() async {}
+  @override
+  Phy get txPhy => Phy.le1m;
+  @override
+  Phy get rxPhy => Phy.le1m;
+  @override
+  Stream<({Phy tx, Phy rx})> get phyChanges => const Stream.empty();
+  @override
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {}
+  @override
+  ConnectionParameters get connectionParameters => ConnectionParameters(
+    interval: ConnectionInterval(30),
+    latency: PeripheralLatency(0),
+    timeout: SupervisionTimeout(4000),
+  );
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) async {}
+}
+
 /// Programmable [Connection] for runner tests. Holds a single fake
 /// service with one fake characteristic that tests configure via
 /// `stressChar.onWriteHook` / `stressChar.onReadHook` /
@@ -14,8 +61,8 @@ class FakeConnection implements Connection {
   final _stateController = StreamController<ConnectionState>.broadcast();
 
   ConnectionState _state = ConnectionState.ready;
-  int _mtu = 23;
-  int? _mtuRequest;
+  final _FakeAndroidConnectionExtensions _android =
+      _FakeAndroidConnectionExtensions();
 
   FakeConnection({required this.stressServiceUuid, required this.stressChar});
 
@@ -29,17 +76,14 @@ class FakeConnection implements Connection {
   Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
 
   @override
-  Mtu get mtu => Mtu.fromPlatform(_mtu);
-
-  @override
-  Future<Mtu> requestMtu(Mtu mtu) async {
-    _mtuRequest = mtu.value;
-    _mtu = mtu.value;
-    return Mtu.fromPlatform(_mtu);
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async {
+    return WritePayloadLimit.fromPlatform(_android.mtu.value - 3);
   }
 
   /// Records what mtu was most recently requested.
-  int? get lastRequestedMtu => _mtuRequest;
+  int? get lastRequestedMtu => _android.lastRequestedMtu;
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
@@ -80,7 +124,7 @@ class FakeConnection implements Connection {
   Future<int> readRssi() => throw UnimplementedError();
 
   @override
-  AndroidConnectionExtensions? get android => null;
+  AndroidConnectionExtensions? get android => _android;
 
   @override
   IosConnectionExtensions? get ios => null;

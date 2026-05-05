@@ -101,6 +101,12 @@ final class MockBlueyPlatform extends BlueyPlatform
       throw UnimplementedError();
 
   @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) => throw UnimplementedError();
+
+  @override
   Future<int> readRssi(String deviceId) => throw UnimplementedError();
 
   // Server (Peripheral) operations

@@ -20,7 +20,9 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
 
   setUp(() {
-    fakePlatform = FakeBlueyPlatform();
+    fakePlatform = FakeBlueyPlatform(
+      capabilities: platform.Capabilities.android,
+    );
     platform.BlueyPlatform.instance = fakePlatform;
   });
 
@@ -56,7 +58,7 @@ void main() {
           fakePlatform.writeCharacteristicCalls.clear();
 
           // requestMtu — records activity on success.
-          conn.requestMtu(
+          conn.android!.requestMtu(
             Mtu(247, capabilities: platform.Capabilities.android),
           );
           async.flushMicrotasks();

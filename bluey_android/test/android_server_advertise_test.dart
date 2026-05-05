@@ -29,9 +29,7 @@ void main() {
 
   group('AndroidServer.startAdvertising — DTO mapping', () {
     test('forwards scanResponseServiceUuids to the Pigeon DTO', () async {
-      when(
-        () => mockHostApi.startAdvertising(any()),
-      ).thenAnswer((_) async {});
+      when(() => mockHostApi.startAdvertising(any())).thenAnswer((_) async {});
 
       await server.startAdvertising(
         const PlatformAdvertiseConfig(
@@ -40,9 +38,11 @@ void main() {
         ),
       );
 
-      final captured = verify(
-        () => mockHostApi.startAdvertising(captureAny()),
-      ).captured.single as AdvertiseConfigDto;
+      final captured =
+          verify(
+                () => mockHostApi.startAdvertising(captureAny()),
+              ).captured.single
+              as AdvertiseConfigDto;
 
       expect(captured.serviceUuids, equals(['svc-1']));
       expect(captured.scanResponseServiceUuids, equals(['scan-1']));

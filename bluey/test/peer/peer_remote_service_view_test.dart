@@ -86,9 +86,8 @@ class _SpyConnection implements Connection {
   @override
   Stream<List<RemoteService>> get servicesChanges => throw UnimplementedError();
   @override
-  Mtu get mtu => throw UnimplementedError();
-  @override
-  Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
+      throw UnimplementedError();
   @override
   Future<int> readRssi() => throw UnimplementedError();
   @override

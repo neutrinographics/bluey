@@ -237,6 +237,12 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   }
 
   @override
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async => withResponse ? 100 : 182;
+
+  @override
   Future<int> readRssi(String deviceId) async {
     return mockRssi;
   }
@@ -845,12 +851,12 @@ void main() {
       test('requestMtu returns negotiated MTU from platform', () async {
         mockPlatform.mockMtu = 256;
 
-        final mtu = await connection.requestMtu(
+        final mtu = await connection.android!.requestMtu(
           Mtu(512, capabilities: platform.Capabilities.android),
         );
 
         expect(mtu, equals(Mtu.fromPlatform(256)));
-        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(256)));
       });
     });
 

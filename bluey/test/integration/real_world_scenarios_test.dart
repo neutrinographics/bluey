@@ -222,6 +222,11 @@ void main() {
       const dfuPacketUuid = '8ec90002-f315-4f60-9fb8-838830daea50';
 
       test('simulates firmware update flow', () async {
+        // I325 — MTU lives on Android-only extensions; pin to Android.
+        fakePlatform = FakeBlueyPlatform(
+          capabilities: platform.Capabilities.android,
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
         fakePlatform.simulatePeripheral(
           id: 'AA:BB:CC:DD:EE:01',
           name: 'DFU Device',
@@ -266,7 +271,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         // Request larger MTU for faster transfer
-        final mtu = await connection.requestMtu(
+        final mtu = await connection.android!.requestMtu(
           Mtu(256, capabilities: platform.Capabilities.android),
         );
         expect(mtu, equals(Mtu.fromPlatform(256)));

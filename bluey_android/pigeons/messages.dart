@@ -473,6 +473,14 @@ abstract class BlueyHostApi {
   @async
   int requestMtu(String deviceId, int mtu);
 
+  /// Largest single ATT write payload the platform will accept for the
+  /// active connection. On Android this is derived from the cached
+  /// negotiated MTU; the [withResponse] parameter is preserved for API
+  /// symmetry with iOS but does not affect the value (Android's ATT
+  /// MTU does not distinguish write types).
+  @async
+  int getMaximumWriteLength(String deviceId, bool withResponse);
+
   /// Read the current RSSI for a connected device.
   @async
   int readRssi(String deviceId);

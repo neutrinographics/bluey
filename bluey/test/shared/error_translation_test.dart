@@ -122,9 +122,10 @@ void main() {
     test(
       'PlatformRespondToRequestNotFoundException -> RespondNotFoundException',
       () {
-        const platformError = platform.PlatformRespondToRequestNotFoundException(
-          'requestId 42 not found',
-        );
+        const platformError =
+            platform.PlatformRespondToRequestNotFoundException(
+              'requestId 42 not found',
+            );
         final translated = translatePlatformException(
           platformError,
           operation: 'respondToReadRequest',

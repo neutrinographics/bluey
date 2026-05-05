@@ -439,6 +439,11 @@ void main() {
       });
 
       test('MTU change maintains connection state', () async {
+        // I325 — MTU lives on Android-only extensions; pin to Android.
+        fakePlatform = FakeBlueyPlatform(
+          capabilities: platform.Capabilities.android,
+        );
+        platform.BlueyPlatform.instance = fakePlatform;
         fakePlatform.simulatePeripheral(
           id: 'AA:BB:CC:DD:EE:01',
           name: 'Test Device',
@@ -450,7 +455,7 @@ void main() {
         await connection.services(); // promote linked → ready
 
         // Request MTU change
-        final newMtu = await connection.requestMtu(
+        final newMtu = await connection.android!.requestMtu(
           Mtu(512, capabilities: platform.Capabilities.android),
         );
 

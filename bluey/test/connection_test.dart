@@ -2,6 +2,46 @@ import 'dart:async';
 import 'package:bluey/bluey.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class MockAndroidConnectionExtensions implements AndroidConnectionExtensions {
+  Mtu mtu;
+  MockAndroidConnectionExtensions({Mtu? mtu})
+    : mtu = mtu ?? Mtu.fromPlatform(23);
+
+  @override
+  Future<Mtu> requestMtu(Mtu desired) async {
+    // Simulate negotiation - might get less than requested
+    final negotiated = desired.value > 512 ? 512 : desired.value;
+    mtu = Mtu.fromPlatform(negotiated);
+    return mtu;
+  }
+
+  // Stub all other AndroidConnectionExtensions members.
+  @override
+  BondState get bondState => BondState.none;
+  @override
+  Stream<BondState> get bondStateChanges => const Stream.empty();
+  @override
+  Future<void> bond() async {}
+  @override
+  Future<void> removeBond() async {}
+  @override
+  Phy get txPhy => Phy.le1m;
+  @override
+  Phy get rxPhy => Phy.le1m;
+  @override
+  Stream<({Phy tx, Phy rx})> get phyChanges => const Stream.empty();
+  @override
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) async {}
+  @override
+  ConnectionParameters get connectionParameters => ConnectionParameters(
+    interval: ConnectionInterval(30),
+    latency: PeripheralLatency(0),
+    timeout: SupervisionTimeout(4000),
+  );
+  @override
+  Future<void> requestConnectionParameters(ConnectionParameters params) async {}
+}
+
 // Mock implementation for testing the interface
 class MockConnection implements Connection {
   @override
@@ -10,8 +50,7 @@ class MockConnection implements Connection {
   @override
   ConnectionState state;
 
-  @override
-  Mtu mtu;
+  final MockAndroidConnectionExtensions _android;
 
   final List<RemoteService> _services;
 
@@ -20,9 +59,9 @@ class MockConnection implements Connection {
   MockConnection({
     required this.deviceId,
     this.state = ConnectionState.ready,
-    Mtu? mtu,
+    MockAndroidConnectionExtensions? android,
     List<RemoteService>? services,
-  }) : mtu = mtu ?? Mtu.fromPlatform(23),
+  }) : _android = android ?? MockAndroidConnectionExtensions(),
        _services = services ?? [];
 
   @override
@@ -52,11 +91,10 @@ class MockConnection implements Connection {
   }
 
   @override
-  Future<Mtu> requestMtu(Mtu mtu) async {
-    // Simulate negotiation - might get less than requested
-    final negotiated = mtu.value > 512 ? 512 : mtu.value;
-    this.mtu = Mtu.fromPlatform(negotiated);
-    return this.mtu;
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async {
+    return WritePayloadLimit.fromPlatform(_android.mtu.value - 3);
   }
 
   @override
@@ -73,7 +111,7 @@ class MockConnection implements Connection {
   }
 
   @override
-  AndroidConnectionExtensions? get android => null;
+  AndroidConnectionExtensions? get android => _android;
 
   @override
   IosConnectionExtensions? get ios => null;
@@ -137,7 +175,7 @@ void main() {
       });
 
       test('has mtu', () {
-        expect(connection.mtu, equals(Mtu.fromPlatform(23)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(23)));
       });
 
       test('provides stateChanges stream', () {
@@ -213,15 +251,15 @@ void main() {
 
     group('MTU', () {
       test('requestMtu returns negotiated MTU', () async {
-        final negotiated = await connection.requestMtu(
+        final negotiated = await connection.android!.requestMtu(
           Mtu(256, capabilities: Capabilities.android),
         );
         expect(negotiated, equals(Mtu.fromPlatform(256)));
-        expect(connection.mtu, equals(Mtu.fromPlatform(256)));
+        expect(connection.android?.mtu, equals(Mtu.fromPlatform(256)));
       });
 
       test('requestMtu may return less than requested', () async {
-        final negotiated = await connection.requestMtu(
+        final negotiated = await connection.android!.requestMtu(
           Mtu(517, capabilities: Capabilities.android),
         );
         expect(negotiated.value, lessThanOrEqualTo(512));

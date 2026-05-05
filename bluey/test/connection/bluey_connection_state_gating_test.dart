@@ -73,7 +73,9 @@ void main() {
   }
 
   setUp(() {
-    fakePlatform = FakeBlueyPlatform();
+    fakePlatform = FakeBlueyPlatform(
+      capabilities: platform.Capabilities.android,
+    );
     platform.BlueyPlatform.instance = fakePlatform;
     bluey = Bluey();
   });
@@ -88,7 +90,7 @@ void main() {
       await ctx.connection.disconnect();
 
       await expectLater(
-        ctx.connection.requestMtu(
+        ctx.connection.android!.requestMtu(
           Mtu(247, capabilities: platform.Capabilities.android),
         ),
         throwsA(isA<DisconnectedException>()),
@@ -104,6 +106,19 @@ void main() {
         throwsA(isA<DisconnectedException>()),
       );
     });
+
+    test(
+      'maxWritePayload after disconnect throws DisconnectedException',
+      () async {
+        final ctx = await establishWithChar();
+        await ctx.connection.disconnect();
+
+        await expectLater(
+          ctx.connection.maxWritePayload(withResponse: false),
+          throwsA(isA<DisconnectedException>()),
+        );
+      },
+    );
 
     test('services after disconnect throws DisconnectedException', () async {
       final ctx = await establishWithChar();
@@ -190,7 +205,7 @@ void main() {
         await ctx.connection.disconnect();
 
         try {
-          await ctx.connection.requestMtu(
+          await ctx.connection.android!.requestMtu(
             Mtu(247, capabilities: platform.Capabilities.android),
           );
           fail('expected DisconnectedException');
@@ -205,7 +220,7 @@ void main() {
       final ctx = await establishWithChar();
 
       // None of these should throw.
-      await ctx.connection.requestMtu(
+      await ctx.connection.android!.requestMtu(
         Mtu(247, capabilities: platform.Capabilities.android),
       );
       await ctx.char.read();

@@ -222,6 +222,18 @@ class AndroidConnectionManager {
     );
   }
 
+  /// Largest single ATT write payload the platform will accept for the
+  /// active connection. Derived from the cached negotiated MTU.
+  Future<int> getMaximumWriteLength(
+    String deviceId, {
+    required bool withResponse,
+  }) async {
+    return _translateGattPlatformError(
+      'getMaximumWriteLength',
+      () => _hostApi.getMaximumWriteLength(deviceId, withResponse),
+    );
+  }
+
   /// Reads the RSSI for the connected device.
   Future<int> readRssi(String deviceId) async {
     return _translateGattPlatformError(

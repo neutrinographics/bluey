@@ -512,6 +512,21 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         }
     }
 
+    override fun getMaximumWriteLength(
+        deviceId: String,
+        withResponse: Boolean,
+        callback: (Result<Long>) -> Unit
+    ) {
+        try {
+            val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")
+            cm.getMaximumWriteLength(deviceId, withResponse) { result ->
+                callback(result.recoverCatching { e -> throw e.toClientFlutterError() })
+            }
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toClientFlutterError()))
+        }
+    }
+
     override fun readRssi(deviceId: String, callback: (Result<Long>) -> Unit) {
         try {
             val cm = connectionManager ?: throw BlueyAndroidError.NotInitialized("ConnectionManager")

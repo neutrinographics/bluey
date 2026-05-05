@@ -1,4 +1,4 @@
-import 'connection.dart' show BondState, ConnectionParameters, Phy;
+import 'connection.dart' show BondState, ConnectionParameters, Mtu, Phy;
 
 /// Android-specific [Connection] extensions.
 ///
@@ -89,4 +89,31 @@ abstract class AndroidConnectionExtensions {
   ///
   /// Throws [DisconnectedException] if not connected.
   Future<void> requestConnectionParameters(ConnectionParameters params);
+
+  /// Current MTU (Maximum Transmission Unit).
+  ///
+  /// The MTU determines the maximum size of an ATT PDU on this
+  /// connection. Wrapped as an [Mtu] value object; access the
+  /// wire-level integer via [Mtu.value].
+  ///
+  /// Note: for sizing chunked writes, prefer `Connection.maxWritePayload`
+  /// which is portable and authoritative on both platforms. `mtu` is
+  /// useful for diagnostics, logging, or non-write ATT operations.
+  ///
+  /// **Staleness caveat (I326).** This getter reflects only the value
+  /// last observed by an explicit [requestMtu] call. The platform-emitted
+  /// `onMtuChanged` event (which fires on peer-initiated renegotiation)
+  /// is not yet wired into this cache. `Connection.maxWritePayload`
+  /// round-trips to the platform on every call and is unaffected.
+  Mtu get mtu;
+
+  /// Request a specific MTU.
+  ///
+  /// Returns the negotiated MTU, which may differ from [desired]
+  /// depending on what the remote device and platform support. Both
+  /// the parameter and the returned future are wrapped as [Mtu] value
+  /// objects; the wire-level integer is available via [Mtu.value].
+  ///
+  /// Throws [DisconnectedException] if not connected.
+  Future<Mtu> requestMtu(Mtu desired);
 }

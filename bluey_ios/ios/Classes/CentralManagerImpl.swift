@@ -373,9 +373,9 @@ class CentralManagerImpl: NSObject {
 
     // MARK: - MTU
 
-    func getMaximumWriteLength(deviceId: String, withResponse: Bool) -> Int64 {
+    func getMaximumWriteLength(deviceId: String, withResponse: Bool) throws -> Int64 {
         guard let peripheral = peripherals[deviceId] else {
-            return 20 // Default BLE MTU - 3
+            throw BlueyError.notConnected.toClientPigeonError()
         }
 
         let type: CBCharacteristicWriteType = withResponse ? .withResponse : .withoutResponse
