@@ -4,10 +4,36 @@ title: Expose `Connection.maxWritePayload(withResponse: bool)`; relocate `mtu` /
 category: enhancement
 severity: medium
 platform: both
-status: open
+status: fixed
 last_verified: 2026-05-05
-related: [I326]
+related: [I326, I327]
 ---
+
+## Resolution (2026-05-05)
+
+Landed on branch `feature/i325-mtu-relocation` per the design at
+`docs/superpowers/specs/2026-05-05-mtu-platform-extension-relocation-design.md`
+and plan at
+`docs/superpowers/plans/2026-05-05-mtu-platform-extension-relocation.md`.
+
+- New `WritePayloadLimit` value object
+  (`bluey/lib/src/connection/value_objects/write_payload_limit.dart`).
+- New `Connection.maxWritePayload({required bool withResponse})` returning
+  `WritePayloadLimit`.
+- New `BlueyPlatform.getMaximumWriteLength` on the platform interface;
+  Android Pigeon + Kotlin impl (with cached negotiated MTU updated from
+  `onMtuChanged`); iOS Dart-side wiring of the existing host-API method.
+- `Connection.mtu` and `Connection.requestMtu` relocated to
+  `AndroidConnectionExtensions`. iOS's `connection.android` is null; the
+  asymmetry now surfaces at compile time.
+- iOS-throws-on-`requestMtu` test deleted; the API is compile-time absent
+  on iOS post-refactor.
+- ~15 internal call sites migrated across tests and example app.
+  Example UI shows `'—'` for MTU on iOS to teach platform-asymmetry.
+
+Follow-ups filed: I326 (Android `onMtuChanged` listener for cache refresh
+on peer-initiated renegotiation), I327 (RSSI value object — closes the
+last primitive-obsession gap in the Connection aggregate).
 
 ## Expanded scope (2026-05-05)
 
