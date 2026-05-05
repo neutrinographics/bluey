@@ -105,7 +105,9 @@ void main() {
 
   group('PlatformAdvertiseDataTooLargeException', () {
     test('toString includes the message', () {
-      const e = PlatformAdvertiseDataTooLargeException('AD payload exceeded 31 bytes');
+      const e = PlatformAdvertiseDataTooLargeException(
+        'AD payload exceeded 31 bytes',
+      );
       expect(e.toString(), contains('PlatformAdvertiseDataTooLargeException'));
       expect(e.toString(), contains('AD payload exceeded 31 bytes'));
     });
@@ -136,8 +138,13 @@ void main() {
 
   group('PlatformRespondToRequestNotFoundException', () {
     test('toString includes the message and class name', () {
-      const e = PlatformRespondToRequestNotFoundException('requestId 42 not found');
-      expect(e.toString(), contains('PlatformRespondToRequestNotFoundException'));
+      const e = PlatformRespondToRequestNotFoundException(
+        'requestId 42 not found',
+      );
+      expect(
+        e.toString(),
+        contains('PlatformRespondToRequestNotFoundException'),
+      );
       expect(e.toString(), contains('requestId 42 not found'));
     });
 

@@ -807,32 +807,29 @@ void main() {
         expect(advertised, isNot(contains(lifecycle.controlServiceUuid)));
       });
 
-      test(
-        'startAdvertising(peerDiscoverable: true) routes control UUID to '
-        'scan response, leaving primary UUIDs untouched (I313)',
-        () async {
-          final server = bluey.server()!;
+      test('startAdvertising(peerDiscoverable: true) routes control UUID to '
+          'scan response, leaving primary UUIDs untouched (I313)', () async {
+        final server = bluey.server()!;
 
-          await server.startAdvertising(
-            services: [UUID.short(0x180F)],
-            peerDiscoverable: true,
-          );
+        await server.startAdvertising(
+          services: [UUID.short(0x180F)],
+          peerDiscoverable: true,
+        );
 
-          final last = mockPlatform.lastAdvertiseConfig!;
-          // Primary AD carries only the user's UUID — the control UUID
-          // moves to scan response so we don't blow the 31-byte budget on
-          // Android.
-          expect(last.serviceUuids, hasLength(1));
-          expect(
-            last.serviceUuids.first,
-            equals(UUID.short(0x180F).toString().toLowerCase()),
-          );
-          expect(
-            last.scanResponseServiceUuids,
-            equals([lifecycle.controlServiceUuid]),
-          );
-        },
-      );
+        final last = mockPlatform.lastAdvertiseConfig!;
+        // Primary AD carries only the user's UUID — the control UUID
+        // moves to scan response so we don't blow the 31-byte budget on
+        // Android.
+        expect(last.serviceUuids, hasLength(1));
+        expect(
+          last.serviceUuids.first,
+          equals(UUID.short(0x180F).toString().toLowerCase()),
+        );
+        expect(
+          last.scanResponseServiceUuids,
+          equals([lifecycle.controlServiceUuid]),
+        );
+      });
 
       test('startAdvertising(peerDiscoverable: true) does not duplicate the '
           'control UUID when caller already lists it', () async {
@@ -869,75 +866,66 @@ void main() {
       // overflow the budget. Routing the control UUID into the scan
       // response (a separate 31-byte packet) keeps user UUIDs in the
       // primary AD and avoids ADVERTISE_FAILED_DATA_TOO_LARGE.
-      test(
-        'startAdvertising(peerDiscoverable: true) routes control UUID to '
-        'scanResponseServiceUuids, leaves user UUIDs in primary',
-        () async {
-          final server = bluey.server()!;
-          await server.addService(
-            HostedService(
-              uuid: UUID('12345678-1234-1234-1234-123456789abc'),
-              isPrimary: true,
-              characteristics: const [],
-            ),
-          );
-          await server.startAdvertising(
-            services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
-            peerDiscoverable: true,
-          );
+      test('startAdvertising(peerDiscoverable: true) routes control UUID to '
+          'scanResponseServiceUuids, leaves user UUIDs in primary', () async {
+        final server = bluey.server()!;
+        await server.addService(
+          HostedService(
+            uuid: UUID('12345678-1234-1234-1234-123456789abc'),
+            isPrimary: true,
+            characteristics: const [],
+          ),
+        );
+        await server.startAdvertising(
+          services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
+          peerDiscoverable: true,
+        );
 
-          final last = mockPlatform.lastAdvertiseConfig!;
-          expect(
-            last.serviceUuids,
-            equals(['f0000000-0000-1000-8000-00805f9b34fb']),
-            reason: 'user UUIDs stay in primary AD',
-          );
-          expect(
-            last.scanResponseServiceUuids,
-            equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
-            reason: 'control UUID routes to scan response (I313)',
-          );
-        },
-      );
+        final last = mockPlatform.lastAdvertiseConfig!;
+        expect(
+          last.serviceUuids,
+          equals(['f0000000-0000-1000-8000-00805f9b34fb']),
+          reason: 'user UUIDs stay in primary AD',
+        );
+        expect(
+          last.scanResponseServiceUuids,
+          equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
+          reason: 'control UUID routes to scan response (I313)',
+        );
+      });
 
-      test(
-        'startAdvertising(peerDiscoverable: false) leaves '
-        'scanResponseServiceUuids empty',
-        () async {
-          final server = bluey.server()!;
-          await server.startAdvertising(
-            services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
-            peerDiscoverable: false,
-          );
+      test('startAdvertising(peerDiscoverable: false) leaves '
+          'scanResponseServiceUuids empty', () async {
+        final server = bluey.server()!;
+        await server.startAdvertising(
+          services: [UUID('f0000000-0000-1000-8000-00805f9b34fb')],
+          peerDiscoverable: false,
+        );
 
-          final last = mockPlatform.lastAdvertiseConfig!;
-          expect(
-            last.serviceUuids,
-            equals(['f0000000-0000-1000-8000-00805f9b34fb']),
-          );
-          expect(last.scanResponseServiceUuids, isEmpty);
-        },
-      );
+        final last = mockPlatform.lastAdvertiseConfig!;
+        expect(
+          last.serviceUuids,
+          equals(['f0000000-0000-1000-8000-00805f9b34fb']),
+        );
+        expect(last.scanResponseServiceUuids, isEmpty);
+      });
 
-      test(
-        'startAdvertising(peerDiscoverable: true) does not duplicate '
-        'control UUID across primary and scan response when caller '
-        'already lists it explicitly',
-        () async {
-          final server = bluey.server()!;
-          await server.startAdvertising(
-            services: [UUID('b1e70001-0000-1000-8000-00805f9b34fb')],
-            peerDiscoverable: true,
-          );
+      test('startAdvertising(peerDiscoverable: true) does not duplicate '
+          'control UUID across primary and scan response when caller '
+          'already lists it explicitly', () async {
+        final server = bluey.server()!;
+        await server.startAdvertising(
+          services: [UUID('b1e70001-0000-1000-8000-00805f9b34fb')],
+          peerDiscoverable: true,
+        );
 
-          final last = mockPlatform.lastAdvertiseConfig!;
-          expect(
-            last.serviceUuids,
-            equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
-          );
-          expect(last.scanResponseServiceUuids, isEmpty);
-        },
-      );
+        final last = mockPlatform.lastAdvertiseConfig!;
+        expect(
+          last.serviceUuids,
+          equals(['b1e70001-0000-1000-8000-00805f9b34fb']),
+        );
+        expect(last.scanResponseServiceUuids, isEmpty);
+      });
     });
 
     group('Central Connections', () {
@@ -1021,24 +1009,21 @@ void main() {
           expect(server.isClientConnected('central-1'), isTrue);
         });
 
-        test(
-          'returns true regardless of whether the central has identified '
-          'as a Bluey peer',
-          () async {
-            final server = bluey.server()!;
-            server.connections.listen((_) {});
+        test('returns true regardless of whether the central has identified '
+            'as a Bluey peer', () async {
+          final server = bluey.server()!;
+          server.connections.listen((_) {});
 
-            mockPlatform.emitCentralConnected(
-              const platform.PlatformCentral(id: 'central-1', mtu: 512),
-            );
-            await Future<void>.delayed(const Duration(milliseconds: 10));
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'central-1', mtu: 512),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 10));
 
-            // No heartbeat written, so the central has not been promoted
-            // to a PeerClient — but it is still connected and the guard
-            // must report it as such.
-            expect(server.isClientConnected('central-1'), isTrue);
-          },
-        );
+          // No heartbeat written, so the central has not been promoted
+          // to a PeerClient — but it is still connected and the guard
+          // must report it as such.
+          expect(server.isClientConnected('central-1'), isTrue);
+        });
 
         test('returns false after the central disconnects', () async {
           final server = bluey.server()!;

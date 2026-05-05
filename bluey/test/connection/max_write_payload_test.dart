@@ -38,7 +38,9 @@ void main() {
           withResponse: 100,
           withoutResponse: 182,
         );
-        final connection = await bluey.connect(deviceFor(TestDeviceIds.device1));
+        final connection = await bluey.connect(
+          deviceFor(TestDeviceIds.device1),
+        );
 
         final limit = await connection.maxWritePayload(withResponse: false);
 
@@ -55,7 +57,9 @@ void main() {
           withResponse: 100,
           withoutResponse: 182,
         );
-        final connection = await bluey.connect(deviceFor(TestDeviceIds.device1));
+        final connection = await bluey.connect(
+          deviceFor(TestDeviceIds.device1),
+        );
 
         final limit = await connection.maxWritePayload(withResponse: true);
 
@@ -82,7 +86,9 @@ void main() {
     late Bluey androidBluey;
 
     setUp(() {
-      androidFake = FakeBlueyPlatform(capabilities: platform.Capabilities.android);
+      androidFake = FakeBlueyPlatform(
+        capabilities: platform.Capabilities.android,
+      );
       platform.BlueyPlatform.instance = androidFake;
       androidBluey = Bluey();
       androidFake.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');

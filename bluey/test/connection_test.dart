@@ -91,7 +91,9 @@ class MockConnection implements Connection {
   }
 
   @override
-  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) async {
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async {
     return WritePayloadLimit.fromPlatform(_android.mtu.value - 3);
   }
 

@@ -76,7 +76,9 @@ class FakeConnection implements Connection {
   Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
 
   @override
-  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) async {
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async {
     return WritePayloadLimit.fromPlatform(_android.mtu.value - 3);
   }
 

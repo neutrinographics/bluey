@@ -203,13 +203,12 @@ class PlatformAdvertiseDataTooLargeException implements Exception {
   const PlatformAdvertiseDataTooLargeException(this.message);
 
   @override
-  String toString() =>
-      'PlatformAdvertiseDataTooLargeException: $message';
+  String toString() => 'PlatformAdvertiseDataTooLargeException: $message';
 
   @override
   bool operator ==(Object other) =>
       other is PlatformAdvertiseDataTooLargeException &&
-          other.message == message;
+      other.message == message;
 
   @override
   int get hashCode => message.hashCode;
@@ -240,13 +239,12 @@ class PlatformRespondToRequestNotFoundException implements Exception {
   const PlatformRespondToRequestNotFoundException(this.message);
 
   @override
-  String toString() =>
-      'PlatformRespondToRequestNotFoundException: $message';
+  String toString() => 'PlatformRespondToRequestNotFoundException: $message';
 
   @override
   bool operator ==(Object other) =>
       other is PlatformRespondToRequestNotFoundException &&
-          other.message == message;
+      other.message == message;
 
   @override
   int get hashCode => message.hashCode;

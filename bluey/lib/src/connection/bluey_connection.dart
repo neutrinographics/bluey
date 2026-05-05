@@ -1344,7 +1344,10 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Future<Mtu> requestMtu(Mtu desired) {
-    _requireCapability(_conn._platform.capabilities.canRequestMtu, 'requestMtu');
+    _requireCapability(
+      _conn._platform.capabilities.canRequestMtu,
+      'requestMtu',
+    );
     return _conn._requestMtuImpl(desired);
   }
 }

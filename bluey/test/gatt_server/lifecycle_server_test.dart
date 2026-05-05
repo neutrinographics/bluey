@@ -766,9 +766,8 @@ void main() {
           );
           await Future<void>.delayed(Duration.zero);
 
-          final warns = logs
-              .where((e) => e.level == BlueyLogLevel.warn)
-              .toList();
+          final warns =
+              logs.where((e) => e.level == BlueyLogLevel.warn).toList();
           expect(
             warns,
             isNotEmpty,
@@ -799,15 +798,11 @@ void main() {
         );
 
         server.handleReadRequest(
-          _readReq(
-            characteristicUuid: 'b1e70003-0000-1000-8000-00805f9b34fb',
-          ),
+          _readReq(characteristicUuid: 'b1e70003-0000-1000-8000-00805f9b34fb'),
         );
         await Future<void>.delayed(Duration.zero);
 
-        final warns = logs
-            .where((e) => e.level == BlueyLogLevel.warn)
-            .toList();
+        final warns = logs.where((e) => e.level == BlueyLogLevel.warn).toList();
         expect(warns, isNotEmpty);
 
         server.dispose();
@@ -840,9 +835,8 @@ void main() {
           );
           await Future<void>.delayed(Duration.zero);
 
-          final errors = logs
-              .where((e) => e.level == BlueyLogLevel.error)
-              .toList();
+          final errors =
+              logs.where((e) => e.level == BlueyLogLevel.error).toList();
           expect(
             errors,
             isNotEmpty,

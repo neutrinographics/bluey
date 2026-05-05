@@ -1247,7 +1247,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// writes-without-response can populate both keys; tests that don't
   /// care fall back to the simulated peripheral's MTU minus 3.
   final Map<String, ({int withResponse, int withoutResponse})>
-      _maxWriteOverrides = {};
+  _maxWriteOverrides = {};
 
   /// Override the value returned from [getMaximumWriteLength] for
   /// [deviceId]. Used by tests that need explicit control over the

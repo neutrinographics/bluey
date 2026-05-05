@@ -244,8 +244,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<int> getMaximumWriteLength(
     String deviceId, {
     required bool withResponse,
-  }) async =>
-      withResponse ? 100 : 182;
+  }) async => withResponse ? 100 : 182;
 
   @override
   Future<int> readRssi(String deviceId) async => -60;

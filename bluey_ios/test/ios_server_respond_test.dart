@@ -49,10 +49,7 @@ void main() {
         when(
           () => mockHostApi.respondToReadRequest(any(), any(), any()),
         ).thenThrow(
-          PlatformException(
-            code: 'bluey-unknown',
-            message: 'something else',
-          ),
+          PlatformException(code: 'bluey-unknown', message: 'something else'),
         );
         final server = IosServer(mockHostApi);
 
