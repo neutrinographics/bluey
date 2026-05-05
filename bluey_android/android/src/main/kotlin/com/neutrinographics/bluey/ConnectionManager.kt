@@ -526,9 +526,7 @@ class ConnectionManager(
     ) {
         val mtu = negotiatedMtu[deviceId]
         if (mtu == null) {
-            callback(
-                Result.failure(IllegalStateException("Not connected: $deviceId"))
-            )
+            callback(Result.failure(BlueyAndroidError.DeviceNotConnected))
             return
         }
         callback(Result.success((mtu - 3).toLong()))
