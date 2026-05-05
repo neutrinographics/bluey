@@ -89,6 +89,9 @@ class _SpyConnection implements Connection {
   @override
   Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
   @override
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
+      throw UnimplementedError();
+  @override
   Future<int> readRssi() => throw UnimplementedError();
   @override
   AndroidConnectionExtensions? get android => throw UnimplementedError();
@@ -435,6 +438,9 @@ class _OrderingSpyConnection implements Connection {
   Future<bool> hasService(UUID uuid) => throw UnimplementedError();
   @override
   Future<Mtu> requestMtu(Mtu mtu) => throw UnimplementedError();
+  @override
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
+      throw UnimplementedError();
   @override
   Future<int> readRssi() => throw UnimplementedError();
   @override

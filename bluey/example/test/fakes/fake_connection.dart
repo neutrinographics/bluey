@@ -38,6 +38,11 @@ class FakeConnection implements Connection {
     return Mtu.fromPlatform(_mtu);
   }
 
+  @override
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) async {
+    return WritePayloadLimit.fromPlatform(_mtu - 3);
+  }
+
   /// Records what mtu was most recently requested.
   int? get lastRequestedMtu => _mtuRequest;
 

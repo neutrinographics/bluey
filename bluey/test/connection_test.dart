@@ -60,6 +60,11 @@ class MockConnection implements Connection {
   }
 
   @override
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) async {
+    return WritePayloadLimit.fromPlatform(mtu.value - 3);
+  }
+
+  @override
   Future<int> readRssi() async {
     return -60; // Simulated RSSI
   }

@@ -4,6 +4,7 @@ import 'android_connection_extensions.dart';
 import 'connection_state.dart';
 import 'ios_connection_extensions.dart';
 import 'value_objects/mtu.dart';
+import 'value_objects/write_payload_limit.dart';
 
 export 'connection_state.dart';
 export 'value_objects/connection_interval.dart';
@@ -160,6 +161,23 @@ abstract class Connection {
   ///
   /// Throws [DisconnectedException] if not connected.
   Future<Mtu> requestMtu(Mtu mtu);
+
+  /// Largest single ATT write payload the platform will accept on this
+  /// connection.
+  ///
+  /// Use this — not `mtu - 3` — when sizing chunked writes. Critical on
+  /// iOS, where the negotiated MTU is not exposed by CoreBluetooth and
+  /// `Connection.android` (which carries `mtu` / `requestMtu`) is null.
+  ///
+  /// On Android: derived from the cached negotiated GATT MTU.
+  /// On iOS: returned by `CBPeripheral.maximumWriteValueLength(for:)`.
+  ///
+  /// [withResponse] selects the write type; on iOS the values may
+  /// differ. On Android both write types share the same limit, but the
+  /// parameter is preserved for API symmetry.
+  ///
+  /// Throws [DisconnectedException] if not connected.
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse});
 
   /// Read the current RSSI (signal strength).
   ///

@@ -533,6 +533,30 @@ class BlueyConnection implements Connection {
   }
 
   @override
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async {
+    _ensureConnected();
+    return _trackInFlight(
+      () => _loggedGattOp(
+        deviceId: deviceId,
+        op: 'getMaximumWriteLength',
+        startDetail: 'withResponse=$withResponse',
+        body: () async {
+          final value = await _platform.getMaximumWriteLength(
+            _connectionId,
+            withResponse: withResponse,
+          );
+          return WritePayloadLimit.fromPlatform(value);
+        },
+        completeDetail:
+            (limit) => 'withResponse=$withResponse, limit=${limit.value}',
+        logger: _logger,
+      ),
+    );
+  }
+
+  @override
   Future<int> readRssi() async {
     _ensureConnected();
     return _trackInFlight(
