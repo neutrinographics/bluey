@@ -41,6 +41,7 @@ export 'src/gatt_client/well_known_uuids.dart';
 export 'src/gatt_server/server.dart';
 export 'src/gatt_server/hosted_gatt.dart';
 export 'src/gatt_server/gatt_request.dart';
+export 'src/gatt_server/advertising_state.dart';
 
 // Platform bounded context
 export 'src/platform/bluetooth_state.dart';

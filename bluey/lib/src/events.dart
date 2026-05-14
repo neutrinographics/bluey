@@ -272,6 +272,14 @@ final class ServiceAddedEvent extends BlueyEvent {
   String toString() => '[Server] Added service ${serviceId.toShortString()}';
 }
 
+/// Advertising starting.
+final class AdvertisingStartingEvent extends BlueyEvent {
+  AdvertisingStartingEvent({super.source});
+
+  @override
+  String toString() => '[Server] Advertising starting';
+}
+
 /// Advertising started.
 final class AdvertisingStartedEvent extends BlueyEvent {
   final String? name;
@@ -284,6 +292,14 @@ final class AdvertisingStartedEvent extends BlueyEvent {
     final n = name != null ? ' as "$name"' : '';
     return '[Server] Advertising started$n';
   }
+}
+
+/// Advertising stopping.
+final class AdvertisingStoppingEvent extends BlueyEvent {
+  AdvertisingStoppingEvent({super.source});
+
+  @override
+  String toString() => '[Server] Advertising stopping';
 }
 
 /// Advertising stopped.
