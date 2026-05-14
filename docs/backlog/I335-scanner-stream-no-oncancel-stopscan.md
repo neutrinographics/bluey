@@ -4,10 +4,21 @@ title: `BlueyScanner.scan()`'s returned stream does not stop the platform scan o
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-05-14
+status: fixed
+last_verified: 2026-05-15
 related: [I334]
 ---
+
+## Resolution (2026-05-15)
+
+Closed by the stream-conventions sweep on branch
+`feature/stream-conventions`. Per Convention 5 of the design,
+`Scanner.scan()`'s returned `StreamController` now has
+`onCancel: () => stop()`. Cancelling the subscription stops the
+platform scan; `Scanner.stop()` stays for imperative use.
+
+The consumer-side workaround in `gossip_bluey` (holding the
+`Scanner` reference and calling `stop()` explicitly) can be removed.
 
 ## Symptom
 
