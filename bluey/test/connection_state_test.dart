@@ -44,6 +44,10 @@ void main() {
       test('returns false for disconnecting', () {
         expect(ConnectionState.disconnecting.isActive, isFalse);
       });
+
+      test('returns false for invalidated', () {
+        expect(ConnectionState.invalidated.isActive, isFalse);
+      });
     });
 
     group('isConnected (link is up — linked OR ready)', () {
@@ -66,6 +70,10 @@ void main() {
       test('returns false for disconnecting', () {
         expect(ConnectionState.disconnecting.isConnected, isFalse);
       });
+
+      test('returns false for invalidated', () {
+        expect(ConnectionState.invalidated.isConnected, isFalse);
+      });
     });
 
     group('isReady (services discovered, GATT ops safe — only ready)', () {
@@ -87,6 +95,10 @@ void main() {
 
       test('returns false for disconnecting', () {
         expect(ConnectionState.disconnecting.isReady, isFalse);
+      });
+
+      test('returns false for invalidated', () {
+        expect(ConnectionState.invalidated.isReady, isFalse);
       });
     });
   });
