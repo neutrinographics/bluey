@@ -20,6 +20,8 @@ final class BlueyAndroid extends BlueyPlatform {
       AndroidConnectionManager(_hostApi);
   late final AndroidServer _server = AndroidServer(_hostApi);
 
+  BluetoothState _cachedState = BluetoothState.unknown;
+
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
   final StreamController<String> _serviceChangesController =
@@ -43,7 +45,8 @@ final class BlueyAndroid extends BlueyPlatform {
 
     // Wire up callbacks to our streams
     _flutterApi.onStateChangedCallback = (state) {
-      _stateController.add(_mapBluetoothState(state));
+      _cachedState = _mapBluetoothState(state);
+      _stateController.add(_cachedState);
     };
 
     _flutterApi.onDeviceDiscoveredCallback = (device) {
@@ -124,6 +127,9 @@ final class BlueyAndroid extends BlueyPlatform {
     );
     await _hostApi.configure(dto);
   }
+
+  @override
+  BluetoothState get currentState => _cachedState;
 
   @override
   Stream<BluetoothState> get stateStream {
