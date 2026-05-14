@@ -538,10 +538,11 @@ class BlueyServer implements Server {
     try {
       await _platform.startAdvertising(config);
     } catch (_) {
-      // Roll back to idle on platform failure so subsequent retries are
-      // valid. Suppresses AdvertisingStoppedEvent since the transition
-      // is a rollback, not a confirmed stop — but the current contract
-      // is to emit it, matching scanner stop-on-error behaviour.
+      // Roll back to idle on platform failure. This transition fires
+      // AdvertisingStoppedEvent (paired with the AdvertisingStartingEvent
+      // already emitted), matching Scanner's behavior on a failed
+      // _platform.scan() — consumers see Starting → Stopped without an
+      // intervening Started.
       _setAdvertisingState(AdvertisingState.idle);
       rethrow;
     }

@@ -348,7 +348,9 @@ void main() {
         mockPlatform = MockBlueyPlatform();
         mockPlatform.mockState = platform.BluetoothState.unknown;
         platform.BlueyPlatform.instance = mockPlatform;
-        bluey = await Bluey.create();
+        bluey = await Bluey.create(
+          initialStateTimeout: const Duration(milliseconds: 50),
+        );
 
         // Initially unknown before platform reports
         expect(bluey.currentState, equals(BluetoothState.unknown));

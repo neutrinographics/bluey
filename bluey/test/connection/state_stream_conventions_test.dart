@@ -220,6 +220,26 @@ void main() {
 
       expect(connection.state, equals(ConnectionState.invalidated));
     });
+
+    test(
+      'late subscriber after invalidation receives ConnectionState.invalidated and onDone',
+      () async {
+        final connection = await establish();
+        fakePlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        // Connection is now invalidated. Subscribe AFTER.
+        final received = <ConnectionState>[];
+        final completer = Completer<void>();
+        connection.stateChanges.listen(
+          received.add,
+          onDone: completer.complete,
+        );
+        await completer.future;
+
+        expect(received, equals([ConnectionState.invalidated]));
+      },
+    );
   });
 
   group('Connection non-enum streams (Convention 3 — addError + close)', () {
@@ -282,6 +302,68 @@ void main() {
         await Future<void>.delayed(Duration.zero);
 
         fakePlatform.setState(platform.BluetoothState.off);
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+
+    test(
+      'late subscriber on servicesChanges after invalidation receives StaleHandleException',
+      () async {
+        final connection = await establish();
+        fakePlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        Object? errorReceived;
+        final completer = Completer<void>();
+        connection.servicesChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+
+    test(
+      'late subscriber on bondStateChanges after invalidation receives StaleHandleException',
+      () async {
+        final connection = await establish();
+        final android = connection.android!;
+        fakePlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        Object? errorReceived;
+        final completer = Completer<void>();
+        android.bondStateChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+
+    test(
+      'late subscriber on phyChanges after invalidation receives StaleHandleException',
+      () async {
+        final connection = await establish();
+        final android = connection.android!;
+        fakePlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        Object? errorReceived;
+        final completer = Completer<void>();
+        android.phyChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
         await completer.future;
 
         expect(errorReceived, isA<StaleHandleException>());

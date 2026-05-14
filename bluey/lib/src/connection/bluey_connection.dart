@@ -544,8 +544,17 @@ class BlueyConnection implements Connection {
       // `Bluey.stateStream`. `StreamController.broadcast(onListen: ...)`
       // would only fire on the 0→1 transition; `Stream.multi` runs the
       // factory per subscriber, so every late subscriber gets the replay.
-      if (!_stateController.isClosed) {
-        controller.add(_state);
+      //
+      // Convention 6 (sync getter agrees with last emitted signal):
+      // always replay `_state` — including the terminal
+      // `ConnectionState.invalidated` value set by `_invalidate`. On
+      // the invalidated path the underlying controller is already
+      // closed, so we close the per-subscriber controller directly
+      // without trying to bridge.
+      controller.add(_state);
+      if (_invalidated) {
+        controller.close();
+        return;
       }
       final sub = _stateController.stream.listen(
         controller.add,
@@ -561,11 +570,21 @@ class BlueyConnection implements Connection {
   Stream<List<RemoteService>> get servicesChanges =>
       Stream<List<RemoteService>>.multi(
         (controller) {
+          // Convention 3 (non-enum terminal): late subscribers after
+          // invalidation see addError(StaleHandleException) + close so
+          // their `onError` mirrors what the corresponding sync getter
+          // would throw (Convention 6).
+          if (_invalidated) {
+            controller.addError(StaleHandleException(
+              triggeringState: _invalidationState!,
+              instanceType: InvalidatedInstance.connection,
+            ));
+            controller.close();
+            return;
+          }
           // Replay the currently-discovered services (or the empty list
           // if discovery hasn't run yet) before forwarding live events.
-          if (!_servicesChangesController.isClosed) {
-            controller.add(_cachedServices ?? const <RemoteService>[]);
-          }
+          controller.add(_cachedServices ?? const <RemoteService>[]);
           final sub = _servicesChangesController.stream.listen(
             controller.add,
             onError: controller.addError,
@@ -799,10 +818,20 @@ class BlueyConnection implements Connection {
 
   Stream<BondState> get _bondStateChanges => Stream<BondState>.multi(
     (controller) {
-      // Replay the cached bond state before bridging live events.
-      if (!_bondStateController.isClosed) {
-        controller.add(_bondState);
+      // Convention 3 (non-enum terminal): late subscribers post-
+      // invalidation see addError(StaleHandleException) + close so
+      // their `onError` mirrors what the corresponding sync getter
+      // would throw (Convention 6).
+      if (_invalidated) {
+        controller.addError(StaleHandleException(
+          triggeringState: _invalidationState!,
+          instanceType: InvalidatedInstance.connection,
+        ));
+        controller.close();
+        return;
       }
+      // Replay the cached bond state before bridging live events.
+      controller.add(_bondState);
       final sub = _bondStateController.stream.listen(
         controller.add,
         onError: controller.addError,
@@ -839,10 +868,20 @@ class BlueyConnection implements Connection {
 
   Stream<({Phy tx, Phy rx})> get _phyChanges => Stream<({Phy tx, Phy rx})>.multi(
     (controller) {
-      // Replay the cached (tx, rx) PHY pair before bridging live events.
-      if (!_phyController.isClosed) {
-        controller.add((tx: _txPhy, rx: _rxPhy));
+      // Convention 3 (non-enum terminal): late subscribers post-
+      // invalidation see addError(StaleHandleException) + close so
+      // their `onError` mirrors what the corresponding sync getter
+      // would throw (Convention 6).
+      if (_invalidated) {
+        controller.addError(StaleHandleException(
+          triggeringState: _invalidationState!,
+          instanceType: InvalidatedInstance.connection,
+        ));
+        controller.close();
+        return;
       }
+      // Replay the cached (tx, rx) PHY pair before bridging live events.
+      controller.add((tx: _txPhy, rx: _rxPhy));
       final sub = _phyController.stream.listen(
         controller.add,
         onError: controller.addError,
@@ -1492,7 +1531,11 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Stream<BondState> get bondStateChanges {
-    _conn._ensureValid();
+    // Convention 3 / Convention 6: do NOT throw on invalidation here.
+    // The stream itself is responsible for delivering the terminal
+    // signal (addError(StaleHandleException) + close) so late
+    // subscribers observe the failure via `onError`, mirroring what
+    // the sync `bondState` getter throws.
     _requireCapability(
       _conn._platform.capabilities.canBond,
       'bondStateChanges',
@@ -1530,7 +1573,11 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Stream<({Phy tx, Phy rx})> get phyChanges {
-    _conn._ensureValid();
+    // Convention 3 / Convention 6: do NOT throw on invalidation here.
+    // The stream itself is responsible for delivering the terminal
+    // signal (addError(StaleHandleException) + close) so late
+    // subscribers observe the failure via `onError`, mirroring what
+    // the sync `txPhy` / `rxPhy` getters throw.
     _requireCapability(
       _conn._platform.capabilities.canRequestPhy,
       'phyChanges',

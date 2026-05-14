@@ -132,7 +132,7 @@ import 'package:bluey/bluey.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  final bluey = Bluey();
+  final bluey = await Bluey.create();
   
   // Configure plugin behavior (optional - defaults are sensible)
   await bluey.configure(
@@ -207,7 +207,7 @@ bluey.scan(config).listen(
 ```dart
 import 'package:bluey/bluey.dart';
 
-final bluey = Bluey();
+final bluey = await Bluey.create();
 
 // Connect to a device (returns a Connection object)
 final connection = await bluey.connect(device);
@@ -230,7 +230,7 @@ await connection.disconnect();
 ```dart
 import 'package:bluey/bluey.dart';
 
-final bluey = Bluey();
+final bluey = await Bluey.create();
 
 // Create a server (peripheral)
 final server = bluey.server();
@@ -361,7 +361,7 @@ filtered by a level you set; setting the level also pushes the filter down
 to the native side, so no Pigeon traffic is incurred for filtered events.
 
 ```dart
-final bluey = Bluey();
+final bluey = await Bluey.create();
 bluey.setLogLevel(BlueyLogLevel.debug);
 bluey.logEvents.listen((event) {
   print('${event.timestamp.toIso8601String()} '
