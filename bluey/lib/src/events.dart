@@ -58,6 +58,16 @@ final class ScanStartingEvent extends BlueyEvent {
     this.timeout,
     super.source,
   });
+
+  @override
+  String toString() {
+    final filter =
+        serviceFilter?.isNotEmpty == true
+            ? ' filter=${serviceFilter!.map((u) => u.toShortString()).join(', ')}'
+            : '';
+    final to = timeout != null ? ' timeout=${timeout!.inSeconds}s' : '';
+    return '[Scan] Starting$filter$to';
+  }
 }
 
 /// Device discovered during scan.
@@ -100,6 +110,9 @@ final class ScanStoppedEvent extends BlueyEvent {
 /// confirms.
 final class ScanStoppingEvent extends BlueyEvent {
   ScanStoppingEvent({super.source});
+
+  @override
+  String toString() => '[Scan] Stopping';
 }
 
 /// Connection attempt started.
