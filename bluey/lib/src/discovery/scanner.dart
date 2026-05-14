@@ -1,5 +1,6 @@
 import '../shared/uuid.dart';
 import 'scan_result.dart';
+import 'scan_state.dart';
 
 /// Aggregate root for the Discovery bounded context.
 ///
@@ -32,7 +33,16 @@ import 'scan_result.dart';
 /// scanner.dispose();
 /// ```
 abstract class Scanner {
-  /// Whether a scan is currently in progress.
+  /// Current scan state. Replays via [stateChanges]. See [ScanState].
+  ScanState get state;
+
+  /// State transitions, replayed on subscribe (per-subscriber Stream.multi
+  /// pattern). Terminal: emits [ScanState.invalidated] then closes on
+  /// adapter invalidation.
+  Stream<ScanState> get stateChanges;
+
+  /// Whether a scan is currently in progress. Derived from [state].
+  /// Kept for ergonomic convenience.
   bool get isScanning;
 
   /// Start scanning for nearby BLE devices.
