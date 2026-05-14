@@ -1,4 +1,5 @@
 import '../peer/server_id.dart';
+import '../platform/bluetooth_state.dart';
 import 'uuid.dart';
 
 /// Base class for all Bluey exceptions.
@@ -460,4 +461,63 @@ class BlueyPlatformException extends BlueyException {
 
   BlueyPlatformException(String message, {this.code, Object? cause})
     : super(message, cause: cause);
+}
+
+/// The kind of instance that was invalidated. Used by
+/// [StaleHandleException] to surface the right type in messages and
+/// diagnostics without primitive-obsession on a free-form string.
+enum InvalidatedInstance {
+  server('Server'),
+  connection('Connection'),
+  scanner('Scanner');
+
+  /// Display name used in user-facing exception messages.
+  final String displayName;
+
+  const InvalidatedInstance(this.displayName);
+}
+
+/// A method was called on a [Server], [Connection], or [Scanner]
+/// instance that was invalidated by a prior Bluetooth-adapter state
+/// transition (e.g. the user toggled Bluetooth off).
+///
+/// Invalidation is **terminal**: the instance is dead and will not
+/// recover even if the adapter returns to [BluetoothState.on]. Construct
+/// a fresh instance from [Bluey] to proceed:
+///
+/// ```dart
+/// try {
+///   await server.addService(...);
+/// } on StaleHandleException {
+///   server = bluey.server();
+///   await server!.addService(...);
+/// }
+/// ```
+///
+/// [triggeringState] is the adapter state that caused invalidation.
+/// It does **not** reflect the adapter's current state, which may have
+/// returned to [BluetoothState.on] since invalidation.
+class StaleHandleException extends BlueyException {
+  /// The adapter state that caused this instance to be invalidated.
+  final BluetoothState triggeringState;
+
+  /// The instance type that was invalidated.
+  final InvalidatedInstance instanceType;
+
+  // Note: `const` cannot be added here because Dart's const evaluator
+  // forbids string interpolation of instance-property getters (`.displayName`,
+  // `.name`) on constructor parameters, even when those parameters are
+  // compile-time constants. The constructor is intentionally non-const to
+  // preserve readable, human-friendly messages.
+  StaleHandleException({
+    required this.triggeringState,
+    required this.instanceType,
+  }) : super(
+         '${instanceType.displayName} was invalidated by adapter '
+         'transition to ${triggeringState.name}; the instance is dead '
+         'even if the adapter has since returned to BluetoothState.on.',
+         action:
+             'Construct a fresh ${instanceType.displayName} from Bluey '
+             'rather than reusing this one.',
+       );
 }

@@ -25,6 +25,14 @@ enum BlueyError: Error {
     /// `PlatformRespondToRequestNotFoundException` for the lifecycle
     /// server's defense-in-depth race handling (see I322).
     case pendingRequestNotFound
+    /// I333 — the underlying `CBCentralManager` / `CBPeripheralManager`
+    /// is not `.poweredOn`, so a CoreBluetooth call would silently
+    /// no-op (worst-case: the consumer's `Future` hangs forever).
+    /// Pre-check at GATT op entry and surface to Dart as the typed
+    /// `BluetoothUnavailableException` (Pigeon code
+    /// `bluetooth-unavailable`), matching Android's
+    /// `DeadObjectException` translation.
+    case notReady
 }
 
 extension BlueyError: LocalizedError {
@@ -44,6 +52,8 @@ extension BlueyError: LocalizedError {
             return "GATT attribute handle invalidated by Service Changed"
         case .pendingRequestNotFound:
             return "Pending request not found"
+        case .notReady:
+            return "Bluetooth adapter not powered on"
         }
     }
 }
@@ -82,6 +92,13 @@ extension BlueyError {
             // client-side raise still surfaces an exception rather than
             // being silently dropped.
             return PigeonError(code: "bluey-unknown",
+                               message: self.errorDescription,
+                               details: nil)
+        case .notReady:
+            // I333 — CBCentralManager not powered on. Surfaces as
+            // BluetoothUnavailableException Dart-side, matching the
+            // Android DeadObjectException translation.
+            return PigeonError(code: "bluetooth-unavailable",
                                message: self.errorDescription,
                                details: nil)
         }
@@ -130,6 +147,14 @@ extension BlueyError {
             // ATTRIBUTE_NOT_FOUND (0x0A) mapping for the
             // attribute-not-registered semantic.
             return PigeonError(code: "bluey-not-found",
+                               message: self.errorDescription,
+                               details: nil)
+        case .notReady:
+            // I333 — CBPeripheralManager not powered on. Surfaces as
+            // BluetoothUnavailableException Dart-side, matching the
+            // Android DeadObjectException translation. Same code on
+            // both client and server sides.
+            return PigeonError(code: "bluetooth-unavailable",
                                message: self.errorDescription,
                                details: nil)
         }

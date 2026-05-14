@@ -214,6 +214,35 @@ class PlatformAdvertiseDataTooLargeException implements Exception {
   int get hashCode => message.hashCode;
 }
 
+/// Raised when a platform GATT or server operation is attempted while the
+/// Bluetooth adapter is unavailable (powered off, being reset, or the
+/// underlying Binder proxy has died).
+///
+/// On Android this surfaces when `android.os.DeadObjectException` is thrown
+/// by a `BluetoothGatt` / `BluetoothGattServer` Binder proxy — typically
+/// because the BT stack was killed while an IPC call was in flight.
+///
+/// The domain layer translates this to `BluetoothUnavailableException`.
+class PlatformBluetoothUnavailableException implements Exception {
+  /// Human-readable description from the native layer, if available.
+  final String? message;
+
+  const PlatformBluetoothUnavailableException({this.message});
+
+  @override
+  String toString() =>
+      'PlatformBluetoothUnavailableException'
+      '${message != null ? ': $message' : ''}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlatformBluetoothUnavailableException &&
+      other.message == message;
+
+  @override
+  int get hashCode => message.hashCode;
+}
+
 /// Raised when a server-side `respondToReadRequest` or
 /// `respondToWriteRequest` call references a `requestId` the platform
 /// plugin no longer has on file.

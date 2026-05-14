@@ -485,6 +485,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _stateController.add(state);
   }
 
+  /// Test seam — update the simulated adapter state and broadcast.
+  ///
+  /// Equivalent to [setBluetoothState]; this shorter alias matches the
+  /// naming convention used in factory-pre-check tests.
+  void setState(BluetoothState state) {
+    setBluetoothState(state);
+  }
+
   /// Simulates a peripheral device that can be discovered and connected to.
   void simulatePeripheral({
     required String id,
@@ -757,6 +765,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Stream<BluetoothState> get stateStream => _stateController.stream;
+
+  @override
+  BluetoothState get currentState => _state;
 
   @override
   Future<BluetoothState> getState() async => _state;

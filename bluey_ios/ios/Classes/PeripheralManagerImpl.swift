@@ -59,9 +59,27 @@ class PeripheralManagerImpl: NSObject {
         peripheralManager.delegate = peripheralManagerDelegate
     }
 
+    // MARK: - Readiness gate (I333)
+
+    // I333 — symmetric backstop to Android's `DeadObjectException`
+    // translation. CoreBluetooth calls against a `CBPeripheralManager`
+    // whose `state != .poweredOn` silently no-op (worst-case: the
+    // consumer's `Future` hangs forever). Every public server op
+    // short-circuits with `BlueyError.notReady.toServerPigeonError()`
+    // (Pigeon code `bluetooth-unavailable`, surfaces Dart-side as
+    // `BluetoothUnavailableException`) when the manager is not
+    // powered on. All current server ops use completion handlers, so
+    // the gate is inlined at op entry rather than via a `throws`
+    // helper; see `CentralManagerImpl.requireReady()` for the
+    // throwing variant used by `getMaximumWriteLength`.
+
     // MARK: - Service Management
 
     func addService(service: LocalServiceDto, completion: @escaping (Result<LocalServiceDto, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         let mutableService = service.toMutableService()
         let serviceUuid = service.uuid.lowercased()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "addService",
@@ -113,6 +131,10 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func removeService(serviceUuid: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         let uuid = serviceUuid.lowercased()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "removeService",
                             data: ["serviceUuid": uuid])
@@ -158,6 +180,10 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Advertising
 
     func startAdvertising(config: AdvertiseConfigDto, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "startAdvertising",
                             data: ["serviceUuidCount": config.serviceUuids.count,
                                    "scanResponseServiceUuidCount": config.scanResponseServiceUuids.count,
@@ -188,6 +214,10 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func stopAdvertising(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "stopAdvertising")
         peripheralManager.stopAdvertising()
         completion(.success(()))
@@ -196,6 +226,10 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Notifications
 
     func notifyCharacteristic(characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristic (broadcast)",
                             data: ["characteristicHandle": characteristicHandle,
                                    "length": value.data.count])
@@ -234,6 +268,10 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func notifyCharacteristicTo(centralId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "notifyCharacteristicTo (targeted)",
                             data: ["centralId": centralId,
                                    "characteristicHandle": characteristicHandle,
@@ -285,6 +323,10 @@ class PeripheralManagerImpl: NSObject {
     // MARK: - Request Responses
 
     func respondToReadRequest(requestId: Int, status: GattStatusDto, value: FlutterStandardTypedData?, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "respondToReadRequest",
                             data: ["requestId": requestId,
                                    "status": String(describing: status),
@@ -306,6 +348,10 @@ class PeripheralManagerImpl: NSObject {
     }
 
     func respondToWriteRequest(requestId: Int, status: GattStatusDto, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard peripheralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toServerPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "respondToWriteRequest",
                             data: ["requestId": requestId,
                                    "status": String(describing: status)])

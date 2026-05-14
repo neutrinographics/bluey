@@ -59,6 +59,27 @@ class CentralManagerImpl: NSObject {
         centralManager.delegate = centralManagerDelegate
     }
 
+    // MARK: - Readiness gate (I333)
+
+    /// I333 — symmetric backstop to Android's `DeadObjectException`
+    /// translation. CoreBluetooth calls against a `CBCentralManager`
+    /// whose `state != .poweredOn` silently no-op (worst-case: the
+    /// consumer's `Future` hangs forever). Every public GATT op
+    /// short-circuits with `BlueyError.notReady.toClientPigeonError()`
+    /// (Pigeon code `bluetooth-unavailable`, surfaces Dart-side as
+    /// `BluetoothUnavailableException`) when the manager is not
+    /// powered on.
+    ///
+    /// For `throws` functions, use `try requireReady()`. For
+    /// completion-handler functions, the inline `guard` pattern at op
+    /// entry is preferred so the handler signature is self-evidently
+    /// gated.
+    private func requireReady() throws {
+        guard centralManager.state == .poweredOn else {
+            throw BlueyError.notReady.toClientPigeonError()
+        }
+    }
+
     // MARK: - Configuration
 
     func configure(config: BlueyConfigDto) {
@@ -127,6 +148,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - Scanning
 
     func startScan(config: ScanConfigDto, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         let serviceUUIDs: [CBUUID]? = config.serviceUuids.isEmpty ? nil : config.serviceUuids.map { $0.toCBUUID() }
         let options: [String: Any] = [CBCentralManagerScanOptionAllowDuplicatesKey: true]
         BlueyLog.shared.log(.info, "bluey.ios.central", "startScan",
@@ -136,6 +161,10 @@ class CentralManagerImpl: NSObject {
     }
 
     func stopScan(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.info, "bluey.ios.central", "stopScan")
         centralManager.stopScan()
         flutterApi.onScanComplete { _ in }
@@ -145,6 +174,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - Connection
 
     func connect(deviceId: String, config: ConnectConfigDto, completion: @escaping (Result<String, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.info, "bluey.ios.central", "connect",
                             data: ["deviceId": deviceId])
         guard let peripheral = peripherals[deviceId] else {
@@ -186,6 +219,10 @@ class CentralManagerImpl: NSObject {
     }
 
     func disconnect(deviceId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         BlueyLog.shared.log(.info, "bluey.ios.central", "disconnect",
                             data: ["deviceId": deviceId])
         guard let peripheral = peripherals[deviceId] else {
@@ -222,6 +259,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - Service Discovery
 
     func discoverServices(deviceId: String, completion: @escaping (Result<[ServiceDto], Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let peripheral = peripherals[deviceId] else {
             completion(.failure(BlueyError.notFound.toClientPigeonError()))
             return
@@ -251,6 +292,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - Characteristic Operations
 
     func readCharacteristic(deviceId: String, characteristicHandle: Int64, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let characteristic = handleStore.characteristicByHandle[deviceId]?[Int(characteristicHandle)] else {
             completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
             return
@@ -273,6 +318,10 @@ class CentralManagerImpl: NSObject {
     }
 
     func writeCharacteristic(deviceId: String, characteristicHandle: Int64, value: FlutterStandardTypedData, withResponse: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let characteristic = handleStore.characteristicByHandle[deviceId]?[Int(characteristicHandle)] else {
             completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
             return
@@ -304,6 +353,10 @@ class CentralManagerImpl: NSObject {
     }
 
     func setNotification(deviceId: String, characteristicHandle: Int64, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let characteristic = handleStore.characteristicByHandle[deviceId]?[Int(characteristicHandle)] else {
             completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
             return
@@ -328,6 +381,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - Descriptor Operations
 
     func readDescriptor(deviceId: String, characteristicHandle: Int64, descriptorHandle: Int64, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let descriptor = handleStore.descriptorByHandle[deviceId]?[Int(descriptorHandle)] else {
             completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
             return
@@ -350,6 +407,10 @@ class CentralManagerImpl: NSObject {
     }
 
     func writeDescriptor(deviceId: String, characteristicHandle: Int64, descriptorHandle: Int64, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let descriptor = handleStore.descriptorByHandle[deviceId]?[Int(descriptorHandle)] else {
             completion(.failure(BlueyError.handleInvalidated.toClientPigeonError()))
             return
@@ -374,6 +435,7 @@ class CentralManagerImpl: NSObject {
     // MARK: - MTU
 
     func getMaximumWriteLength(deviceId: String, withResponse: Bool) throws -> Int64 {
+        try requireReady()
         guard let peripheral = peripherals[deviceId] else {
             throw BlueyError.notConnected.toClientPigeonError()
         }
@@ -385,6 +447,10 @@ class CentralManagerImpl: NSObject {
     // MARK: - RSSI
 
     func readRssi(deviceId: String, completion: @escaping (Result<Int64, Error>) -> Void) {
+        guard centralManager.state == .poweredOn else {
+            completion(.failure(BlueyError.notReady.toClientPigeonError()))
+            return
+        }
         guard let peripheral = peripherals[deviceId], peripheral.state == .connected else {
             completion(.failure(BlueyError.notConnected.toClientPigeonError()))
             return

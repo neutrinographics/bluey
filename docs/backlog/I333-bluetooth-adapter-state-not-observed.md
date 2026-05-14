@@ -4,10 +4,36 @@ title: Live `Server`/`Connection`/`Scanner` instances are not invalidated when t
 category: bug
 severity: medium
 platform: both
-status: open
+status: fixed
 last_verified: 2026-05-06
 related: []
 ---
+
+## Resolution (2026-05-06)
+
+Landed on branch `feature/i333-adapter-state-invalidation` per:
+- Spec: `docs/superpowers/specs/2026-05-06-adapter-state-invalidation-design.md`
+- Plan: `docs/superpowers/plans/2026-05-06-adapter-state-invalidation.md`
+
+Five coordinated changes:
+
+- **`StaleHandleException`** value object in `bluey/lib/src/shared/exceptions.dart`, with companion `InvalidatedInstance` enum (`server` / `connection` / `scanner`). Carries `triggeringState` and `instanceType` for diagnostics.
+- **Factory pre-checks** on `Bluey.server()` / `Bluey.connect()` / `Bluey.scanner()`. Each calls `_requireAdapterOn()` and throws the state-mapped exception (`BluetoothDisabledException` / `PermissionDeniedException` / `BluetoothUnavailableException`) synchronously before any construction. `BlueyPlatform` gained a synchronous `BluetoothState get currentState` getter to make the pre-check honest at construction time; `BlueyAndroid` and `BlueyIos` both maintain a `_cachedState` updated from `onStateChangedCallback`.
+- **Removed `Bluey.ensureReady()`** — redundant once factories pre-check. Non-throwing probes (`currentState`, `state`) still available.
+- **Per-instance invalidation** on `BlueyServer`, `BlueyConnection`, and `BlueyScanner`. Each subscribes to `_platform.stateStream` at construction; on non-`on` emission, the instance is terminal-failed — every owned `StreamSubscription` cancels (not just the state one — Task 4 caught a `StateError` race the spec hadn't anticipated, where post-`STATE_OFF` platform events were writing to closed controllers), owned `StreamController`s close, in-flight ops fail with `StaleHandleException`, caches clear. Subsequent calls throw `StaleHandleException`. Idempotent.
+- **Race backstops**: Android's `DeadObjectException` translates to the new `bluetooth-unavailable` Pigeon code → new `PlatformBluetoothUnavailableException` (platform-interface) → `BluetoothUnavailableException` (domain). iOS GATT op handlers pre-check `centralManager.state` / `peripheralManager.state` and short-circuit with `BlueyError.notReady.toClientPigeonError()` (same Pigeon code). Both paths converge on the same Dart-side typed exception.
+
+Consumer migration:
+- Replace `bluey.ensureReady()` calls with the factory call itself (the factory now throws the same typed exception).
+- Catch `StaleHandleException` and construct fresh from `Bluey` to recover.
+- For UI that needs to react to adapter cycles, subscribe to `bluey.stateStream`.
+
+Tests added:
+- `stale_handle_exception_test.dart`, `factory_state_check_test.dart`, `bluey_scanner_invalidation_test.dart`, `adapter_state_invalidation_test.dart` (new files).
+- New groups in `bluey_server_test.dart`, `bluey_connection_state_gating_test.dart`, and `android_connection_manager_test.dart`.
+- 934 tests pass in the `bluey` package (up from 905 pre-branch).
+
+No follow-ups filed — the scope was intentionally narrow (no session manager, no auto-reinit; see spec).
 
 ## What's already in place (verified 2026-05-06)
 
