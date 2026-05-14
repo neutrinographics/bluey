@@ -136,6 +136,43 @@ class Bluey {
     );
   }
 
+  /// Asynchronously construct a [Bluey] instance, awaiting the first
+  /// platform state event before returning.
+  ///
+  /// Use this in preference to the synchronous [Bluey()] constructor.
+  /// The async path guarantees [currentState] reflects real adapter
+  /// state by the time consumers call factories like [server],
+  /// [connect], or [scanner], eliminating the cold-start race where
+  /// the very first factory call could throw `BluetoothUnavailableException`
+  /// spuriously because the cached state hadn't yet been refreshed.
+  ///
+  /// If the platform doesn't emit a state within [initialStateTimeout]
+  /// (default 2 seconds — long enough for normal native init, short
+  /// enough to surface a stuck platform promptly), this falls back to
+  /// the synchronous-cache behavior — [currentState] may be
+  /// [BluetoothState.unknown] and the first factory call may throw
+  /// `BluetoothUnavailableException`. Consumers can either retry or
+  /// extend the timeout.
+  static Future<Bluey> create({
+    ServerId? localIdentity,
+    Duration initialStateTimeout = const Duration(seconds: 2),
+  }) async {
+    final bluey = Bluey(localIdentity: localIdentity);
+    try {
+      // Await the first meaningful state event so the sync cache is
+      // fresh. `firstWhere` keeps waiting if the platform emits
+      // `unknown` first (rare), waiting for a more meaningful state.
+      await bluey.stateStream
+          .firstWhere((s) => s != BluetoothState.unknown)
+          .timeout(initialStateTimeout);
+    } on TimeoutException {
+      // Fall through: bluey is returned with whatever cache state
+      // exists (typically still BluetoothState.unknown). Documented
+      // behavior; consumers can retry.
+    }
+    return bluey;
+  }
+
   /// Platform capabilities.
   platform.Capabilities get capabilities => _platform.capabilities;
 

@@ -43,6 +43,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   BluetoothState _state = BluetoothState.on;
   final Capabilities _capabilities;
 
+  /// Test seam — when true, [setBluetoothState] / [setState] will NOT
+  /// push events onto [stateStream] (the cached `_state` is still
+  /// updated). Used by [Bluey.create] tests to simulate platforms that
+  /// never publish an initial state.
+  bool suppressInitialStateEmission = false;
+
   // === Structured logging (I307) ===
   final StreamController<PlatformLogEvent> _logEventsController =
       StreamController<PlatformLogEvent>.broadcast();
@@ -482,7 +488,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
-    _stateController.add(state);
+    if (!suppressInitialStateEmission) {
+      _stateController.add(state);
+    }
   }
 
   /// Test seam — update the simulated adapter state and broadcast.
@@ -767,7 +775,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Stream<BluetoothState> get stateStream => _stateController.stream;
 
   @override
-  BluetoothState get currentState => _state;
+  BluetoothState get currentState =>
+      suppressInitialStateEmission ? BluetoothState.unknown : _state;
 
   @override
   Future<BluetoothState> getState() async => _state;
