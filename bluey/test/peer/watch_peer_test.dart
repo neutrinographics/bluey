@@ -131,9 +131,11 @@ void main() {
           .listen(emissions.add, onDone: () => completed = true);
       addTearDown(sub.cancel);
 
-      // Initial tryUpgrade resolves null.
+      // Initial tryUpgrade resolves null. servicesChanges replays the
+      // current cached services (Convention 2), triggering one extra
+      // attempt that also resolves null.
       await pumpEventQueue();
-      expect(emissions, equals([null]));
+      expect(emissions, equals([null, null]));
       expect(completed, isFalse);
 
       // Server registers its lifecycle service; Service Changed fires.
@@ -144,9 +146,9 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(emissions, hasLength(2));
-      expect(emissions[1], isNotNull);
-      expect(emissions[1]!.serverId, equals(id));
+      expect(emissions, hasLength(3));
+      expect(emissions.last, isNotNull);
+      expect(emissions.last!.serverId, equals(id));
       expect(
         completed,
         isTrue,
@@ -195,13 +197,16 @@ void main() {
       final sub = bluey.watchPeer(conn).listen(emissions.add);
       addTearDown(sub.cancel);
 
+      // servicesChanges replays the current cached services on subscribe
+      // (Convention 2), so the initial attempt() plus the replay-driven
+      // attempt() both resolve null.
       await pumpEventQueue();
-      expect(emissions, equals([null]));
+      expect(emissions, equals([null, null]));
 
       // First Service Changed still has no control service.
       fakePlatform.simulateServiceChange(address);
       await pumpEventQueue();
-      expect(emissions, equals([null, null]));
+      expect(emissions, equals([null, null, null]));
 
       // Second Service Changed adds the control service.
       fakePlatform.simulateServiceChange(
@@ -211,9 +216,9 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(emissions, hasLength(3));
-      expect(emissions[2], isNotNull);
-      expect(emissions[2]!.serverId, equals(id));
+      expect(emissions, hasLength(4));
+      expect(emissions.last, isNotNull);
+      expect(emissions.last!.serverId, equals(id));
 
       await conn.disconnect();
     });

@@ -110,9 +110,11 @@ void main() {
       final sub = conn.servicesChanges.listen(emissions.add);
       addTearDown(sub.cancel);
 
-      // No emission yet — the stream fires on Service-Changed-driven
-      // re-discovery, not on initial discovery.
-      expect(emissions, isEmpty);
+      // Convention 2 (replay-on-subscribe): the initial subscription
+      // immediately replays the current cached services list. Flush
+      // that before asserting on Service-Changed-driven emissions.
+      await Future<void>.delayed(Duration.zero);
+      emissions.clear();
 
       fakePlatform.simulateServiceChange(TestDeviceIds.device1);
       // Let the platform's serviceChanges stream deliver to the
@@ -151,6 +153,12 @@ void main() {
           await subA.cancel();
           await subB.cancel();
         });
+
+        // Convention 2 (replay-on-subscribe): flush each subscriber's
+        // initial replay before the Service-Changed-driven emission.
+        await Future<void>.delayed(Duration.zero);
+        a.clear();
+        b.clear();
 
         fakePlatform.simulateServiceChange(TestDeviceIds.device1);
         await pumpEventQueue();

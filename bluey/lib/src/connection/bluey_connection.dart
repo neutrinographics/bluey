@@ -511,11 +511,44 @@ class BlueyConnection implements Connection {
   ConnectionState get state => _state;
 
   @override
-  Stream<ConnectionState> get stateChanges => _stateController.stream;
+  Stream<ConnectionState> get stateChanges => Stream<ConnectionState>.multi(
+    (controller) {
+      // Convention 2 (replay-on-subscribe): inject the current cached
+      // value before bridging live events. Mirrors the pattern in
+      // `Bluey.stateStream`. `StreamController.broadcast(onListen: ...)`
+      // would only fire on the 0→1 transition; `Stream.multi` runs the
+      // factory per subscriber, so every late subscriber gets the replay.
+      if (!_stateController.isClosed) {
+        controller.add(_state);
+      }
+      final sub = _stateController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
 
   @override
   Stream<List<RemoteService>> get servicesChanges =>
-      _servicesChangesController.stream;
+      Stream<List<RemoteService>>.multi(
+        (controller) {
+          // Replay the currently-discovered services (or the empty list
+          // if discovery hasn't run yet) before forwarding live events.
+          if (!_servicesChangesController.isClosed) {
+            controller.add(_cachedServices ?? const <RemoteService>[]);
+          }
+          final sub = _servicesChangesController.stream.listen(
+            controller.add,
+            onError: controller.addError,
+            onDone: controller.close,
+          );
+          controller.onCancel = sub.cancel;
+        },
+        isBroadcast: true,
+      );
 
   // I325 — relocated to AndroidConnectionExtensions; private accessor
   // is used by _AndroidConnectionExtensionsImpl.
@@ -738,7 +771,21 @@ class BlueyConnection implements Connection {
 
   BondState get _bondStateValue => _bondState;
 
-  Stream<BondState> get _bondStateChanges => _bondStateController.stream;
+  Stream<BondState> get _bondStateChanges => Stream<BondState>.multi(
+    (controller) {
+      // Replay the cached bond state before bridging live events.
+      if (!_bondStateController.isClosed) {
+        controller.add(_bondState);
+      }
+      final sub = _bondStateController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
 
   Future<void> _bondImpl() async {
     _ensureValid();
@@ -764,7 +811,21 @@ class BlueyConnection implements Connection {
 
   Phy get _rxPhyValue => _rxPhy;
 
-  Stream<({Phy tx, Phy rx})> get _phyChanges => _phyController.stream;
+  Stream<({Phy tx, Phy rx})> get _phyChanges => Stream<({Phy tx, Phy rx})>.multi(
+    (controller) {
+      // Replay the cached (tx, rx) PHY pair before bridging live events.
+      if (!_phyController.isClosed) {
+        controller.add((tx: _txPhy, rx: _rxPhy));
+      }
+      final sub = _phyController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
 
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureValid();
