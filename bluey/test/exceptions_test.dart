@@ -3,6 +3,7 @@ import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey/src/shared/uuid.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 import 'package:bluey/src/peer/server_id.dart';
+import 'package:bluey/src/platform/bluetooth_state.dart';
 
 void main() {
   group('BlueyException', () {
@@ -298,6 +299,46 @@ void main() {
     test('exposes the message via the public field', () {
       const e = RespondNotFoundException('requestId 42 missing');
       expect(e.message, contains('requestId 42 missing'));
+    });
+  });
+
+  group('StaleHandleException', () {
+    test('extends BlueyException', () {
+      final exception = StaleHandleException(
+        triggeringState: BluetoothState.off,
+        instanceType: InvalidatedInstance.server,
+      );
+
+      expect(exception, isA<BlueyException>());
+    });
+
+    test('carries triggeringState and instanceType', () {
+      final exception = StaleHandleException(
+        triggeringState: BluetoothState.unauthorized,
+        instanceType: InvalidatedInstance.connection,
+      );
+
+      expect(exception.triggeringState, equals(BluetoothState.unauthorized));
+      expect(exception.instanceType, equals(InvalidatedInstance.connection));
+    });
+
+    test('message identifies the instance type and triggering state', () {
+      final exception = StaleHandleException(
+        triggeringState: BluetoothState.off,
+        instanceType: InvalidatedInstance.server,
+      );
+
+      expect(exception.message, contains('Server'));
+      expect(exception.message, contains('off'));
+    });
+
+    test('action guides the caller to construct fresh', () {
+      final exception = StaleHandleException(
+        triggeringState: BluetoothState.off,
+        instanceType: InvalidatedInstance.connection,
+      );
+
+      expect(exception.action, contains('fresh'));
     });
   });
 }

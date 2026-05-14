@@ -463,6 +463,20 @@ class BlueyPlatformException extends BlueyException {
     : super(message, cause: cause);
 }
 
+/// The kind of instance that was invalidated. Used by
+/// [StaleHandleException] to surface the right type in messages and
+/// diagnostics without primitive-obsession on a free-form string.
+enum InvalidatedInstance {
+  server('Server'),
+  connection('Connection'),
+  scanner('Scanner');
+
+  /// Display name used in user-facing exception messages.
+  final String displayName;
+
+  const InvalidatedInstance(this.displayName);
+}
+
 /// A method was called on a [Server], [Connection], or [Scanner]
 /// instance that was invalidated by a prior Bluetooth-adapter state
 /// transition (e.g. the user toggled Bluetooth off).
@@ -487,19 +501,23 @@ class StaleHandleException extends BlueyException {
   /// The adapter state that caused this instance to be invalidated.
   final BluetoothState triggeringState;
 
-  /// The instance type that was invalidated, e.g. `'Server'`,
-  /// `'Connection'`, `'Scanner'`. Used for diagnostics.
-  final String instanceType;
+  /// The instance type that was invalidated.
+  final InvalidatedInstance instanceType;
 
+  // Note: `const` cannot be added here because Dart's const evaluator
+  // forbids string interpolation of instance-property getters (`.displayName`,
+  // `.name`) on constructor parameters, even when those parameters are
+  // compile-time constants. The constructor is intentionally non-const to
+  // preserve readable, human-friendly messages.
   StaleHandleException({
     required this.triggeringState,
     required this.instanceType,
   }) : super(
-         '$instanceType was invalidated by adapter transition to '
-         '${triggeringState.name}; the instance is dead even if the '
-         'adapter has since returned to BluetoothState.on.',
+         '${instanceType.displayName} was invalidated by adapter '
+         'transition to ${triggeringState.name}; the instance is dead '
+         'even if the adapter has since returned to BluetoothState.on.',
          action:
-             'Construct a fresh $instanceType from Bluey rather than '
-             'reusing this one.',
+             'Construct a fresh ${instanceType.displayName} from Bluey '
+             'rather than reusing this one.',
        );
 }
