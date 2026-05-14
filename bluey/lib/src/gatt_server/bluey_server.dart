@@ -11,6 +11,7 @@ import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
+import '../platform/bluetooth_state.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
@@ -71,6 +72,14 @@ class BlueyServer implements Server {
   StreamSubscription? _centralDisconnectionsSub;
   StreamSubscription? _platformReadRequestsSub;
   StreamSubscription? _platformWriteRequestsSub;
+
+  // I333: adapter-state invalidation. The server subscribes to
+  // platform.stateStream at construction; any non-`on` emission flips
+  // [_invalidated] to true and tears down owned streams + caches.
+  // Subsequent public calls throw [StaleHandleException].
+  bool _invalidated = false;
+  BluetoothState? _invalidationState;
+  StreamSubscription<platform.BluetoothState>? _stateSubscription;
 
   BlueyServer(
     this._platform,
@@ -171,13 +180,78 @@ class BlueyServer implements Server {
         _filteredWriteRequestsController.add(req);
       }
     });
+
+    // I333: invalidate on any non-`on` adapter state. The platform
+    // stream emits the platform-interface enum; map to the domain enum
+    // before deciding so the carried [triggeringState] surfaces as the
+    // domain type.
+    _stateSubscription = _platform.stateStream.listen((platformState) {
+      final domainState = _mapPlatformState(platformState);
+      if (domainState != BluetoothState.on) {
+        _invalidate(domainState);
+      }
+    });
+  }
+
+  /// Maps the platform-interface [platform.BluetoothState] to the
+  /// domain [BluetoothState]. Mirrors `Bluey._mapState`; kept local so
+  /// the server doesn't reach across bounded contexts.
+  BluetoothState _mapPlatformState(platform.BluetoothState s) {
+    switch (s) {
+      case platform.BluetoothState.unknown:
+        return BluetoothState.unknown;
+      case platform.BluetoothState.unsupported:
+        return BluetoothState.unsupported;
+      case platform.BluetoothState.unauthorized:
+        return BluetoothState.unauthorized;
+      case platform.BluetoothState.off:
+        return BluetoothState.off;
+      case platform.BluetoothState.on:
+        return BluetoothState.on;
+    }
+  }
+
+  /// Marks this server as terminal-failed. Idempotent — re-entry is a
+  /// no-op. Cancels the state subscription, closes owned streams, and
+  /// fails subsequent calls with [StaleHandleException].
+  void _invalidate(BluetoothState triggeringState) {
+    if (_invalidated) return;
+    _invalidated = true;
+    _invalidationState = triggeringState;
+    _stateSubscription?.cancel();
+    _stateSubscription = null;
+
+    // Close every StreamController owned by this server.
+    _connectionsController.close();
+    _disconnectionsController.close();
+    _peerConnectionsController.close();
+    _filteredReadRequestsController.close();
+    _filteredWriteRequestsController.close();
+
+    // Clear cached state — connected clients are gone with the adapter.
+    _connectedClients.clear();
+    _identifiedPeerClientIds.clear();
+  }
+
+  /// Throws [StaleHandleException] if this server has been invalidated
+  /// by a prior adapter-state transition.
+  void _ensureValid() {
+    if (_invalidated) {
+      throw StaleHandleException(
+        triggeringState: _invalidationState!,
+        instanceType: InvalidatedInstance.server,
+      );
+    }
   }
 
   @override
   ServerId get serverId => _serverId;
 
   @override
-  bool get isAdvertising => _isAdvertising;
+  bool get isAdvertising {
+    _ensureValid();
+    return _isAdvertising;
+  }
 
   @override
   Stream<Client> get connections => _connectionsController.stream;
@@ -189,14 +263,20 @@ class BlueyServer implements Server {
   Stream<String> get disconnections => _disconnectionsController.stream;
 
   @override
-  List<Client> get connectedClients => _connectedClients.values.toList();
+  List<Client> get connectedClients {
+    _ensureValid();
+    return _connectedClients.values.toList();
+  }
 
   @override
-  bool isClientConnected(String address) =>
-      _connectedClients.containsKey(address);
+  bool isClientConnected(String address) {
+    _ensureValid();
+    return _connectedClients.containsKey(address);
+  }
 
   @override
   Future<void> addService(HostedService service) async {
+    _ensureValid();
     _logger.log(
       BlueyLogLevel.info,
       'bluey.server',
@@ -288,6 +368,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> removeService(UUID uuid) async {
+    _ensureValid();
     await _platform.removeService(uuid.toString());
   }
 
@@ -300,6 +381,7 @@ class BlueyServer implements Server {
     AdvertiseMode? mode,
     bool peerDiscoverable = false,
   }) async {
+    _ensureValid();
     _logger.log(
       BlueyLogLevel.info,
       'bluey.server',
@@ -375,6 +457,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> stopAdvertising() async {
+    _ensureValid();
     _logger.log(BlueyLogLevel.info, 'bluey.server', 'stopAdvertising invoked');
     await _platform.stopAdvertising();
     _isAdvertising = false;
@@ -383,6 +466,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> notify(UUID characteristic, {required Uint8List data}) async {
+    _ensureValid();
     _logger.log(
       BlueyLogLevel.debug,
       'bluey.server',
@@ -424,6 +508,7 @@ class BlueyServer implements Server {
     UUID characteristic, {
     required Uint8List data,
   }) async {
+    _ensureValid();
     final blueyClient = client as BlueyClient;
     final handle = _resolveLocalHandle(characteristic);
     if (handle == null) {
@@ -450,6 +535,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> indicate(UUID characteristic, {required Uint8List data}) async {
+    _ensureValid();
     final handle = _resolveLocalHandle(characteristic);
     if (handle == null) {
       throw CharacteristicNotFoundException(characteristic);
@@ -473,6 +559,7 @@ class BlueyServer implements Server {
     UUID characteristic, {
     required Uint8List data,
   }) async {
+    _ensureValid();
     final blueyClient = client as BlueyClient;
     final handle = _resolveLocalHandle(characteristic);
     if (handle == null) {
@@ -541,6 +628,7 @@ class BlueyServer implements Server {
     required GattResponseStatus status,
     Uint8List? value,
   }) async {
+    _ensureValid();
     final clientId = (request.client as BlueyClient)._platformId;
     // Drain pending state BEFORE the platform call so the obligation is
     // discharged even if respondToReadRequest throws (stale request id,
@@ -571,6 +659,7 @@ class BlueyServer implements Server {
     WriteRequest request, {
     required GattResponseStatus status,
   }) async {
+    _ensureValid();
     final clientId = (request.client as BlueyClient)._platformId;
     // Drain pending state BEFORE the platform call — see respondToRead.
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
@@ -595,7 +684,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> dispose() async {
-    if (_isAdvertising) {
+    if (!_invalidated && _isAdvertising) {
       await stopAdvertising();
     }
 
@@ -605,10 +694,14 @@ class BlueyServer implements Server {
     // This is important on Android to prevent zombie BLE connections
     await _platform.closeServer();
 
+    await _stateSubscription?.cancel();
+    _stateSubscription = null;
     await _centralConnectionsSub?.cancel();
     await _centralDisconnectionsSub?.cancel();
     await _platformReadRequestsSub?.cancel();
     await _platformWriteRequestsSub?.cancel();
+    // Stream controllers may already be closed by _invalidate; close()
+    // is a no-op on an already-closed controller.
     await _connectionsController.close();
     await _peerConnectionsController.close();
     await _disconnectionsController.close();
