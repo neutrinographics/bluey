@@ -890,7 +890,8 @@ void main() {
           ).thenThrow(
             PlatformException(
               code: 'bluetooth-unavailable',
-              message: 'Bluetooth adapter is unavailable: remote object is dead',
+              message:
+                  'Bluetooth adapter is unavailable: remote object is dead',
             ),
           );
 
@@ -919,7 +920,8 @@ void main() {
           when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
             PlatformException(
               code: 'bluetooth-unavailable',
-              message: 'Bluetooth adapter is unavailable: remote object is dead',
+              message:
+                  'Bluetooth adapter is unavailable: remote object is dead',
             ),
           );
 

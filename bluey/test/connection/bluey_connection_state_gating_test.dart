@@ -253,10 +253,7 @@ void main() {
       fakePlatform.setState(platform.BluetoothState.unauthorized);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      await expectLater(
-        ctx.char.read(),
-        throwsA(isA<StaleHandleException>()),
-      );
+      await expectLater(ctx.char.read(), throwsA(isA<StaleHandleException>()));
     });
 
     test('stays invalidated after adapter returns to on', () async {
@@ -273,29 +270,29 @@ void main() {
       );
     });
 
-    test('triggeringState reflects the state that caused invalidation', () async {
-      final ctx = await establishWithChar();
+    test(
+      'triggeringState reflects the state that caused invalidation',
+      () async {
+        final ctx = await establishWithChar();
 
-      fakePlatform.setState(platform.BluetoothState.unauthorized);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+        fakePlatform.setState(platform.BluetoothState.unauthorized);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      try {
-        await ctx.connection.maxWritePayload(withResponse: false);
-        fail('expected StaleHandleException');
-      } on StaleHandleException catch (e) {
-        expect(e.triggeringState, equals(BluetoothState.unauthorized));
-        expect(e.instanceType, equals(InvalidatedInstance.connection));
-      }
-    });
+        try {
+          await ctx.connection.maxWritePayload(withResponse: false);
+          fail('expected StaleHandleException');
+        } on StaleHandleException catch (e) {
+          expect(e.triggeringState, equals(BluetoothState.unauthorized));
+          expect(e.instanceType, equals(InvalidatedInstance.connection));
+        }
+      },
+    );
 
     test('stateChanges stream closes on invalidation', () async {
       final ctx = await establishWithChar();
       final stateClosed = Completer<void>();
 
-      ctx.connection.stateChanges.listen(
-        (_) {},
-        onDone: stateClosed.complete,
-      );
+      ctx.connection.stateChanges.listen((_) {}, onDone: stateClosed.complete);
 
       fakePlatform.setState(platform.BluetoothState.off);
       await Future<void>.delayed(const Duration(milliseconds: 5));

@@ -13,10 +13,10 @@ void main() {
   late Bluey bluey;
 
   Device deviceFor(String address) => Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: address,
-        name: 'Test',
-      );
+    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
+    address: address,
+    name: 'Test',
+  );
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform(
@@ -70,8 +70,9 @@ void main() {
     });
 
     test('Connection: alive -> off -> stale -> fresh after on', () async {
-      final firstConnection =
-          await bluey.connect(deviceFor(TestDeviceIds.device1));
+      final firstConnection = await bluey.connect(
+        deviceFor(TestDeviceIds.device1),
+      );
 
       fakePlatform.setState(platform.BluetoothState.off);
       await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -89,8 +90,9 @@ void main() {
         throwsA(isA<StaleHandleException>()),
       );
 
-      final secondConnection =
-          await bluey.connect(deviceFor(TestDeviceIds.device1));
+      final secondConnection = await bluey.connect(
+        deviceFor(TestDeviceIds.device1),
+      );
       await expectLater(secondConnection.services(), completes);
     });
 
@@ -100,18 +102,12 @@ void main() {
       fakePlatform.setState(platform.BluetoothState.off);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      expect(
-        () => firstScanner.scan(),
-        throwsA(isA<StaleHandleException>()),
-      );
+      expect(() => firstScanner.scan(), throwsA(isA<StaleHandleException>()));
 
       fakePlatform.setState(platform.BluetoothState.on);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      expect(
-        () => firstScanner.scan(),
-        throwsA(isA<StaleHandleException>()),
-      );
+      expect(() => firstScanner.scan(), throwsA(isA<StaleHandleException>()));
 
       final secondScanner = bluey.scanner();
       // scan() returns a stream, not a Future — just verify it can be called.

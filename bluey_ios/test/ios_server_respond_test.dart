@@ -94,27 +94,22 @@ void main() {
       },
     );
 
-    test(
-      'respondToWriteRequest: PlatformException(bluetooth-unavailable) -> '
-      'PlatformBluetoothUnavailableException',
-      () async {
-        final mockHostApi = MockBlueyHostApi();
-        when(
-          () => mockHostApi.respondToWriteRequest(any(), any()),
-        ).thenThrow(
-          PlatformException(
-            code: 'bluetooth-unavailable',
-            message: 'Bluetooth is not powered on',
-          ),
-        );
-        final server = IosServer(mockHostApi);
+    test('respondToWriteRequest: PlatformException(bluetooth-unavailable) -> '
+        'PlatformBluetoothUnavailableException', () async {
+      final mockHostApi = MockBlueyHostApi();
+      when(() => mockHostApi.respondToWriteRequest(any(), any())).thenThrow(
+        PlatformException(
+          code: 'bluetooth-unavailable',
+          message: 'Bluetooth is not powered on',
+        ),
+      );
+      final server = IosServer(mockHostApi);
 
-        await expectLater(
-          server.respondToWriteRequest(8, PlatformGattStatus.success),
-          throwsA(isA<PlatformBluetoothUnavailableException>()),
-        );
-      },
-    );
+      await expectLater(
+        server.respondToWriteRequest(8, PlatformGattStatus.success),
+        throwsA(isA<PlatformBluetoothUnavailableException>()),
+      );
+    });
 
     test(
       'gatt-status-failed code propagates unchanged (does NOT spuriously translate)',

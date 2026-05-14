@@ -31,20 +31,14 @@ void main() {
       fakePlatform.setState(platform.BluetoothState.off);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      expect(
-        () => scanner.scan(),
-        throwsA(isA<StaleHandleException>()),
-      );
+      expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
     });
 
     test('active scan stream closes on invalidation', () async {
       final scanner = bluey.scanner();
       final scanClosed = Completer<void>();
 
-      scanner.scan().listen(
-        (_) {},
-        onDone: scanClosed.complete,
-      );
+      scanner.scan().listen((_) {}, onDone: scanClosed.complete);
 
       fakePlatform.setState(platform.BluetoothState.off);
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -60,25 +54,25 @@ void main() {
       fakePlatform.setState(platform.BluetoothState.on);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      expect(
-        () => scanner.scan(),
-        throwsA(isA<StaleHandleException>()),
-      );
+      expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
     });
 
-    test('triggeringState reflects the state that caused invalidation', () async {
-      final scanner = bluey.scanner();
+    test(
+      'triggeringState reflects the state that caused invalidation',
+      () async {
+        final scanner = bluey.scanner();
 
-      fakePlatform.setState(platform.BluetoothState.unauthorized);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+        fakePlatform.setState(platform.BluetoothState.unauthorized);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      try {
-        scanner.scan();
-        fail('expected StaleHandleException');
-      } on StaleHandleException catch (e) {
-        expect(e.triggeringState, equals(BluetoothState.unauthorized));
-        expect(e.instanceType, equals(InvalidatedInstance.scanner));
-      }
-    });
+        try {
+          scanner.scan();
+          fail('expected StaleHandleException');
+        } on StaleHandleException catch (e) {
+          expect(e.triggeringState, equals(BluetoothState.unauthorized));
+          expect(e.instanceType, equals(InvalidatedInstance.scanner));
+        }
+      },
+    );
   });
 }

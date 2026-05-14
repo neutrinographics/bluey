@@ -45,10 +45,7 @@ void main() {
         fakePlatform.setState(platform.BluetoothState.unauthorized);
         await flushState();
 
-        expect(
-          () => bluey.server(),
-          throwsA(isA<PermissionDeniedException>()),
-        );
+        expect(() => bluey.server(), throwsA(isA<PermissionDeniedException>()));
       },
     );
 
