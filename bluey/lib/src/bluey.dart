@@ -657,14 +657,21 @@ class Bluey {
           // so swallow the error to avoid an "Unhandled error" warning.
           onError: (_) {},
         );
-        stateSub = connection.stateChanges.listen((s) {
-          if (s == ConnectionState.disconnected &&
-              !resolved &&
-              !controller.isClosed) {
-            resolved = true;
-            controller.close();
-          }
-        });
+        stateSub = connection.stateChanges.listen(
+          (s) {
+            if (s == ConnectionState.disconnected &&
+                !resolved &&
+                !controller.isClosed) {
+              resolved = true;
+              controller.close();
+            }
+          },
+          // Convention 3 — stateChanges can forward platform-level errors.
+          // Invalidation arrives as ConnectionState.invalidated (data event),
+          // so there is nothing to handle here. Swallow to avoid
+          // "Unhandled error" warnings.
+          onError: (_) {},
+        );
       },
       onCancel: () async {
         resolved = true;
