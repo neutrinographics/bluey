@@ -27,6 +27,12 @@ void main() {
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
+        // Convention 2: stateStream replays the current value on subscribe.
+        // FakeBlueyPlatform defaults to BluetoothState.on, so the first
+        // event is the replay. We flush that before driving transitions.
+        await Future.delayed(Duration.zero);
+        states.clear();
+
         // Start unknown
         fakePlatform.setBluetoothState(platform.BluetoothState.unknown);
         await Future.delayed(Duration.zero);
@@ -57,6 +63,11 @@ void main() {
         final bluey = await Bluey.create();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
+
+        // Convention 2: stateStream replays the current value on subscribe.
+        // Flush the replay before counting rapid-toggle emissions.
+        await Future.delayed(Duration.zero);
+        states.clear();
 
         // Rapid toggling
         for (var i = 0; i < 10; i++) {

@@ -448,6 +448,11 @@ void main() {
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
+        // Convention 2: stateStream replays the current value on subscribe.
+        // Flush the replay before driving state transitions.
+        await Future.delayed(Duration.zero);
+        states.clear();
+
         // Multiple state changes
         fakePlatform.setBluetoothState(platform.BluetoothState.off);
         await Future.delayed(Duration.zero);

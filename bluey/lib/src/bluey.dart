@@ -248,7 +248,27 @@ class Bluey {
   /// Stream of Bluetooth state changes.
   ///
   /// Emits whenever Bluetooth is enabled, disabled, or permissions change.
-  Stream<BluetoothState> get stateStream => _stateController.stream;
+  ///
+  /// Convention 2 (replay-on-subscribe): each new subscriber immediately
+  /// receives the current [BluetoothState] as its first event, so callers
+  /// never need to read [currentState] separately to seed their UI.
+  /// Subsequent events are live platform transitions as usual.
+  Stream<BluetoothState> get stateStream => Stream<BluetoothState>.multi(
+    (controller) {
+      // Replay the current value to this subscriber immediately.
+      if (!_stateController.isClosed) {
+        controller.add(_currentState);
+      }
+      // Then forward all future events from the broadcast controller.
+      final sub = _stateController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
 
   /// Stream of diagnostic events from Bluey.
   ///
