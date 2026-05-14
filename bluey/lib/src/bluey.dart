@@ -56,16 +56,17 @@ export 'platform/bluetooth_state.dart';
 /// ```dart
 /// final bluey = Bluey.shared;
 ///
-/// // Check Bluetooth state
-/// if (await bluey.state != BluetoothState.on) {
+/// // Factory methods throw a state-mapped BlueyException if the adapter
+/// // isn't on. Handle BluetoothDisabledException to prompt the user, or
+/// // subscribe to bluey.stateStream for a reactive UI.
+/// try {
+///   final scanner = bluey.scanner();
+///   scanner.scan().listen((result) {
+///     print('Found: ${result.device.name}');
+///   });
+/// } on BluetoothDisabledException {
 ///   await bluey.requestEnable();
 /// }
-///
-/// // Scan for devices
-/// final scanner = bluey.scanner();
-/// scanner.scan().listen((result) {
-///   print('Found: ${result.device.name}');
-/// });
 /// ```
 class Bluey {
   /// Shared instance for simple apps.
