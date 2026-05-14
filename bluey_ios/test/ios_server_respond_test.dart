@@ -67,6 +67,56 @@ void main() {
     );
 
     test(
+      'PlatformException(bluetooth-unavailable) -> '
+      'PlatformBluetoothUnavailableException (adapter-state race backstop)',
+      () async {
+        final mockHostApi = MockBlueyHostApi();
+        when(
+          () => mockHostApi.respondToReadRequest(any(), any(), any()),
+        ).thenThrow(
+          PlatformException(
+            code: 'bluetooth-unavailable',
+            message: 'Bluetooth is not powered on',
+          ),
+        );
+        final server = IosServer(mockHostApi);
+
+        await expectLater(
+          server.respondToReadRequest(7, PlatformGattStatus.success, null),
+          throwsA(
+            isA<PlatformBluetoothUnavailableException>().having(
+              (e) => e.message,
+              'message',
+              'Bluetooth is not powered on',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'respondToWriteRequest: PlatformException(bluetooth-unavailable) -> '
+      'PlatformBluetoothUnavailableException',
+      () async {
+        final mockHostApi = MockBlueyHostApi();
+        when(
+          () => mockHostApi.respondToWriteRequest(any(), any()),
+        ).thenThrow(
+          PlatformException(
+            code: 'bluetooth-unavailable',
+            message: 'Bluetooth is not powered on',
+          ),
+        );
+        final server = IosServer(mockHostApi);
+
+        await expectLater(
+          server.respondToWriteRequest(8, PlatformGattStatus.success),
+          throwsA(isA<PlatformBluetoothUnavailableException>()),
+        );
+      },
+    );
+
+    test(
       'gatt-status-failed code propagates unchanged (does NOT spuriously translate)',
       () async {
         // Sanity check: pre-Option-A, the Swift side could emit

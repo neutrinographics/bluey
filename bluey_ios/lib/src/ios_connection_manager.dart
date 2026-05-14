@@ -22,6 +22,9 @@ import 'uuid_utils.dart';
 ///   * `'gatt-handle-invalidated'` → [GattOperationUnknownPlatformException]
 ///     preserving the code so the domain layer translates it to the typed
 ///     `AttributeHandleInvalidatedException`.
+///   * `'bluetooth-unavailable'` → [PlatformBluetoothUnavailableException]
+///     (backstop for adapter-state races on iOS; e.g. the GATT-op state
+///     pre-check rejecting an op because `CBCentralManager.state != .poweredOn`).
 ///
 /// Other errors propagate unchanged.
 ///
@@ -58,6 +61,9 @@ Future<T> _translateGattPlatformError<T>(
         code: 'gatt-handle-invalidated',
         message: e.message,
       );
+    }
+    if (e.code == 'bluetooth-unavailable') {
+      throw PlatformBluetoothUnavailableException(message: e.message);
     }
     rethrow;
   }

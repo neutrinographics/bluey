@@ -152,6 +152,18 @@ void main() {
       expect(denied.permissions, equals(['BLUETOOTH_CONNECT']));
     });
 
+    test('PlatformBluetoothUnavailableException → '
+        'BluetoothUnavailableException — adapter-state race backstop', () {
+      final result = translatePlatformException(
+        const platform.PlatformBluetoothUnavailableException(
+          message: 'Bluetooth adapter is unavailable: remote object is dead',
+        ),
+        operation: 'writeCharacteristic',
+        deviceId: testDeviceId,
+      );
+      expect(result, isA<BluetoothUnavailableException>());
+    });
+
     test('Flutter PlatformException → BlueyPlatformException (defensive '
         'backstop for un-translated platform errors)', () {
       final result = translatePlatformException(

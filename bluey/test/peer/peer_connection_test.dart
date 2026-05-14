@@ -352,6 +352,42 @@ void main() {
     },
   );
 
+  // Regression: when the underlying BlueyConnection invalidates (e.g.
+  // adapter-state turned off mid-flight via I333), it closes its state
+  // controller. Subscribers see an `onDone` callback rather than a
+  // `disconnected` data event. The LifecycleClient must still be stopped
+  // in that path or the heartbeat probe timer keeps firing for ~30s
+  // until the peer-silence-timeout fallback fires.
+  test(
+    'stops LifecycleClient when underlying state stream closes (onDone)',
+    () async {
+      final conn = _SpyConnection();
+      final lifecycle = _SpyLifecycleClient(callLog: []);
+
+      PeerConnection.create(
+        connection: conn,
+        serverId: serverId,
+        lifecycleClient: lifecycle,
+      );
+
+      expect(lifecycle.stopCalled, isFalse);
+
+      // Close the state controller without emitting `disconnected` — this
+      // is what `BlueyConnection._invalidate()` does on adapter-state
+      // invalidation.
+      await conn.dispose();
+      await pumpEventQueue();
+
+      expect(
+        lifecycle.stopCalled,
+        isTrue,
+        reason:
+            'LifecycleClient.stop should fire on state-stream close (onDone), '
+            'not just on a `disconnected` data event.',
+      );
+    },
+  );
+
   test(
     'does NOT stop LifecycleClient on non-disconnected state changes',
     () async {
@@ -409,6 +445,13 @@ class _OrderingSpyConnection implements Connection {
 
   final List<String> callLog;
 
+  /// Long-lived state controller. `PeerConnection.create` subscribes to
+  /// [stateChanges]; an empty (already-closed) stream would immediately
+  /// fire the subscription's `onDone` and pollute the call log with a
+  /// spurious `lifecycle.stop` before the ordering assertion runs.
+  final StreamController<ConnectionState> _stateController =
+      StreamController<ConnectionState>.broadcast();
+
   @override
   Future<void> disconnect() async {
     callLog.add('connection.disconnect');
@@ -420,7 +463,7 @@ class _OrderingSpyConnection implements Connection {
   @override
   ConnectionState get state => throw UnimplementedError();
   @override
-  Stream<ConnectionState> get stateChanges => const Stream.empty();
+  Stream<ConnectionState> get stateChanges => _stateController.stream;
   @override
   Stream<List<RemoteService>> get servicesChanges => const Stream.empty();
   @override

@@ -5,6 +5,36 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
+/// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
+/// matching typed platform-interface exception for server-side operations:
+///
+///   * `'bluetooth-unavailable'` → [PlatformBluetoothUnavailableException]
+///     (backstop for adapter-state races on iOS; e.g. the Task-8 GATT-op
+///     state pre-check rejecting an op because
+///     `CBPeripheralManager.state != .poweredOn`).
+///
+/// Other errors propagate unchanged.
+///
+/// Kept package-private so the same wrapper can be used by every server
+/// operation in this file without leaking translation logic into the
+/// platform interface contract. Note: `respondToReadRequest` does NOT
+/// use this wrapper because it also needs to translate
+/// `'bluey-not-found'`; see [IosServer.respondToReadRequest] for the
+/// inline translation chain.
+Future<T> _translateServerPlatformError<T>(
+  String operation,
+  Future<T> Function() body,
+) async {
+  try {
+    return await body();
+  } on PlatformException catch (e) {
+    if (e.code == 'bluetooth-unavailable') {
+      throw PlatformBluetoothUnavailableException(message: e.message);
+    }
+    rethrow;
+  }
+}
+
 /// Handles GATT server (peripheral) operations for the iOS platform.
 ///
 /// Delegates to [BlueyHostApi] for native communication and manages
@@ -48,14 +78,19 @@ class IosServer {
   /// Adds a GATT service to the server. Returns the service with all
   /// characteristic and descriptor handles populated by the platform.
   Future<PlatformLocalService> addService(PlatformLocalService service) async {
-    final dto = _mapLocalServiceToDto(service);
-    final populated = await _hostApi.addService(dto);
-    return _mapLocalServiceFromDto(populated);
+    return _translateServerPlatformError('addService', () async {
+      final dto = _mapLocalServiceToDto(service);
+      final populated = await _hostApi.addService(dto);
+      return _mapLocalServiceFromDto(populated);
+    });
   }
 
   /// Removes a GATT service from the server.
   Future<void> removeService(String serviceUuid) async {
-    await _hostApi.removeService(serviceUuid);
+    await _translateServerPlatformError(
+      'removeService',
+      () => _hostApi.removeService(serviceUuid),
+    );
   }
 
   // === Advertising ===
@@ -72,12 +107,18 @@ class IosServer {
       manufacturerData: config.manufacturerData,
       timeoutMs: config.timeoutMs,
     );
-    await _hostApi.startAdvertising(dto);
+    await _translateServerPlatformError(
+      'startAdvertising',
+      () => _hostApi.startAdvertising(dto),
+    );
   }
 
   /// Stops advertising.
   Future<void> stopAdvertising() async {
-    await _hostApi.stopAdvertising();
+    await _translateServerPlatformError(
+      'stopAdvertising',
+      () => _hostApi.stopAdvertising(),
+    );
   }
 
   // === Notifications / Indications ===
@@ -87,7 +128,10 @@ class IosServer {
     int characteristicHandle,
     Uint8List value,
   ) async {
-    await _hostApi.notifyCharacteristic(characteristicHandle, value);
+    await _translateServerPlatformError(
+      'notifyCharacteristic',
+      () => _hostApi.notifyCharacteristic(characteristicHandle, value),
+    );
   }
 
   /// Sends a notification to a specific central.
@@ -96,10 +140,13 @@ class IosServer {
     int characteristicHandle,
     Uint8List value,
   ) async {
-    await _hostApi.notifyCharacteristicTo(
-      centralId,
-      characteristicHandle,
-      value,
+    await _translateServerPlatformError(
+      'notifyCharacteristicTo',
+      () => _hostApi.notifyCharacteristicTo(
+        centralId,
+        characteristicHandle,
+        value,
+      ),
     );
   }
 
@@ -111,7 +158,10 @@ class IosServer {
     int characteristicHandle,
     Uint8List value,
   ) async {
-    await _hostApi.notifyCharacteristic(characteristicHandle, value);
+    await _translateServerPlatformError(
+      'indicateCharacteristic',
+      () => _hostApi.notifyCharacteristic(characteristicHandle, value),
+    );
   }
 
   /// Sends an indication to a specific central.
@@ -123,10 +173,13 @@ class IosServer {
     int characteristicHandle,
     Uint8List value,
   ) async {
-    await _hostApi.notifyCharacteristicTo(
-      centralId,
-      characteristicHandle,
-      value,
+    await _translateServerPlatformError(
+      'indicateCharacteristicTo',
+      () => _hostApi.notifyCharacteristicTo(
+        centralId,
+        characteristicHandle,
+        value,
+      ),
     );
   }
 
@@ -154,6 +207,9 @@ class IosServer {
       if (e.code == 'bluey-not-found') {
         throw PlatformRespondToRequestNotFoundException(e.message ?? '');
       }
+      if (e.code == 'bluetooth-unavailable') {
+        throw PlatformBluetoothUnavailableException(message: e.message);
+      }
       rethrow;
     }
   }
@@ -163,15 +219,21 @@ class IosServer {
     int requestId,
     PlatformGattStatus status,
   ) async {
-    await _hostApi.respondToWriteRequest(
-      requestId,
-      _mapGattStatusToDto(status),
+    await _translateServerPlatformError(
+      'respondToWriteRequest',
+      () => _hostApi.respondToWriteRequest(
+        requestId,
+        _mapGattStatusToDto(status),
+      ),
     );
   }
 
   /// Closes the GATT server.
   Future<void> closeServer() async {
-    await _hostApi.closeServer();
+    await _translateServerPlatformError(
+      'closeServer',
+      () => _hostApi.closeServer(),
+    );
   }
 
   // === Callback Handlers ===

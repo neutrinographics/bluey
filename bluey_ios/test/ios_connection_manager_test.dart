@@ -739,6 +739,55 @@ void main() {
       );
 
       test(
+        'writeCharacteristic translates PlatformException(bluetooth-unavailable) '
+        'to PlatformBluetoothUnavailableException — adapter-state race backstop',
+        () async {
+          when(
+            () => mockHostApi.writeCharacteristic(any(), any(), any(), any()),
+          ).thenThrow(
+            PlatformException(
+              code: 'bluetooth-unavailable',
+              message: 'Bluetooth is not powered on',
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              42,
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformBluetoothUnavailableException>().having(
+                (e) => e.message,
+                'message',
+                'Bluetooth is not powered on',
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(bluetooth-unavailable) '
+        'to PlatformBluetoothUnavailableException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(
+              code: 'bluetooth-unavailable',
+              message: 'Bluetooth is not powered on',
+            ),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 42),
+            throwsA(isA<PlatformBluetoothUnavailableException>()),
+          );
+        },
+      );
+
+      test(
         'writeCharacteristic translates PlatformException(gatt-status-failed) to GattOperationStatusFailedException',
         () async {
           when(

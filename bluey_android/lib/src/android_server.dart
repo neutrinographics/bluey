@@ -9,6 +9,9 @@ import 'messages.g.dart';
 ///
 ///   * `'gatt-status-failed'` → [GattOperationStatusFailedException] with
 ///     the native status extracted from `details`.
+///   * `'bluetooth-unavailable'` → [PlatformBluetoothUnavailableException]
+///     (backstop for `DeadObjectException` races on the
+///     `BluetoothGattServer` Binder proxy).
 ///
 /// Other errors propagate unchanged.
 ///
@@ -27,6 +30,9 @@ Future<T> _translateServerPlatformError<T>(
       // the rare marshaling paths where it could come back null / non-int.
       final status = e.details is int ? e.details as int : -1;
       throw GattOperationStatusFailedException(operation, status);
+    }
+    if (e.code == 'bluetooth-unavailable') {
+      throw PlatformBluetoothUnavailableException(message: e.message);
     }
     rethrow;
   }

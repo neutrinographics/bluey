@@ -110,7 +110,17 @@ final class BlueyIos extends BlueyPlatform {
   }
 
   @override
-  BluetoothState get currentState => _cachedState;
+  BluetoothState get currentState {
+    // Ensure the FlutterApi handler is registered before native pushes
+    // arrive. The native plugin eagerly publishes initial state at attach
+    // time via `flutterApi.onStateChanged(...)`; without this call the
+    // handler isn't registered yet and that push is dropped, leaving
+    // `_cachedState == BluetoothState.unknown` even when BT is on. The
+    // first factory call (e.g. `bluey.scanner()`) then throws
+    // `BluetoothUnavailableException` spuriously.
+    _ensureInitialized();
+    return _cachedState;
+  }
 
   @override
   Stream<BluetoothState> get stateStream {

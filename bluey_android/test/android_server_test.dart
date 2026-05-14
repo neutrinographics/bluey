@@ -341,6 +341,37 @@ void main() {
           );
         },
       );
+
+      test(
+        'translates PlatformException(bluetooth-unavailable) '
+        'to PlatformBluetoothUnavailableException — DeadObjectException race '
+        'backstop on BluetoothGattServer Binder proxy',
+        () async {
+          when(
+            () => mockHostApi.respondToReadRequest(any(), any(), any()),
+          ).thenThrow(
+            PlatformException(
+              code: 'bluetooth-unavailable',
+              message: 'Bluetooth adapter is unavailable: remote object is dead',
+            ),
+          );
+
+          expect(
+            () => server.respondToReadRequest(
+              1,
+              PlatformGattStatus.success,
+              null,
+            ),
+            throwsA(
+              isA<PlatformBluetoothUnavailableException>().having(
+                (e) => e.message,
+                'message',
+                'Bluetooth adapter is unavailable: remote object is dead',
+              ),
+            ),
+          );
+        },
+      );
     });
 
     group('respondToWriteRequest', () {
