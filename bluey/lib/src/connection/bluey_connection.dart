@@ -8,6 +8,7 @@ import '../events.dart';
 import '../gatt_client/gatt.dart';
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
+import '../platform/bluetooth_state.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
@@ -163,6 +164,14 @@ class BlueyConnection implements Connection {
   StreamSubscription? _platformPhySubscription;
   StreamSubscription? _platformServiceChangesSubscription;
 
+  // I333: adapter-state invalidation. The connection subscribes to
+  // platform.stateStream at construction; any non-`on` emission flips
+  // [_invalidated] to true and tears down owned streams + caches.
+  // Subsequent public calls throw [StaleHandleException].
+  bool _invalidated = false;
+  BluetoothState? _invalidationState;
+  StreamSubscription<platform.BluetoothState>? _adapterStateSubscription;
+
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
@@ -276,6 +285,107 @@ class BlueyConnection implements Connection {
         _connectionParameters = connectionParametersFromPlatform(params);
       });
     }
+
+    // I333: invalidate on any non-`on` adapter state. The platform
+    // stream emits the platform-interface enum; map to the domain enum
+    // before deciding so the carried [triggeringState] surfaces as the
+    // domain type.
+    _adapterStateSubscription = _platform.stateStream.listen((platformState) {
+      final domainState = _mapPlatformState(platformState);
+      if (domainState != BluetoothState.on) {
+        _invalidate(domainState);
+      }
+    });
+  }
+
+  /// Maps the platform-interface [platform.BluetoothState] to the
+  /// domain [BluetoothState]. Mirrors [BlueyServer._mapPlatformState];
+  /// kept local so the connection doesn't reach across bounded contexts.
+  BluetoothState _mapPlatformState(platform.BluetoothState s) {
+    switch (s) {
+      case platform.BluetoothState.unknown:
+        return BluetoothState.unknown;
+      case platform.BluetoothState.unsupported:
+        return BluetoothState.unsupported;
+      case platform.BluetoothState.unauthorized:
+        return BluetoothState.unauthorized;
+      case platform.BluetoothState.off:
+        return BluetoothState.off;
+      case platform.BluetoothState.on:
+        return BluetoothState.on;
+    }
+  }
+
+  /// Marks this connection as terminal-failed. Idempotent — re-entry is
+  /// a no-op. Cancels every owned platform subscription, closes every
+  /// owned StreamController, aborts in-flight GATT ops, and clears the
+  /// services cache. Subsequent public calls throw
+  /// [StaleHandleException].
+  void _invalidate(BluetoothState triggeringState) {
+    if (_invalidated) return;
+    _invalidated = true;
+    _invalidationState = triggeringState;
+
+    // Cancel every owned platform subscription so post-invalidation
+    // emissions can't call .add(...) on a closed controller. Android's
+    // STATE_TURNING_OFF is followed by a flurry of disconnect /
+    // bond / phy callbacks; missing any one risks a StateError.
+    _adapterStateSubscription?.cancel();
+    _adapterStateSubscription = null;
+    _platformStateSubscription?.cancel();
+    _platformStateSubscription = null;
+    _platformBondStateSubscription?.cancel();
+    _platformBondStateSubscription = null;
+    _platformPhySubscription?.cancel();
+    _platformPhySubscription = null;
+    _platformServiceChangesSubscription?.cancel();
+    _platformServiceChangesSubscription = null;
+
+    // Abort every in-flight GATT op so callers stop awaiting futures
+    // backed by a dead adapter.
+    if (_pendingGattOpAborters.isNotEmpty) {
+      final aborters = _pendingGattOpAborters.toList(growable: false);
+      _pendingGattOpAborters.clear();
+      for (final aborter in aborters) {
+        if (!aborter.isCompleted) {
+          aborter.completeError(
+            StaleHandleException(
+              triggeringState: triggeringState,
+              instanceType: InvalidatedInstance.connection,
+            ),
+          );
+        }
+      }
+    }
+
+    // Close every StreamController owned by this connection.
+    _stateController.close();
+    _bondStateController.close();
+    _phyController.close();
+    _servicesChangesController.close();
+
+    // Clear cached state. Per-characteristic notification controllers
+    // are torn down via service.dispose(); fire-and-forget because
+    // _invalidate is synchronous (called from a stream listener).
+    final cached = _cachedServices;
+    _cachedServices = null;
+    if (cached != null) {
+      for (final service in cached) {
+        // ignore: discarded_futures
+        service.dispose();
+      }
+    }
+  }
+
+  /// Throws [StaleHandleException] if this connection has been
+  /// invalidated by a prior adapter-state transition.
+  void _ensureValid() {
+    if (_invalidated) {
+      throw StaleHandleException(
+        triggeringState: _invalidationState!,
+        instanceType: InvalidatedInstance.connection,
+      );
+    }
   }
 
   /// Throws [DisconnectedException] if the connection is not in a
@@ -285,6 +395,12 @@ class BlueyConnection implements Connection {
   /// upgraded). Every other state — `connecting`, `disconnecting`,
   /// `disconnected` — fails the gate.
   ///
+  /// Also runs the I333 invalidity gate first: an invalidated
+  /// connection (adapter off / unauthorized / etc.) throws
+  /// [StaleHandleException] before this method's connection-state
+  /// check fires. The order matters — invalidation is the stronger
+  /// failure mode and should surface to the caller verbatim.
+  ///
   /// Called at the top of every public GATT-op method on the connection
   /// itself, and from `BlueyRemoteCharacteristic` /
   /// `BlueyRemoteDescriptor` via the closure threaded through their
@@ -292,6 +408,7 @@ class BlueyConnection implements Connection {
   /// dead connection lets a raw [PlatformException] escape from the
   /// platform layer.
   void _ensureConnected() {
+    _ensureValid();
     if (_state == ConnectionState.linked || _state == ConnectionState.ready) {
       return;
     }
@@ -406,6 +523,7 @@ class BlueyConnection implements Connection {
 
   @override
   RemoteService service(UUID uuid) {
+    _ensureValid();
     if (_cachedServices == null) {
       throw ServiceNotFoundException(uuid);
     }
@@ -429,6 +547,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
+    _ensureValid();
     _ensureConnected();
     if (cache && _cachedServices != null) {
       return _cachedServices!;
@@ -495,6 +614,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<bool> hasService(UUID uuid) async {
+    _ensureValid();
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
   }
@@ -502,6 +622,7 @@ class BlueyConnection implements Connection {
   // I325 — relocated to AndroidConnectionExtensions; private impl is
   // used by _AndroidConnectionExtensionsImpl.
   Future<Mtu> _requestMtuImpl(Mtu mtu) async {
+    _ensureValid();
     _ensureConnected();
     final requested = mtu.value;
     _mtu = await _trackInFlight(
@@ -522,6 +643,7 @@ class BlueyConnection implements Connection {
   Future<WritePayloadLimit> maxWritePayload({
     required bool withResponse,
   }) async {
+    _ensureValid();
     _ensureConnected();
     return _trackInFlight(
       () => _loggedGattOp(
@@ -544,6 +666,7 @@ class BlueyConnection implements Connection {
 
   @override
   Future<int> readRssi() async {
+    _ensureValid();
     _ensureConnected();
     return _trackInFlight(
       () => _loggedGattOp(
@@ -576,6 +699,10 @@ class BlueyConnection implements Connection {
 
   @override
   Future<void> disconnect() async {
+    // I333: an invalidated connection is effectively dead from the
+    // user's perspective — the adapter is off / unauthorised. Treat
+    // disconnect() as a graceful no-op rather than throwing.
+    if (_invalidated) return;
     // Idempotent: if already disconnected or disconnecting, do nothing
     if (_state == ConnectionState.disconnected ||
         _state == ConnectionState.disconnecting) {
@@ -614,6 +741,7 @@ class BlueyConnection implements Connection {
   Stream<BondState> get _bondStateChanges => _bondStateController.stream;
 
   Future<void> _bondImpl() async {
+    _ensureValid();
     _ensureConnected();
     await withErrorTranslation(
       () => _platform.bond(_connectionId),
@@ -623,6 +751,7 @@ class BlueyConnection implements Connection {
   }
 
   Future<void> _removeBondImpl() async {
+    _ensureValid();
     _ensureConnected();
     await withErrorTranslation(
       () => _platform.removeBond(_connectionId),
@@ -638,6 +767,7 @@ class BlueyConnection implements Connection {
   Stream<({Phy tx, Phy rx})> get _phyChanges => _phyController.stream;
 
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
+    _ensureValid();
     _ensureConnected();
     await withErrorTranslation(
       () => _platform.requestPhy(
@@ -655,6 +785,7 @@ class BlueyConnection implements Connection {
   Future<void> _requestConnectionParametersImpl(
     ConnectionParameters params,
   ) async {
+    _ensureValid();
     _ensureConnected();
     await withErrorTranslation(
       () => _platform.requestConnectionParameters(
@@ -1266,12 +1397,14 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   BondState get bondState {
+    _conn._ensureValid();
     _requireCapability(_conn._platform.capabilities.canBond, 'bondState');
     return _conn._bondStateValue;
   }
 
   @override
   Stream<BondState> get bondStateChanges {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canBond,
       'bondStateChanges',
@@ -1281,30 +1414,35 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Future<void> bond() {
+    _conn._ensureValid();
     _requireCapability(_conn._platform.capabilities.canBond, 'bond');
     return _conn._bondImpl();
   }
 
   @override
   Future<void> removeBond() {
+    _conn._ensureValid();
     _requireCapability(_conn._platform.capabilities.canBond, 'removeBond');
     return _conn._removeBondImpl();
   }
 
   @override
   Phy get txPhy {
+    _conn._ensureValid();
     _requireCapability(_conn._platform.capabilities.canRequestPhy, 'txPhy');
     return _conn._txPhyValue;
   }
 
   @override
   Phy get rxPhy {
+    _conn._ensureValid();
     _requireCapability(_conn._platform.capabilities.canRequestPhy, 'rxPhy');
     return _conn._rxPhyValue;
   }
 
   @override
   Stream<({Phy tx, Phy rx})> get phyChanges {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canRequestPhy,
       'phyChanges',
@@ -1314,6 +1452,7 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canRequestPhy,
       'requestPhy',
@@ -1323,6 +1462,7 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   ConnectionParameters get connectionParameters {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canRequestConnectionParameters,
       'connectionParameters',
@@ -1332,6 +1472,7 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
 
   @override
   Future<void> requestConnectionParameters(ConnectionParameters params) {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canRequestConnectionParameters,
       'requestConnectionParameters',
@@ -1340,10 +1481,14 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
   }
 
   @override
-  Mtu get mtu => _conn._mtuValue;
+  Mtu get mtu {
+    _conn._ensureValid();
+    return _conn._mtuValue;
+  }
 
   @override
   Future<Mtu> requestMtu(Mtu desired) {
+    _conn._ensureValid();
     _requireCapability(
       _conn._platform.capabilities.canRequestMtu,
       'requestMtu',

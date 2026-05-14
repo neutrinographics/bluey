@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
@@ -230,6 +231,76 @@ void main() {
       expect(() => ctx.char.notifications, returnsNormally);
 
       await ctx.connection.disconnect();
+    });
+  });
+
+  group('I333 — adapter-state invalidation', () {
+    test('invalidates on stateStream emitting off', () async {
+      final ctx = await establishWithChar();
+
+      fakePlatform.setState(platform.BluetoothState.off);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      await expectLater(
+        ctx.connection.maxWritePayload(withResponse: false),
+        throwsA(isA<StaleHandleException>()),
+      );
+    });
+
+    test('invalidates on stateStream emitting unauthorized', () async {
+      final ctx = await establishWithChar();
+
+      fakePlatform.setState(platform.BluetoothState.unauthorized);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      await expectLater(
+        ctx.char.read(),
+        throwsA(isA<StaleHandleException>()),
+      );
+    });
+
+    test('stays invalidated after adapter returns to on', () async {
+      final ctx = await establishWithChar();
+
+      fakePlatform.setState(platform.BluetoothState.off);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      fakePlatform.setState(platform.BluetoothState.on);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      await expectLater(
+        ctx.connection.services(),
+        throwsA(isA<StaleHandleException>()),
+      );
+    });
+
+    test('triggeringState reflects the state that caused invalidation', () async {
+      final ctx = await establishWithChar();
+
+      fakePlatform.setState(platform.BluetoothState.unauthorized);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      try {
+        await ctx.connection.maxWritePayload(withResponse: false);
+        fail('expected StaleHandleException');
+      } on StaleHandleException catch (e) {
+        expect(e.triggeringState, equals(BluetoothState.unauthorized));
+        expect(e.instanceType, equals(InvalidatedInstance.connection));
+      }
+    });
+
+    test('stateChanges stream closes on invalidation', () async {
+      final ctx = await establishWithChar();
+      final stateClosed = Completer<void>();
+
+      ctx.connection.stateChanges.listen(
+        (_) {},
+        onDone: stateClosed.complete,
+      );
+
+      fakePlatform.setState(platform.BluetoothState.off);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(stateClosed.isCompleted, isTrue);
     });
   });
 }
