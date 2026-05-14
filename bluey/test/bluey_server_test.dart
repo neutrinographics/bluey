@@ -2442,6 +2442,41 @@ void main() {
 
         expect(connectionsClosed.isCompleted, isTrue);
       });
+
+      test(
+        'platform events arriving after invalidation do not crash',
+        () async {
+          final server = bluey.server()!;
+
+          // Drive a connect first to populate state.
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'racing-central', mtu: 23),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // Adapter goes off — server invalidates.
+          mockPlatform.setState(platform.BluetoothState.off);
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // Platform now delivers a flurry of post-off events that would
+          // normally land in the now-closed controllers. None of these
+          // should throw or escape the server's listeners.
+          expect(() {
+            mockPlatform.emitCentralConnected(
+              const platform.PlatformCentral(id: 'post-off', mtu: 23),
+            );
+            mockPlatform.emitCentralDisconnected('racing-central');
+          }, returnsNormally);
+
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // The server is still invalidated and any public call still throws.
+          expect(
+            () => server.startAdvertising(),
+            throwsA(isA<StaleHandleException>()),
+          );
+        },
+      );
     });
   });
 }

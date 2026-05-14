@@ -221,6 +221,26 @@ class BlueyServer implements Server {
     _stateSubscription?.cancel();
     _stateSubscription = null;
 
+    // Cancel the platform-event subscriptions so they can't call .add(...)
+    // on a closed controller. Android's STATE_TURNING_OFF is regularly
+    // followed by a flurry of disconnect / onConnectionStateChange callbacks,
+    // which would otherwise crash the listener with a StateError.
+    _centralConnectionsSub?.cancel();
+    _centralConnectionsSub = null;
+    _centralDisconnectionsSub?.cancel();
+    _centralDisconnectionsSub = null;
+    _platformReadRequestsSub?.cancel();
+    _platformReadRequestsSub = null;
+    _platformWriteRequestsSub?.cancel();
+    _platformWriteRequestsSub = null;
+
+    // Tear down the LifecycleServer so heartbeat timers stop firing. An
+    // armed timer firing post-invalidation would hit `onClientGone` →
+    // `_handleClientDisconnected` → `.add(...)` on the now-closed
+    // disconnections controller. `dispose()` is idempotent so calling it
+    // again from `dispose()` is safe.
+    _lifecycle.dispose();
+
     // Close every StreamController owned by this server.
     _connectionsController.close();
     _disconnectionsController.close();
