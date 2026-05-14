@@ -124,7 +124,13 @@ class BlueyScanner implements Scanner {
     _isScanning = true;
     _eventBus.emit(ScanStartedEvent(serviceFilter: services, timeout: timeout));
 
-    final controller = StreamController<ScanResult>();
+    final controller = StreamController<ScanResult>(
+      onCancel: () {
+        // Convention 5 — last-subscriber cancel stops the platform
+        // resource. stop() is idempotent: returns early if !_isScanning.
+        return stop();
+      },
+    );
     _activeScanControllers.add(controller);
 
     _platformSubscription = _platform
