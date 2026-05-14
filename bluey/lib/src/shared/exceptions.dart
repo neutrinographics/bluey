@@ -1,4 +1,5 @@
 import '../peer/server_id.dart';
+import '../platform/bluetooth_state.dart';
 import 'uuid.dart';
 
 /// Base class for all Bluey exceptions.
@@ -460,4 +461,45 @@ class BlueyPlatformException extends BlueyException {
 
   BlueyPlatformException(String message, {this.code, Object? cause})
     : super(message, cause: cause);
+}
+
+/// A method was called on a [Server], [Connection], or [Scanner]
+/// instance that was invalidated by a prior Bluetooth-adapter state
+/// transition (e.g. the user toggled Bluetooth off).
+///
+/// Invalidation is **terminal**: the instance is dead and will not
+/// recover even if the adapter returns to [BluetoothState.on]. Construct
+/// a fresh instance from [Bluey] to proceed:
+///
+/// ```dart
+/// try {
+///   await server.addService(...);
+/// } on StaleHandleException {
+///   server = bluey.server();
+///   await server!.addService(...);
+/// }
+/// ```
+///
+/// [triggeringState] is the adapter state that caused invalidation.
+/// It does **not** reflect the adapter's current state, which may have
+/// returned to [BluetoothState.on] since invalidation.
+class StaleHandleException extends BlueyException {
+  /// The adapter state that caused this instance to be invalidated.
+  final BluetoothState triggeringState;
+
+  /// The instance type that was invalidated, e.g. `'Server'`,
+  /// `'Connection'`, `'Scanner'`. Used for diagnostics.
+  final String instanceType;
+
+  StaleHandleException({
+    required this.triggeringState,
+    required this.instanceType,
+  }) : super(
+         '$instanceType was invalidated by adapter transition to '
+         '${triggeringState.name}; the instance is dead even if the '
+         'adapter has since returned to BluetoothState.on.',
+         action:
+             'Construct a fresh $instanceType from Bluey rather than '
+             'reusing this one.',
+       );
 }
