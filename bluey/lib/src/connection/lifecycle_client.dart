@@ -80,7 +80,14 @@ class LifecycleClient {
        _events = events,
        _deviceId = deviceId {
     if (servicesChanges != null) {
-      _servicesChangesSub = servicesChanges.listen(_refreshFromServices);
+      _servicesChangesSub = servicesChanges.listen(
+        _refreshFromServices,
+        // I333 invalidation surfaces here as StaleHandleException. The
+        // lifecycle client is torn down via stop() on disconnect (which
+        // adapter invalidation implies), so swallow to avoid an
+        // "Unhandled error" warning while teardown races.
+        onError: (_) {},
+      );
     }
     _monitor = PeerSilenceMonitor(
       peerSilenceTimeout: peerSilenceTimeout,

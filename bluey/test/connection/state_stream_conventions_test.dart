@@ -221,4 +221,71 @@ void main() {
       expect(connection.state, equals(ConnectionState.invalidated));
     });
   });
+
+  group('Connection non-enum streams (Convention 3 — addError + close)', () {
+    test(
+      'servicesChanges errors with StaleHandleException then closes on invalidation',
+      () async {
+        final connection = await establish();
+        Object? errorReceived;
+        final completer = Completer<void>();
+
+        connection.servicesChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.setState(platform.BluetoothState.off);
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+
+    test(
+      'bondStateChanges errors with StaleHandleException then closes',
+      () async {
+        final connection = await establish();
+        final android = connection.android!;
+        Object? errorReceived;
+        final completer = Completer<void>();
+
+        android.bondStateChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.setState(platform.BluetoothState.off);
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+
+    test(
+      'phyChanges errors with StaleHandleException then closes',
+      () async {
+        final connection = await establish();
+        final android = connection.android!;
+        Object? errorReceived;
+        final completer = Completer<void>();
+
+        android.phyChanges.listen(
+          (_) {},
+          onError: (e) => errorReceived = e,
+          onDone: completer.complete,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.setState(platform.BluetoothState.off);
+        await completer.future;
+
+        expect(errorReceived, isA<StaleHandleException>());
+      },
+    );
+  });
 }

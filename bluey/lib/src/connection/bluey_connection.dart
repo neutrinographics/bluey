@@ -366,9 +366,29 @@ class BlueyConnection implements Connection {
       _stateController.add(ConnectionState.invalidated);
       _stateController.close();
     }
-    _bondStateController.close();
-    _phyController.close();
-    _servicesChangesController.close();
+
+    // Convention 3 (non-enum path) — for streams whose value type isn't
+    // an enum we own, the terminal signal is addError(StaleHandleException)
+    // then close. Subscribers receive the typed error via onError, which
+    // mirrors what the corresponding sync getters throw (Convention 6 —
+    // see I333).
+    final stale = StaleHandleException(
+      triggeringState: triggeringState,
+      instanceType: InvalidatedInstance.connection,
+    );
+
+    if (!_servicesChangesController.isClosed) {
+      _servicesChangesController.addError(stale);
+      _servicesChangesController.close();
+    }
+    if (!_bondStateController.isClosed) {
+      _bondStateController.addError(stale);
+      _bondStateController.close();
+    }
+    if (!_phyController.isClosed) {
+      _phyController.addError(stale);
+      _phyController.close();
+    }
 
     // Clear cached state. Per-characteristic notification controllers
     // are torn down via service.dispose(); fire-and-forget because

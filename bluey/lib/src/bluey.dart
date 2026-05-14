@@ -646,9 +646,17 @@ class Bluey {
       onListen: () async {
         await attempt();
         if (resolved || controller.isClosed) return;
-        servicesSub = connection.servicesChanges.listen((_) {
-          attempt();
-        });
+        servicesSub = connection.servicesChanges.listen(
+          (_) {
+            attempt();
+          },
+          // I333 invalidation surfaces here as StaleHandleException. The
+          // peer-discovery flow doesn't need to react to it (the
+          // stateChanges listener below already closes the controller on
+          // disconnect, and an invalidated adapter implies disconnect),
+          // so swallow the error to avoid an "Unhandled error" warning.
+          onError: (_) {},
+        );
         stateSub = connection.stateChanges.listen((s) {
           if (s == ConnectionState.disconnected &&
               !resolved &&
