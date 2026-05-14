@@ -272,14 +272,6 @@ final class ServiceAddedEvent extends BlueyEvent {
   String toString() => '[Server] Added service ${serviceId.toShortString()}';
 }
 
-/// Advertising starting.
-final class AdvertisingStartingEvent extends BlueyEvent {
-  AdvertisingStartingEvent({super.source});
-
-  @override
-  String toString() => '[Server] Advertising starting';
-}
-
 /// Advertising started.
 final class AdvertisingStartedEvent extends BlueyEvent {
   final String? name;
@@ -294,12 +286,14 @@ final class AdvertisingStartedEvent extends BlueyEvent {
   }
 }
 
-/// Advertising stopping.
-final class AdvertisingStoppingEvent extends BlueyEvent {
-  AdvertisingStoppingEvent({super.source});
+/// Emitted when [Server.startAdvertising] is called and the
+/// platform-side start is now in flight. Followed by
+/// [AdvertisingStartedEvent] when the platform confirms.
+final class AdvertisingStartingEvent extends BlueyEvent {
+  AdvertisingStartingEvent({super.source});
 
   @override
-  String toString() => '[Server] Advertising stopping';
+  String toString() => '[Server] Advertising starting';
 }
 
 /// Advertising stopped.
@@ -308,6 +302,16 @@ final class AdvertisingStoppedEvent extends BlueyEvent {
 
   @override
   String toString() => '[Server] Advertising stopped';
+}
+
+/// Emitted when [Server.stopAdvertising] is called and the
+/// platform-side stop is now in flight. Followed by
+/// [AdvertisingStoppedEvent] when the platform confirms.
+final class AdvertisingStoppingEvent extends BlueyEvent {
+  AdvertisingStoppingEvent({super.source});
+
+  @override
+  String toString() => '[Server] Advertising stopping';
 }
 
 /// Client connected to server.
