@@ -56,16 +56,17 @@ export 'platform/bluetooth_state.dart';
 /// ```dart
 /// final bluey = Bluey.shared;
 ///
-/// // Check Bluetooth state
-/// if (await bluey.state != BluetoothState.on) {
+/// // Factory methods throw a state-mapped BlueyException if the adapter
+/// // isn't on. Handle BluetoothDisabledException to prompt the user, or
+/// // subscribe to bluey.stateStream for a reactive UI.
+/// try {
+///   final scanner = bluey.scanner();
+///   scanner.scan().listen((result) {
+///     print('Found: ${result.device.name}');
+///   });
+/// } on BluetoothDisabledException {
 ///   await bluey.requestEnable();
 /// }
-///
-/// // Scan for devices
-/// final scanner = bluey.scanner();
-/// scanner.scan().listen((result) {
-///   print('Found: ${result.device.name}');
-/// });
 /// ```
 class Bluey {
   /// Shared instance for simple apps.
@@ -112,6 +113,10 @@ class Bluey {
     : _platform = platform.BlueyPlatform.instance,
       _eventBus = BlueyEventBus(),
       _localIdentity = localIdentity {
+    // Seed the cached state synchronously from the platform so the
+    // factory pre-checks (`_requireAdapterOn`) see the adapter's most
+    // recent observation without waiting for the first stream event.
+    _currentState = _mapState(_platform.currentState);
     _stateSubscription = _platform.stateStream.listen(
       (state) {
         _currentState = _mapState(state);
@@ -268,25 +273,23 @@ class Bluey {
     );
   }
 
-  /// Ensure Bluetooth is ready to use.
+  /// Throws a state-mapped exception if the adapter is not currently
+  /// in [BluetoothState.on]. Called by every factory method on this
+  /// class before construction.
   ///
-  /// Throws [BluetoothUnavailableException] if Bluetooth is not supported.
-  /// Throws [PermissionDeniedException] if permissions are not granted.
-  /// Throws [BluetoothDisabledException] if Bluetooth is off and cannot be enabled.
-  Future<void> ensureReady() async {
-    final currentState = await state;
-    switch (currentState) {
+  /// Uses the cached [currentState] (not [state]) so the check is
+  /// synchronous — the cached value is kept fresh by the live
+  /// subscription to `_platform.stateStream` established in the
+  /// constructor.
+  void _requireAdapterOn() {
+    switch (_currentState) {
       case BluetoothState.on:
         return;
-      case BluetoothState.unsupported:
-        throw const BluetoothUnavailableException();
-      case BluetoothState.unauthorized:
-        throw PermissionDeniedException(['Bluetooth']);
       case BluetoothState.off:
-        final enabled = await requestEnable();
-        if (!enabled) {
-          throw const BluetoothDisabledException();
-        }
+        throw const BluetoothDisabledException();
+      case BluetoothState.unauthorized:
+        throw PermissionDeniedException(const ['Bluetooth']);
+      case BluetoothState.unsupported:
       case BluetoothState.unknown:
         throw const BluetoothUnavailableException();
     }
@@ -339,6 +342,7 @@ class Bluey {
   /// scanner.dispose();
   /// ```
   Scanner scanner() {
+    _requireAdapterOn();
     return BlueyScanner(_platform, _eventBus);
   }
 
@@ -355,6 +359,7 @@ class Bluey {
   ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(Device device, {Duration? timeout}) async {
+    _requireAdapterOn();
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
@@ -781,6 +786,7 @@ class Bluey {
   /// }
   /// ```
   Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
+    _requireAdapterOn();
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }

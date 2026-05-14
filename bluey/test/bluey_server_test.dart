@@ -80,6 +80,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.BluetoothState> get stateStream => _stateController.stream;
 
   @override
+  platform.BluetoothState get currentState => mockState;
+
+  @override
   Future<platform.BluetoothState> getState() async => mockState;
 
   @override
@@ -463,6 +466,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Future<void> setLogLevel(platform.PlatformLogLevel level) async {}
 
   // Test helpers
+  void setState(platform.BluetoothState newState) {
+    mockState = newState;
+    _stateController.add(newState);
+  }
+
   void emitCentralConnected(platform.PlatformCentral central) {
     _centralConnectionsController.add(central);
   }
@@ -2346,6 +2354,128 @@ void main() {
           ),
         );
       });
+    });
+
+    group('I333 — adapter-state invalidation', () {
+      test('invalidates on stateStream emitting off', () async {
+        final server = bluey.server()!;
+
+        mockPlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        expect(
+          () => server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          throwsA(isA<StaleHandleException>()),
+        );
+      });
+
+      test('invalidates on stateStream emitting unauthorized', () async {
+        final server = bluey.server()!;
+
+        mockPlatform.setState(platform.BluetoothState.unauthorized);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        expect(
+          () => server.startAdvertising(),
+          throwsA(isA<StaleHandleException>()),
+        );
+      });
+
+      test('does not invalidate on stateStream emitting on', () async {
+        final server = bluey.server()!;
+
+        // Already on at setUp; explicitly re-emit to verify no spurious invalidation.
+        mockPlatform.setState(platform.BluetoothState.on);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        await expectLater(
+          server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          completes,
+        );
+      });
+
+      test('stays invalidated after adapter returns to on', () async {
+        final server = bluey.server()!;
+
+        mockPlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        mockPlatform.setState(platform.BluetoothState.on);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        expect(
+          () => server.startAdvertising(),
+          throwsA(isA<StaleHandleException>()),
+        );
+      });
+
+      test(
+        'triggeringState reflects the state that caused invalidation',
+        () async {
+          final server = bluey.server()!;
+
+          mockPlatform.setState(platform.BluetoothState.unauthorized);
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          try {
+            await server.startAdvertising();
+            fail('expected StaleHandleException');
+          } on StaleHandleException catch (e) {
+            expect(e.triggeringState, equals(BluetoothState.unauthorized));
+            expect(e.instanceType, equals(InvalidatedInstance.server));
+          }
+        },
+      );
+
+      test('connections stream closes on invalidation', () async {
+        final server = bluey.server()!;
+        final connectionsClosed = Completer<void>();
+
+        server.connections.listen((_) {}, onDone: connectionsClosed.complete);
+
+        mockPlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        expect(connectionsClosed.isCompleted, isTrue);
+      });
+
+      test(
+        'platform events arriving after invalidation do not crash',
+        () async {
+          final server = bluey.server()!;
+
+          // Drive a connect first to populate state.
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'racing-central', mtu: 23),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // Adapter goes off — server invalidates.
+          mockPlatform.setState(platform.BluetoothState.off);
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // Platform now delivers a flurry of post-off events that would
+          // normally land in the now-closed controllers. None of these
+          // should throw or escape the server's listeners.
+          expect(() {
+            mockPlatform.emitCentralConnected(
+              const platform.PlatformCentral(id: 'post-off', mtu: 23),
+            );
+            mockPlatform.emitCentralDisconnected('racing-central');
+          }, returnsNormally);
+
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+
+          // The server is still invalidated and any public call still throws.
+          expect(
+            () => server.startAdvertising(),
+            throwsA(isA<StaleHandleException>()),
+          );
+        },
+      );
     });
   });
 }

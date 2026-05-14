@@ -32,6 +32,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.BluetoothState> get stateStream => _stateController.stream;
 
   @override
+  platform.BluetoothState get currentState => mockState;
+
+  @override
   Future<platform.BluetoothState> getState() async => mockState;
 
   @override
@@ -337,6 +340,16 @@ void main() {
       });
 
       test('currentState returns cached state synchronously', () async {
+        // Use a fresh mock whose initial sync state is `unknown` so we
+        // can observe the "before any observation" baseline. The default
+        // mock seeds `on` for the rest of the suite's happy-path tests;
+        // here we want the cold-start semantics explicitly.
+        await bluey.dispose();
+        mockPlatform = MockBlueyPlatform();
+        mockPlatform.mockState = platform.BluetoothState.unknown;
+        platform.BlueyPlatform.instance = mockPlatform;
+        bluey = Bluey();
+
         // Initially unknown before platform reports
         expect(bluey.currentState, equals(BluetoothState.unknown));
 
@@ -361,50 +374,6 @@ void main() {
         expect(states, contains(BluetoothState.on));
 
         await subscription.cancel();
-      });
-    });
-
-    group('ensureReady', () {
-      test('succeeds when Bluetooth is on', () async {
-        mockPlatform.mockState = platform.BluetoothState.on;
-        await expectLater(bluey.ensureReady(), completes);
-      });
-
-      test('throws BluetoothUnavailableException when unsupported', () async {
-        mockPlatform.mockState = platform.BluetoothState.unsupported;
-        await expectLater(
-          bluey.ensureReady(),
-          throwsA(isA<BluetoothUnavailableException>()),
-        );
-      });
-
-      test('throws PermissionDeniedException when unauthorized', () async {
-        mockPlatform.mockState = platform.BluetoothState.unauthorized;
-        await expectLater(
-          bluey.ensureReady(),
-          throwsA(isA<PermissionDeniedException>()),
-        );
-      });
-
-      test(
-        'throws BluetoothDisabledException when off and cannot enable',
-        () async {
-          mockPlatform.mockState = platform.BluetoothState.off;
-          mockPlatform.requestEnableResult = false;
-          await expectLater(
-            bluey.ensureReady(),
-            throwsA(isA<BluetoothDisabledException>()),
-          );
-        },
-      );
-
-      test('succeeds when off but can enable', () async {
-        mockPlatform.mockState = platform.BluetoothState.off;
-        mockPlatform.requestEnableResult = true;
-        // After requestEnable succeeds, we need to simulate state change
-        // In real implementation this would happen, but our mock is simple
-        // So this test verifies requestEnable is called
-        await expectLater(bluey.ensureReady(), completes);
       });
     });
 

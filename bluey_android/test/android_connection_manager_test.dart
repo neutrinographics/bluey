@@ -880,6 +880,57 @@ void main() {
           );
         },
       );
+
+      test(
+        'writeCharacteristic translates PlatformException(bluetooth-unavailable) '
+        'to PlatformBluetoothUnavailableException',
+        () async {
+          when(
+            () => mockHostApi.writeCharacteristic(any(), any(), any(), any()),
+          ).thenThrow(
+            PlatformException(
+              code: 'bluetooth-unavailable',
+              message:
+                  'Bluetooth adapter is unavailable: remote object is dead',
+            ),
+          );
+
+          expect(
+            () => connectionManager.writeCharacteristic(
+              'device-1',
+              42,
+              Uint8List.fromList([0x01]),
+              true,
+            ),
+            throwsA(
+              isA<PlatformBluetoothUnavailableException>().having(
+                (e) => e.message,
+                'message',
+                'Bluetooth adapter is unavailable: remote object is dead',
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'readCharacteristic translates PlatformException(bluetooth-unavailable) '
+        'to PlatformBluetoothUnavailableException',
+        () async {
+          when(() => mockHostApi.readCharacteristic(any(), any())).thenThrow(
+            PlatformException(
+              code: 'bluetooth-unavailable',
+              message:
+                  'Bluetooth adapter is unavailable: remote object is dead',
+            ),
+          );
+
+          expect(
+            () => connectionManager.readCharacteristic('device-1', 42),
+            throwsA(isA<PlatformBluetoothUnavailableException>()),
+          );
+        },
+      );
     });
 
     group('unimplemented stubs (I035 Stage A)', () {

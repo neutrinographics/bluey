@@ -1,5 +1,7 @@
 package com.neutrinographics.bluey
 
+import android.os.DeadObjectException
+
 /**
  * Translates a throwable raised by the Kotlin plugin into a [FlutterError]
  * with one of the well-known Pigeon codes the Dart adapter knows how to
@@ -33,6 +35,12 @@ internal fun Throwable.toClientFlutterError(): FlutterError = when (this) {
         FlutterError("gatt-status-failed", message, 0x01)
     is BlueyAndroidError ->
         FlutterError("bluey-unknown", message, null)
+    is DeadObjectException ->
+        FlutterError(
+            "bluetooth-unavailable",
+            "Bluetooth adapter is unavailable: ${message ?: "remote object is dead"}",
+            null
+        )
     else ->
         FlutterError("bluey-unknown", message ?: javaClass.simpleName, null)
 }
@@ -48,6 +56,12 @@ internal fun Throwable.toServerFlutterError(): FlutterError = when (this) {
         FlutterError("bluey-advertise-data-too-large", message, null)
     is BlueyAndroidError ->
         FlutterError("bluey-unknown", message, null)
+    is DeadObjectException ->
+        FlutterError(
+            "bluetooth-unavailable",
+            "Bluetooth adapter is unavailable: ${message ?: "remote object is dead"}",
+            null
+        )
     else ->
         FlutterError("bluey-unknown", message ?: javaClass.simpleName, null)
 }

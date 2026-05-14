@@ -15,6 +15,8 @@ import 'messages.g.dart';
 ///   * `'gatt-handle-invalidated'` → [GattOperationUnknownPlatformException]
 ///     preserving the code so the domain layer can throw the typed
 ///     `AttributeHandleInvalidatedException`.
+///   * `'bluetooth-unavailable'` → [PlatformBluetoothUnavailableException]
+///     (backstop for `DeadObjectException` races on Android).
 ///
 /// Other errors propagate unchanged.
 ///
@@ -58,6 +60,9 @@ Future<T> _translateGattPlatformError<T>(
         permission: permission,
         message: e.message,
       );
+    }
+    if (e.code == 'bluetooth-unavailable') {
+      throw PlatformBluetoothUnavailableException(message: e.message);
     }
     rethrow;
   }

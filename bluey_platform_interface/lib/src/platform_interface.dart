@@ -345,6 +345,19 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// Stream of Bluetooth state changes.
   Stream<BluetoothState> get stateStream;
 
+  /// The most recent synchronously-known Bluetooth state.
+  ///
+  /// Returns the cached state observed by the platform without
+  /// crossing the platform channel. Implementations should track every
+  /// state notification from the host adapter and update this value;
+  /// when no observation has ever happened (cold start), the value is
+  /// [BluetoothState.unknown].
+  ///
+  /// The domain layer reads this synchronously inside factory pre-checks
+  /// (`Bluey.scanner()`, `Bluey.connect()`, `Bluey.server()`) to fail
+  /// fast with a typed exception before any platform call is made.
+  BluetoothState get currentState => BluetoothState.unknown;
+
   /// Get current Bluetooth state.
   Future<BluetoothState> getState();
 

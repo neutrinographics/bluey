@@ -56,6 +56,9 @@ BlueyException translatePlatformException(
   if (error is platform.PlatformPermissionDeniedException) {
     return PermissionDeniedException([error.permission]);
   }
+  if (error is platform.PlatformBluetoothUnavailableException) {
+    return const BluetoothUnavailableException();
+  }
   if (error is platform.PlatformAdvertiseDataTooLargeException) {
     return AdvertisingException(AdvertisingFailureReason.dataTooBig);
   }

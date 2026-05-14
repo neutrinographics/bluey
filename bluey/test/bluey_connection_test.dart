@@ -58,6 +58,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
       Stream.value(platform.BluetoothState.on);
 
   @override
+  platform.BluetoothState get currentState => platform.BluetoothState.on;
+
+  @override
   Future<platform.BluetoothState> getState() async =>
       platform.BluetoothState.on;
 

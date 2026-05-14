@@ -21,6 +21,8 @@ final class BlueyIos extends BlueyPlatform {
   );
   late final IosServer _server = IosServer(_hostApi);
 
+  BluetoothState _cachedState = BluetoothState.unknown;
+
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
   final StreamController<String> _serviceChangesController =
@@ -43,7 +45,8 @@ final class BlueyIos extends BlueyPlatform {
 
     // Wire up callbacks to our streams
     _flutterApi.onStateChangedCallback = (state) {
-      _stateController.add(_mapBluetoothState(state));
+      _cachedState = _mapBluetoothState(state);
+      _stateController.add(_cachedState);
     };
 
     _flutterApi.onDeviceDiscoveredCallback = _scanner.onDeviceDiscovered;
@@ -104,6 +107,19 @@ final class BlueyIos extends BlueyPlatform {
       readRssiTimeoutMs: config.readRssiTimeoutMs,
     );
     await _hostApi.configure(dto);
+  }
+
+  @override
+  BluetoothState get currentState {
+    // Ensure the FlutterApi handler is registered before native pushes
+    // arrive. The native plugin eagerly publishes initial state at attach
+    // time via `flutterApi.onStateChanged(...)`; without this call the
+    // handler isn't registered yet and that push is dropped, leaving
+    // `_cachedState == BluetoothState.unknown` even when BT is on. The
+    // first factory call (e.g. `bluey.scanner()`) then throws
+    // `BluetoothUnavailableException` spuriously.
+    _ensureInitialized();
+    return _cachedState;
   }
 
   @override
