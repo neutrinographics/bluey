@@ -3,13 +3,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ConnectionState', () {
-    test('has all expected values (I067 split connected → linked + ready)', () {
-      expect(ConnectionState.values, hasLength(5));
-      expect(ConnectionState.values, contains(ConnectionState.disconnected));
-      expect(ConnectionState.values, contains(ConnectionState.connecting));
-      expect(ConnectionState.values, contains(ConnectionState.linked));
-      expect(ConnectionState.values, contains(ConnectionState.ready));
-      expect(ConnectionState.values, contains(ConnectionState.disconnecting));
+    test(
+      'has all expected values (I067 split connected → linked + ready; I333 adds invalidated)',
+      () {
+        expect(ConnectionState.values, hasLength(6));
+        expect(ConnectionState.values, contains(ConnectionState.disconnected));
+        expect(ConnectionState.values, contains(ConnectionState.connecting));
+        expect(ConnectionState.values, contains(ConnectionState.linked));
+        expect(ConnectionState.values, contains(ConnectionState.ready));
+        expect(ConnectionState.values, contains(ConnectionState.disconnecting));
+        expect(ConnectionState.values, contains(ConnectionState.invalidated));
+      },
+    );
+
+    test('invalidated value exists and is distinct from disconnected', () {
+      expect(ConnectionState.invalidated, isA<ConnectionState>());
+      expect(
+        ConnectionState.invalidated,
+        isNot(equals(ConnectionState.disconnected)),
+      );
     });
 
     group('isActive', () {
