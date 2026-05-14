@@ -18,12 +18,12 @@ void main() {
     name: 'Test',
   );
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform(
       capabilities: platform.Capabilities.android,
     );
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
     fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
   });
 

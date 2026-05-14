@@ -73,12 +73,12 @@ void main() {
     return (connection: connection, char: char, desc: desc);
   }
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform(
       capabilities: platform.Capabilities.android,
     );
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() {

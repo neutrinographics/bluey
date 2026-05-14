@@ -307,10 +307,10 @@ void main() {
   late MockBlueyPlatform mockPlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     mockPlatform = MockBlueyPlatform();
     platform.BlueyPlatform.instance = mockPlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {
@@ -348,7 +348,7 @@ void main() {
         mockPlatform = MockBlueyPlatform();
         mockPlatform.mockState = platform.BluetoothState.unknown;
         platform.BlueyPlatform.instance = mockPlatform;
-        bluey = Bluey();
+        bluey = await Bluey.create();
 
         // Initially unknown before platform reports
         expect(bluey.currentState, equals(BluetoothState.unknown));

@@ -29,7 +29,7 @@ void main() {
 
   group('Server Lifecycle', () {
     test('adds control service when lifecycle is enabled', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
 
       await server.addService(
@@ -53,7 +53,7 @@ void main() {
     });
 
     test('does NOT add control service when lifecycle is null', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server(lifecycleInterval: null)!;
 
       await server.addService(
@@ -76,7 +76,7 @@ void main() {
     });
 
     test('filters heartbeat writes from public writeRequests', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
 
       await server.addService(
@@ -133,9 +133,9 @@ void main() {
 
     test(
       'heartbeat timeout fires disconnect after client opts into lifecycle',
-      () {
+      () async {
+        final bluey = await Bluey.create();
         fakeAsync((async) {
-          final bluey = Bluey();
           final server =
               bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
@@ -170,9 +170,9 @@ void main() {
       },
     );
 
-    test('heartbeat resets timer', () {
+    test('heartbeat resets timer', () async {
+      final bluey = await Bluey.create();
       fakeAsync((async) {
-        final bluey = Bluey();
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
@@ -211,7 +211,7 @@ void main() {
     });
 
     test('disconnect command triggers immediate disconnect', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
       await server.startAdvertising();
 
@@ -237,9 +237,9 @@ void main() {
       await bluey.dispose();
     });
 
-    test('non-Bluey client that never heartbeats is not disconnected', () {
+    test('non-Bluey client that never heartbeats is not disconnected', () async {
+      final bluey = await Bluey.create();
       fakeAsync((async) {
-        final bluey = Bluey();
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
@@ -267,7 +267,7 @@ void main() {
     });
 
     test('filters interval reads from public readRequests', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
       await server.startAdvertising();
 
@@ -290,9 +290,9 @@ void main() {
       await bluey.dispose();
     });
 
-    test('platform disconnect cancels heartbeat timer', () {
+    test('platform disconnect cancels heartbeat timer', () async {
+      final bluey = await Bluey.create();
       fakeAsync((async) {
-        final bluey = Bluey();
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
@@ -320,9 +320,9 @@ void main() {
       });
     });
 
-    test('dispose cancels all heartbeat timers', () {
+    test('dispose cancels all heartbeat timers', () async {
+      final bluey = await Bluey.create();
       fakeAsync((async) {
-        final bluey = Bluey();
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
@@ -366,7 +366,7 @@ void main() {
     test(
       'emits disconnect for untracked client (stale connection after server restart)',
       () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
         await server.startAdvertising();
 
@@ -387,28 +387,28 @@ void main() {
       },
     );
 
-    test('auto-generates a ServerId when constructed without identity', () {
-      final bluey = Bluey();
+    test('auto-generates a ServerId when constructed without identity', () async {
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
       expect(server.serverId, isNotNull);
       server.dispose();
-      bluey.dispose();
+      await bluey.dispose();
     });
 
-    test('respects an app-supplied identity', () {
+    test('respects an app-supplied identity', () async {
       final id = ServerId('11111111-2222-3333-4444-555555555555');
-      final bluey = Bluey(localIdentity: id);
+      final bluey = await Bluey.create(localIdentity: id);
       final server = bluey.server()!;
       expect(server.serverId, equals(id));
       server.dispose();
-      bluey.dispose();
+      await bluey.dispose();
     });
 
     test(
       'server responds to serverId reads with the configured identity',
       () async {
         final id = ServerId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-        final bluey = Bluey(localIdentity: id);
+        final bluey = await Bluey.create(localIdentity: id);
         final server = bluey.server()!;
         await server.startAdvertising();
 
@@ -506,7 +506,7 @@ void main() {
     // connectedClients and on the connections stream, and that a second
     // heartbeat does not double-track.
     test('untracked client sending heartbeat gets auto-tracked', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
       await server.startAdvertising();
 

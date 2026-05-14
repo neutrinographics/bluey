@@ -40,21 +40,26 @@ export 'platform/bluetooth_state.dart';
 ///
 /// ## Usage
 ///
-/// For most apps, use the shared instance:
+/// Construct via the async factory in `main()` and hold the instance
+/// for the lifetime of your app:
 /// ```dart
-/// final bluey = Bluey.shared;
+/// void main() async {
+///   WidgetsFlutterBinding.ensureInitialized();
+///   final bluey = await Bluey.create();
+///   runApp(MyApp(bluey: bluey));
+/// }
 /// ```
 ///
-/// For testing, set the platform instance before creating Bluey:
+/// For testing, set the platform instance before constructing:
 /// ```dart
 /// BlueyPlatform.instance = fakePlatform;
-/// final bluey = Bluey();
+/// final bluey = await Bluey.create();
 /// ```
 ///
 /// ## Example
 ///
 /// ```dart
-/// final bluey = Bluey.shared;
+/// final bluey = await Bluey.create();
 ///
 /// // Factory methods throw a state-mapped BlueyException if the adapter
 /// // isn't on. Handle BluetoothDisabledException to prompt the user, or
@@ -69,21 +74,6 @@ export 'platform/bluetooth_state.dart';
 /// }
 /// ```
 class Bluey {
-  /// Shared instance for simple apps.
-  ///
-  /// Use this when you don't need dependency injection or isolated instances.
-  /// The instance is created lazily on first access.
-  static Bluey get shared => _shared ??= Bluey();
-  static Bluey? _shared;
-
-  /// Resets the shared instance.
-  ///
-  /// Call this if you need to reinitialize Bluey (e.g., after dispose).
-  /// Typically only needed in tests.
-  static void resetShared() {
-    _shared = null;
-  }
-
   final platform.BlueyPlatform _platform;
   final BlueyEventBus _eventBus;
   final BlueyLogger _logger = BlueyLogger();
@@ -96,20 +86,17 @@ class Bluey {
 
   BluetoothState _currentState = BluetoothState.unknown;
 
-  /// Creates a new Bluey instance.
+  /// Private synchronous constructor. Use [Bluey.create] instead.
   ///
-  /// For most apps, prefer using [Bluey.shared] instead.
-  ///
-  /// Use this constructor when you need multiple isolated Bluey instances.
-  ///
-  /// [localIdentity] is the stable [ServerId] this instance announces to
-  /// remote peers in lifecycle heartbeats and uses as the default identity
-  /// for any local [server]. Required when calling [peer] or
-  /// [discoverPeers] (those throw [LocalIdentityRequiredException]
-  /// otherwise) — pure scanner / GATT-client consumers may omit it.
-  ///
-  /// Call [dispose] when done to release resources.
-  Bluey({ServerId? localIdentity})
+  /// The async factory awaits the first non-`unknown` platform state
+  /// before returning, ensuring [currentState] reflects real adapter
+  /// state by the time consumers call factory methods like [server],
+  /// [connect], or [scanner]. The synchronous path used to be public
+  /// but it surfaced a cold-start race where the very first factory
+  /// call could throw `BluetoothUnavailableException` spuriously
+  /// because the cached state hadn't yet been refreshed — making this
+  /// constructor private closes that race off from public consumers.
+  Bluey._({ServerId? localIdentity})
     : _platform = platform.BlueyPlatform.instance,
       _eventBus = BlueyEventBus(),
       _localIdentity = localIdentity {
@@ -139,12 +126,12 @@ class Bluey {
   /// Asynchronously construct a [Bluey] instance, awaiting the first
   /// platform state event before returning.
   ///
-  /// Use this in preference to the synchronous [Bluey()] constructor.
-  /// The async path guarantees [currentState] reflects real adapter
-  /// state by the time consumers call factories like [server],
-  /// [connect], or [scanner], eliminating the cold-start race where
-  /// the very first factory call could throw `BluetoothUnavailableException`
-  /// spuriously because the cached state hadn't yet been refreshed.
+  /// This is the only public construction path. The async-only API
+  /// guarantees [currentState] reflects real adapter state by the time
+  /// consumers call factories like [server], [connect], or [scanner],
+  /// eliminating the cold-start race where the very first factory call
+  /// could throw `BluetoothUnavailableException` spuriously because the
+  /// cached state hadn't yet been refreshed.
   ///
   /// If the platform doesn't emit a state within [initialStateTimeout]
   /// (default 2 seconds — long enough for normal native init, short
@@ -157,7 +144,15 @@ class Bluey {
     ServerId? localIdentity,
     Duration initialStateTimeout = const Duration(seconds: 2),
   }) async {
-    final bluey = Bluey(localIdentity: localIdentity);
+    final bluey = Bluey._(localIdentity: localIdentity);
+    // If the platform already reported a meaningful state synchronously
+    // via `currentState` (the constructor seeds `_currentState` from
+    // that), there's nothing to await. This is the common case on real
+    // platforms after the plugin has been initialised once during the
+    // app's lifetime — the OS-cached state is available immediately.
+    if (bluey._currentState != BluetoothState.unknown) {
+      return bluey;
+    }
     try {
       // Await the first meaningful state event so the sync cache is
       // fresh. `firstWhere` keeps waiting if the platform emits
@@ -208,7 +203,7 @@ class Bluey {
   ///   WidgetsFlutterBinding.ensureInitialized();
   ///
   ///   // Use default cleanup behavior (recommended)
-  ///   final bluey = Bluey();
+  ///   final bluey = await Bluey.create();
   ///   await bluey.configure();
   ///
   ///   // Or disable automatic cleanup (you'll manage it manually)
@@ -908,18 +903,14 @@ class Bluey {
 
   /// Release all resources.
   ///
-  /// After calling dispose, this instance cannot be used.
-  /// If this is the shared instance, it will be cleared so a new one
-  /// can be created via [Bluey.shared].
+  /// After calling dispose, this instance cannot be used. Construct a
+  /// fresh instance via [Bluey.create] if you need to reinitialise.
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
     await _eventBus.close();
     await _logger.dispose();
-    if (_shared == this) {
-      _shared = null;
-    }
   }
 
   platform.PlatformLogLevel _mapLogLevelToPlatform(BlueyLogLevel level) {

@@ -28,7 +28,7 @@ void main() {
           name: 'Device 1',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Start two concurrent scans via separate scanners
         final scanner1 = bluey.scanner();
@@ -59,7 +59,7 @@ void main() {
           name: 'Device 1',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final scanner1 = bluey.scanner();
         final scanner2 = bluey.scanner();
@@ -114,7 +114,7 @@ void main() {
           name: 'Device 3',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Discover devices
         final scanner = bluey.scanner();
@@ -152,7 +152,7 @@ void main() {
           name: 'Device 2',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Discover devices
         final scanner = bluey.scanner();
@@ -233,7 +233,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -294,7 +294,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -360,7 +360,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -439,7 +439,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -507,7 +507,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -536,7 +536,7 @@ void main() {
 
     group('Server Concurrent Operations', () {
       test('handles multiple centrals connecting simultaneously', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -575,7 +575,7 @@ void main() {
       test(
         'handles concurrent read requests from different centrals',
         () async {
-          final bluey = Bluey();
+          final bluey = await Bluey.create();
           final server = bluey.server()!;
 
           await server.addService(
@@ -629,7 +629,7 @@ void main() {
       );
 
       test('notifies all connected centrals simultaneously', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -705,7 +705,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Start server
         final server = bluey.server()!;

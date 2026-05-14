@@ -35,19 +35,21 @@ void main() {
 
   group('Client-side lifecycle events on bluey.events (I068)', () {
     test('HeartbeatSentEvent fires on every probe write; '
-        'HeartbeatAcknowledgedEvent fires on every successful ack', () {
+        'HeartbeatAcknowledgedEvent fires on every successful ack', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: deviceAddress,
+        serverId: serverId,
+        intervalValue: const Duration(seconds: 10),
+      );
+
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
       fakeAsync((async) {
-        final fakePlatform = FakeBlueyPlatform();
-        platform.BlueyPlatform.instance = fakePlatform;
-
-        final serverId = ServerId.generate();
-        fakePlatform.simulateBlueyServer(
-          address: deviceAddress,
-          serverId: serverId,
-          intervalValue: const Duration(seconds: 10),
-        );
-
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -93,19 +95,21 @@ void main() {
     });
 
     test('HeartbeatFailedEvent(isDeadPeerSignal: true) fires on '
-        'GattOperationTimeoutException', () {
+        'GattOperationTimeoutException', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: deviceAddress,
+        serverId: serverId,
+        intervalValue: const Duration(seconds: 10),
+      );
+
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
       fakeAsync((async) {
-        final fakePlatform = FakeBlueyPlatform();
-        platform.BlueyPlatform.instance = fakePlatform;
-
-        final serverId = ServerId.generate();
-        fakePlatform.simulateBlueyServer(
-          address: deviceAddress,
-          serverId: serverId,
-          intervalValue: const Duration(seconds: 10),
-        );
-
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -140,19 +144,21 @@ void main() {
     });
 
     test('HeartbeatFailedEvent(isDeadPeerSignal: false) fires on '
-        'transient (non-dead-peer) error', () {
+        'transient (non-dead-peer) error', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: deviceAddress,
+        serverId: serverId,
+        intervalValue: const Duration(seconds: 10),
+      );
+
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
       fakeAsync((async) {
-        final fakePlatform = FakeBlueyPlatform();
-        platform.BlueyPlatform.instance = fakePlatform;
-
-        final serverId = ServerId.generate();
-        fakePlatform.simulateBlueyServer(
-          address: deviceAddress,
-          serverId: serverId,
-          intervalValue: const Duration(seconds: 10),
-        );
-
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -184,19 +190,21 @@ void main() {
       });
     });
 
-    test('PeerDeclaredUnreachableEvent fires when silence detector trips', () {
+    test('PeerDeclaredUnreachableEvent fires when silence detector trips', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: deviceAddress,
+        serverId: serverId,
+        intervalValue: const Duration(seconds: 10),
+      );
+
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
       fakeAsync((async) {
-        final fakePlatform = FakeBlueyPlatform();
-        platform.BlueyPlatform.instance = fakePlatform;
-
-        final serverId = ServerId.generate();
-        fakePlatform.simulateBlueyServer(
-          address: deviceAddress,
-          serverId: serverId,
-          intervalValue: const Duration(seconds: 10),
-        );
-
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
         final eventLog = <BlueyEvent>[];
         bluey.events.listen(eventLog.add);
 
@@ -237,7 +245,7 @@ void main() {
       final fakePlatform = FakeBlueyPlatform();
       platform.BlueyPlatform.instance = fakePlatform;
 
-      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+      final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
       final server = bluey.server()!;
 
       const clientId = '00000000-0000-0000-0000-000000000001';
@@ -311,12 +319,14 @@ void main() {
       await bluey.dispose();
     });
 
-    test('ClientLifecycleTimeoutEvent fires when heartbeat timer expires', () {
-      fakeAsync((async) {
-        final fakePlatform = FakeBlueyPlatform();
-        platform.BlueyPlatform.instance = fakePlatform;
+    test('ClientLifecycleTimeoutEvent fires when heartbeat timer expires', () async {
+      final fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
 
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
+      fakeAsync((async) {
         // Short interval so the timer expires quickly under fakeAsync.
         final server =
             bluey.server(lifecycleInterval: const Duration(seconds: 5))!;

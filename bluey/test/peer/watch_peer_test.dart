@@ -21,10 +21,10 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+    bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
   });
 
   tearDown(() async {

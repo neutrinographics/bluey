@@ -10,12 +10,11 @@ void main() {
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     BlueyPlatform.instance = fakePlatform;
-    Bluey.resetShared();
   });
 
   group('Bluey logger integration', () {
     test('logEvents emits when internal logger logs', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final received = <BlueyLogEvent>[];
@@ -42,7 +41,7 @@ void main() {
     });
 
     test('setLogLevel forwards to internal logger', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.warn);
 
       final received = <BlueyLogEvent>[];
@@ -63,7 +62,7 @@ void main() {
     });
 
     test('dispose() closes the logger; subsequent logs are no-ops', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final received = <BlueyLogEvent>[];
@@ -80,7 +79,7 @@ void main() {
     });
 
     test('logEvents is a broadcast stream with multiple listeners', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       expect(bluey.logEvents.isBroadcast, isTrue);

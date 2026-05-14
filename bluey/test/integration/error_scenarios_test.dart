@@ -23,7 +23,7 @@ void main() {
   group('Error Scenarios', () {
     group('Connection Errors', () {
       test('throws when connecting to unknown device', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final unknownDevice = Device(
           id: UUID('00000000-0000-0000-0000-000000000001'),
@@ -69,7 +69,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -115,7 +115,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.disconnect();
@@ -149,7 +149,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -195,7 +195,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -224,7 +224,7 @@ void main() {
       );
 
       test('throws when notifying to disconnected central', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -263,7 +263,7 @@ void main() {
       test(
         'throws when simulating read request from non-connected central',
         () async {
-          final bluey = Bluey();
+          final bluey = await Bluey.create();
           final server = bluey.server()!;
 
           await server.addService(
@@ -292,7 +292,7 @@ void main() {
       test(
         'throws when simulating write request from non-connected central',
         () async {
-          final bluey = Bluey();
+          final bluey = await Bluey.create();
           final server = bluey.server()!;
 
           await server.addService(
@@ -323,7 +323,7 @@ void main() {
       test('handles Bluetooth being unsupported', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.unsupported);
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final state = await bluey.state;
 
         expect(state, equals(BluetoothState.unsupported));
@@ -334,7 +334,7 @@ void main() {
       test('handles Bluetooth unauthorized state', () async {
         fakePlatform.setBluetoothState(platform.BluetoothState.unauthorized);
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final state = await bluey.state;
 
         expect(state, equals(BluetoothState.unauthorized));
@@ -348,7 +348,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -392,7 +392,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -425,7 +425,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -444,7 +444,7 @@ void main() {
       });
 
       test('state stream continues after Bluetooth state changes', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -470,7 +470,7 @@ void main() {
 
     group('Request/Response Errors', () {
       test('read request fails with error status', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -517,7 +517,7 @@ void main() {
       });
 
       test('write request fails with error status', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -571,7 +571,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
 
         // Rapid connect/disconnect cycles
@@ -594,7 +594,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Multiple scans in sequence
         for (var i = 0; i < 3; i++) {
@@ -612,7 +612,7 @@ void main() {
       });
 
       test('handles device appearing and disappearing', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // First scan - no devices
         var scanner = bluey.scanner();
@@ -680,7 +680,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -722,7 +722,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 

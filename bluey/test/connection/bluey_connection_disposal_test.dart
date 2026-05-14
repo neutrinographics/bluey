@@ -58,7 +58,7 @@ void main() {
         ],
       );
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: TestDeviceIds.device1,
@@ -137,7 +137,7 @@ void main() {
         ],
       );
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: TestDeviceIds.device1,
@@ -212,7 +212,7 @@ void main() {
         ],
       );
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final device = Device(
         id: UUID('00000000-0000-0000-0000-aabbccddee01'),
         address: TestDeviceIds.device1,

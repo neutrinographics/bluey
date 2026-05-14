@@ -23,7 +23,7 @@ void main() {
   group('State Machine', () {
     group('Bluetooth State Transitions', () {
       test('transitions through all Bluetooth states', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -54,7 +54,7 @@ void main() {
       });
 
       test('handles rapid state changes', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final states = <BluetoothState>[];
         final subscription = bluey.stateStream.listen(states.add);
 
@@ -74,7 +74,7 @@ void main() {
       });
 
       test('state getter reflects current state', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
         expect(await bluey.state, equals(BluetoothState.on));
@@ -93,7 +93,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -122,7 +122,7 @@ void main() {
             name: 'Test Device',
           );
 
-          final bluey = Bluey();
+          final bluey = await Bluey.create();
           final device = await scanFirstDevice(bluey);
           final connection = await bluey.connect(device);
 
@@ -171,7 +171,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -198,7 +198,7 @@ void main() {
 
     group('Server State Transitions', () {
       test('transitions idle -> advertising -> connected', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         // Initially not advertising
@@ -224,7 +224,7 @@ void main() {
       });
 
       test('transitions advertising -> stopped', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -245,7 +245,7 @@ void main() {
       });
 
       test('handles central disconnect -> reconnect', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -281,7 +281,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -297,7 +297,7 @@ void main() {
       });
 
       test('can restart advertising after stopping', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -324,7 +324,7 @@ void main() {
       });
 
       test('stop advertising when not advertising is safe', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -344,7 +344,7 @@ void main() {
       });
 
       test('double dispose is safe', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Double dispose should not throw
         await bluey.dispose();
@@ -352,7 +352,7 @@ void main() {
       });
 
       test('server dispose cleans up advertising', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -380,7 +380,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Start scan
         final scanner = bluey.scanner();
@@ -423,7 +423,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -449,7 +449,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -468,7 +468,7 @@ void main() {
       });
 
       test('server state survives service changes', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         // Add service
@@ -502,7 +502,7 @@ void main() {
 
     group('Recovery Scenarios', () {
       test('recovers from Bluetooth turning off and on', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Start with Bluetooth on
         fakePlatform.setBluetoothState(platform.BluetoothState.on);
@@ -534,7 +534,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
 
         // Connect
@@ -557,7 +557,7 @@ void main() {
       });
 
       test('server recovers after all centrals disconnect', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(

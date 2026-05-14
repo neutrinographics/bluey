@@ -16,10 +16,10 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
 
     fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
   });
@@ -85,12 +85,12 @@ void main() {
     late FakeBlueyPlatform androidFake;
     late Bluey androidBluey;
 
-    setUp(() {
+    setUp(() async {
       androidFake = FakeBlueyPlatform(
         capabilities: platform.Capabilities.android,
       );
       platform.BlueyPlatform.instance = androidFake;
-      androidBluey = Bluey();
+      androidBluey = await Bluey.create();
       androidFake.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
     });
 

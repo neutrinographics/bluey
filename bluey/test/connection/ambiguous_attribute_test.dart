@@ -54,7 +54,7 @@ void main() {
         ),
       ],
     );
-    final bluey = Bluey();
+    final bluey = await Bluey.create();
     final device = await scanFirstDevice(bluey);
     final connection = await bluey.connect(device);
     final services = await connection.services();
@@ -215,7 +215,7 @@ void main() {
             ),
           ],
         );
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         // Trigger discovery so the cache is populated.
@@ -251,7 +251,7 @@ void main() {
           ),
         ],
       );
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final device = await scanFirstDevice(bluey);
       final connection = await bluey.connect(device);
       await connection.services();

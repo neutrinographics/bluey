@@ -10,12 +10,11 @@ void main() {
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     BlueyPlatform.instance = fakePlatform;
-    Bluey.resetShared();
   });
 
   group('Bluey native log bridging (I307 B.9)', () {
     test('native PlatformLogEvent surfaces on bluey.logEvents', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final received = <BlueyLogEvent>[];
@@ -50,7 +49,7 @@ void main() {
     });
 
     test('setLogLevel forwards to the platform', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
 
       bluey.setLogLevel(BlueyLogLevel.warn);
       // The forward is fire-and-forget — give the microtask a chance to run.
@@ -67,7 +66,7 @@ void main() {
     });
 
     test('disposing Bluey stops forwarding native events', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final received = <BlueyLogEvent>[];
