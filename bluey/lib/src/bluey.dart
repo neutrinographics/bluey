@@ -112,6 +112,10 @@ class Bluey {
     : _platform = platform.BlueyPlatform.instance,
       _eventBus = BlueyEventBus(),
       _localIdentity = localIdentity {
+    // Seed the cached state synchronously from the platform so the
+    // factory pre-checks (`_requireAdapterOn`) see the adapter's most
+    // recent observation without waiting for the first stream event.
+    _currentState = _mapState(_platform.currentState);
     _stateSubscription = _platform.stateStream.listen(
       (state) {
         _currentState = _mapState(state);
@@ -292,6 +296,28 @@ class Bluey {
     }
   }
 
+  /// Throws a state-mapped exception if the adapter is not currently
+  /// in [BluetoothState.on]. Called by every factory method on this
+  /// class before construction.
+  ///
+  /// Uses the cached [currentState] (not [state]) so the check is
+  /// synchronous — the cached value is kept fresh by the live
+  /// subscription to `_platform.stateStream` established in the
+  /// constructor.
+  void _requireAdapterOn(String operation) {
+    switch (_currentState) {
+      case BluetoothState.on:
+        return;
+      case BluetoothState.off:
+        throw const BluetoothDisabledException();
+      case BluetoothState.unauthorized:
+        throw PermissionDeniedException(const ['Bluetooth']);
+      case BluetoothState.unsupported:
+      case BluetoothState.unknown:
+        throw const BluetoothUnavailableException();
+    }
+  }
+
   /// Request the user to enable Bluetooth.
   ///
   /// Returns true if Bluetooth was enabled, false if user declined.
@@ -339,6 +365,7 @@ class Bluey {
   /// scanner.dispose();
   /// ```
   Scanner scanner() {
+    _requireAdapterOn('scanner');
     return BlueyScanner(_platform, _eventBus);
   }
 
@@ -355,6 +382,7 @@ class Bluey {
   ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(Device device, {Duration? timeout}) async {
+    _requireAdapterOn('connect');
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
@@ -781,6 +809,7 @@ class Bluey {
   /// }
   /// ```
   Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
+    _requireAdapterOn('server');
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }

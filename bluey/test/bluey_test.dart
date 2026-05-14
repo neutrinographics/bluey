@@ -32,6 +32,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   Stream<platform.BluetoothState> get stateStream => _stateController.stream;
 
   @override
+  platform.BluetoothState get currentState => mockState;
+
+  @override
   Future<platform.BluetoothState> getState() async => mockState;
 
   @override
@@ -337,6 +340,16 @@ void main() {
       });
 
       test('currentState returns cached state synchronously', () async {
+        // Use a fresh mock whose initial sync state is `unknown` so we
+        // can observe the "before any observation" baseline. The default
+        // mock seeds `on` for the rest of the suite's happy-path tests;
+        // here we want the cold-start semantics explicitly.
+        await bluey.dispose();
+        mockPlatform = MockBlueyPlatform();
+        mockPlatform.mockState = platform.BluetoothState.unknown;
+        platform.BlueyPlatform.instance = mockPlatform;
+        bluey = Bluey();
+
         // Initially unknown before platform reports
         expect(bluey.currentState, equals(BluetoothState.unknown));
 
