@@ -304,7 +304,7 @@ class Bluey {
   /// synchronous — the cached value is kept fresh by the live
   /// subscription to `_platform.stateStream` established in the
   /// constructor.
-  void _requireAdapterOn(String operation) {
+  void _requireAdapterOn() {
     switch (_currentState) {
       case BluetoothState.on:
         return;
@@ -365,7 +365,7 @@ class Bluey {
   /// scanner.dispose();
   /// ```
   Scanner scanner() {
-    _requireAdapterOn('scanner');
+    _requireAdapterOn();
     return BlueyScanner(_platform, _eventBus);
   }
 
@@ -382,7 +382,7 @@ class Bluey {
   ///
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(Device device, {Duration? timeout}) async {
-    _requireAdapterOn('connect');
+    _requireAdapterOn();
     final config = platform.PlatformConnectConfig(
       timeoutMs: timeout?.inMilliseconds,
       mtu: null,
@@ -809,7 +809,7 @@ class Bluey {
   /// }
   /// ```
   Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)}) {
-    _requireAdapterOn('server');
+    _requireAdapterOn();
     if (!_platform.capabilities.canAdvertise) {
       return null;
     }
