@@ -5,9 +5,11 @@ import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
+import 'advertising_state.dart';
 import 'gatt_request.dart';
 import 'hosted_gatt.dart';
 
+export 'advertising_state.dart';
 export 'gatt_request.dart';
 export 'hosted_gatt.dart';
 
@@ -76,7 +78,16 @@ abstract class Server {
   /// control service.
   ServerId get serverId;
 
-  /// Whether advertising is currently active.
+  /// Current advertising state. Replays via [advertisingStateChanges].
+  AdvertisingState get advertisingState;
+
+  /// Advertising state transitions, replayed on subscribe (per-subscriber
+  /// `Stream.multi` pattern). Terminal: emits
+  /// [AdvertisingState.invalidated] then closes on adapter invalidation.
+  Stream<AdvertisingState> get advertisingStateChanges;
+
+  /// Whether advertising is currently active. Derived from
+  /// [advertisingState]. Kept for ergonomic convenience.
   bool get isAdvertising;
 
   /// Stream of connected client devices.
