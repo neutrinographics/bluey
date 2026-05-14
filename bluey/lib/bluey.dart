@@ -19,6 +19,7 @@ export 'src/discovery/scanner.dart';
 export 'src/discovery/device.dart';
 export 'src/discovery/advertisement.dart';
 export 'src/discovery/scan_result.dart';
+export 'src/discovery/scan_state.dart';
 export 'src/discovery/scan.dart';
 
 // Connection bounded context

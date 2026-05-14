@@ -46,6 +46,20 @@ final class ScanStartedEvent extends BlueyEvent {
   }
 }
 
+/// Emitted when [Scanner.scan] is called and the platform-side start
+/// is now in flight. Followed by [ScanStartedEvent] when the platform
+/// confirms (or a failure if the platform rejects).
+final class ScanStartingEvent extends BlueyEvent {
+  final List<UUID>? serviceFilter;
+  final Duration? timeout;
+
+  ScanStartingEvent({
+    this.serviceFilter,
+    this.timeout,
+    super.source,
+  });
+}
+
 /// Device discovered during scan.
 final class DeviceDiscoveredEvent extends BlueyEvent {
   final UUID deviceId;
@@ -78,6 +92,14 @@ final class ScanStoppedEvent extends BlueyEvent {
     final r = reason != null ? ' ($reason)' : '';
     return '[Scan] Stopped$r';
   }
+}
+
+/// Emitted when [Scanner.stop] is called (or the consumer cancelled
+/// the subscription, or a timeout fired) and the platform-side stop
+/// is now in flight. Followed by [ScanStoppedEvent] when the platform
+/// confirms.
+final class ScanStoppingEvent extends BlueyEvent {
+  ScanStoppingEvent({super.source});
 }
 
 /// Connection attempt started.
