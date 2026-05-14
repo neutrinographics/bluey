@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -187,6 +189,36 @@ void main() {
       expect(r2.first.tx, equals(android.txPhy));
       await s1.cancel();
       await s2.cancel();
+    });
+  });
+
+  group('Connection.stateChanges (Convention 3 — terminal signal)', () {
+    test(
+      'emits ConnectionState.invalidated then closes on adapter invalidation',
+      () async {
+        final connection = await establish();
+        final received = <ConnectionState>[];
+        final completer = Completer<void>();
+
+        connection.stateChanges.listen(
+          received.add,
+          onDone: completer.complete,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        fakePlatform.setState(platform.BluetoothState.off);
+        await completer.future;
+
+        expect(received.last, equals(ConnectionState.invalidated));
+      },
+    );
+
+    test('connection.state returns invalidated after adapter invalidation', () async {
+      final connection = await establish();
+      fakePlatform.setState(platform.BluetoothState.off);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(connection.state, equals(ConnectionState.invalidated));
     });
   });
 }

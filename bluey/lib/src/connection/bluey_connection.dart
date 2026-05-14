@@ -358,8 +358,14 @@ class BlueyConnection implements Connection {
       }
     }
 
-    // Close every StreamController owned by this connection.
-    _stateController.close();
+    // Convention 3 — emit terminal enum value before closing so
+    // subscribers observe the transition cleanly. Set _state first so
+    // the sync getter (Convention 6) agrees with the last signal.
+    _state = ConnectionState.invalidated;
+    if (!_stateController.isClosed) {
+      _stateController.add(ConnectionState.invalidated);
+      _stateController.close();
+    }
     _bondStateController.close();
     _phyController.close();
     _servicesChangesController.close();
