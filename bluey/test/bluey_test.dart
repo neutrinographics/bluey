@@ -377,50 +377,6 @@ void main() {
       });
     });
 
-    group('ensureReady', () {
-      test('succeeds when Bluetooth is on', () async {
-        mockPlatform.mockState = platform.BluetoothState.on;
-        await expectLater(bluey.ensureReady(), completes);
-      });
-
-      test('throws BluetoothUnavailableException when unsupported', () async {
-        mockPlatform.mockState = platform.BluetoothState.unsupported;
-        await expectLater(
-          bluey.ensureReady(),
-          throwsA(isA<BluetoothUnavailableException>()),
-        );
-      });
-
-      test('throws PermissionDeniedException when unauthorized', () async {
-        mockPlatform.mockState = platform.BluetoothState.unauthorized;
-        await expectLater(
-          bluey.ensureReady(),
-          throwsA(isA<PermissionDeniedException>()),
-        );
-      });
-
-      test(
-        'throws BluetoothDisabledException when off and cannot enable',
-        () async {
-          mockPlatform.mockState = platform.BluetoothState.off;
-          mockPlatform.requestEnableResult = false;
-          await expectLater(
-            bluey.ensureReady(),
-            throwsA(isA<BluetoothDisabledException>()),
-          );
-        },
-      );
-
-      test('succeeds when off but can enable', () async {
-        mockPlatform.mockState = platform.BluetoothState.off;
-        mockPlatform.requestEnableResult = true;
-        // After requestEnable succeeds, we need to simulate state change
-        // In real implementation this would happen, but our mock is simple
-        // So this test verifies requestEnable is called
-        await expectLater(bluey.ensureReady(), completes);
-      });
-    });
-
     group('scanner', () {
       test('scanner() returns a Scanner', () {
         final scanner = bluey.scanner();

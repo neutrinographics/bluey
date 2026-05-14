@@ -272,30 +272,6 @@ class Bluey {
     );
   }
 
-  /// Ensure Bluetooth is ready to use.
-  ///
-  /// Throws [BluetoothUnavailableException] if Bluetooth is not supported.
-  /// Throws [PermissionDeniedException] if permissions are not granted.
-  /// Throws [BluetoothDisabledException] if Bluetooth is off and cannot be enabled.
-  Future<void> ensureReady() async {
-    final currentState = await state;
-    switch (currentState) {
-      case BluetoothState.on:
-        return;
-      case BluetoothState.unsupported:
-        throw const BluetoothUnavailableException();
-      case BluetoothState.unauthorized:
-        throw PermissionDeniedException(['Bluetooth']);
-      case BluetoothState.off:
-        final enabled = await requestEnable();
-        if (!enabled) {
-          throw const BluetoothDisabledException();
-        }
-      case BluetoothState.unknown:
-        throw const BluetoothUnavailableException();
-    }
-  }
-
   /// Throws a state-mapped exception if the adapter is not currently
   /// in [BluetoothState.on]. Called by every factory method on this
   /// class before construction.
