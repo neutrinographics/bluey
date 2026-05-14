@@ -804,6 +804,7 @@ class BlueyConnection implements Connection {
     await _platformBondStateSubscription?.cancel();
     await _platformPhySubscription?.cancel();
     await _platformServiceChangesSubscription?.cancel();
+    await _adapterStateSubscription?.cancel();
     await _stateController.close();
     await _bondStateController.close();
     await _phyController.close();
