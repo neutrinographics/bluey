@@ -51,6 +51,14 @@ class BlueyScanner implements Scanner {
   /// silent hang.
   final List<StreamController<ScanResult>> _activeScanControllers = [];
 
+  /// Arguments of the currently-active scan, captured on `scan()` and
+  /// read by `_setState` so the emitted `ScanStartingEvent` and
+  /// `ScanStartedEvent` carry the same `serviceFilter`/`timeout` payload
+  /// as the direct emits they replaced. Cleared on transition back to
+  /// `stopped` / `invalidated`.
+  List<UUID>? _activeServiceFilter;
+  Duration? _activeTimeout;
+
   BlueyScanner(this._platform, this._eventBus) {
     // I333: mirror BlueyServer / BlueyConnection — invalidate on any
     // non-`on` adapter state. Map the platform-interface enum to the
@@ -173,19 +181,30 @@ class BlueyScanner implements Scanner {
     }
     switch (newState) {
       case ScanState.starting:
-        _eventBus.emit(ScanStartingEvent(source: 'BlueyScanner'));
+        _eventBus.emit(ScanStartingEvent(
+          serviceFilter: _activeServiceFilter,
+          timeout: _activeTimeout,
+          source: 'BlueyScanner',
+        ));
       case ScanState.scanning:
-        _eventBus.emit(ScanStartedEvent(source: 'BlueyScanner'));
+        _eventBus.emit(ScanStartedEvent(
+          serviceFilter: _activeServiceFilter,
+          timeout: _activeTimeout,
+          source: 'BlueyScanner',
+        ));
       case ScanState.stopping:
         _eventBus.emit(ScanStoppingEvent(source: 'BlueyScanner'));
       case ScanState.stopped:
         if (old != ScanState.stopped) {
           _eventBus.emit(ScanStoppedEvent(source: 'BlueyScanner'));
         }
+        _activeServiceFilter = null;
+        _activeTimeout = null;
       case ScanState.invalidated:
         // No event — the stateChanges terminal close and I333 instance
         // invalidation are sufficient signals.
-        break;
+        _activeServiceFilter = null;
+        _activeTimeout = null;
     }
   }
 
@@ -196,6 +215,12 @@ class BlueyScanner implements Scanner {
       serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
       timeoutMs: timeout?.inMilliseconds,
     );
+
+    // Stash the scan args so `_setState` can ride them through to the
+    // emitted ScanStartingEvent / ScanStartedEvent. Cleared when we
+    // transition back to stopped/invalidated.
+    _activeServiceFilter = services;
+    _activeTimeout = timeout;
 
     // stopped -> starting. Emits ScanStartingEvent via _setState.
     _setState(ScanState.starting);

@@ -33,6 +33,14 @@ class BlueyServer implements Server {
   // from `_advertisingState == AdvertisingState.advertising`.
   AdvertisingState _advertisingState = AdvertisingState.idle;
 
+  /// Arguments of the currently-active advertisement, captured on
+  /// `startAdvertising` and read by `_setAdvertisingState` so the
+  /// emitted `AdvertisingStartedEvent` carries the same `name`/`services`
+  /// payload as the direct emit it replaced. Cleared on transition back
+  /// to `idle` / `invalidated`.
+  String? _activeAdvertisingName;
+  List<UUID>? _activeAdvertisingServices;
+
   /// Broadcast controller for advertising-state-change deltas.
   /// `advertisingStateChanges` wraps this in a `Stream.multi` per the
   /// Task 6/7/11 convention so every new subscriber gets the current
@@ -333,17 +341,24 @@ class BlueyServer implements Server {
       case AdvertisingState.starting:
         _eventBus.emit(AdvertisingStartingEvent(source: 'BlueyServer'));
       case AdvertisingState.advertising:
-        _eventBus.emit(AdvertisingStartedEvent(source: 'BlueyServer'));
+        _eventBus.emit(AdvertisingStartedEvent(
+          name: _activeAdvertisingName,
+          services: _activeAdvertisingServices,
+          source: 'BlueyServer',
+        ));
       case AdvertisingState.stopping:
         _eventBus.emit(AdvertisingStoppingEvent(source: 'BlueyServer'));
       case AdvertisingState.idle:
         if (old != AdvertisingState.idle) {
           _eventBus.emit(AdvertisingStoppedEvent(source: 'BlueyServer'));
         }
+        _activeAdvertisingName = null;
+        _activeAdvertisingServices = null;
       case AdvertisingState.invalidated:
         // No event — the advertisingStateChanges terminal close and I333
         // instance invalidation are sufficient signals.
-        break;
+        _activeAdvertisingName = null;
+        _activeAdvertisingServices = null;
     }
   }
 
@@ -531,6 +546,12 @@ class BlueyServer implements Server {
       timeoutMs: timeout?.inMilliseconds,
       mode: mode == null ? null : _mapAdvertiseModeToPlatform(mode),
     );
+
+    // Stash the advertise args so `_setAdvertisingState` can ride them
+    // through to the emitted AdvertisingStartedEvent. Cleared when we
+    // transition back to idle/invalidated.
+    _activeAdvertisingName = name;
+    _activeAdvertisingServices = services;
 
     // idle -> starting. Emits AdvertisingStartingEvent via
     // _setAdvertisingState.

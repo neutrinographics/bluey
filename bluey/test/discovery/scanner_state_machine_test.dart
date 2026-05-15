@@ -104,5 +104,34 @@ void main() {
       expect(events.whereType<ScanStoppingEvent>().length, equals(1));
       expect(events.whereType<ScanStoppedEvent>().length, equals(1));
     });
+
+    // Regression guard (PR #32 Codex P2): the transition helper must
+    // carry the active scan's `services` filter and `timeout` through
+    // to ScanStartingEvent and ScanStartedEvent. Without this, consumers
+    // of `bluey.events` lose audit information about which filter / cap
+    // was applied to a scan.
+    test('ScanStarting/Started events carry serviceFilter and timeout',
+        () async {
+      final scanner = bluey.scanner();
+      final events = <BlueyEvent>[];
+      bluey.events.listen(events.add);
+
+      final filter = [UUID.short(0x180F)];
+      const timeout = Duration(seconds: 30);
+
+      final scanSub =
+          scanner.scan(services: filter, timeout: timeout).listen((_) {});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await scanSub.cancel();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final starting = events.whereType<ScanStartingEvent>().single;
+      expect(starting.serviceFilter, equals(filter));
+      expect(starting.timeout, equals(timeout));
+
+      final started = events.whereType<ScanStartedEvent>().single;
+      expect(started.serviceFilter, equals(filter));
+      expect(started.timeout, equals(timeout));
+    });
   });
 }
