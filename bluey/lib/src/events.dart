@@ -46,6 +46,30 @@ final class ScanStartedEvent extends BlueyEvent {
   }
 }
 
+/// Emitted when [Scanner.scan] is called and the platform-side start
+/// is now in flight. Followed by [ScanStartedEvent] when the platform
+/// confirms (or a failure if the platform rejects).
+final class ScanStartingEvent extends BlueyEvent {
+  final List<UUID>? serviceFilter;
+  final Duration? timeout;
+
+  ScanStartingEvent({
+    this.serviceFilter,
+    this.timeout,
+    super.source,
+  });
+
+  @override
+  String toString() {
+    final filter =
+        serviceFilter?.isNotEmpty == true
+            ? ' filter=${serviceFilter!.map((u) => u.toShortString()).join(', ')}'
+            : '';
+    final to = timeout != null ? ' timeout=${timeout!.inSeconds}s' : '';
+    return '[Scan] Starting$filter$to';
+  }
+}
+
 /// Device discovered during scan.
 final class DeviceDiscoveredEvent extends BlueyEvent {
   final UUID deviceId;
@@ -78,6 +102,17 @@ final class ScanStoppedEvent extends BlueyEvent {
     final r = reason != null ? ' ($reason)' : '';
     return '[Scan] Stopped$r';
   }
+}
+
+/// Emitted when [Scanner.stop] is called (or the consumer cancelled
+/// the subscription, or a timeout fired) and the platform-side stop
+/// is now in flight. Followed by [ScanStoppedEvent] when the platform
+/// confirms.
+final class ScanStoppingEvent extends BlueyEvent {
+  ScanStoppingEvent({super.source});
+
+  @override
+  String toString() => '[Scan] Stopping';
 }
 
 /// Connection attempt started.
@@ -251,12 +286,32 @@ final class AdvertisingStartedEvent extends BlueyEvent {
   }
 }
 
+/// Emitted when [Server.startAdvertising] is called and the
+/// platform-side start is now in flight. Followed by
+/// [AdvertisingStartedEvent] when the platform confirms.
+final class AdvertisingStartingEvent extends BlueyEvent {
+  AdvertisingStartingEvent({super.source});
+
+  @override
+  String toString() => '[Server] Advertising starting';
+}
+
 /// Advertising stopped.
 final class AdvertisingStoppedEvent extends BlueyEvent {
   AdvertisingStoppedEvent({super.source});
 
   @override
   String toString() => '[Server] Advertising stopped';
+}
+
+/// Emitted when [Server.stopAdvertising] is called and the
+/// platform-side stop is now in flight. Followed by
+/// [AdvertisingStoppedEvent] when the platform confirms.
+final class AdvertisingStoppingEvent extends BlueyEvent {
+  AdvertisingStoppingEvent({super.source});
+
+  @override
+  String toString() => '[Server] Advertising stopping';
 }
 
 /// Client connected to server.

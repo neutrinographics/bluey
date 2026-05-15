@@ -4,10 +4,32 @@ title: `Bluey.stateStream` does not replay current value on subscription, leavin
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-05-14
+status: fixed
+last_verified: 2026-05-15
 related: [I333]
 ---
+
+## Resolution (2026-05-15)
+
+Closed by the stream-conventions sweep on branch
+`feature/stream-conventions`. Per Convention 2 of
+`docs/superpowers/specs/2026-05-15-stream-conventions-design.md`,
+every Type A stream in bluey now uses a `Stream.multi(isBroadcast: true)`
+per-subscriber factory pattern that injects the cached current value
+to each new subscriber before bridging the underlying broadcast
+controller. (The plan originally proposed `StreamController.broadcast(onListen:)`,
+but that only fires on the 0→1 subscriber transition — `Stream.multi`
+is the correct primitive for per-subscriber replay.)
+
+The convention applies uniformly across `Bluey.stateStream`,
+`Connection.stateChanges`, `Connection.servicesChanges`,
+`AndroidConnectionExtensions.bondStateChanges`,
+`AndroidConnectionExtensions.phyChanges`, plus the new
+`Scanner.stateChanges` and `Server.advertisingStateChanges`.
+
+New subscribers receive the current value as their first emission;
+the consumer-side `onListen` workaround in `gossip_bluey` can be
+removed.
 
 ## Symptom
 

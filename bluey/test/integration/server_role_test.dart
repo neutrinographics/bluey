@@ -22,7 +22,7 @@ void main() {
   group('Server Role', () {
     group('Service Management', () {
       test('adds a service to the GATT server', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server();
         expect(server, isNotNull);
 
@@ -50,7 +50,7 @@ void main() {
       });
 
       test('adds multiple services', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -74,7 +74,7 @@ void main() {
       });
 
       test('adds service with multiple characteristics', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final service = HostedService(
@@ -103,7 +103,7 @@ void main() {
       });
 
       test('adds service with descriptors', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final service = HostedService(
@@ -137,7 +137,7 @@ void main() {
       });
 
       test('removes a service', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final serviceUuid = UUID('0000180f-0000-1000-8000-00805f9b34fb');
@@ -161,7 +161,7 @@ void main() {
 
     group('Advertising', () {
       test('starts advertising', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         // Act
@@ -177,7 +177,7 @@ void main() {
       });
 
       test('starts advertising with service UUIDs', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final services = [
@@ -197,7 +197,7 @@ void main() {
       });
 
       test('starts advertising with manufacturer data', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(
@@ -220,7 +220,7 @@ void main() {
       });
 
       test('stops advertising', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -238,7 +238,7 @@ void main() {
       });
 
       test('isAdvertising reflects current state', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         expect(server.isAdvertising, isFalse);
@@ -256,7 +256,7 @@ void main() {
 
     group('Client Connections', () {
       test('receives central connection event', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -282,7 +282,7 @@ void main() {
       });
 
       test('tracks connected centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -304,7 +304,7 @@ void main() {
       });
 
       test('handles central disconnection', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -330,7 +330,7 @@ void main() {
       });
 
       test('handles multiple central connections', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -361,7 +361,7 @@ void main() {
 
     group('Notifications', () {
       test('sends notification to all subscribed centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final charUuid = UUID('00002a37-0000-1000-8000-00805f9b34fb');
@@ -393,7 +393,7 @@ void main() {
       });
 
       test('sends notification to specific central', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         final charUuid = UUID('00002a37-0000-1000-8000-00805f9b34fb');
@@ -432,7 +432,7 @@ void main() {
 
     group('Server Lifecycle', () {
       test('dispose stops advertising', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -448,7 +448,7 @@ void main() {
       });
 
       test('dispose disconnects all centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.startAdvertising(name: 'Test Device');
@@ -475,7 +475,7 @@ void main() {
       });
 
       test('dispose clears local services', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(

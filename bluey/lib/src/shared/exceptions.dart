@@ -416,16 +416,16 @@ class NotABlueyPeerException extends BlueyException {
 ///
 /// The lifecycle protocol requires both sides of a connection to
 /// announce their stable [ServerId]; a [Bluey] without a configured
-/// identity cannot participate. Construct `Bluey(localIdentity: ...)`
-/// to fix.
+/// identity cannot participate. Construct
+/// `Bluey.create(localIdentity: ...)` to fix.
 class LocalIdentityRequiredException extends BlueyException {
   const LocalIdentityRequiredException(String operation)
     : super(
         'Bluey was constructed without a localIdentity but $operation '
         'requires one.',
         action:
-            'Construct Bluey(localIdentity: ServerId.generate()) — or a '
-            'persisted ServerId — and reuse it across sessions.',
+            'Construct Bluey.create(localIdentity: ServerId.generate()) — '
+            'or a persisted ServerId — and reuse it across sessions.',
       );
 }
 

@@ -50,7 +50,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -91,7 +91,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -142,7 +142,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -176,7 +176,7 @@ void main() {
           rssi: -65, // Medium signal
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final scanner = bluey.scanner();
         final results = <ScanResult>[];
@@ -214,7 +214,7 @@ void main() {
           rssi: -35,
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final scanner = bluey.scanner();
         final results = <ScanResult>[];
@@ -266,7 +266,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -324,7 +324,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -359,7 +359,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -408,7 +408,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -465,7 +465,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -520,7 +520,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -562,7 +562,7 @@ void main() {
           name: 'Connected Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Connect to first device
         final device1 = await scanFirstDevice(bluey);
@@ -604,7 +604,7 @@ void main() {
           name: 'Device 2',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Discover devices
         final scanner = bluey.scanner();
@@ -642,7 +642,7 @@ void main() {
           rssi: -50,
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final scanner = bluey.scanner();
         final results = <ScanResult>[];
@@ -671,7 +671,7 @@ void main() {
           name: 'Device C',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         final scanner = bluey.scanner();
         final deviceIds = <String>{};
@@ -716,7 +716,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -763,7 +763,7 @@ void main() {
             ],
           );
 
-          final bluey = Bluey();
+          final bluey = await Bluey.create();
           final device = await scanFirstDevice(bluey);
           final connection = await bluey.connect(device);
           final services = await connection.services();
@@ -792,7 +792,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -823,7 +823,7 @@ void main() {
           name: 'Test Device',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         await connection.services(); // promote linked → ready
@@ -858,7 +858,7 @@ void main() {
           manufacturerData: [0x01, 0x02],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // First scan
         final scanner1 = bluey.scanner();
@@ -887,7 +887,7 @@ void main() {
       });
 
       test('tracks RSSI changes over time', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Simulate device moving closer
         final rssiValues = [-80, -70, -60, -50, -40];
@@ -944,7 +944,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -996,7 +996,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -1049,7 +1049,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -1111,7 +1111,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -1166,7 +1166,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
         final services = await connection.services();
@@ -1201,7 +1201,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -1227,7 +1227,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 

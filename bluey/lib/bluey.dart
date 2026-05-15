@@ -19,6 +19,7 @@ export 'src/discovery/scanner.dart';
 export 'src/discovery/device.dart';
 export 'src/discovery/advertisement.dart';
 export 'src/discovery/scan_result.dart';
+export 'src/discovery/scan_state.dart';
 export 'src/discovery/scan.dart';
 
 // Connection bounded context
@@ -40,6 +41,7 @@ export 'src/gatt_client/well_known_uuids.dart';
 export 'src/gatt_server/server.dart';
 export 'src/gatt_server/hosted_gatt.dart';
 export 'src/gatt_server/gatt_request.dart';
+export 'src/gatt_server/advertising_state.dart';
 
 // Platform bounded context
 export 'src/platform/bluetooth_state.dart';

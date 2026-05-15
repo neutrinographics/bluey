@@ -116,6 +116,11 @@ class _BlueyPeerConnection implements PeerConnection {
           _stateSub = null;
         }
       },
+      // Convention 3 — stateChanges can forward platform-level errors from
+      // connectionStateStream. Invalidation itself arrives as a data event
+      // (ConnectionState.invalidated), not an error, so there is nothing to
+      // react to here. Swallow to avoid "Unhandled error" warnings.
+      onError: (_) {},
       onDone: () {
         _lifecycle.stop();
         _stateSub = null;

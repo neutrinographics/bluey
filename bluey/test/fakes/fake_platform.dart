@@ -43,6 +43,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   BluetoothState _state = BluetoothState.on;
   final Capabilities _capabilities;
 
+  /// Test seam — when true, [setBluetoothState] / [setState] will NOT
+  /// push events onto [stateStream] (the cached `_state` is still
+  /// updated). Used by [Bluey.create] tests to simulate platforms that
+  /// never publish an initial state.
+  bool suppressInitialStateEmission = false;
+
   // === Structured logging (I307) ===
   final StreamController<PlatformLogEvent> _logEventsController =
       StreamController<PlatformLogEvent>.broadcast();
@@ -482,7 +488,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
-    _stateController.add(state);
+    if (!suppressInitialStateEmission) {
+      _stateController.add(state);
+    }
   }
 
   /// Test seam — update the simulated adapter state and broadcast.
@@ -736,6 +744,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _serviceChangesController.add(deviceId);
   }
 
+  /// Whether the fake platform is currently scanning (central role).
+  /// Test seam — flipped to true on the first event delivery inside [scan]
+  /// and back to false when [stopScan] is called.
+  bool _isScanningPlatform = false;
+
+  /// Whether the fake platform scan is currently active.
+  /// Exposed as a test seam so tests can assert that cancelling the
+  /// consumer's subscription stops the radio (Convention 5 / I335).
+  bool get isScanning => _isScanningPlatform;
+
   /// Gets whether we're currently advertising.
   bool get isAdvertising => _isAdvertising;
 
@@ -767,7 +785,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Stream<BluetoothState> get stateStream => _stateController.stream;
 
   @override
-  BluetoothState get currentState => _state;
+  BluetoothState get currentState =>
+      suppressInitialStateEmission ? BluetoothState.unknown : _state;
 
   @override
   Future<BluetoothState> getState() async => _state;
@@ -790,6 +809,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
     lastScanConfig = config;
+    _isScanningPlatform = true;
     // Create a new controller for each scan to avoid "closed stream" issues
     final scanController = StreamController<PlatformDevice>.broadcast();
 
@@ -814,7 +834,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
-    // No-op - scanning is passive in fake
+    _isScanningPlatform = false;
   }
 
   @override

@@ -20,7 +20,6 @@ void main() {
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    Bluey.resetShared();
 
     // A device with a couple of services so service discovery has
     // something to resolve.
@@ -43,7 +42,7 @@ void main() {
 
   group('Log integration: connect → services → disconnect', () {
     test('emits the expected log sequence at trace level', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final events = <BlueyLogEvent>[];
@@ -87,7 +86,7 @@ void main() {
     });
 
     test('warn level filters out the happy-path info events', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.warn);
 
       final events = <BlueyLogEvent>[];
@@ -118,7 +117,7 @@ void main() {
     });
 
     test('multiple subscribers each receive the same events', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       bluey.setLogLevel(BlueyLogLevel.trace);
 
       final a = <BlueyLogEvent>[];

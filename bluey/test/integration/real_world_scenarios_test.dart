@@ -69,7 +69,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Scan for heart rate monitors only
         final scanner = bluey.scanner();
@@ -127,7 +127,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -169,7 +169,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -266,7 +266,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         final connection = await bluey.connect(device);
 
@@ -358,7 +358,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -434,7 +434,7 @@ void main() {
           },
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -483,7 +483,7 @@ void main() {
           ],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
         await bluey.connect(device);
 
@@ -523,7 +523,7 @@ void main() {
 
     group('Peripheral Server', () {
       test('acts as a custom BLE peripheral', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         // Create a custom service
@@ -573,7 +573,7 @@ void main() {
       });
 
       test('handles read requests from central', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abd';
@@ -613,7 +613,7 @@ void main() {
       });
 
       test('sends notifications to connected centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         const charUuid = '12345678-1234-1234-1234-123456789abe';
@@ -670,7 +670,7 @@ void main() {
           serviceUuids: ['00001810-0000-1000-8000-00805f9b34fb'],
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
 
         // Discover all devices
         final scanner = bluey.scanner();

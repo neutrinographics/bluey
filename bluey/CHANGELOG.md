@@ -124,7 +124,7 @@
 - New `Bluey.setLogLevel(BlueyLogLevel level)` — filters Dart-side and pushes the filter to native sides so no Pigeon traffic is incurred for filtered events. Default `info`.
 - New types: `BlueyLogEvent` (timestamp / level / context / message / data / errorCode), `BlueyLogLevel { trace, debug, info, warn, error }`.
 - All internal `dev.log` calls replaced; new emissions added at meaningful points (state transitions, op-queue events, lifecycle activity, errors).
-- Bootstrap caveat: events emitted during `Bluey()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
+- Bootstrap caveat: events emitted during `Bluey.create()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
 
 ## 0.2.0
 

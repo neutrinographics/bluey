@@ -76,7 +76,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 
 ### Key Design Decisions
 
-- **No singletons** - explicit `Bluey()` instance with lifecycle via `dispose()`
+- **No singletons** - explicit `await Bluey.create()` instance with lifecycle via `dispose()`
 - **Streams over callbacks** - all async events use Dart Streams
 - **Immutable data, mutable connections** - Device/Advertisement are snapshots; Connection state is observable
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
@@ -112,7 +112,7 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - Levels: `trace`, `debug`, `info`, `warn`, `error`.
 - Context naming convention: `bluey`, `bluey.connection`, `bluey.connection.lifecycle`, `bluey.server`, `bluey.server.lifecycle`, `bluey.peer`, `bluey.peer.discovery`, `bluey.android.{plugin,gatt_server,gatt_queue,advertiser}`, `bluey.ios.{plugin,central,peripheral,op_slot}`.
 - Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
-- Bootstrap caveat: events emitted during `Bluey()` construction are dropped if no listener has subscribed yet (broadcast stream semantics).
+- Bootstrap caveat: events emitted during `Bluey.create()` construction are dropped if no listener has subscribed yet (broadcast stream semantics). Subscribe immediately after `create()` resolves to start capturing events.
 
 ### Ubiquitous Language
 
