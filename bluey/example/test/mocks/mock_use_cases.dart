@@ -2,7 +2,6 @@ import 'package:mocktail/mocktail.dart';
 
 // Scanner Use Cases
 import 'package:bluey_example/features/scanner/application/scan_for_devices.dart';
-import 'package:bluey_example/features/scanner/application/stop_scan.dart';
 import 'package:bluey_example/features/scanner/application/get_bluetooth_state.dart';
 import 'package:bluey_example/features/scanner/application/request_permissions.dart';
 import 'package:bluey_example/features/scanner/application/request_enable.dart';
@@ -38,8 +37,6 @@ import 'package:bluey_example/features/server/infrastructure/server_identity_sto
 
 // Scanner Mocks
 class MockScanForDevices extends Mock implements ScanForDevices {}
-
-class MockStopScan extends Mock implements StopScan {}
 
 class MockGetBluetoothState extends Mock implements GetBluetoothState {}
 

@@ -12,9 +12,6 @@ abstract class ScannerRepository {
   /// Returns a stream of discovered scan results.
   Stream<ScanResult> scan({Duration? timeout});
 
-  /// Stops the current scan.
-  Future<void> stopScan();
-
   /// Requests Bluetooth permissions from the user.
   /// Returns true if permission was granted.
   Future<bool> authorize();

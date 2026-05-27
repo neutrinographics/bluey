@@ -3,9 +3,14 @@ import 'package:bluey/bluey.dart';
 import '../domain/scanner_repository.dart';
 
 /// Implementation of [ScannerRepository] using the Bluey library.
+///
+/// Note: `scan()` returns the platform-backed stream directly. Consumers
+/// stop the radio by cancelling their subscription — the `Scanner.scan()`
+/// stream is wired with `onCancel: () => stop()` in bluey since PR #32
+/// (Convention 5 of the stream-conventions design). No explicit stop()
+/// method is needed.
 class BlueyScannerRepository implements ScannerRepository {
   final Bluey _bluey;
-  Scanner? _scanner;
 
   BlueyScannerRepository(this._bluey);
 
@@ -17,30 +22,15 @@ class BlueyScannerRepository implements ScannerRepository {
 
   @override
   Stream<ScanResult> scan({Duration? timeout}) {
-    _scanner?.dispose();
-    _scanner = _bluey.scanner();
-    return _scanner!.scan(timeout: timeout);
+    return _bluey.scanner().scan(timeout: timeout);
   }
 
   @override
-  Future<void> stopScan() async {
-    await _scanner?.stop();
-    _scanner?.dispose();
-    _scanner = null;
-  }
+  Future<bool> authorize() => _bluey.authorize();
 
   @override
-  Future<bool> authorize() async {
-    return await _bluey.authorize();
-  }
+  Future<bool> requestEnable() => _bluey.requestEnable();
 
   @override
-  Future<bool> requestEnable() async {
-    return await _bluey.requestEnable();
-  }
-
-  @override
-  Future<void> openSettings() async {
-    await _bluey.openSettings();
-  }
+  Future<void> openSettings() => _bluey.openSettings();
 }
