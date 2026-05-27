@@ -10,7 +10,6 @@ import '../../../shared/domain/uuid_names.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../../connection/presentation/connection_screen.dart';
 import '../application/scan_for_devices.dart';
-import '../application/stop_scan.dart';
 import '../application/get_bluetooth_state.dart';
 import '../application/request_permissions.dart';
 import '../application/request_enable.dart';
@@ -69,10 +68,10 @@ class ScannerScreen extends StatelessWidget {
       create:
           (context) => ScannerCubit(
             scanForDevices: getIt<ScanForDevices>(),
-            stopScan: getIt<StopScan>(),
             getBluetoothState: getIt<GetBluetoothState>(),
             requestPermissions: getIt<RequestPermissions>(),
             requestEnable: getIt<RequestEnable>(),
+            bluey: getIt<Bluey>(),
           )..initialize(),
       child: const _ScannerView(),
     );
