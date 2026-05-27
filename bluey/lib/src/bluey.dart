@@ -171,6 +171,14 @@ class Bluey {
   /// Platform capabilities.
   platform.Capabilities get capabilities => _platform.capabilities;
 
+  /// The stable local identity bound to this instance.
+  ///
+  /// Used by server advertising, peer-protocol upgrades, and peer
+  /// discovery. Null when [Bluey.create] was called without a
+  /// [localIdentity] argument (raw mode — peer-protocol operations will
+  /// throw [LocalIdentityRequiredException]).
+  ServerId? get localIdentity => _localIdentity;
+
   /// Configure the Bluey plugin behavior.
   ///
   /// Call this early in your app lifecycle (e.g., in `main()` before
