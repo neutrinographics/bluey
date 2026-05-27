@@ -42,6 +42,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
   final ObserveWriteRequests _observeWriteRequests;
   final GetServer _getServer;
   final ServerIdentityStorage _identityStorage;
+  final Bluey _bluey;
 
   final StressServiceHandler _stressHandler = StressServiceHandler();
 
@@ -50,6 +51,8 @@ class ServerCubit extends Cubit<ServerScreenState> {
   StreamSubscription<String>? _disconnectionSubscription;
   StreamSubscription<ReadRequest>? _readRequestSubscription;
   StreamSubscription<WriteRequest>? _writeRequestSubscription;
+  StreamSubscription<AdvertisingState>? _advertisingStateSubscription;
+  StreamSubscription<BlueyEvent>? _eventsSubscription;
 
   // Demo configuration
   static const advertisedName = 'Bluey Demo';
@@ -76,6 +79,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
     required ObserveWriteRequests observeWriteRequests,
     required GetServer getServer,
     required ServerIdentityStorage identityStorage,
+    required Bluey bluey,
   }) : _checkServerSupport = checkServerSupport,
        _setServerIdentity = setServerIdentity,
        _resetServer = resetServer,
@@ -92,6 +96,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
        _observeWriteRequests = observeWriteRequests,
        _getServer = getServer,
        _identityStorage = identityStorage,
+       _bluey = bluey,
        super(const ServerScreenState());
 
   /// Initializes the server.
@@ -114,6 +119,33 @@ class ServerCubit extends Cubit<ServerScreenState> {
   ///
   /// Shared by [initialize] and [resetIdentity].
   Future<void> _resubscribeAndSetup() async {
+    // Subscribe to advertising state transitions. The stream replays
+    // the current state on subscribe (stream-conventions Convention 2),
+    // so the cubit's advertisingState is always consistent with the
+    // platform's view without a manual read.
+    final server = _getServer();
+    if (server != null) {
+      _advertisingStateSubscription = server.advertisingStateChanges.listen(
+        (advertisingState) {
+          emit(state.copyWith(advertisingState: advertisingState));
+        },
+      );
+    }
+
+    // Ingest advertising lifecycle events from bluey.events into the
+    // server log (prepend-and-cap pattern, capped at 100).
+    _eventsSubscription = _bluey.events.listen((event) {
+      if (event is AdvertisingStartingEvent ||
+          event is AdvertisingStartedEvent ||
+          event is AdvertisingStoppingEvent ||
+          event is AdvertisingStoppedEvent) {
+        _addLog(
+          event.runtimeType.toString(),
+          event.toString(),
+        );
+      }
+    });
+
     // Listen for central connection/disconnection events and refresh
     // the list from the library's authoritative state each time.
     _connectionSubscription = _observeConnections().listen(
@@ -287,7 +319,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
         name: advertisedName,
         services: [demoServiceUuid],
       );
-      emit(state.copyWith(isAdvertising: true));
       _addLog('Advertising', 'Started advertising');
     } catch (e) {
       emit(state.copyWith(error: 'Failed to start advertising: $e'));
@@ -298,7 +329,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
   Future<void> stopAdvertising() async {
     try {
       await _stopAdvertising();
-      emit(state.copyWith(isAdvertising: false));
       _addLog('Advertising', 'Stopped advertising');
     } catch (e) {
       emit(state.copyWith(error: 'Failed to stop advertising: $e'));
@@ -344,13 +374,14 @@ class ServerCubit extends Cubit<ServerScreenState> {
     await _disconnectionSubscription?.cancel();
     await _readRequestSubscription?.cancel();
     await _writeRequestSubscription?.cancel();
+    await _advertisingStateSubscription?.cancel();
+    await _eventsSubscription?.cancel();
 
     final newId = await _identityStorage.reset();
     await _resetServer(identity: newId);
     emit(
       state.copyWith(
         serverId: newId,
-        isAdvertising: false,
         connectedClients: [],
         blueyPeerClientIds: const {},
       ),
@@ -385,6 +416,8 @@ class ServerCubit extends Cubit<ServerScreenState> {
     _disconnectionSubscription?.cancel();
     _readRequestSubscription?.cancel();
     _writeRequestSubscription?.cancel();
+    _advertisingStateSubscription?.cancel();
+    _eventsSubscription?.cancel();
     _disposeServer();
     return super.close();
   }

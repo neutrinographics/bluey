@@ -82,6 +82,7 @@ class ServerScreen extends StatelessWidget {
             observeWriteRequests: getIt<ObserveWriteRequests>(),
             getServer: getIt<GetServer>(),
             identityStorage: getIt<ServerIdentityStorage>(),
+            bluey: getIt<Bluey>(),
           )..initialize(),
       child: const _ServerView(),
     );
