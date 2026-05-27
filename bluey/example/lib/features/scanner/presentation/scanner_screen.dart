@@ -6,8 +6,11 @@ import 'package:bluey/bluey.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/recovery_notifier.dart';
 import '../../../shared/domain/uuid_names.dart';
+import '../../../shared/presentation/adapter_cycle_hint.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/invalidation_banner.dart';
 import '../../connection/presentation/connection_screen.dart';
 import '../application/scan_for_devices.dart';
 import '../application/get_bluetooth_state.dart';
@@ -64,16 +67,20 @@ class ScannerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create:
-          (context) => ScannerCubit(
-            scanForDevices: getIt<ScanForDevices>(),
-            getBluetoothState: getIt<GetBluetoothState>(),
-            requestPermissions: getIt<RequestPermissions>(),
-            requestEnable: getIt<RequestEnable>(),
-            bluey: getIt<Bluey>(),
-          )..initialize(),
-      child: const _ScannerView(),
+    return ValueListenableBuilder<int>(
+      valueListenable: getIt<RecoveryNotifier>(),
+      builder: (context, tick, _) => BlocProvider(
+        key: ValueKey('scanner-$tick'),
+        create:
+            (context) => ScannerCubit(
+              scanForDevices: getIt<ScanForDevices>(),
+              getBluetoothState: getIt<GetBluetoothState>(),
+              requestPermissions: getIt<RequestPermissions>(),
+              requestEnable: getIt<RequestEnable>(),
+              bluey: getIt<Bluey>(),
+            )..initialize(),
+        child: const _ScannerView(),
+      ),
     );
   }
 }
@@ -101,7 +108,11 @@ class _ScannerView extends StatelessWidget {
             child: Column(
               children: [
                 const _TopBar(),
+                if (state.scanState == ScanState.invalidated)
+                  InvalidationBanner(onRecover: () => recreateBluey()),
                 Expanded(child: _buildContent(state)),
+                const AdapterCycleHint(),
+                SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
             ),
           ),
@@ -200,7 +211,60 @@ class _ScannerContent extends StatelessWidget {
         ] else if (!state.isScanning) ...[
           const _EmptyDeviceHint(),
         ],
+        if (state.scanLog.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          _ScanLogPanel(events: state.scanLog),
+        ],
       ],
+    );
+  }
+}
+
+// -- Scan log panel --
+
+class _ScanLogPanel extends StatelessWidget {
+  final List<BlueyEvent> events;
+
+  const _ScanLogPanel({required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    // Cap displayed entries; the cubit already caps the underlying log
+    // at 100 — show the most recent 20 for readability on the screen.
+    final shown = events.reversed.take(20).toList();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SCAN EVENTS',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _kTextMedium,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...shown.map(
+            (event) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                event.toString(),
+                style: GoogleFonts.robotoMono(
+                  fontSize: 11,
+                  color: _kTextLight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
