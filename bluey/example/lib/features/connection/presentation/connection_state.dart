@@ -22,6 +22,8 @@ class ConnectionScreenState {
 
   bool get isBlueyPeer => peer != null;
 
+  bool get isInvalidated => connectionState == ConnectionState.invalidated;
+
   ConnectionScreenState copyWith({
     Device? device,
     Connection? connection,

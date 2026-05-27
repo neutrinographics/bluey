@@ -107,52 +107,126 @@ void main() {
     );
 
     blocTest<ConnectionCubit, ConnectionScreenState>(
-      'connect succeeds and auto-discovers services',
+      'connect succeeds — stateChanges replay delivers initial state, '
+      'servicesChanges replay delivers initial services (no manual reads)',
       setUp: () {
         final mockConnection = MockConnection();
-        when(() => mockConnection.state).thenReturn(ConnectionState.ready);
+        final mockService = MockRemoteService();
+
+        // stateChanges replays ConnectionState.ready (stream-conventions PR #32).
+        when(() => mockConnection.stateChanges).thenAnswer((_) async* {
+          yield ConnectionState.ready;
+        });
+        // servicesChanges replays the cached services on subscribe.
+        when(() => mockConnection.servicesChanges).thenAnswer((_) async* {
+          yield [mockService];
+        });
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
+
         when(
-          () => mockConnection.stateChanges,
-        ).thenAnswer((_) => const Stream.empty());
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        ).thenAnswer((_) async => mockConnection);
+        // mockGetServices should NOT be called — explicit loadServices() is gone.
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.connect();
+        // Allow the replay streams to deliver.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      verify: (cubit) {
+        // Connection assigned.
+        expect(cubit.state.connection, isNotNull);
+        // State came from stateChanges replay.
+        expect(cubit.state.connectionState, ConnectionState.ready);
+        // Services came from servicesChanges replay.
+        expect(cubit.state.services, hasLength(1));
+        // getServices use-case never called — no manual loadServices().
+        verifyNever(() => mockGetServices(any()));
+      },
+    );
+
+    // Verify stream-replay-based initial state delivery, checking emitted
+    // sequence rather than final state.
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'connect() uses stateChanges replay for initial state (no manual read)',
+      setUp: () {
+        final mockConnection = MockConnection();
+
+        // stateChanges replay delivers ConnectionState.ready.
+        when(() => mockConnection.stateChanges).thenAnswer((_) async* {
+          yield ConnectionState.ready;
+        });
         when(
           () => mockConnection.servicesChanges,
         ).thenAnswer((_) => const Stream.empty());
         when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
-        final mockService = MockRemoteService();
+        when(
+          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
+        ).thenAnswer((_) async => mockConnection);
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.connect();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => [
+        // First: connecting transition.
+        isA<ConnectionScreenState>().having(
+          (s) => s.connectionState,
+          'connectionState',
+          ConnectionState.connecting,
+        ),
+        // Second: connection assigned — no connectionState from manual read.
+        isA<ConnectionScreenState>().having(
+          (s) => s.connection,
+          'connection',
+          isNotNull,
+        ),
+        // Third: stateChanges replay delivers ConnectionState.ready.
+        isA<ConnectionScreenState>().having(
+          (s) => s.connectionState,
+          'connectionState',
+          ConnectionState.ready,
+        ),
+      ],
+    );
+
+    blocTest<ConnectionCubit, ConnectionScreenState>(
+      'flips connectionState to invalidated when stateChanges emits '
+      'StaleHandleException',
+      setUp: () {
+        final mockConnection = MockConnection();
+
+        // stateChanges emits an error of type StaleHandleException.
+        when(() => mockConnection.stateChanges).thenAnswer((_) async* {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          throw StaleHandleException(
+            triggeringState: BluetoothState.off,
+            instanceType: InvalidatedInstance.connection,
+          );
+        });
+        when(
+          () => mockConnection.servicesChanges,
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
 
         when(
           () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
         ).thenAnswer((_) async => mockConnection);
-        when(
-          () => mockGetServices(any()),
-        ).thenAnswer((_) async => [mockService]);
       },
       build: createCubit,
-      act: (cubit) => cubit.connect(),
-      expect:
-          () => [
-            isA<ConnectionScreenState>().having(
-              (s) => s.connectionState,
-              'connectionState',
-              ConnectionState.connecting,
-            ),
-            isA<ConnectionScreenState>()
-                .having(
-                  (s) => s.connectionState,
-                  'connectionState',
-                  ConnectionState.ready,
-                )
-                .having((s) => s.connection, 'connection', isNotNull),
-            isA<ConnectionScreenState>().having(
-              (s) => s.isDiscovering,
-              'isDiscovering',
-              true,
-            ),
-            isA<ConnectionScreenState>()
-                .having((s) => s.services?.length, 'services.length', 1)
-                .having((s) => s.isDiscovering, 'isDiscovering', false),
-          ],
+      act: (cubit) async {
+        await cubit.connect();
+        // Allow the stale error to propagate.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      verify: (cubit) {
+        expect(cubit.state.connectionState, ConnectionState.invalidated);
+        expect(cubit.state.error, isNull);
+        expect(cubit.state.isInvalidated, isTrue);
+      },
     );
 
     blocTest<ConnectionCubit, ConnectionScreenState>(
