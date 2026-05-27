@@ -88,24 +88,23 @@ A cycled adapter invalidates *every* bluey-derived live instance. Per-feature re
 
 ### `RecoveryNotifier` (new, `shared/domain/`)
 
-A simple stream-based notifier (`Stream<void>`). Each affected cubit subscribes in its constructor and resets its state on tick.
+A `ValueNotifier<int>` (tick counter). Each call to `recreateBluey()` increments the tick; affected screens listen and rebuild their `BlocProvider` so the cubit is recreated cleanly with fresh use cases.
 
 ### `ServiceLocator.recreateBluey()` (new method)
 
 ```text
-1. Cancel any subscriptions the locator holds on the current Bluey.
-2. Dispose the current Bluey instance.
-3. await Bluey.create() to construct a fresh instance.
-4. Re-register Scanner / Server / Connection-related factories that capture the new Bluey reference.
-5. Broadcast on RecoveryNotifier so each cubit resets.
+1. Read back the previously-captured ServerId (stashed on first setup).
+2. await resetServiceLocator()  -- wipes GetIt.
+3. await setupServiceLocator(localIdentity: stashedIdentity)  -- registers a fresh Bluey + use cases.
+4. recoveryNotifier.value++  -- triggers screen rebuilds.
 ```
 
-### Per-cubit recovery handler
+### Recovery flow
 
-Each affected cubit's constructor takes a `RecoveryNotifier`. On notification, the cubit:
-- Releases its prior bluey-derived references (cancels subscriptions to the now-dead instance).
-- Resets state to the post-construction starting point (no active scan, no connection, no server, empty log).
-- Re-emits the clean state so the invalidation banner clears.
+Cubits in the example are widget-tree-scoped via `BlocProvider`, pulling use cases from `getIt`. Cubits are not GetIt singletons. So recovery rebuilds the widget subtree:
+
+- Affected screens wrap their `BlocProvider` in a `ValueListenableBuilder<int>` listening to `RecoveryNotifier`. The builder uses the tick as the `BlocProvider`'s `key`, so on tick the provider tears down the old cubit and creates a fresh one with use cases pulled from the refreshed `getIt`.
+- The cubits themselves don't subscribe to `RecoveryNotifier` — they're cleanly recreated. Each new cubit starts at its initial state; the screen renders cleanly; the user re-performs the action manually.
 
 The user is then in a clean state and re-performs the action manually (start scan, connect, start advertising). The example does **not** auto-resume the prior action — that would conflict with the manual-recovery decision and hide the lifecycle the example is supposed to teach.
 
