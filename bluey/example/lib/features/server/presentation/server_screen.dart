@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/di/service_locator.dart';
 import '../../../shared/domain/recovery_notifier.dart';
 import '../../../shared/presentation/adapter_cycle_hint.dart';
+import '../../../shared/presentation/bluetooth_state_chip.dart';
 import '../../../shared/presentation/error_snackbar.dart';
 import '../../../shared/presentation/invalidation_banner.dart';
 import '../application/check_server_support.dart';
@@ -231,28 +232,7 @@ class _HeroCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Status indicator
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: state.isAdvertising ? _kAccentBlue : _kPillBg,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                state.isAdvertising ? 'ADVERTISING' : 'IDLE',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: state.isAdvertising ? _kAccentBlue : _kTextMedium,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
+          AdvertisingStateChip(advertisingState: state.advertisingState),
           const SizedBox(height: 16),
           // Device name
           Text(
@@ -325,10 +305,11 @@ class _HeroCard extends StatelessWidget {
                     ? Icons.stop_circle_outlined
                     : Icons.play_arrow,
             isPrimary: true,
-            onPressed:
-                state.isAdvertising
-                    ? cubit.stopAdvertising
-                    : cubit.startAdvertising,
+            onPressed: switch (state.advertisingState) {
+              AdvertisingState.advertising => cubit.stopAdvertising,
+              AdvertisingState.idle => cubit.startAdvertising,
+              _ => null, // starting / stopping / invalidated — transient
+            },
           ),
           const SizedBox(height: 16),
           _ActionButton(

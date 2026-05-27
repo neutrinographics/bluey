@@ -139,10 +139,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
           event is AdvertisingStartedEvent ||
           event is AdvertisingStoppingEvent ||
           event is AdvertisingStoppedEvent) {
-        _addLog(
-          event.runtimeType.toString(),
-          event.toString(),
-        );
+        final entry = ServerLogEntry.fromBlueyEvent(event);
+        final log = [entry, ...state.log];
+        if (log.length > 100) log.removeLast();
+        emit(state.copyWith(log: log));
       }
     });
 
