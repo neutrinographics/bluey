@@ -289,13 +289,19 @@ class BlueyConnection implements Connection {
     // I333: invalidate on any non-`on` adapter state. The platform
     // stream emits the platform-interface enum; map to the domain enum
     // before deciding so the carried [triggeringState] surfaces as the
-    // domain type.
-    _adapterStateSubscription = _platform.stateStream.listen((platformState) {
-      final domainState = _mapPlatformState(platformState);
-      if (domainState != BluetoothState.on) {
-        _invalidate(domainState);
-      }
-    });
+    // domain type. Errors surfaced by the platform stream are treated
+    // as invalidation with `unknown` as the triggering state — we
+    // don't know the real adapter state, so the conservative choice
+    // is to kill the connection and force the consumer to reconnect.
+    _adapterStateSubscription = _platform.stateStream.listen(
+      (platformState) {
+        final domainState = _mapPlatformState(platformState);
+        if (domainState != BluetoothState.on) {
+          _invalidate(domainState);
+        }
+      },
+      onError: (_) => _invalidate(BluetoothState.unknown),
+    );
   }
 
   /// Maps the platform-interface [platform.BluetoothState] to the

@@ -501,6 +501,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     setBluetoothState(state);
   }
 
+  /// Test seam — emit an error on the adapter-state stream. Exercises
+  /// the defensive `onError` paths on per-instance adapter-state
+  /// listeners in `BlueyScanner`, `BlueyConnection`, and `BlueyServer`.
+  void simulateStateError(Object error) {
+    _stateController.addError(error);
+  }
+
   /// Simulates a peripheral device that can be discovered and connected to.
   void simulatePeripheral({
     required String id,
@@ -1528,8 +1535,17 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _localServices.removeWhere((s) => s.uuid == serviceUuid);
   }
 
+  /// Test seam — when true, the next `startAdvertising` call throws.
+  /// Reset to false automatically after firing once. Drives the
+  /// rollback path in [BlueyServer.startAdvertising].
+  bool advertisingShouldFail = false;
+
   @override
   Future<void> startAdvertising(PlatformAdvertiseConfig config) async {
+    if (advertisingShouldFail) {
+      advertisingShouldFail = false;
+      throw StateError('fake: startAdvertising rejected');
+    }
     _isAdvertising = true;
     _advertiseConfig = config;
   }

@@ -105,6 +105,67 @@ void main() {
       expect(events.whereType<ScanStoppedEvent>().length, equals(1));
     });
 
+    // H2 — late subscriber after invalidation observes the terminal
+    // `ScanState.invalidated` value followed by onDone. Without this
+    // guard, a refactor of `_invalidate`'s ordering or of the
+    // `stateChanges` factory could silently regress late-subscriber
+    // semantics (Convention 3).
+    test(
+      'late subscriber after invalidation receives ScanState.invalidated and onDone',
+      () async {
+        final scanner = bluey.scanner();
+        fakePlatform.setState(platform.BluetoothState.off);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        // Scanner is now invalidated. Subscribe AFTER.
+        final received = <ScanState>[];
+        final completer = Completer<void>();
+        scanner.stateChanges.listen(
+          received.add,
+          onDone: completer.complete,
+        );
+        await completer.future;
+
+        expect(received, equals([ScanState.invalidated]));
+      },
+    );
+
+    // M3 — Stream.multi runs its factory per subscriber so every late
+    // subscriber gets the replay. A regression to
+    // `StreamController.broadcast(onListen:)` would only fire the
+    // replay on the 0→1 transition; this test pins that down.
+    test('multiple sequential subscribers each receive replay', () async {
+      final scanner = bluey.scanner();
+
+      final firstReplay = await scanner.stateChanges.first;
+      expect(firstReplay, equals(ScanState.stopped));
+
+      // Second subscriber after the first finishes — must also receive
+      // a replay rather than waiting silently for the next transition.
+      final secondReplay = await scanner.stateChanges.first;
+      expect(secondReplay, equals(ScanState.stopped));
+    });
+
+    // L1 — same-state writes to _setState must not emit duplicate
+    // events on the event bus or the stateChanges stream.
+    test('same-state transitions are idempotent', () async {
+      final scanner = bluey.scanner();
+      final observed = <ScanState>[];
+      final sub = scanner.stateChanges.listen(observed.add);
+
+      // Two stop() calls back-to-back: the first short-circuits on
+      // `_state == stopped`, the second too. No duplicate Stopped
+      // events should hit the stream beyond the single replay value.
+      await scanner.stop();
+      await scanner.stop();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      // Only the replay should be present.
+      expect(observed, equals([ScanState.stopped]));
+
+      await sub.cancel();
+    });
+
     // Regression guard (PR #32 Codex P2): the transition helper must
     // carry the active scan's `services` filter and `timeout` through
     // to ScanStartingEvent and ScanStartedEvent. Without this, consumers

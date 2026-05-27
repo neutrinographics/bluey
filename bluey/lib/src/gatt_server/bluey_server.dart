@@ -203,13 +203,19 @@ class BlueyServer implements Server {
     // I333: invalidate on any non-`on` adapter state. The platform
     // stream emits the platform-interface enum; map to the domain enum
     // before deciding so the carried [triggeringState] surfaces as the
-    // domain type.
-    _stateSubscription = _platform.stateStream.listen((platformState) {
-      final domainState = _mapPlatformState(platformState);
-      if (domainState != BluetoothState.on) {
-        _invalidate(domainState);
-      }
-    });
+    // domain type. Errors surfaced by the platform stream are treated
+    // as invalidation with `unknown` as the triggering state — we
+    // don't know the real adapter state, so the conservative choice
+    // is to kill the server and force the consumer to recreate.
+    _stateSubscription = _platform.stateStream.listen(
+      (platformState) {
+        final domainState = _mapPlatformState(platformState);
+        if (domainState != BluetoothState.on) {
+          _invalidate(domainState);
+        }
+      },
+      onError: (_) => _invalidate(BluetoothState.unknown),
+    );
   }
 
   /// Maps the platform-interface [platform.BluetoothState] to the
@@ -300,19 +306,22 @@ class BlueyServer implements Server {
   AdvertisingState get advertisingState => _advertisingState;
 
   @override
-  Stream<AdvertisingState> get advertisingStateChanges => Stream.multi(
+  Stream<AdvertisingState> get advertisingStateChanges =>
+      Stream<AdvertisingState>.multi(
     (controller) {
-      if (!controller.isClosed) {
-        controller.add(_advertisingState);
-      }
-      // If the underlying broadcast controller is already closed (we've
-      // been invalidated and torn down), close the per-subscriber
-      // controller after delivering the replay so consumers see the
-      // terminal `onDone`.
-      if (_advertisingStateController.isClosed) {
+      // Convention 3 (terminal-signal) — late subscribers after
+      // invalidation see the terminal `AdvertisingState.invalidated`
+      // value followed by `onDone`. Matches the explicit pattern used
+      // in `BlueyConnection.stateChanges` so all Type A streams in
+      // bluey share the same late-subscriber shape.
+      if (_invalidated) {
+        controller.add(AdvertisingState.invalidated);
         controller.close();
         return;
       }
+      // Convention 2 (replay-on-subscribe) — replay the current state
+      // before bridging future deltas.
+      controller.add(_advertisingState);
       final sub = _advertisingStateController.stream.listen(
         controller.add,
         onError: controller.addError,

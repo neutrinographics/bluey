@@ -63,13 +63,19 @@ class BlueyScanner implements Scanner {
     // I333: mirror BlueyServer / BlueyConnection — invalidate on any
     // non-`on` adapter state. Map the platform-interface enum to the
     // domain enum before deciding so [triggeringState] surfaces as the
-    // domain type.
-    _stateSubscription = _platform.stateStream.listen((platformState) {
-      final domainState = _mapPlatformState(platformState);
-      if (domainState != BluetoothState.on) {
-        _invalidate(domainState);
-      }
-    });
+    // domain type. Errors surfaced by the platform stream are treated
+    // as invalidation with `unknown` as the triggering state — we
+    // don't know the real adapter state, so the conservative choice
+    // is to kill the instance and force the consumer to recreate.
+    _stateSubscription = _platform.stateStream.listen(
+      (platformState) {
+        final domainState = _mapPlatformState(platformState);
+        if (domainState != BluetoothState.on) {
+          _invalidate(domainState);
+        }
+      },
+      onError: (_) => _invalidate(BluetoothState.unknown),
+    );
   }
 
   /// Maps the platform-interface [platform.BluetoothState] to the
@@ -143,19 +149,21 @@ class BlueyScanner implements Scanner {
   ScanState get state => _state;
 
   @override
-  Stream<ScanState> get stateChanges => Stream.multi(
+  Stream<ScanState> get stateChanges => Stream<ScanState>.multi(
     (controller) {
-      if (!controller.isClosed) {
-        controller.add(_state);
-      }
-      // If the underlying broadcast controller is already closed (we've
-      // been invalidated and torn down), close the per-subscriber
-      // controller after delivering the replay so consumers see the
-      // terminal `onDone`.
-      if (_stateController.isClosed) {
+      // Convention 3 (terminal-signal) — late subscribers after
+      // invalidation see the terminal `ScanState.invalidated` value
+      // followed by `onDone`. Matches the explicit pattern used in
+      // `BlueyConnection.stateChanges` so all Type A streams in bluey
+      // share the same late-subscriber shape.
+      if (_invalidated) {
+        controller.add(ScanState.invalidated);
         controller.close();
         return;
       }
+      // Convention 2 (replay-on-subscribe) — replay the current state
+      // before bridging future deltas.
+      controller.add(_state);
       final sub = _stateController.stream.listen(
         controller.add,
         onError: controller.addError,
