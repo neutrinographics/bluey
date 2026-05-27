@@ -346,5 +346,135 @@ void main() {
             isA<CharacteristicState>().having((s) => s.error, 'error', isNull),
           ],
     );
+
+    test('StaleHandleException during read flips state to invalidated', () async {
+      when(() => mockReadCharacteristic(any())).thenThrow(
+        StaleHandleException(
+          triggeringState: BluetoothState.off,
+          instanceType: InvalidatedInstance.connection,
+        ),
+      );
+
+      final cubit = createCubit();
+      await cubit.read();
+
+      expect(cubit.state.isInvalidated, isTrue);
+      expect(cubit.state.isReading, isFalse);
+      expect(cubit.state.error, isNull);
+      cubit.close();
+    });
+
+    test('StaleHandleException during write flips state to invalidated', () async {
+      when(
+        () => mockWriteCharacteristic(
+          any(),
+          any(),
+          withResponse: any(named: 'withResponse'),
+        ),
+      ).thenThrow(
+        StaleHandleException(
+          triggeringState: BluetoothState.off,
+          instanceType: InvalidatedInstance.connection,
+        ),
+      );
+
+      final cubit = createCubit();
+      await cubit.write(Uint8List.fromList([0xAA]));
+
+      expect(cubit.state.isInvalidated, isTrue);
+      expect(cubit.state.isWriting, isFalse);
+      expect(cubit.state.error, isNull);
+      cubit.close();
+    });
+
+    test('StaleHandleException via notification stream flips state to invalidated', () async {
+      when(() => mockSubscribeToCharacteristic(any())).thenAnswer(
+        (_) => Stream.error(
+          StaleHandleException(
+            triggeringState: BluetoothState.off,
+            instanceType: InvalidatedInstance.connection,
+          ),
+        ),
+      );
+
+      final cubit = createCubit();
+      cubit.toggleNotifications();
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      expect(cubit.state.isInvalidated, isTrue);
+      expect(cubit.state.isSubscribed, isFalse);
+      expect(cubit.state.error, isNull);
+      cubit.close();
+    });
+
+    test('read is a no-op when already invalidated', () async {
+      final cubit = createCubit();
+      // Seed invalidated state via a real StaleHandleException throw.
+      when(() => mockReadCharacteristic(any())).thenThrow(
+        StaleHandleException(
+          triggeringState: BluetoothState.off,
+          instanceType: InvalidatedInstance.connection,
+        ),
+      );
+      await cubit.read(); // first call flips isInvalidated (mock called once)
+      expect(cubit.state.isInvalidated, isTrue);
+
+      // Arrange a successful read and confirm the mock is NOT called a second time.
+      final data = Uint8List.fromList([0x01]);
+      when(() => mockReadCharacteristic(any())).thenAnswer((_) async => data);
+      await cubit.read(); // should short-circuit
+
+      expect(cubit.state.value, isNull); // value unchanged
+      // Exactly one call total (from the throw above) — the second read() was blocked.
+      verify(() => mockReadCharacteristic(any())).called(1);
+      cubit.close();
+    });
+
+    test('write is a no-op when already invalidated', () async {
+      final cubit = createCubit();
+      when(() => mockReadCharacteristic(any())).thenThrow(
+        StaleHandleException(
+          triggeringState: BluetoothState.off,
+          instanceType: InvalidatedInstance.connection,
+        ),
+      );
+      await cubit.read(); // flip to invalidated
+      expect(cubit.state.isInvalidated, isTrue);
+
+      when(
+        () => mockWriteCharacteristic(
+          any(),
+          any(),
+          withResponse: any(named: 'withResponse'),
+        ),
+      ).thenAnswer((_) async {});
+      await cubit.write(Uint8List.fromList([0x01])); // should short-circuit
+
+      verifyNever(
+        () => mockWriteCharacteristic(
+          any(),
+          any(),
+          withResponse: any(named: 'withResponse'),
+        ),
+      );
+      cubit.close();
+    });
+
+    test('toggleNotifications is a no-op when already invalidated', () async {
+      final cubit = createCubit();
+      when(() => mockReadCharacteristic(any())).thenThrow(
+        StaleHandleException(
+          triggeringState: BluetoothState.off,
+          instanceType: InvalidatedInstance.connection,
+        ),
+      );
+      await cubit.read(); // flip to invalidated
+      expect(cubit.state.isInvalidated, isTrue);
+
+      cubit.toggleNotifications(); // should short-circuit
+
+      verifyNever(() => mockSubscribeToCharacteristic(any()));
+      cubit.close();
+    });
   });
 }

@@ -65,6 +65,8 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
 
   /// Reads the characteristic value.
   Future<void> read() async {
+    if (state.isInvalidated) return;
+
     emit(state.copyWith(isReading: true, error: null));
 
     try {
@@ -73,6 +75,8 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
       if (newLog.length > 100) newLog.removeLast();
 
       emit(state.copyWith(value: value, isReading: false, log: newLog));
+    } on StaleHandleException {
+      emit(state.copyWith(isReading: false, isInvalidated: true, error: null));
     } catch (e) {
       emit(state.copyWith(isReading: false, error: 'Read failed: $e'));
     }
@@ -80,6 +84,8 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
 
   /// Writes a value to the characteristic.
   Future<void> write(Uint8List value) async {
+    if (state.isInvalidated) return;
+
     emit(state.copyWith(isWriting: true, error: null));
 
     try {
@@ -94,6 +100,8 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
       if (newLog.length > 100) newLog.removeLast();
 
       emit(state.copyWith(isWriting: false, log: newLog));
+    } on StaleHandleException {
+      emit(state.copyWith(isWriting: false, isInvalidated: true, error: null));
     } catch (e) {
       emit(state.copyWith(isWriting: false, error: 'Write failed: $e'));
     }
@@ -101,6 +109,8 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
 
   /// Toggles notification subscription.
   void toggleNotifications() {
+    if (state.isInvalidated) return;
+
     if (state.isSubscribed) {
       _unsubscribe();
     } else {
@@ -119,6 +129,16 @@ class CharacteristicCubit extends Cubit<CharacteristicState> {
         emit(state.copyWith(value: value, log: newLog));
       },
       onError: (error) {
+        if (error is StaleHandleException) {
+          emit(
+            state.copyWith(
+              isSubscribed: false,
+              isInvalidated: true,
+              error: null,
+            ),
+          );
+          return;
+        }
         emit(
           state.copyWith(
             isSubscribed: false,
