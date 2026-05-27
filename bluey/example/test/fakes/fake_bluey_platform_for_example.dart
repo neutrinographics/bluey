@@ -27,6 +27,13 @@ base class FakeBlueyPlatformForExample extends platform.BlueyPlatform {
     _stateController.add(state);
   }
 
+  /// Dispose of the fake platform and close its stream controller.
+  ///
+  /// Call this in test tearDown to avoid leaking state between tests.
+  Future<void> dispose() async {
+    await _stateController.close();
+  }
+
   @override
   platform.Capabilities get capabilities => platform.Capabilities.android;
 

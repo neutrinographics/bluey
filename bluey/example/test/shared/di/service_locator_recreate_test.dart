@@ -19,6 +19,7 @@ void main() {
   });
 
   tearDown(() async {
+    await fakePlatform.dispose();
     await resetServiceLocator();
   });
 
