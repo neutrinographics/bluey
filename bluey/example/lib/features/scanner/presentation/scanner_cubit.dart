@@ -7,6 +7,7 @@ import '../application/scan_for_devices.dart';
 import '../application/get_bluetooth_state.dart';
 import '../application/request_permissions.dart';
 import '../application/request_enable.dart';
+import '../domain/scanner_repository.dart';
 import 'scanner_state.dart';
 
 /// Cubit for managing scanner state.
@@ -15,6 +16,7 @@ class ScannerCubit extends Cubit<ScannerState> {
   final GetBluetoothState _getBluetoothState;
   final RequestPermissions _requestPermissions;
   final RequestEnable _requestEnable;
+  final ScannerRepository _repository;
   final Bluey _bluey;
 
   StreamSubscription<BluetoothState>? _stateSubscription;
@@ -22,18 +24,18 @@ class ScannerCubit extends Cubit<ScannerState> {
   StreamSubscription<ScanState>? _scanStateSubscription;
   StreamSubscription<BlueyEvent>? _eventsSubscription;
 
-  Scanner? _scanner;
-
   ScannerCubit({
     required ScanForDevices scanForDevices,
     required GetBluetoothState getBluetoothState,
     required RequestPermissions requestPermissions,
     required RequestEnable requestEnable,
+    required ScannerRepository repository,
     required Bluey bluey,
   }) : _scanForDevices = scanForDevices,
        _getBluetoothState = getBluetoothState,
        _requestPermissions = requestPermissions,
        _requestEnable = requestEnable,
+       _repository = repository,
        _bluey = bluey,
        super(const ScannerState());
 
@@ -51,10 +53,12 @@ class ScannerCubit extends Cubit<ScannerState> {
       },
     );
 
-    // Hold one Scanner for this cubit's lifetime and subscribe to its
-    // state transitions (replays current state on subscribe).
-    _scanner = _bluey.scanner();
-    _scanStateSubscription = _scanner!.stateChanges.listen(
+    // Subscribe to state transitions on the repository's shared Scanner
+    // instance (replays current state on subscribe per Convention 2).
+    // Using the repository guarantees that the scanner watched here is
+    // the SAME instance that backs ScanForDevices.scan(), so state
+    // changes are always coherent with the active scan.
+    _scanStateSubscription = _repository.scanner.stateChanges.listen(
       (scanState) {
         emit(state.copyWith(scanState: scanState));
       },
@@ -66,7 +70,8 @@ class ScannerCubit extends Cubit<ScannerState> {
         if (event is ScanStartingEvent ||
             event is ScanStartedEvent ||
             event is ScanStoppingEvent ||
-            event is ScanStoppedEvent) {
+            event is ScanStoppedEvent ||
+            event is DeviceDiscoveredEvent) {
           final updated = [...state.scanLog, event];
           final capped =
               updated.length > 100

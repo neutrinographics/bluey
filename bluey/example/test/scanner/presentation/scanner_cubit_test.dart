@@ -9,6 +9,7 @@ import 'package:bluey_example/features/scanner/presentation/scanner_cubit.dart';
 import 'package:bluey_example/features/scanner/presentation/scanner_state.dart';
 
 import '../../mocks/mock_bluey.dart';
+import '../../mocks/mock_repositories.dart';
 import '../../mocks/mock_use_cases.dart';
 
 class _MockScanner extends Mock implements Scanner {}
@@ -19,6 +20,7 @@ void main() {
   late MockRequestPermissions mockRequestPermissions;
   late MockRequestEnable mockRequestEnable;
   late MockBluey mockBluey;
+  late MockScannerRepository mockRepository;
   late _MockScanner mockScanner;
   late StreamController<ScanState> scanStateController;
   late StreamController<BlueyEvent> eventsController;
@@ -29,11 +31,16 @@ void main() {
     mockRequestPermissions = MockRequestPermissions();
     mockRequestEnable = MockRequestEnable();
     mockBluey = MockBluey();
+    mockRepository = MockScannerRepository();
     mockScanner = _MockScanner();
     scanStateController = StreamController<ScanState>.broadcast();
     eventsController = StreamController<BlueyEvent>.broadcast();
 
-    when(() => mockBluey.scanner()).thenReturn(mockScanner);
+    // The repository exposes the SAME shared scanner — this is the core
+    // invariant the two-scanner fix enforces. Both the cubit (via
+    // repository.scanner) and the use-case (via repository.scan()) now
+    // go through the same object.
+    when(() => mockRepository.scanner).thenReturn(mockScanner);
     when(() => mockBluey.events).thenAnswer((_) => eventsController.stream);
     when(() => mockScanner.stateChanges)
         .thenAnswer((_) => scanStateController.stream);
@@ -54,6 +61,7 @@ void main() {
       getBluetoothState: mockGetBluetoothState,
       requestPermissions: mockRequestPermissions,
       requestEnable: mockRequestEnable,
+      repository: mockRepository,
       bluey: mockBluey,
     );
   }
@@ -65,6 +73,19 @@ void main() {
       expect(cubit.state.scanLog, isEmpty);
       cubit.close();
     });
+
+    test(
+      'initialize() subscribes to scanner via repository (not via Bluey.scanner())',
+      () {
+        final cubit = createCubit();
+        cubit.initialize();
+        // The repository.scanner getter must have been accessed; Bluey.scanner()
+        // must NOT have been called directly (that would create a second instance).
+        verify(() => mockRepository.scanner).called(greaterThanOrEqualTo(1));
+        verifyNever(() => mockBluey.scanner());
+        cubit.close();
+      },
+    );
 
     blocTest<ScannerCubit, ScannerState>(
       'reflects ScanState transitions from scanner.stateChanges',
@@ -118,6 +139,25 @@ void main() {
         expect(cubit.state.scanLog.length, equals(4));
         expect(cubit.state.scanLog.first, isA<ScanStartingEvent>());
         expect(cubit.state.scanLog.last, isA<ScanStoppedEvent>());
+      },
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'appends DeviceDiscoveredEvent into scanLog',
+      build: createCubit,
+      act: (cubit) {
+        cubit.initialize();
+        eventsController.add(
+          DeviceDiscoveredEvent(
+            deviceId: UUID('00000000-0000-0000-0000-000000000001'),
+            name: 'Test Device',
+            rssi: -70,
+          ),
+        );
+      },
+      verify: (cubit) {
+        expect(cubit.state.scanLog.length, equals(1));
+        expect(cubit.state.scanLog.first, isA<DeviceDiscoveredEvent>());
       },
     );
 
