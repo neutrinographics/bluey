@@ -6,7 +6,10 @@ import 'package:bluey/bluey.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/recovery_notifier.dart';
+import '../../../shared/presentation/adapter_cycle_hint.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/invalidation_banner.dart';
 import '../application/check_server_support.dart';
 import '../application/set_server_identity.dart';
 import '../application/reset_server.dart';
@@ -63,28 +66,32 @@ class ServerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create:
-          (context) => ServerCubit(
-            checkServerSupport: getIt<CheckServerSupport>(),
-            setServerIdentity: getIt<SetServerIdentity>(),
-            resetServer: getIt<ResetServer>(),
-            startAdvertising: getIt<StartAdvertising>(),
-            stopAdvertising: getIt<StopAdvertising>(),
-            addService: getIt<AddService>(),
-            sendNotification: getIt<SendNotification>(),
-            observeConnections: getIt<ObserveConnections>(),
-            observePeerConnections: getIt<ObservePeerConnections>(),
-            disposeServer: getIt<DisposeServer>(),
-            getConnectedClients: getIt<GetConnectedClients>(),
-            observeDisconnections: getIt<ObserveDisconnections>(),
-            observeReadRequests: getIt<ObserveReadRequests>(),
-            observeWriteRequests: getIt<ObserveWriteRequests>(),
-            getServer: getIt<GetServer>(),
-            identityStorage: getIt<ServerIdentityStorage>(),
-            bluey: getIt<Bluey>(),
-          )..initialize(),
-      child: const _ServerView(),
+    return ValueListenableBuilder<int>(
+      valueListenable: getIt<RecoveryNotifier>(),
+      builder: (context, tick, _) => BlocProvider(
+        key: ValueKey('server-$tick'),
+        create:
+            (context) => ServerCubit(
+              checkServerSupport: getIt<CheckServerSupport>(),
+              setServerIdentity: getIt<SetServerIdentity>(),
+              resetServer: getIt<ResetServer>(),
+              startAdvertising: getIt<StartAdvertising>(),
+              stopAdvertising: getIt<StopAdvertising>(),
+              addService: getIt<AddService>(),
+              sendNotification: getIt<SendNotification>(),
+              observeConnections: getIt<ObserveConnections>(),
+              observePeerConnections: getIt<ObservePeerConnections>(),
+              disposeServer: getIt<DisposeServer>(),
+              getConnectedClients: getIt<GetConnectedClients>(),
+              observeDisconnections: getIt<ObserveDisconnections>(),
+              observeReadRequests: getIt<ObserveReadRequests>(),
+              observeWriteRequests: getIt<ObserveWriteRequests>(),
+              getServer: getIt<GetServer>(),
+              identityStorage: getIt<ServerIdentityStorage>(),
+              bluey: getIt<Bluey>(),
+            )..initialize(),
+        child: const _ServerView(),
+      ),
     );
   }
 }
@@ -112,12 +119,15 @@ class _ServerView extends StatelessWidget {
             child: Column(
               children: [
                 const _TopBar(),
+                if (state.advertisingState == AdvertisingState.invalidated)
+                  InvalidationBanner(onRecover: () => recreateBluey()),
                 Expanded(
                   child:
                       state.isSupported
                           ? _ServerContent(state: state)
                           : const _UnsupportedState(),
                 ),
+                const AdapterCycleHint(),
               ],
             ),
           ),
