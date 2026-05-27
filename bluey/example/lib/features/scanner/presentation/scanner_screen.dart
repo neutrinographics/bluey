@@ -16,6 +16,7 @@ import '../application/scan_for_devices.dart';
 import '../application/get_bluetooth_state.dart';
 import '../application/request_permissions.dart';
 import '../application/request_enable.dart';
+import '../domain/scanner_repository.dart';
 import 'scanner_cubit.dart';
 import 'scanner_state.dart';
 
@@ -77,6 +78,7 @@ class ScannerScreen extends StatelessWidget {
               getBluetoothState: getIt<GetBluetoothState>(),
               requestPermissions: getIt<RequestPermissions>(),
               requestEnable: getIt<RequestEnable>(),
+              repository: getIt<ScannerRepository>(),
               bluey: getIt<Bluey>(),
             )..initialize(),
         child: const _ScannerView(),
@@ -120,7 +122,7 @@ class _ScannerView extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).padding.bottom,
             ),
-            child: _ScanFab(isScanning: state.isScanning),
+            child: _ScanFab(scanState: state.scanState),
           ),
         );
       },
@@ -882,13 +884,17 @@ class _HeroCard extends StatelessWidget {
 // -- Circular scan FAB --
 
 class _ScanFab extends StatelessWidget {
-  final bool isScanning;
+  final ScanState scanState;
 
-  const _ScanFab({required this.isScanning});
+  const _ScanFab({required this.scanState});
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<ScannerCubit>();
+
+    final isScanning = scanState == ScanState.scanning;
+    final isTransient =
+        scanState == ScanState.starting || scanState == ScanState.stopping;
 
     return Container(
       width: 64,
@@ -909,7 +915,12 @@ class _ScanFab extends StatelessWidget {
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: isScanning ? cubit.stopScan : cubit.startScan,
+          onTap:
+              isTransient
+                  ? null
+                  : isScanning
+                  ? cubit.stopScan
+                  : cubit.startScan,
           child: Center(
             child: Icon(
               isScanning ? Icons.stop : Icons.bluetooth_searching,
