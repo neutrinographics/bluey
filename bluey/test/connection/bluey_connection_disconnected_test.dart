@@ -25,7 +25,7 @@ void main() {
   const _serviceUuid = TestUuids.customService;
   const _charUuid = TestUuids.customChar1;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
 
@@ -39,7 +39,7 @@ void main() {
       ],
     );
 
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {

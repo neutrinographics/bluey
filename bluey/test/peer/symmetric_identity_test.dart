@@ -26,7 +26,7 @@ void main() {
         'heartbeat', () async {
       final localId = ServerId('11111111-1111-4111-8111-111111111111');
       final remoteId = ServerId('22222222-2222-4222-8222-222222222222');
-      final bluey = Bluey(localIdentity: localId);
+      final bluey = await Bluey.create(localIdentity: localId);
       final server = bluey.server()!;
       await server.startAdvertising();
 
@@ -53,7 +53,7 @@ void main() {
 
     test('rejects malformed heartbeat writes — no PeerClient emission, '
         'no client tracking', () async {
-      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+      final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
       final server = bluey.server()!;
       await server.startAdvertising();
 
@@ -95,7 +95,7 @@ void main() {
     test(
       'rejects unknown protocol versions — no PeerClient emission',
       () async {
-        final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+        final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
         final server = bluey.server()!;
         await server.startAdvertising();
 
@@ -127,7 +127,7 @@ void main() {
     test('PeerClient stream emits exactly once per identification, even after '
         'many heartbeats', () async {
       final remoteId = TestServerIds.remoteIdentity;
-      final bluey = Bluey(localIdentity: TestServerIds.localIdentity);
+      final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
       final server = bluey.server()!;
       await server.startAdvertising();
 
@@ -160,7 +160,7 @@ void main() {
       'serverId read response is versioned (17 bytes, leading 0x01)',
       () async {
         final id = ServerId('cccccccc-cccc-4ccc-cccc-cccccccccccc');
-        final bluey = Bluey(localIdentity: id);
+        final bluey = await Bluey.create(localIdentity: id);
         final server = bluey.server()!;
         await server.startAdvertising();
 
@@ -196,7 +196,7 @@ void main() {
       const address = 'AA:BB:CC:DD:EE:01';
       fakePlatform.simulateBlueyServer(address: address, serverId: remoteId);
 
-      final bluey = Bluey(localIdentity: localId);
+      final bluey = await Bluey.create(localIdentity: localId);
       final peer = bluey.peer(remoteId);
       final peerConn = await peer.connect();
 
@@ -229,7 +229,7 @@ void main() {
       const address = 'AA:BB:CC:DD:EE:02';
       fakePlatform.simulateBlueyServer(address: address, serverId: remoteId);
 
-      final bluey = Bluey(localIdentity: localId);
+      final bluey = await Bluey.create(localIdentity: localId);
       final peer = bluey.peer(remoteId);
       final peerConn = await peer.connect();
       await Future<void>.delayed(Duration.zero);
@@ -256,17 +256,17 @@ void main() {
   });
 
   group('Bluey.peer / discoverPeers identity gating', () {
-    test('peer() throws when localIdentity is null', () {
-      final bluey = Bluey();
+    test('peer() throws when localIdentity is null', () async {
+      final bluey = await Bluey.create();
       expect(
         () => bluey.peer(TestServerIds.remoteIdentity),
         throwsA(isA<LocalIdentityRequiredException>()),
       );
-      bluey.dispose();
+      await bluey.dispose();
     });
 
     test('discoverPeers() throws when localIdentity is null', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       await expectLater(
         bluey.discoverPeers(),
         throwsA(isA<LocalIdentityRequiredException>()),
@@ -285,7 +285,7 @@ void main() {
           serverId: TestServerIds.remoteIdentity,
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final scanner = bluey.scanner();
         final result = await scanner.scan().first;
         scanner.dispose();

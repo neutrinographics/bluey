@@ -285,7 +285,9 @@ class MockClient implements Client {
 /// Mock implementation of Server for testing.
 class MockServer implements Server {
   final List<HostedService> _services = [];
-  bool _isAdvertising = false;
+  AdvertisingState _advertisingState = AdvertisingState.idle;
+  final _advertisingStateController =
+      StreamController<AdvertisingState>.broadcast();
   final _connectionsController = StreamController<Client>.broadcast();
   final _disconnectionsController = StreamController<String>.broadcast();
   final ServerId _serverId = ServerId.generate();
@@ -294,7 +296,15 @@ class MockServer implements Server {
   ServerId get serverId => _serverId;
 
   @override
-  bool get isAdvertising => _isAdvertising;
+  AdvertisingState get advertisingState => _advertisingState;
+
+  @override
+  Stream<AdvertisingState> get advertisingStateChanges =>
+      _advertisingStateController.stream;
+
+  @override
+  bool get isAdvertising =>
+      _advertisingState == AdvertisingState.advertising;
 
   @override
   Stream<Client> get connections => _connectionsController.stream;
@@ -332,12 +342,14 @@ class MockServer implements Server {
     AdvertiseMode? mode,
     bool peerDiscoverable = false,
   }) async {
-    _isAdvertising = true;
+    _advertisingState = AdvertisingState.advertising;
+    _advertisingStateController.add(_advertisingState);
   }
 
   @override
   Future<void> stopAdvertising() async {
-    _isAdvertising = false;
+    _advertisingState = AdvertisingState.idle;
+    _advertisingStateController.add(_advertisingState);
   }
 
   @override

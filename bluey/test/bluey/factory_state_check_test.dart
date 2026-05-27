@@ -18,12 +18,12 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform(
       capabilities: platform.Capabilities.android,
     );
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {

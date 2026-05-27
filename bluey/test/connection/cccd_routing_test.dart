@@ -81,7 +81,7 @@ void main() {
       ],
     );
 
-    final bluey = Bluey();
+    final bluey = await Bluey.create();
     final device = await scanFirstDevice(bluey);
     final connection = await bluey.connect(device);
     final services = await connection.services();

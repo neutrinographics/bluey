@@ -57,7 +57,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // canRequestPhy/canRequestConnectionParameters are still true, so
@@ -97,7 +97,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // canBond/canRequestConnectionParameters are still true, so
@@ -146,7 +146,7 @@ void main() {
           name: 'Test',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
         // canBond/canRequestPhy are still true, so `conn.android` is
@@ -204,7 +204,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // Connect completed without throwing — the construction-time skip
@@ -256,7 +256,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // Streams must be live (not the inert defaults). Exposed via the

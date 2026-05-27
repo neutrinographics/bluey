@@ -64,7 +64,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       expect(conn.android, isNotNull);
@@ -79,7 +79,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       expect(conn.android, isNull);
@@ -94,7 +94,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       final first = conn.android;
@@ -116,7 +116,7 @@ void main() {
           name: 'Test',
         );
 
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
         // Post-B.3, `connection.bond()` is gone — bonding is reachable
@@ -135,7 +135,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // `connection.android` is null, so `?.bond()` evaluates to null and
@@ -155,7 +155,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       // Post-B.3 (I089), bond/PHY/conn-params live behind
@@ -182,7 +182,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       expect(conn.ios, isNotNull);
@@ -197,7 +197,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       expect(conn.ios, isNull);
@@ -212,7 +212,7 @@ void main() {
 
       fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
 
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
 
       final first = conn.ios;

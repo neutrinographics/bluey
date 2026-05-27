@@ -28,7 +28,26 @@ class BlueyServer implements Server {
   late final LifecycleServer _lifecycle;
   late final Future<platform.PlatformLocalService?> _controlServiceReady;
 
-  bool _isAdvertising = false;
+  // I333/stream-conv: state machine replaces the previous boolean
+  // `_isAdvertising`. The public `isAdvertising` getter remains, derived
+  // from `_advertisingState == AdvertisingState.advertising`.
+  AdvertisingState _advertisingState = AdvertisingState.idle;
+
+  /// Arguments of the currently-active advertisement, captured on
+  /// `startAdvertising` and read by `_setAdvertisingState` so the
+  /// emitted `AdvertisingStartedEvent` carries the same `name`/`services`
+  /// payload as the direct emit it replaced. Cleared on transition back
+  /// to `idle` / `invalidated`.
+  String? _activeAdvertisingName;
+  List<UUID>? _activeAdvertisingServices;
+
+  /// Broadcast controller for advertising-state-change deltas.
+  /// `advertisingStateChanges` wraps this in a `Stream.multi` per the
+  /// Task 6/7/11 convention so every new subscriber gets the current
+  /// state replayed before receiving subsequent deltas.
+  final StreamController<AdvertisingState> _advertisingStateController =
+      StreamController<AdvertisingState>.broadcast();
+
   final Map<String, BlueyClient> _connectedClients = {};
 
   /// Local handle table populated from `addService`'s populated return
@@ -184,13 +203,19 @@ class BlueyServer implements Server {
     // I333: invalidate on any non-`on` adapter state. The platform
     // stream emits the platform-interface enum; map to the domain enum
     // before deciding so the carried [triggeringState] surfaces as the
-    // domain type.
-    _stateSubscription = _platform.stateStream.listen((platformState) {
-      final domainState = _mapPlatformState(platformState);
-      if (domainState != BluetoothState.on) {
-        _invalidate(domainState);
-      }
-    });
+    // domain type. Errors surfaced by the platform stream are treated
+    // as invalidation with `unknown` as the triggering state — we
+    // don't know the real adapter state, so the conservative choice
+    // is to kill the server and force the consumer to recreate.
+    _stateSubscription = _platform.stateStream.listen(
+      (platformState) {
+        final domainState = _mapPlatformState(platformState);
+        if (domainState != BluetoothState.on) {
+          _invalidate(domainState);
+        }
+      },
+      onError: (_) => _invalidate(BluetoothState.unknown),
+    );
   }
 
   /// Maps the platform-interface [platform.BluetoothState] to the
@@ -251,6 +276,16 @@ class BlueyServer implements Server {
     // Clear cached state — connected clients are gone with the adapter.
     _connectedClients.clear();
     _identifiedPeerClientIds.clear();
+
+    // Transition the advertising state machine into its terminal
+    // `invalidated` state and close the broadcast controller so the
+    // per-subscriber `advertisingStateChanges` streams see `onDone`
+    // after delivering the replay. Re-entry into _setAdvertisingState
+    // is guarded by the same-state short-circuit.
+    _setAdvertisingState(AdvertisingState.invalidated);
+    if (!_advertisingStateController.isClosed) {
+      _advertisingStateController.close();
+    }
   }
 
   /// Throws [StaleHandleException] if this server has been invalidated
@@ -268,9 +303,72 @@ class BlueyServer implements Server {
   ServerId get serverId => _serverId;
 
   @override
-  bool get isAdvertising {
-    _ensureValid();
-    return _isAdvertising;
+  AdvertisingState get advertisingState => _advertisingState;
+
+  @override
+  Stream<AdvertisingState> get advertisingStateChanges =>
+      Stream<AdvertisingState>.multi(
+    (controller) {
+      // Convention 3 (terminal-signal) — late subscribers after
+      // invalidation see the terminal `AdvertisingState.invalidated`
+      // value followed by `onDone`. Matches the explicit pattern used
+      // in `BlueyConnection.stateChanges` so all Type A streams in
+      // bluey share the same late-subscriber shape.
+      if (_invalidated) {
+        controller.add(AdvertisingState.invalidated);
+        controller.close();
+        return;
+      }
+      // Convention 2 (replay-on-subscribe) — replay the current state
+      // before bridging future deltas.
+      controller.add(_advertisingState);
+      final sub = _advertisingStateController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
+
+  @override
+  bool get isAdvertising => _advertisingState == AdvertisingState.advertising;
+
+  /// Transition helper. Pushes the new state onto
+  /// [_advertisingStateController] and emits the corresponding lifecycle
+  /// event on [_eventBus] when one is defined for the transition.
+  /// Idempotent for same-state writes.
+  void _setAdvertisingState(AdvertisingState newState) {
+    if (_advertisingState == newState) return;
+    final old = _advertisingState;
+    _advertisingState = newState;
+    if (!_advertisingStateController.isClosed) {
+      _advertisingStateController.add(newState);
+    }
+    switch (newState) {
+      case AdvertisingState.starting:
+        _eventBus.emit(AdvertisingStartingEvent(source: 'BlueyServer'));
+      case AdvertisingState.advertising:
+        _eventBus.emit(AdvertisingStartedEvent(
+          name: _activeAdvertisingName,
+          services: _activeAdvertisingServices,
+          source: 'BlueyServer',
+        ));
+      case AdvertisingState.stopping:
+        _eventBus.emit(AdvertisingStoppingEvent(source: 'BlueyServer'));
+      case AdvertisingState.idle:
+        if (old != AdvertisingState.idle) {
+          _eventBus.emit(AdvertisingStoppedEvent(source: 'BlueyServer'));
+        }
+        _activeAdvertisingName = null;
+        _activeAdvertisingServices = null;
+      case AdvertisingState.invalidated:
+        // No event — the advertisingStateChanges terminal close and I333
+        // instance invalidation are sufficient signals.
+        _activeAdvertisingName = null;
+        _activeAdvertisingServices = null;
+    }
   }
 
   @override
@@ -458,20 +556,32 @@ class BlueyServer implements Server {
       mode: mode == null ? null : _mapAdvertiseModeToPlatform(mode),
     );
 
-    await _platform.startAdvertising(config);
-    _isAdvertising = true;
+    // Stash the advertise args so `_setAdvertisingState` can ride them
+    // through to the emitted AdvertisingStartedEvent. Cleared when we
+    // transition back to idle/invalidated.
+    _activeAdvertisingName = name;
+    _activeAdvertisingServices = services;
+
+    // idle -> starting. Emits AdvertisingStartingEvent via
+    // _setAdvertisingState.
+    _setAdvertisingState(AdvertisingState.starting);
+    try {
+      await _platform.startAdvertising(config);
+    } catch (_) {
+      // Roll back to idle on platform failure. This transition fires
+      // AdvertisingStoppedEvent (paired with the AdvertisingStartingEvent
+      // already emitted), matching Scanner's behavior on a failed
+      // _platform.scan() — consumers see Starting → Stopped without an
+      // intervening Started.
+      _setAdvertisingState(AdvertisingState.idle);
+      rethrow;
+    }
+    _setAdvertisingState(AdvertisingState.advertising);
     _logger.log(
       BlueyLogLevel.info,
       'bluey.server',
       'advertising started',
       data: {'name': name, 'serviceCount': services?.length ?? 0},
-    );
-    _emitEvent(
-      AdvertisingStartedEvent(
-        name: name,
-        services: services,
-        source: 'BlueyServer',
-      ),
     );
   }
 
@@ -479,9 +589,11 @@ class BlueyServer implements Server {
   Future<void> stopAdvertising() async {
     _ensureValid();
     _logger.log(BlueyLogLevel.info, 'bluey.server', 'stopAdvertising invoked');
+    // Idempotent: nothing to do unless we are currently advertising.
+    if (_advertisingState != AdvertisingState.advertising) return;
+    _setAdvertisingState(AdvertisingState.stopping);
     await _platform.stopAdvertising();
-    _isAdvertising = false;
-    _emitEvent(AdvertisingStoppedEvent(source: 'BlueyServer'));
+    _setAdvertisingState(AdvertisingState.idle);
   }
 
   @override
@@ -704,7 +816,8 @@ class BlueyServer implements Server {
 
   @override
   Future<void> dispose() async {
-    if (!_invalidated && _isAdvertising) {
+    if (!_invalidated &&
+        _advertisingState == AdvertisingState.advertising) {
       await stopAdvertising();
     }
 
@@ -727,6 +840,9 @@ class BlueyServer implements Server {
     await _disconnectionsController.close();
     await _filteredReadRequestsController.close();
     await _filteredWriteRequestsController.close();
+    if (!_advertisingStateController.isClosed) {
+      await _advertisingStateController.close();
+    }
 
     _connectedClients.clear();
   }

@@ -60,6 +60,7 @@ class ConnectionStateChip extends StatelessWidget {
       bluey.ConnectionState.connecting => (Colors.orange, 'Connecting'),
       bluey.ConnectionState.disconnecting => (Colors.orange, 'Disconnecting'),
       bluey.ConnectionState.disconnected => (Colors.grey, 'Disconnected'),
+      bluey.ConnectionState.invalidated => (Colors.red, 'Invalidated'),
     };
 
     return Chip(

@@ -22,7 +22,7 @@ void main() {
   group('BlueyServer addService → startAdvertising ordering (I080)', () {
     test('startAdvertising waits for an in-flight addService to complete '
         'even when the user does not await between them', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
 
       // Hold the next platform addService — the user-added service will
@@ -74,7 +74,7 @@ void main() {
 
     test('startAdvertising with no in-flight addService completes normally '
         '(regression guard)', () async {
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
 
       // Add a service and await it before calling startAdvertising.

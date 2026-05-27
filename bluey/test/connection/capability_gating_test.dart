@@ -21,7 +21,7 @@ void main() {
     final fakePlatform = FakeBlueyPlatform(capabilities: caps);
     platform.BlueyPlatform.instance = fakePlatform;
     fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
-    final bluey = Bluey();
+    final bluey = await Bluey.create();
     final conn = await bluey.connect(deviceFor(TestDeviceIds.device1));
     return (conn: conn, bluey: bluey);
   }
@@ -245,7 +245,7 @@ void main() {
           capabilities: platform.Capabilities.iOS,
         );
         platform.BlueyPlatform.instance = fakePlatform;
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         expect(
           () => bluey.bondedDevices,
           throwsA(
@@ -268,7 +268,7 @@ void main() {
         ),
       );
       platform.BlueyPlatform.instance = fakePlatform;
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final devices = await bluey.bondedDevices;
       expect(devices, isA<List<Device>>());
       bluey.dispose();
@@ -281,7 +281,7 @@ void main() {
     ) async {
       final fakePlatform = FakeBlueyPlatform(capabilities: caps);
       platform.BlueyPlatform.instance = fakePlatform;
-      final bluey = Bluey();
+      final bluey = await Bluey.create();
       final server = bluey.server()!;
       return (server: server, bluey: bluey);
     }

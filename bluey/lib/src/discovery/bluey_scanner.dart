@@ -14,13 +14,26 @@ import '../shared/uuid.dart';
 import 'advertisement.dart';
 import 'device.dart';
 import 'scan_result.dart';
+import 'scan_state.dart';
 import 'scanner.dart';
 
 /// Concrete implementation of [Scanner] that delegates to the platform.
 class BlueyScanner implements Scanner {
   final platform.BlueyPlatform _platform;
   final EventPublisher _eventBus;
-  bool _isScanning = false;
+
+  // I333/stream-conv: state machine replaces the previous boolean
+  // `_isScanning`. The public `isScanning` getter remains, derived from
+  // `_state == ScanState.scanning`.
+  ScanState _state = ScanState.stopped;
+
+  /// Broadcast controller for state-change deltas. `stateChanges`
+  /// wraps this in a `Stream.multi` per the Task 6/7 convention so
+  /// every new subscriber gets the current state replayed before
+  /// receiving subsequent deltas.
+  final StreamController<ScanState> _stateController =
+      StreamController<ScanState>.broadcast();
+
   Timer? _timeoutTimer;
   StreamSubscription<platform.PlatformDevice>? _platformSubscription;
 
@@ -38,17 +51,31 @@ class BlueyScanner implements Scanner {
   /// silent hang.
   final List<StreamController<ScanResult>> _activeScanControllers = [];
 
+  /// Arguments of the currently-active scan, captured on `scan()` and
+  /// read by `_setState` so the emitted `ScanStartingEvent` and
+  /// `ScanStartedEvent` carry the same `serviceFilter`/`timeout` payload
+  /// as the direct emits they replaced. Cleared on transition back to
+  /// `stopped` / `invalidated`.
+  List<UUID>? _activeServiceFilter;
+  Duration? _activeTimeout;
+
   BlueyScanner(this._platform, this._eventBus) {
     // I333: mirror BlueyServer / BlueyConnection — invalidate on any
     // non-`on` adapter state. Map the platform-interface enum to the
     // domain enum before deciding so [triggeringState] surfaces as the
-    // domain type.
-    _stateSubscription = _platform.stateStream.listen((platformState) {
-      final domainState = _mapPlatformState(platformState);
-      if (domainState != BluetoothState.on) {
-        _invalidate(domainState);
-      }
-    });
+    // domain type. Errors surfaced by the platform stream are treated
+    // as invalidation with `unknown` as the triggering state — we
+    // don't know the real adapter state, so the conservative choice
+    // is to kill the instance and force the consumer to recreate.
+    _stateSubscription = _platform.stateStream.listen(
+      (platformState) {
+        final domainState = _mapPlatformState(platformState);
+        if (domainState != BluetoothState.on) {
+          _invalidate(domainState);
+        }
+      },
+      onError: (_) => _invalidate(BluetoothState.unknown),
+    );
   }
 
   /// Maps the platform-interface [platform.BluetoothState] to the
@@ -96,7 +123,15 @@ class BlueyScanner implements Scanner {
       if (!c.isClosed) c.close();
     }
     _activeScanControllers.clear();
-    _isScanning = false;
+
+    // Transition to invalidated terminal state and close the
+    // stateChanges stream (Convention 3 — terminal close on
+    // invalidation). Re-entry into _setState is guarded against by
+    // the `if (_state == newState) return` short-circuit.
+    _setState(ScanState.invalidated);
+    if (!_stateController.isClosed) {
+      _stateController.close();
+    }
   }
 
   /// Throws [StaleHandleException] if this scanner has been invalidated
@@ -111,7 +146,75 @@ class BlueyScanner implements Scanner {
   }
 
   @override
-  bool get isScanning => _isScanning;
+  ScanState get state => _state;
+
+  @override
+  Stream<ScanState> get stateChanges => Stream<ScanState>.multi(
+    (controller) {
+      // Convention 3 (terminal-signal) — late subscribers after
+      // invalidation see the terminal `ScanState.invalidated` value
+      // followed by `onDone`. Matches the explicit pattern used in
+      // `BlueyConnection.stateChanges` so all Type A streams in bluey
+      // share the same late-subscriber shape.
+      if (_invalidated) {
+        controller.add(ScanState.invalidated);
+        controller.close();
+        return;
+      }
+      // Convention 2 (replay-on-subscribe) — replay the current state
+      // before bridging future deltas.
+      controller.add(_state);
+      final sub = _stateController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    },
+    isBroadcast: true,
+  );
+
+  @override
+  bool get isScanning => _state == ScanState.scanning;
+
+  /// Transition helper. Pushes the new state onto [_stateController] and
+  /// emits the corresponding lifecycle event on [_eventBus] when one is
+  /// defined for the transition. Idempotent for same-state writes.
+  void _setState(ScanState newState) {
+    if (_state == newState) return;
+    final old = _state;
+    _state = newState;
+    if (!_stateController.isClosed) {
+      _stateController.add(newState);
+    }
+    switch (newState) {
+      case ScanState.starting:
+        _eventBus.emit(ScanStartingEvent(
+          serviceFilter: _activeServiceFilter,
+          timeout: _activeTimeout,
+          source: 'BlueyScanner',
+        ));
+      case ScanState.scanning:
+        _eventBus.emit(ScanStartedEvent(
+          serviceFilter: _activeServiceFilter,
+          timeout: _activeTimeout,
+          source: 'BlueyScanner',
+        ));
+      case ScanState.stopping:
+        _eventBus.emit(ScanStoppingEvent(source: 'BlueyScanner'));
+      case ScanState.stopped:
+        if (old != ScanState.stopped) {
+          _eventBus.emit(ScanStoppedEvent(source: 'BlueyScanner'));
+        }
+        _activeServiceFilter = null;
+        _activeTimeout = null;
+      case ScanState.invalidated:
+        // No event — the stateChanges terminal close and I333 instance
+        // invalidation are sufficient signals.
+        _activeServiceFilter = null;
+        _activeTimeout = null;
+    }
+  }
 
   @override
   Stream<ScanResult> scan({List<UUID>? services, Duration? timeout}) {
@@ -121,16 +224,36 @@ class BlueyScanner implements Scanner {
       timeoutMs: timeout?.inMilliseconds,
     );
 
-    _isScanning = true;
-    _eventBus.emit(ScanStartedEvent(serviceFilter: services, timeout: timeout));
+    // Stash the scan args so `_setState` can ride them through to the
+    // emitted ScanStartingEvent / ScanStartedEvent. Cleared when we
+    // transition back to stopped/invalidated.
+    _activeServiceFilter = services;
+    _activeTimeout = timeout;
 
-    final controller = StreamController<ScanResult>();
+    // stopped -> starting. Emits ScanStartingEvent via _setState.
+    _setState(ScanState.starting);
+
+    final controller = StreamController<ScanResult>(
+      onCancel: () {
+        // Convention 5 — last-subscriber cancel stops the platform
+        // resource. stop() is idempotent: returns early if we are
+        // already stopped/stopping.
+        return stop();
+      },
+    );
     _activeScanControllers.add(controller);
 
     _platformSubscription = _platform
         .scan(config)
         .listen(
           (platformDevice) {
+            // Real platforms don't fire a discrete "scan started" event
+            // distinct from the subscription succeeding, so we treat
+            // the first device emission as confirmation. The post-listen
+            // microtask below covers the no-devices case.
+            if (_state == ScanState.starting) {
+              _setState(ScanState.scanning);
+            }
             final result = _mapScanResult(platformDevice);
             _eventBus.emit(
               DeviceDiscoveredEvent(
@@ -156,6 +279,16 @@ class BlueyScanner implements Scanner {
           },
         );
 
+    // The platform `scan()` call has returned a stream and we've
+    // subscribed; treat that as confirmation that scanning is now
+    // active. Done in a microtask so the `starting` transition is
+    // observable on `stateChanges` before `scanning` overwrites it.
+    scheduleMicrotask(() {
+      if (_state == ScanState.starting) {
+        _setState(ScanState.scanning);
+      }
+    });
+
     if (timeout != null) {
       _timeoutTimer = Timer(
         timeout,
@@ -172,23 +305,34 @@ class BlueyScanner implements Scanner {
   }
 
   void _finishScan(StreamController<ScanResult> controller) {
-    _isScanning = false;
-    _eventBus.emit(ScanStoppedEvent());
     if (!controller.isClosed) {
       controller.close();
     }
     _activeScanControllers.remove(controller);
+    // If the platform stream completed on its own (e.g. timeout-driven
+    // close from the platform side) we still need to land in `stopped`.
+    // Guard against the invalidated terminal — _setState already no-ops
+    // for same-state writes but invalidated must remain terminal.
+    if (_state != ScanState.invalidated && _state != ScanState.stopped) {
+      _setState(ScanState.stopped);
+    }
   }
 
   @override
   Future<void> stop() async {
     _timeoutTimer?.cancel();
-    if (!_isScanning) return;
+    // Idempotent: nothing to do if we're already stopped/stopping or if
+    // the scanner has been invalidated.
+    if (_state == ScanState.stopped ||
+        _state == ScanState.stopping ||
+        _state == ScanState.invalidated) {
+      return;
+    }
+    _setState(ScanState.stopping);
     await _platform.stopScan();
     _platformSubscription?.cancel();
     _platformSubscription = null;
-    _isScanning = false;
-    _eventBus.emit(ScanStoppedEvent());
+    _setState(ScanState.stopped);
   }
 
   @override
@@ -207,7 +351,17 @@ class BlueyScanner implements Scanner {
       if (!c.isClosed) c.close();
     }
     _activeScanControllers.clear();
-    _isScanning = false;
+    // Land the state machine in `stopped` so `isScanning` flips back to
+    // false. Skip if we're already in a terminal/rest state to avoid
+    // emitting stale events. `invalidated` remains terminal.
+    if (_state != ScanState.invalidated && _state != ScanState.stopped) {
+      _setState(ScanState.stopped);
+    }
+    // Close the state controller if dispose ran without prior
+    // invalidation. Safe to call on an already-closed controller.
+    if (!_stateController.isClosed) {
+      _stateController.close();
+    }
   }
 
   ScanResult _mapScanResult(platform.PlatformDevice platformDevice) {

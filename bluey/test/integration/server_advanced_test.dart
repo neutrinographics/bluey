@@ -22,7 +22,7 @@ void main() {
   group('Server Advanced Scenarios', () {
     group('Central Subscription Tracking', () {
       test('tracks which centrals are connected', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -60,7 +60,7 @@ void main() {
       });
 
       test('tracks central disconnections', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -98,7 +98,7 @@ void main() {
       });
 
       test('can notify specific central only', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -136,7 +136,7 @@ void main() {
       });
 
       test('broadcast notifies all connected centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -169,7 +169,7 @@ void main() {
 
     group('Read Request Handling', () {
       test('handles read requests from different centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -222,7 +222,7 @@ void main() {
       });
 
       test('can reject read requests', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -268,7 +268,7 @@ void main() {
 
     group('Write Request Handling', () {
       test('handles write requests with response', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -312,7 +312,7 @@ void main() {
       });
 
       test('handles write without response', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -357,7 +357,7 @@ void main() {
       });
 
       test('can reject write requests', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -403,7 +403,7 @@ void main() {
 
     group('Multiple Services', () {
       test('serves multiple services simultaneously', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         // Add multiple services
@@ -459,7 +459,7 @@ void main() {
       });
 
       test('removes service while others remain', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -495,7 +495,7 @@ void main() {
 
     group('Advertising with Manufacturer Data', () {
       test('includes manufacturer data in advertisement', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -530,7 +530,7 @@ void main() {
 
     group('Server Disconnect Central', () {
       test('closeServer disconnects all centrals', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(
@@ -560,7 +560,7 @@ void main() {
 
     group('Concurrent Central Operations', () {
       test('handles rapid connects and disconnects', () async {
-        final bluey = Bluey();
+        final bluey = await Bluey.create();
         final server = bluey.server()!;
 
         await server.addService(

@@ -561,10 +561,10 @@ void main() {
   late MockBlueyPlatform mockPlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     mockPlatform = MockBlueyPlatform();
     platform.BlueyPlatform.instance = mockPlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {
@@ -586,7 +586,7 @@ void main() {
           // Create a new instance with non-advertising platform
           final nonAdvertisingPlatform = _NonAdvertisingPlatform();
           platform.BlueyPlatform.instance = nonAdvertisingPlatform;
-          final bluey2 = Bluey();
+          final bluey2 = await Bluey.create();
 
           final server = bluey2.server();
           expect(server, isNull);

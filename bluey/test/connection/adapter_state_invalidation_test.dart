@@ -18,12 +18,12 @@ void main() {
     name: 'Test',
   );
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform(
       capabilities: platform.Capabilities.android,
     );
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
     fakePlatform.simulatePeripheral(id: TestDeviceIds.device1, name: 'Test');
   });
 
@@ -113,6 +113,35 @@ void main() {
       // scan() returns a stream, not a Future — just verify it can be called.
       final stream = secondScanner.scan();
       expect(stream, isA<Stream<ScanResult>>());
+    });
+
+    // H1 — defensive: if the platform's stateStream surfaces an error
+    // (e.g. native channel glitch), the live Connection must invalidate
+    // rather than let an unhandled async error escape.
+    test('Connection: platform stateStream error invalidates', () async {
+      final connection = await bluey.connect(deviceFor(TestDeviceIds.device1));
+      expect(connection.state, isNot(equals(ConnectionState.invalidated)));
+
+      fakePlatform.simulateStateError(StateError('platform glitch'));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(connection.state, equals(ConnectionState.invalidated));
+    });
+
+    // H1 — defensive: if the platform's stateStream surfaces an error,
+    // the live Server must invalidate rather than let an unhandled
+    // async error escape.
+    test('Server: platform stateStream error invalidates', () async {
+      final server = bluey.server()!;
+      expect(
+        server.advertisingState,
+        isNot(equals(AdvertisingState.invalidated)),
+      );
+
+      fakePlatform.simulateStateError(StateError('platform glitch'));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(server.advertisingState, equals(AdvertisingState.invalidated));
     });
   });
 }

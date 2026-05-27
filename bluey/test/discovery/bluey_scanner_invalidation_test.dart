@@ -11,12 +11,12 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform(
       capabilities: platform.Capabilities.android,
     );
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {
@@ -74,5 +74,17 @@ void main() {
         }
       },
     );
+
+    // H1 — defensive: if the platform's stateStream surfaces an error
+    // (e.g. native channel glitch), the scanner must invalidate rather
+    // than let an unhandled async error escape.
+    test('platform stateStream error invalidates the scanner', () async {
+      final scanner = bluey.scanner();
+
+      fakePlatform.simulateStateError(StateError('platform glitch'));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
+    });
   });
 }

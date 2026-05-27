@@ -9,10 +9,10 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {
@@ -69,7 +69,11 @@ void main() {
 
       final subscription = scanner.scan().listen((_) {});
 
-      // isScanning should be true after scan() is called
+      // Post-stream-conv: scan() now transitions `stopped -> starting`
+      // synchronously and `starting -> scanning` on a microtask, so
+      // `isScanning` (derived from `_state == ScanState.scanning`)
+      // requires a microtask boundary before it flips to true.
+      await Future<void>.delayed(Duration.zero);
       expect(scanner.isScanning, isTrue);
 
       await subscription.cancel();
@@ -95,6 +99,8 @@ void main() {
       final scanner = bluey.scanner();
 
       final subscription = scanner.scan().listen((_) {});
+      // Wait a microtask for starting -> scanning (see comment above).
+      await Future<void>.delayed(Duration.zero);
       expect(scanner.isScanning, isTrue);
 
       await scanner.stop();
@@ -175,6 +181,8 @@ void main() {
       final scanner = bluey.scanner();
 
       final subscription = scanner.scan().listen((_) {});
+      // Wait a microtask for starting -> scanning (see comment above).
+      await Future<void>.delayed(Duration.zero);
       expect(scanner.isScanning, isTrue);
 
       scanner.dispose();
@@ -288,6 +296,12 @@ void main() {
       final subscription = scanner.scan().listen((_) {});
       await scanner.stop();
       await subscription.cancel();
+      // Post-stream-conv: ScanStoppedEvent is emitted on the
+      // `stopping -> stopped` transition after the platform-side stop
+      // resolves. The broadcast event bus delivers asynchronously, so
+      // give pending microtasks a chance to drain before cancelling
+      // the listener.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       scanner.dispose();
 
       await eventSub.cancel();

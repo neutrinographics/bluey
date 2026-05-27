@@ -19,7 +19,10 @@ final getIt = GetIt.instance;
 /// `Bluey` instance shared across all bounded contexts.
 Future<void> setupServiceLocator({required ServerId localIdentity}) async {
   // Core dependency: identity-bound Bluey shared across all features.
-  getIt.registerLazySingleton<Bluey>(() => Bluey(localIdentity: localIdentity));
+  // Constructed eagerly via the async factory so the first feature to
+  // touch it never sees `BluetoothState.unknown` — see `Bluey.create`.
+  final bluey = await Bluey.create(localIdentity: localIdentity);
+  getIt.registerSingleton<Bluey>(bluey);
 
   // Bounded context registrations
   registerScannerDependencies(getIt);

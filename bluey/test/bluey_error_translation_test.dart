@@ -17,10 +17,10 @@ void main() {
   late _ErroringFakePlatform mockPlatform;
   late Bluey bluey;
 
-  setUp(() {
+  setUp(() async {
     mockPlatform = _ErroringFakePlatform();
     platform.BlueyPlatform.instance = mockPlatform;
-    bluey = Bluey();
+    bluey = await Bluey.create();
   });
 
   tearDown(() async {

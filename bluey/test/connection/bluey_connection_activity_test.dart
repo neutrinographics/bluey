@@ -29,14 +29,15 @@ void main() {
   group('BlueyConnection activity — own methods', () {
     test(
       'requestMtu on success records activity so the probe deadline resets',
-      () {
+      () async {
+        final bluey = await Bluey.create();
         fakeAsync((async) {
           fakePlatform.simulateBlueyServer(
             address: TestDeviceIds.device1,
             serverId: ServerId.generate(),
           );
 
-          final bluey = Bluey();
+
           late Connection conn;
           bluey
               .connect(
