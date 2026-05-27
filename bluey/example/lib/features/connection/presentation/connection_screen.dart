@@ -6,7 +6,10 @@ import 'package:bluey/bluey.dart' as bluey;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/recovery_notifier.dart';
+import '../../../shared/presentation/adapter_cycle_hint.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/invalidation_banner.dart';
 import '../../../shared/presentation/section_header.dart';
 import '../../../shared/domain/uuid_names.dart';
 import '../../service_explorer/presentation/service_screen.dart';
@@ -46,17 +49,21 @@ class ConnectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create:
-          (context) => ConnectionCubit(
-            device: device,
-            connectToDevice: getIt<ConnectToDevice>(),
-            disconnectDevice: getIt<DisconnectDevice>(),
-            getServices: getIt<GetServices>(),
-            watchPeer: getIt<WatchPeer>(),
-            settingsCubit: getIt<ConnectionSettingsCubit>(),
-          )..connect(),
-      child: const _ConnectionView(),
+    return ValueListenableBuilder<int>(
+      valueListenable: getIt<RecoveryNotifier>(),
+      builder: (context, tick, _) => BlocProvider(
+        key: ValueKey('connection-$tick'),
+        create:
+            (context) => ConnectionCubit(
+              device: device,
+              connectToDevice: getIt<ConnectToDevice>(),
+              disconnectDevice: getIt<DisconnectDevice>(),
+              getServices: getIt<GetServices>(),
+              watchPeer: getIt<WatchPeer>(),
+              settingsCubit: getIt<ConnectionSettingsCubit>(),
+            )..connect(),
+        child: const _ConnectionView(),
+      ),
     );
   }
 }
@@ -91,6 +98,19 @@ class _ConnectionView extends StatelessWidget {
             children: [
               _buildBody(context, state),
               _TopBar(deviceName: state.device.name),
+              if (state.isInvalidated)
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 64,
+                  left: 0,
+                  right: 0,
+                  child: InvalidationBanner(onRecover: () => recreateBluey()),
+                ),
+              Positioned(
+                bottom: MediaQuery.of(context).padding.bottom,
+                left: 0,
+                right: 0,
+                child: const AdapterCycleHint(),
+              ),
             ],
           ),
         );
