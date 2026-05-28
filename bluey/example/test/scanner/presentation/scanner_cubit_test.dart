@@ -67,6 +67,84 @@ void main() {
   }
 
   group('ScannerCubit', () {
+    // P1: Eager scanner creation crashes when BT off
+    test(
+      'initialize() does not access scanner when BT is off',
+      () async {
+        // Override BT state to emit off — scanner must NOT be accessed.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.off));
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.off);
+        // Intentionally do NOT stub mockRepository.scanner so that any
+        // access throws a MissingStubError (mocktail's noSuchMethod).
+
+        final cubit = createCubit();
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(cubit.state.bluetoothState, BluetoothState.off);
+        verifyNever(() => mockRepository.scanner);
+        await cubit.close();
+      },
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'attaches scanner subscription when BT transitions to on',
+      setUp: () {
+        final btController = StreamController<BluetoothState>();
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => btController.stream);
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.off);
+        // Emit off then on inside act via the controller captured here.
+        // We add events in act through a fresh controller, so store it
+        // on the stream stub.
+        addTearDown(btController.close);
+        // Emit off → on
+        btController.add(BluetoothState.off);
+        btController.add(BluetoothState.on);
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(cubit.state.bluetoothState, BluetoothState.on);
+        // repository.scanner should have been called to attach the
+        // scanner-state subscription once BT turned on.
+        verify(() => mockRepository.scanner).called(greaterThanOrEqualTo(1));
+      },
+    );
+
+    // P2: Missing onError on scan stream
+    blocTest<ScannerCubit, ScannerState>(
+      'scan stream error surfaces to state.error',
+      setUp: () {
+        // BT is on so initialize() can attach the scanner subscription.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.on);
+        // Arrange scan() to return a stream that immediately emits an error.
+        when(() => mockScanForDevices(timeout: any(named: 'timeout')))
+            .thenAnswer(
+              (_) => Stream.error(Exception('native scan failed')),
+            );
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        cubit.startScan();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(cubit.state.error, contains('Scan error'));
+      },
+    );
+
     test('initial state has stopped scanState and empty scanLog', () {
       final cubit = createCubit();
       expect(cubit.state.scanState, ScanState.stopped);
@@ -76,31 +154,45 @@ void main() {
 
     test(
       'initialize() subscribes to scanner via repository (not via Bluey.scanner())',
-      () {
+      () async {
+        // BT must be on for the lazy attach to trigger.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
         final cubit = createCubit();
         cubit.initialize();
+        // Allow the BT state event to propagate before verifying.
+        await Future<void>.delayed(const Duration(milliseconds: 5));
         // The repository.scanner getter must have been accessed; Bluey.scanner()
         // must NOT have been called directly (that would create a second instance).
         verify(() => mockRepository.scanner).called(greaterThanOrEqualTo(1));
         verifyNever(() => mockBluey.scanner());
-        cubit.close();
+        await cubit.close();
       },
     );
 
     blocTest<ScannerCubit, ScannerState>(
       'reflects ScanState transitions from scanner.stateChanges',
+      // BT must be on so the scanner subscription is attached before we emit
+      // scan state events.
+      setUp: () {
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+      },
       build: createCubit,
-      act: (cubit) {
+      act: (cubit) async {
         cubit.initialize();
+        // Allow the BT on event to propagate and attach the scanner sub.
+        await Future<void>.delayed(const Duration(milliseconds: 5));
         scanStateController.add(ScanState.starting);
         scanStateController.add(ScanState.scanning);
         scanStateController.add(ScanState.stopping);
         scanStateController.add(ScanState.stopped);
       },
       expect: () => [
-        // initialize() may or may not emit; use the matcher to verify
-        // the cubit reaches each scanState in order regardless of any
-        // intermediate emissions.
+        // BT.on causes a bluetoothState emit; subsequent scan state changes
+        // are appended in order.
+        isA<ScannerState>()
+            .having((s) => s.bluetoothState, 'bluetoothState', BluetoothState.on),
         isA<ScannerState>()
             .having((s) => s.scanState, 'scanState', ScanState.starting),
         isA<ScannerState>()
@@ -114,12 +206,20 @@ void main() {
 
     blocTest<ScannerCubit, ScannerState>(
       'reflects ScanState.invalidated when emitted',
+      // BT must be on so the scanner subscription is attached.
+      setUp: () {
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+      },
       build: createCubit,
-      act: (cubit) {
+      act: (cubit) async {
         cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
         scanStateController.add(ScanState.invalidated);
       },
       expect: () => [
+        isA<ScannerState>()
+            .having((s) => s.bluetoothState, 'bluetoothState', BluetoothState.on),
         isA<ScannerState>()
             .having((s) => s.scanState, 'scanState', ScanState.invalidated),
       ],

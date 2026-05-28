@@ -47,20 +47,16 @@ class ScannerCubit extends Cubit<ScannerState> {
     _stateSubscription = _getBluetoothState().listen(
       (bluetoothState) {
         emit(state.copyWith(bluetoothState: bluetoothState));
+        // Attach the scanner-state subscription lazily on the first
+        // BluetoothState.on event. Accessing the scanner before BT is on
+        // calls _requireAdapterOn() which throws, crashing the cubit.
+        if (bluetoothState == BluetoothState.on &&
+            _scanStateSubscription == null) {
+          _attachScannerStateSubscription();
+        }
       },
       onError: (error) {
         emit(state.copyWith(error: 'Bluetooth state error: $error'));
-      },
-    );
-
-    // Subscribe to state transitions on the repository's shared Scanner
-    // instance (replays current state on subscribe per Convention 2).
-    // Using the repository guarantees that the scanner watched here is
-    // the SAME instance that backs ScanForDevices.scan(), so state
-    // changes are always coherent with the active scan.
-    _scanStateSubscription = _repository.scanner.stateChanges.listen(
-      (scanState) {
-        emit(state.copyWith(scanState: scanState));
       },
     );
 
@@ -79,6 +75,21 @@ class ScannerCubit extends Cubit<ScannerState> {
                   : updated;
           emit(state.copyWith(scanLog: capped));
         }
+      },
+    );
+  }
+
+  /// Subscribes to state transitions on the repository's shared Scanner
+  /// instance. Called lazily on the first [BluetoothState.on] event so that
+  /// [_requireAdapterOn] inside `scanner` is never invoked while BT is off.
+  ///
+  /// Using the repository guarantees that the scanner watched here is the
+  /// SAME instance that backs [ScanForDevices.scan], so state changes are
+  /// always coherent with the active scan.
+  void _attachScannerStateSubscription() {
+    _scanStateSubscription = _repository.scanner.stateChanges.listen(
+      (scanState) {
+        emit(state.copyWith(scanState: scanState));
       },
     );
   }
@@ -111,6 +122,12 @@ class ScannerCubit extends Cubit<ScannerState> {
           results.add(result);
         }
         emit(state.copyWith(scanResults: _sorted(results)));
+      },
+      onError: (error) {
+        // Surface native scan errors to the UI. Do not manually flip any
+        // lifecycle state — scanner.stateChanges will deliver the transition
+        // through _scanStateSubscription.
+        emit(state.copyWith(error: 'Scan error: $error'));
       },
     );
   }
