@@ -77,23 +77,58 @@ class ConnectionStateChip extends StatelessWidget {
 
 /// A chip widget that displays the advertising state.
 class AdvertisingStateChip extends StatelessWidget {
-  final bool isAdvertising;
+  final bluey.AdvertisingState advertisingState;
 
-  const AdvertisingStateChip({super.key, required this.isAdvertising});
+  const AdvertisingStateChip({super.key, required this.advertisingState});
 
   @override
   Widget build(BuildContext context) {
+    final (color, avatar, label) = switch (advertisingState) {
+      bluey.AdvertisingState.idle => (
+        Colors.grey,
+        const Icon(Icons.cell_tower_outlined, color: Colors.white, size: 16),
+        'Idle',
+      ),
+      bluey.AdvertisingState.starting => (
+        Colors.orange,
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        'Starting',
+      ),
+      bluey.AdvertisingState.advertising => (
+        Colors.green,
+        const Icon(Icons.cell_tower, color: Colors.white, size: 16),
+        'Advertising',
+      ),
+      bluey.AdvertisingState.stopping => (
+        Colors.orange,
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        'Stopping',
+      ),
+      bluey.AdvertisingState.invalidated => (
+        Colors.red,
+        const Icon(Icons.error_outline, color: Colors.white, size: 16),
+        'Invalidated',
+      ),
+    };
+
     return Chip(
-      avatar: Icon(
-        isAdvertising ? Icons.cell_tower : Icons.cell_tower_outlined,
-        color: Colors.white,
-        size: 16,
-      ),
-      label: Text(
-        isAdvertising ? 'Advertising' : 'Idle',
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-      ),
-      backgroundColor: isAdvertising ? Colors.green : Colors.grey,
+      avatar: avatar,
+      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      backgroundColor: color,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
     );

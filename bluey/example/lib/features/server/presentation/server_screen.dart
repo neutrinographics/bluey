@@ -6,7 +6,11 @@ import 'package:bluey/bluey.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/recovery_notifier.dart';
+import '../../../shared/presentation/adapter_cycle_hint.dart';
+import '../../../shared/presentation/bluetooth_state_chip.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/invalidation_banner.dart';
 import '../application/check_server_support.dart';
 import '../application/set_server_identity.dart';
 import '../application/reset_server.dart';
@@ -63,27 +67,32 @@ class ServerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create:
-          (context) => ServerCubit(
-            checkServerSupport: getIt<CheckServerSupport>(),
-            setServerIdentity: getIt<SetServerIdentity>(),
-            resetServer: getIt<ResetServer>(),
-            startAdvertising: getIt<StartAdvertising>(),
-            stopAdvertising: getIt<StopAdvertising>(),
-            addService: getIt<AddService>(),
-            sendNotification: getIt<SendNotification>(),
-            observeConnections: getIt<ObserveConnections>(),
-            observePeerConnections: getIt<ObservePeerConnections>(),
-            disposeServer: getIt<DisposeServer>(),
-            getConnectedClients: getIt<GetConnectedClients>(),
-            observeDisconnections: getIt<ObserveDisconnections>(),
-            observeReadRequests: getIt<ObserveReadRequests>(),
-            observeWriteRequests: getIt<ObserveWriteRequests>(),
-            getServer: getIt<GetServer>(),
-            identityStorage: getIt<ServerIdentityStorage>(),
-          )..initialize(),
-      child: const _ServerView(),
+    return ValueListenableBuilder<int>(
+      valueListenable: getIt<RecoveryNotifier>(),
+      builder: (context, tick, _) => BlocProvider(
+        key: ValueKey('server-$tick'),
+        create:
+            (context) => ServerCubit(
+              checkServerSupport: getIt<CheckServerSupport>(),
+              setServerIdentity: getIt<SetServerIdentity>(),
+              resetServer: getIt<ResetServer>(),
+              startAdvertising: getIt<StartAdvertising>(),
+              stopAdvertising: getIt<StopAdvertising>(),
+              addService: getIt<AddService>(),
+              sendNotification: getIt<SendNotification>(),
+              observeConnections: getIt<ObserveConnections>(),
+              observePeerConnections: getIt<ObservePeerConnections>(),
+              disposeServer: getIt<DisposeServer>(),
+              getConnectedClients: getIt<GetConnectedClients>(),
+              observeDisconnections: getIt<ObserveDisconnections>(),
+              observeReadRequests: getIt<ObserveReadRequests>(),
+              observeWriteRequests: getIt<ObserveWriteRequests>(),
+              getServer: getIt<GetServer>(),
+              identityStorage: getIt<ServerIdentityStorage>(),
+              bluey: getIt<Bluey>(),
+            )..initialize(),
+        child: const _ServerView(),
+      ),
     );
   }
 }
@@ -111,12 +120,15 @@ class _ServerView extends StatelessWidget {
             child: Column(
               children: [
                 const _TopBar(),
+                if (state.advertisingState == AdvertisingState.invalidated)
+                  InvalidationBanner(onRecover: () => recreateBluey()),
                 Expanded(
                   child:
                       state.isSupported
                           ? _ServerContent(state: state)
                           : const _UnsupportedState(),
                 ),
+                const AdapterCycleHint(),
               ],
             ),
           ),
@@ -220,28 +232,7 @@ class _HeroCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Status indicator
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: state.isAdvertising ? _kAccentBlue : _kPillBg,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                state.isAdvertising ? 'ADVERTISING' : 'IDLE',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: state.isAdvertising ? _kAccentBlue : _kTextMedium,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
+          AdvertisingStateChip(advertisingState: state.advertisingState),
           const SizedBox(height: 16),
           // Device name
           Text(
@@ -314,10 +305,11 @@ class _HeroCard extends StatelessWidget {
                     ? Icons.stop_circle_outlined
                     : Icons.play_arrow,
             isPrimary: true,
-            onPressed:
-                state.isAdvertising
-                    ? cubit.stopAdvertising
-                    : cubit.startAdvertising,
+            onPressed: switch (state.advertisingState) {
+              AdvertisingState.advertising => cubit.stopAdvertising,
+              AdvertisingState.idle => cubit.startAdvertising,
+              _ => null, // starting / stopping / invalidated — transient
+            },
           ),
           const SizedBox(height: 16),
           _ActionButton(

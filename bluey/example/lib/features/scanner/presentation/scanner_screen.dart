@@ -6,14 +6,17 @@ import 'package:bluey/bluey.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/di/service_locator.dart';
+import '../../../shared/domain/recovery_notifier.dart';
 import '../../../shared/domain/uuid_names.dart';
+import '../../../shared/presentation/adapter_cycle_hint.dart';
 import '../../../shared/presentation/error_snackbar.dart';
+import '../../../shared/presentation/invalidation_banner.dart';
 import '../../connection/presentation/connection_screen.dart';
 import '../application/scan_for_devices.dart';
-import '../application/stop_scan.dart';
 import '../application/get_bluetooth_state.dart';
 import '../application/request_permissions.dart';
 import '../application/request_enable.dart';
+import '../domain/scanner_repository.dart';
 import 'scanner_cubit.dart';
 import 'scanner_state.dart';
 
@@ -65,16 +68,21 @@ class ScannerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create:
-          (context) => ScannerCubit(
-            scanForDevices: getIt<ScanForDevices>(),
-            stopScan: getIt<StopScan>(),
-            getBluetoothState: getIt<GetBluetoothState>(),
-            requestPermissions: getIt<RequestPermissions>(),
-            requestEnable: getIt<RequestEnable>(),
-          )..initialize(),
-      child: const _ScannerView(),
+    return ValueListenableBuilder<int>(
+      valueListenable: getIt<RecoveryNotifier>(),
+      builder: (context, tick, _) => BlocProvider(
+        key: ValueKey('scanner-$tick'),
+        create:
+            (context) => ScannerCubit(
+              scanForDevices: getIt<ScanForDevices>(),
+              getBluetoothState: getIt<GetBluetoothState>(),
+              requestPermissions: getIt<RequestPermissions>(),
+              requestEnable: getIt<RequestEnable>(),
+              repository: getIt<ScannerRepository>(),
+              bluey: getIt<Bluey>(),
+            )..initialize(),
+        child: const _ScannerView(),
+      ),
     );
   }
 }
@@ -102,7 +110,11 @@ class _ScannerView extends StatelessWidget {
             child: Column(
               children: [
                 const _TopBar(),
+                if (state.scanState == ScanState.invalidated)
+                  InvalidationBanner(onRecover: () => recreateBluey()),
                 Expanded(child: _buildContent(state)),
+                const AdapterCycleHint(),
+                SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
             ),
           ),
@@ -110,7 +122,7 @@ class _ScannerView extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).padding.bottom,
             ),
-            child: _ScanFab(isScanning: state.isScanning),
+            child: _ScanFab(scanState: state.scanState),
           ),
         );
       },
@@ -201,7 +213,60 @@ class _ScannerContent extends StatelessWidget {
         ] else if (!state.isScanning) ...[
           const _EmptyDeviceHint(),
         ],
+        if (state.scanLog.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          _ScanLogPanel(events: state.scanLog),
+        ],
       ],
+    );
+  }
+}
+
+// -- Scan log panel --
+
+class _ScanLogPanel extends StatelessWidget {
+  final List<BlueyEvent> events;
+
+  const _ScanLogPanel({required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    // Cap displayed entries; the cubit already caps the underlying log
+    // at 100 — show the most recent 20 for readability on the screen.
+    final shown = events.reversed.take(20).toList();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SCAN EVENTS',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _kTextMedium,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...shown.map(
+            (event) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                event.toString(),
+                style: GoogleFonts.robotoMono(
+                  fontSize: 11,
+                  color: _kTextLight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -819,13 +884,17 @@ class _HeroCard extends StatelessWidget {
 // -- Circular scan FAB --
 
 class _ScanFab extends StatelessWidget {
-  final bool isScanning;
+  final ScanState scanState;
 
-  const _ScanFab({required this.isScanning});
+  const _ScanFab({required this.scanState});
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<ScannerCubit>();
+
+    final isScanning = scanState == ScanState.scanning;
+    final isTransient =
+        scanState == ScanState.starting || scanState == ScanState.stopping;
 
     return Container(
       width: 64,
@@ -846,7 +915,12 @@ class _ScanFab extends StatelessWidget {
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: isScanning ? cubit.stopScan : cubit.startScan,
+          onTap:
+              isTransient
+                  ? null
+                  : isScanning
+                  ? cubit.stopScan
+                  : cubit.startScan,
           child: Center(
             child: Icon(
               isScanning ? Icons.stop : Icons.bluetooth_searching,

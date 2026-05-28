@@ -121,6 +121,15 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
           }
         },
         onError: (error) {
+          if (error is StaleHandleException) {
+            emit(
+              state.copyWith(
+                connectionState: ConnectionState.invalidated,
+                error: null,
+              ),
+            );
+            return;
+          }
           emit(
             state.copyWith(
               connectionState: ConnectionState.disconnected,
@@ -130,12 +139,7 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         },
       );
 
-      emit(
-        state.copyWith(
-          connection: connection,
-          connectionState: connection.state,
-        ),
-      );
+      emit(state.copyWith(connection: connection));
 
       // Watch peer status across the connection's lifetime. The stream
       // emits the initial tryUpgrade result (possibly null), then
@@ -168,7 +172,12 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         },
       );
 
-      // Load services after connecting
+      // Trigger initial discovery. `Connection.services()` is lazy —
+      // it's the only thing that populates the library's
+      // `_cachedServices` and emits onto `servicesChanges`. Without
+      // this call, the subscription above only replays an empty list
+      // and consumer UI gated on specific services (e.g. the "Stress
+      // Tests" button) stays hidden forever.
       await loadServices();
     } on BlueyException catch (e) {
       emit(

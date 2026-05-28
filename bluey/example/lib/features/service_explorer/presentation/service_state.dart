@@ -25,6 +25,11 @@ class CharacteristicState {
   final List<LogEntry> log;
   final String? error;
 
+  /// True when a [StaleHandleException] has been received. This is a terminal
+  /// state — no further operations will be attempted. Recovery requires
+  /// recreating the connection via the parent connection screen.
+  final bool isInvalidated;
+
   const CharacteristicState({
     required this.characteristic,
     this.userDescription,
@@ -34,6 +39,7 @@ class CharacteristicState {
     this.isSubscribed = false,
     this.log = const [],
     this.error,
+    this.isInvalidated = false,
   });
 
   CharacteristicState copyWith({
@@ -44,6 +50,7 @@ class CharacteristicState {
     bool? isSubscribed,
     List<LogEntry>? log,
     String? error,
+    bool? isInvalidated,
   }) {
     return CharacteristicState(
       characteristic: characteristic,
@@ -54,6 +61,7 @@ class CharacteristicState {
       isSubscribed: isSubscribed ?? this.isSubscribed,
       log: log ?? this.log,
       error: error,
+      isInvalidated: isInvalidated ?? this.isInvalidated,
     );
   }
 }

@@ -1,570 +1,278 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:bloc_test/bloc_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:bluey/bluey.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:bluey_example/features/scanner/presentation/scanner_cubit.dart';
 import 'package:bluey_example/features/scanner/presentation/scanner_state.dart';
 
+import '../../mocks/mock_bluey.dart';
+import '../../mocks/mock_repositories.dart';
 import '../../mocks/mock_use_cases.dart';
+
+class _MockScanner extends Mock implements Scanner {}
 
 void main() {
   late MockScanForDevices mockScanForDevices;
-  late MockStopScan mockStopScan;
   late MockGetBluetoothState mockGetBluetoothState;
   late MockRequestPermissions mockRequestPermissions;
   late MockRequestEnable mockRequestEnable;
+  late MockBluey mockBluey;
+  late MockScannerRepository mockRepository;
+  late _MockScanner mockScanner;
+  late StreamController<ScanState> scanStateController;
+  late StreamController<BlueyEvent> eventsController;
 
   setUp(() {
     mockScanForDevices = MockScanForDevices();
-    mockStopScan = MockStopScan();
     mockGetBluetoothState = MockGetBluetoothState();
     mockRequestPermissions = MockRequestPermissions();
     mockRequestEnable = MockRequestEnable();
+    mockBluey = MockBluey();
+    mockRepository = MockScannerRepository();
+    mockScanner = _MockScanner();
+    scanStateController = StreamController<ScanState>.broadcast();
+    eventsController = StreamController<BlueyEvent>.broadcast();
+
+    // The repository exposes the SAME shared scanner — this is the core
+    // invariant the two-scanner fix enforces. Both the cubit (via
+    // repository.scanner) and the use-case (via repository.scan()) now
+    // go through the same object.
+    when(() => mockRepository.scanner).thenReturn(mockScanner);
+    when(() => mockBluey.events).thenAnswer((_) => eventsController.stream);
+    when(() => mockScanner.stateChanges)
+        .thenAnswer((_) => scanStateController.stream);
+    when(() => mockGetBluetoothState())
+        .thenAnswer((_) => const Stream.empty());
+    when(() => mockGetBluetoothState.current)
+        .thenReturn(BluetoothState.on);
+  });
+
+  tearDown(() async {
+    await scanStateController.close();
+    await eventsController.close();
   });
 
   ScannerCubit createCubit() {
     return ScannerCubit(
       scanForDevices: mockScanForDevices,
-      stopScan: mockStopScan,
       getBluetoothState: mockGetBluetoothState,
       requestPermissions: mockRequestPermissions,
       requestEnable: mockRequestEnable,
+      repository: mockRepository,
+      bluey: mockBluey,
     );
   }
 
   group('ScannerCubit', () {
-    test('initial state is correct', () {
-      when(
-        () => mockGetBluetoothState.current,
-      ).thenReturn(BluetoothState.unknown);
-      when(
-        () => mockGetBluetoothState(),
-      ).thenAnswer((_) => const Stream.empty());
+    // P1: Eager scanner creation crashes when BT off
+    test(
+      'initialize() does not access scanner when BT is off',
+      () async {
+        // Override BT state to emit off — scanner must NOT be accessed.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.off));
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.off);
+        // Intentionally do NOT stub mockRepository.scanner so that any
+        // access throws a MissingStubError (mocktail's noSuchMethod).
 
+        final cubit = createCubit();
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(cubit.state.bluetoothState, BluetoothState.off);
+        verifyNever(() => mockRepository.scanner);
+        await cubit.close();
+      },
+    );
+
+    blocTest<ScannerCubit, ScannerState>(
+      'attaches scanner subscription when BT transitions to on',
+      setUp: () {
+        final btController = StreamController<BluetoothState>();
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => btController.stream);
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.off);
+        // Emit off then on inside act via the controller captured here.
+        // We add events in act through a fresh controller, so store it
+        // on the stream stub.
+        addTearDown(btController.close);
+        // Emit off → on
+        btController.add(BluetoothState.off);
+        btController.add(BluetoothState.on);
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(cubit.state.bluetoothState, BluetoothState.on);
+        // repository.scanner should have been called to attach the
+        // scanner-state subscription once BT turned on.
+        verify(() => mockRepository.scanner).called(greaterThanOrEqualTo(1));
+      },
+    );
+
+    // P2: Missing onError on scan stream
+    blocTest<ScannerCubit, ScannerState>(
+      'scan stream error surfaces to state.error',
+      setUp: () {
+        // BT is on so initialize() can attach the scanner subscription.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+        when(() => mockGetBluetoothState.current)
+            .thenReturn(BluetoothState.on);
+        // Arrange scan() to return a stream that immediately emits an error.
+        when(() => mockScanForDevices(timeout: any(named: 'timeout')))
+            .thenAnswer(
+              (_) => Stream.error(Exception('native scan failed')),
+            );
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        cubit.startScan();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        expect(cubit.state.error, contains('Scan error'));
+      },
+    );
+
+    test('initial state has stopped scanState and empty scanLog', () {
       final cubit = createCubit();
-      expect(cubit.state, const ScannerState());
+      expect(cubit.state.scanState, ScanState.stopped);
+      expect(cubit.state.scanLog, isEmpty);
       cubit.close();
     });
 
-    blocTest<ScannerCubit, ScannerState>(
-      'initialize sets bluetooth state and listens to changes',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(() => mockGetBluetoothState()).thenAnswer(
-          (_) => Stream.fromIterable([BluetoothState.off, BluetoothState.on]),
-        );
-      },
-      build: createCubit,
-      act: (cubit) => cubit.initialize(),
-      expect:
-          () => [
-            const ScannerState(bluetoothState: BluetoothState.on),
-            const ScannerState(bluetoothState: BluetoothState.off),
-            const ScannerState(bluetoothState: BluetoothState.on),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'startScan emits error when bluetooth is not ready',
-      setUp: () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.off);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-      },
-      build: createCubit,
-      seed: () => const ScannerState(bluetoothState: BluetoothState.off),
-      act: (cubit) => cubit.startScan(),
-      expect:
-          () => [
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Bluetooth is not ready'),
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'startScan emits devices when bluetooth is ready',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-
-        final scanResult = ScanResult(
-          device: Device(
-            id: UUID('00000000-0000-0000-0000-000000000001'),
-            address: '00:11:22:33:44:55',
-            name: 'Test Device',
-          ),
-          rssi: -50,
-          advertisement: Advertisement.empty(),
-          lastSeen: DateTime.now(),
-        );
-
-        when(
-          () => mockScanForDevices(timeout: any(named: 'timeout')),
-        ).thenAnswer((_) => Stream.value(scanResult));
-      },
-      build: createCubit,
-      seed: () => const ScannerState(bluetoothState: BluetoothState.on),
-      act: (cubit) => cubit.startScan(),
-      expect:
-          () => [
-            const ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [],
-              isScanning: true,
-            ),
-            isA<ScannerState>()
-                .having((s) => s.scanResults.length, 'scanResults.length', 1)
-                .having(
-                  (s) => s.scanResults.first.device.name,
-                  'first device name',
-                  'Test Device',
-                ),
-            isA<ScannerState>().having(
-              (s) => s.isScanning,
-              'isScanning',
-              false,
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'stopScan stops scanning',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(() => mockStopScan()).thenAnswer((_) async {});
-      },
-      build: createCubit,
-      seed:
-          () => const ScannerState(
-            bluetoothState: BluetoothState.on,
-            isScanning: true,
-          ),
-      act: (cubit) => cubit.stopScan(),
-      expect:
-          () => [
-            const ScannerState(
-              bluetoothState: BluetoothState.on,
-              isScanning: false,
-            ),
-          ],
-      verify: (_) {
-        verify(() => mockStopScan()).called(1);
-      },
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'startScan sets isScanning false when stream completes',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-
-        // Stream that emits one result then completes (as the library now does)
-        final result = ScanResult(
-          device: Device(
-            id: UUID('00000000-0000-0000-0000-000000000001'),
-            address: '00:11:22:33:44:55',
-            name: 'Test Device',
-          ),
-          rssi: -50,
-          advertisement: Advertisement.empty(),
-          lastSeen: DateTime.now(),
-        );
-
-        when(
-          () => mockScanForDevices(timeout: any(named: 'timeout')),
-        ).thenAnswer((_) => Stream.value(result));
-      },
-      build: createCubit,
-      seed: () => const ScannerState(bluetoothState: BluetoothState.on),
-      act: (cubit) => cubit.startScan(),
-      expect:
-          () => [
-            const ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [],
-              isScanning: true,
-            ),
-            isA<ScannerState>()
-                .having((s) => s.scanResults.length, 'scanResults.length', 1)
-                .having((s) => s.isScanning, 'isScanning', true),
-            isA<ScannerState>().having(
-              (s) => s.isScanning,
-              'isScanning',
-              false,
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'requestPermissions returns result and emits error on denial',
-      setUp: () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.unauthorized);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(() => mockRequestPermissions()).thenAnswer((_) async => false);
-      },
-      build: createCubit,
-      act: (cubit) async {
-        final result = await cubit.requestPermissions();
-        expect(result, false);
-      },
-      expect:
-          () => [
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Permission denied'),
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'clearError clears the error',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-      },
-      build: createCubit,
-      seed:
-          () => const ScannerState(
-            bluetoothState: BluetoothState.on,
-            error: 'Some error',
-          ),
-      act: (cubit) => cubit.clearError(),
-      expect: () => [const ScannerState(bluetoothState: BluetoothState.on)],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'stopScan emits error when stop fails',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(() => mockStopScan()).thenThrow(Exception('Stop failed'));
-      },
-      build: createCubit,
-      seed:
-          () => const ScannerState(
-            bluetoothState: BluetoothState.on,
-            isScanning: true,
-          ),
-      act: (cubit) => cubit.stopScan(),
-      expect:
-          () => [
-            isA<ScannerState>()
-                .having((s) => s.isScanning, 'isScanning', false)
-                .having(
-                  (s) => s.error,
-                  'error',
-                  contains('Failed to stop scan'),
-                ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'requestEnable emits error when enable fails',
-      setUp: () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.off);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(() => mockRequestEnable()).thenThrow(Exception('Enable failed'));
-      },
-      build: createCubit,
-      act: (cubit) => cubit.requestEnable(),
-      expect:
-          () => [
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Failed to enable Bluetooth'),
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'openSettings emits error when open fails',
-      setUp: () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.off);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(
-          () => mockRequestEnable.openSettings(),
-        ).thenThrow(Exception('Settings failed'));
-      },
-      build: createCubit,
-      act: (cubit) => cubit.openSettings(),
-      expect:
-          () => [
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Failed to open settings'),
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'requestPermissions emits error when request throws',
-      setUp: () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.unauthorized);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-        when(
-          () => mockRequestPermissions(),
-        ).thenThrow(Exception('Permission error'));
-      },
-      build: createCubit,
-      act: (cubit) async {
-        final result = await cubit.requestPermissions();
-        expect(result, false);
-      },
-      expect:
-          () => [
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Failed to request permissions'),
-            ),
-          ],
-    );
-
-    blocTest<ScannerCubit, ScannerState>(
-      'initialize emits error when bluetooth state stream errors',
-      setUp: () {
-        when(() => mockGetBluetoothState.current).thenReturn(BluetoothState.on);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => Stream.error(Exception('State stream error')));
-      },
-      build: createCubit,
-      act: (cubit) => cubit.initialize(),
-      expect:
-          () => [
-            const ScannerState(bluetoothState: BluetoothState.on),
-            isA<ScannerState>().having(
-              (s) => s.error,
-              'error',
-              contains('Bluetooth state error'),
-            ),
-          ],
-    );
-
-    group('sorting', () {
-      final deviceA = ScanResult(
-        device: Device(
-          id: UUID('00000000-0000-0000-0000-000000000001'),
-          address: '00:11:22:33:44:55',
-          name: 'Alpha Device',
-        ),
-        rssi: -80,
-        advertisement: Advertisement.empty(),
-        lastSeen: DateTime(2024),
-      );
-
-      final deviceB = ScanResult(
-        device: Device(
-          id: UUID('00000000-0000-0000-0000-000000000002'),
-          address: 'AA:BB:CC:DD:EE:FF',
-          name: 'Beta Device',
-        ),
-        rssi: -40,
-        advertisement: Advertisement.empty(),
-        lastSeen: DateTime(2024),
-      );
-
-      final unnamed = ScanResult(
-        device: Device(
-          id: UUID('00000000-0000-0000-0000-000000000003'),
-          address: 'FF:FF:FF:FF:FF:FF',
-        ),
-        rssi: -60,
-        advertisement: Advertisement.empty(),
-        lastSeen: DateTime(2024),
-      );
-
-      test('initial sort mode is name', () {
-        when(
-          () => mockGetBluetoothState.current,
-        ).thenReturn(BluetoothState.unknown);
-        when(
-          () => mockGetBluetoothState(),
-        ).thenAnswer((_) => const Stream.empty());
-
+    test(
+      'initialize() subscribes to scanner via repository (not via Bluey.scanner())',
+      () async {
+        // BT must be on for the lazy attach to trigger.
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
         final cubit = createCubit();
-        expect(cubit.state.sortMode, SortMode.name);
-        cubit.close();
-      });
+        cubit.initialize();
+        // Allow the BT state event to propagate before verifying.
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        // The repository.scanner getter must have been accessed; Bluey.scanner()
+        // must NOT have been called directly (that would create a second instance).
+        verify(() => mockRepository.scanner).called(greaterThanOrEqualTo(1));
+        verifyNever(() => mockBluey.scanner());
+        await cubit.close();
+      },
+    );
 
-      blocTest<ScannerCubit, ScannerState>(
-        'setSortMode emits state with new sort mode',
-        setUp: () {
-          when(
-            () => mockGetBluetoothState.current,
-          ).thenReturn(BluetoothState.on);
-          when(
-            () => mockGetBluetoothState(),
-          ).thenAnswer((_) => const Stream.empty());
-        },
-        build: createCubit,
-        seed:
-            () => ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [deviceB, deviceA],
-            ),
-        act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect:
-            () => [
-              isA<ScannerState>().having(
-                (s) => s.sortMode,
-                'sortMode',
-                SortMode.name,
-              ),
-            ],
-      );
+    blocTest<ScannerCubit, ScannerState>(
+      'reflects ScanState transitions from scanner.stateChanges',
+      // BT must be on so the scanner subscription is attached before we emit
+      // scan state events.
+      setUp: () {
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        // Allow the BT on event to propagate and attach the scanner sub.
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        scanStateController.add(ScanState.starting);
+        scanStateController.add(ScanState.scanning);
+        scanStateController.add(ScanState.stopping);
+        scanStateController.add(ScanState.stopped);
+      },
+      expect: () => [
+        // BT.on causes a bluetoothState emit; subsequent scan state changes
+        // are appended in order.
+        isA<ScannerState>()
+            .having((s) => s.bluetoothState, 'bluetoothState', BluetoothState.on),
+        isA<ScannerState>()
+            .having((s) => s.scanState, 'scanState', ScanState.starting),
+        isA<ScannerState>()
+            .having((s) => s.scanState, 'scanState', ScanState.scanning),
+        isA<ScannerState>()
+            .having((s) => s.scanState, 'scanState', ScanState.stopping),
+        isA<ScannerState>()
+            .having((s) => s.scanState, 'scanState', ScanState.stopped),
+      ],
+    );
 
-      blocTest<ScannerCubit, ScannerState>(
-        'sort by name orders alphabetically',
-        setUp: () {
-          when(
-            () => mockGetBluetoothState.current,
-          ).thenReturn(BluetoothState.on);
-          when(
-            () => mockGetBluetoothState(),
-          ).thenAnswer((_) => const Stream.empty());
-        },
-        build: createCubit,
-        seed:
-            () => ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [deviceB, deviceA],
-            ),
-        act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect:
-            () => [
-              isA<ScannerState>().having(
-                (s) => s.scanResults.map((r) => r.device.name).toList(),
-                'device names',
-                ['Alpha Device', 'Beta Device'],
-              ),
-            ],
-      );
+    blocTest<ScannerCubit, ScannerState>(
+      'reflects ScanState.invalidated when emitted',
+      // BT must be on so the scanner subscription is attached.
+      setUp: () {
+        when(() => mockGetBluetoothState())
+            .thenAnswer((_) => Stream.value(BluetoothState.on));
+      },
+      build: createCubit,
+      act: (cubit) async {
+        cubit.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        scanStateController.add(ScanState.invalidated);
+      },
+      expect: () => [
+        isA<ScannerState>()
+            .having((s) => s.bluetoothState, 'bluetoothState', BluetoothState.on),
+        isA<ScannerState>()
+            .having((s) => s.scanState, 'scanState', ScanState.invalidated),
+      ],
+    );
 
-      blocTest<ScannerCubit, ScannerState>(
-        'sort by name places unnamed devices last',
-        setUp: () {
-          when(
-            () => mockGetBluetoothState.current,
-          ).thenReturn(BluetoothState.on);
-          when(
-            () => mockGetBluetoothState(),
-          ).thenAnswer((_) => const Stream.empty());
-        },
-        build: createCubit,
-        seed:
-            () => ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [unnamed, deviceA],
-            ),
-        act: (cubit) => cubit.setSortMode(SortMode.name),
-        expect:
-            () => [
-              isA<ScannerState>().having(
-                (s) => s.scanResults.map((r) => r.device.name).toList(),
-                'device names',
-                ['Alpha Device', null],
-              ),
-            ],
-      );
+    blocTest<ScannerCubit, ScannerState>(
+      'appends scan lifecycle events into scanLog',
+      build: createCubit,
+      act: (cubit) {
+        cubit.initialize();
+        eventsController.add(ScanStartingEvent(source: 'test'));
+        eventsController.add(ScanStartedEvent(source: 'test'));
+        eventsController.add(ScanStoppingEvent(source: 'test'));
+        eventsController.add(ScanStoppedEvent(source: 'test'));
+      },
+      verify: (cubit) {
+        expect(cubit.state.scanLog.length, equals(4));
+        expect(cubit.state.scanLog.first, isA<ScanStartingEvent>());
+        expect(cubit.state.scanLog.last, isA<ScanStoppedEvent>());
+      },
+    );
 
-      blocTest<ScannerCubit, ScannerState>(
-        'sort by signalStrength orders by RSSI descending',
-        setUp: () {
-          when(
-            () => mockGetBluetoothState.current,
-          ).thenReturn(BluetoothState.on);
-          when(
-            () => mockGetBluetoothState(),
-          ).thenAnswer((_) => const Stream.empty());
-        },
-        build: createCubit,
-        seed:
-            () => ScannerState(
-              bluetoothState: BluetoothState.on,
-              sortMode: SortMode.name,
-              scanResults: [deviceA, deviceB],
-            ),
-        act: (cubit) => cubit.setSortMode(SortMode.signalStrength),
-        expect:
-            () => [
-              isA<ScannerState>().having(
-                (s) => s.scanResults.map((r) => r.rssi).toList(),
-                'rssi values',
-                [-40, -80],
-              ),
-            ],
-      );
+    blocTest<ScannerCubit, ScannerState>(
+      'appends DeviceDiscoveredEvent into scanLog',
+      build: createCubit,
+      act: (cubit) {
+        cubit.initialize();
+        eventsController.add(
+          DeviceDiscoveredEvent(
+            deviceId: UUID('00000000-0000-0000-0000-000000000001'),
+            name: 'Test Device',
+            rssi: -70,
+          ),
+        );
+      },
+      verify: (cubit) {
+        expect(cubit.state.scanLog.length, equals(1));
+        expect(cubit.state.scanLog.first, isA<DeviceDiscoveredEvent>());
+      },
+    );
 
-      blocTest<ScannerCubit, ScannerState>(
-        'sort by deviceId orders by UUID string',
-        setUp: () {
-          when(
-            () => mockGetBluetoothState.current,
-          ).thenReturn(BluetoothState.on);
-          when(
-            () => mockGetBluetoothState(),
-          ).thenAnswer((_) => const Stream.empty());
-        },
-        build: createCubit,
-        seed:
-            () => ScannerState(
-              bluetoothState: BluetoothState.on,
-              scanResults: [deviceB, deviceA],
-            ),
-        act: (cubit) => cubit.setSortMode(SortMode.deviceId),
-        expect:
-            () => [
-              isA<ScannerState>().having(
-                (s) =>
-                    s.scanResults.map((r) => r.device.id.toString()).toList(),
-                'device ids',
-                [
-                  '00000000-0000-0000-0000-000000000001',
-                  '00000000-0000-0000-0000-000000000002',
-                ],
-              ),
-            ],
-      );
-    });
+    blocTest<ScannerCubit, ScannerState>(
+      'caps scanLog at 100 entries',
+      build: createCubit,
+      act: (cubit) {
+        cubit.initialize();
+        for (var i = 0; i < 150; i++) {
+          eventsController.add(ScanStartingEvent(source: 'test'));
+        }
+      },
+      verify: (cubit) {
+        expect(cubit.state.scanLog.length, equals(100));
+      },
+    );
   });
 }

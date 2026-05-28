@@ -4,49 +4,92 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bluey/bluey.dart';
 
 import '../application/scan_for_devices.dart';
-import '../application/stop_scan.dart';
 import '../application/get_bluetooth_state.dart';
 import '../application/request_permissions.dart';
 import '../application/request_enable.dart';
+import '../domain/scanner_repository.dart';
 import 'scanner_state.dart';
 
 /// Cubit for managing scanner state.
 class ScannerCubit extends Cubit<ScannerState> {
   final ScanForDevices _scanForDevices;
-  final StopScan _stopScan;
   final GetBluetoothState _getBluetoothState;
   final RequestPermissions _requestPermissions;
   final RequestEnable _requestEnable;
+  final ScannerRepository _repository;
+  final Bluey _bluey;
 
   StreamSubscription<BluetoothState>? _stateSubscription;
   StreamSubscription<ScanResult>? _scanSubscription;
+  StreamSubscription<ScanState>? _scanStateSubscription;
+  StreamSubscription<BlueyEvent>? _eventsSubscription;
 
   ScannerCubit({
     required ScanForDevices scanForDevices,
-    required StopScan stopScan,
     required GetBluetoothState getBluetoothState,
     required RequestPermissions requestPermissions,
     required RequestEnable requestEnable,
+    required ScannerRepository repository,
+    required Bluey bluey,
   }) : _scanForDevices = scanForDevices,
-       _stopScan = stopScan,
        _getBluetoothState = getBluetoothState,
        _requestPermissions = requestPermissions,
        _requestEnable = requestEnable,
+       _repository = repository,
+       _bluey = bluey,
        super(const ScannerState());
 
-  /// Initializes the cubit by getting the current Bluetooth state
-  /// and subscribing to state changes.
+  /// Initializes the cubit by subscribing to Bluetooth state changes,
+  /// scanner state transitions, and Bluey lifecycle events.
   void initialize() {
-    // Get initial state
-    emit(state.copyWith(bluetoothState: _getBluetoothState.current));
-
-    // Listen to state changes
+    // Listen to Bluetooth state changes (replays current on subscribe
+    // per Convention 2).
     _stateSubscription = _getBluetoothState().listen(
       (bluetoothState) {
         emit(state.copyWith(bluetoothState: bluetoothState));
+        // Attach the scanner-state subscription lazily on the first
+        // BluetoothState.on event. Accessing the scanner before BT is on
+        // calls _requireAdapterOn() which throws, crashing the cubit.
+        if (bluetoothState == BluetoothState.on &&
+            _scanStateSubscription == null) {
+          _attachScannerStateSubscription();
+        }
       },
       onError: (error) {
         emit(state.copyWith(error: 'Bluetooth state error: $error'));
+      },
+    );
+
+    // Ingest scan lifecycle events into the scanLog (capped at 100).
+    _eventsSubscription = _bluey.events.listen(
+      (event) {
+        if (event is ScanStartingEvent ||
+            event is ScanStartedEvent ||
+            event is ScanStoppingEvent ||
+            event is ScanStoppedEvent ||
+            event is DeviceDiscoveredEvent) {
+          final updated = [...state.scanLog, event];
+          final capped =
+              updated.length > 100
+                  ? updated.sublist(updated.length - 100)
+                  : updated;
+          emit(state.copyWith(scanLog: capped));
+        }
+      },
+    );
+  }
+
+  /// Subscribes to state transitions on the repository's shared Scanner
+  /// instance. Called lazily on the first [BluetoothState.on] event so that
+  /// [_requireAdapterOn] inside `scanner` is never invoked while BT is off.
+  ///
+  /// Using the repository guarantees that the scanner watched here is the
+  /// SAME instance that backs [ScanForDevices.scan], so state changes are
+  /// always coherent with the active scan.
+  void _attachScannerStateSubscription() {
+    _scanStateSubscription = _repository.scanner.stateChanges.listen(
+      (scanState) {
+        emit(state.copyWith(scanState: scanState));
       },
     );
   }
@@ -63,7 +106,7 @@ class ScannerCubit extends Cubit<ScannerState> {
       return;
     }
 
-    emit(state.copyWith(scanResults: [], isScanning: true, error: null));
+    emit(state.copyWith(scanResults: [], error: null));
 
     final results = <ScanResult>[];
 
@@ -80,25 +123,22 @@ class ScannerCubit extends Cubit<ScannerState> {
         }
         emit(state.copyWith(scanResults: _sorted(results)));
       },
-      onDone: () {
-        emit(state.copyWith(isScanning: false));
-      },
       onError: (error) {
-        emit(state.copyWith(isScanning: false, error: 'Scan error: $error'));
+        // Surface native scan errors to the UI. Do not manually flip any
+        // lifecycle state — scanner.stateChanges will deliver the transition
+        // through _scanStateSubscription.
+        emit(state.copyWith(error: 'Scan error: $error'));
       },
     );
   }
 
   /// Stops the current scan.
+  ///
+  /// Cancelling the subscription triggers bluey's onCancel → stop()
+  /// so the platform scan stops automatically.
   Future<void> stopScan() async {
-    try {
-      await _stopScan();
-      await _scanSubscription?.cancel();
-      _scanSubscription = null;
-      emit(state.copyWith(isScanning: false));
-    } catch (e) {
-      emit(state.copyWith(isScanning: false, error: 'Failed to stop scan: $e'));
-    }
+    await _scanSubscription?.cancel();
+    _scanSubscription = null;
   }
 
   /// Requests Bluetooth permissions.
@@ -179,6 +219,8 @@ class ScannerCubit extends Cubit<ScannerState> {
   Future<void> close() {
     _stateSubscription?.cancel();
     _scanSubscription?.cancel();
+    _scanStateSubscription?.cancel();
+    _eventsSubscription?.cancel();
     return super.close();
   }
 }

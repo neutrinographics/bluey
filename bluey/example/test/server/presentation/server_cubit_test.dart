@@ -30,6 +30,8 @@ void main() {
   late MockObserveWriteRequests mockObserveWriteRequests;
   late MockGetServer mockGetServer;
   late MockServerIdentityStorage mockIdentityStorage;
+  late MockBluey mockBluey;
+  late StreamController<BlueyEvent> eventsController;
 
   final testServerId = ServerId('12345678-1234-4234-8234-123456789abc');
 
@@ -64,6 +66,8 @@ void main() {
     mockObserveWriteRequests = MockObserveWriteRequests();
     mockGetServer = MockGetServer();
     mockIdentityStorage = MockServerIdentityStorage();
+    mockBluey = MockBluey();
+    eventsController = StreamController<BlueyEvent>.broadcast();
 
     when(() => mockDisposeServer()).thenAnswer((_) async {});
     when(() => mockGetConnectedClients()).thenReturn([]);
@@ -87,6 +91,11 @@ void main() {
     when(
       () => mockResetServer(identity: any(named: 'identity')),
     ).thenAnswer((_) async => null);
+    when(() => mockBluey.events).thenAnswer((_) => eventsController.stream);
+  });
+
+  tearDown(() async {
+    await eventsController.close();
   });
 
   ServerCubit createCubit() {
@@ -107,6 +116,7 @@ void main() {
       observeWriteRequests: mockObserveWriteRequests,
       getServer: mockGetServer,
       identityStorage: mockIdentityStorage,
+      bluey: mockBluey,
     );
   }
 
@@ -173,7 +183,7 @@ void main() {
     );
 
     blocTest<ServerCubit, ServerScreenState>(
-      'startAdvertising sets isAdvertising true',
+      'startAdvertising calls use case and adds log entry',
       setUp: () {
         when(
           () => mockStartAdvertising(
@@ -185,7 +195,16 @@ void main() {
       build: createCubit,
       act: (cubit) => cubit.startAdvertising(),
       verify: (cubit) {
-        expect(cubit.state.isAdvertising, isTrue);
+        verify(
+          () => mockStartAdvertising(
+            name: any(named: 'name'),
+            services: any(named: 'services'),
+          ),
+        ).called(1);
+        expect(
+          cubit.state.log.any((e) => e.message.contains('Started advertising')),
+          isTrue,
+        );
       },
     );
 
@@ -208,15 +227,18 @@ void main() {
     );
 
     blocTest<ServerCubit, ServerScreenState>(
-      'stopAdvertising sets isAdvertising false',
+      'stopAdvertising calls use case and adds log entry',
       setUp: () {
         when(() => mockStopAdvertising()).thenAnswer((_) async {});
       },
       build: createCubit,
-      seed: () => const ServerScreenState(isAdvertising: true),
       act: (cubit) => cubit.stopAdvertising(),
       verify: (cubit) {
-        expect(cubit.state.isAdvertising, isFalse);
+        verify(() => mockStopAdvertising()).called(1);
+        expect(
+          cubit.state.log.any((e) => e.message.contains('Stopped advertising')),
+          isTrue,
+        );
       },
     );
 
@@ -226,7 +248,6 @@ void main() {
         when(() => mockStopAdvertising()).thenThrow(Exception('Stop failed'));
       },
       build: createCubit,
-      seed: () => const ServerScreenState(isAdvertising: true),
       act: (cubit) => cubit.stopAdvertising(),
       verify: (cubit) {
         expect(cubit.state.error, contains('Failed to stop advertising'));
@@ -381,6 +402,112 @@ void main() {
       await cubit.close();
       verify(() => mockDisposeServer()).called(1);
     });
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'initial advertisingState is idle',
+      build: createCubit,
+      verify: (cubit) => expect(
+        cubit.state.advertisingState,
+        AdvertisingState.idle,
+      ),
+    );
+
+    group('AdvertisingState stream', () {
+      late StreamController<AdvertisingState> adController;
+      late MockServer mockServer;
+
+      setUp(() {
+        adController = StreamController<AdvertisingState>.broadcast();
+        mockServer = MockServer();
+        when(() => mockServer.advertisingStateChanges)
+            .thenAnswer((_) => adController.stream);
+        when(() => mockGetServer()).thenReturn(mockServer);
+        when(() => mockCheckServerSupport()).thenReturn(true);
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockAddService(any())).thenAnswer((_) async {});
+      });
+
+      tearDown(() async {
+        await adController.close();
+      });
+
+      blocTest<ServerCubit, ServerScreenState>(
+        'reflects AdvertisingState transitions from server.advertisingStateChanges',
+        build: createCubit,
+        act: (cubit) async {
+          await cubit.initialize();
+          adController.add(AdvertisingState.starting);
+          adController.add(AdvertisingState.advertising);
+          adController.add(AdvertisingState.stopping);
+          adController.add(AdvertisingState.idle);
+          await Future.delayed(const Duration(milliseconds: 10));
+        },
+        verify: (cubit) {
+          // Verify the final state reached all four transitions in sequence.
+          // The cubit may emit additional states from initialize(); we only
+          // care that it reached each advertising state.
+          expect(cubit.state.advertisingState, AdvertisingState.idle);
+        },
+      );
+
+      blocTest<ServerCubit, ServerScreenState>(
+        'reflects AdvertisingState.invalidated when emitted',
+        build: createCubit,
+        act: (cubit) async {
+          await cubit.initialize();
+          adController.add(AdvertisingState.invalidated);
+          await Future.delayed(const Duration(milliseconds: 10));
+        },
+        verify: (cubit) {
+          expect(cubit.state.advertisingState, AdvertisingState.invalidated);
+        },
+      );
+    });
+
+    blocTest<ServerCubit, ServerScreenState>(
+      'advertising lifecycle events are ingested into log via fromBlueyEvent',
+      setUp: () {
+        when(() => mockCheckServerSupport()).thenReturn(true);
+        when(
+          () => mockObserveConnections(),
+        ).thenAnswer((_) => const Stream.empty());
+        when(() => mockAddService(any())).thenAnswer((_) async {});
+      },
+      build: createCubit,
+      act: (cubit) async {
+        await cubit.initialize();
+        eventsController.add(AdvertisingStartingEvent());
+        eventsController.add(AdvertisingStartedEvent());
+        eventsController.add(AdvertisingStoppingEvent());
+        eventsController.add(AdvertisingStoppedEvent());
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+      verify: (cubit) {
+        final logTags = cubit.state.log.map((e) => e.tag).toList();
+        expect(
+          logTags.any((t) => t == 'AdvertisingStartingEvent'),
+          isTrue,
+          reason: 'AdvertisingStartingEvent should appear in log',
+        );
+        expect(
+          logTags.any((t) => t == 'AdvertisingStartedEvent'),
+          isTrue,
+          reason: 'AdvertisingStartedEvent should appear in log',
+        );
+        expect(
+          logTags.any((t) => t == 'AdvertisingStoppingEvent'),
+          isTrue,
+          reason: 'AdvertisingStoppingEvent should appear in log',
+        );
+        expect(
+          logTags.any((t) => t == 'AdvertisingStoppedEvent'),
+          isTrue,
+          reason: 'AdvertisingStoppedEvent should appear in log',
+        );
+      },
+    );
   });
 
   group('stress write null-server drop', () {

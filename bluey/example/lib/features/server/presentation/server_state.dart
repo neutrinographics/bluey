@@ -3,7 +3,7 @@ import 'package:bluey/bluey.dart';
 /// State for the server feature.
 class ServerScreenState {
   final bool isSupported;
-  final bool isAdvertising;
+  final AdvertisingState advertisingState;
   final List<Client> connectedClients;
 
   /// IDs of currently-connected clients that have identified as Bluey
@@ -19,7 +19,7 @@ class ServerScreenState {
 
   const ServerScreenState({
     this.isSupported = true,
-    this.isAdvertising = false,
+    this.advertisingState = AdvertisingState.idle,
     this.connectedClients = const [],
     this.blueyPeerClientIds = const {},
     this.log = const [],
@@ -28,12 +28,16 @@ class ServerScreenState {
     this.error,
   });
 
+  /// Whether advertising is currently active. Derived from
+  /// [advertisingState]. Kept for ergonomic convenience.
+  bool get isAdvertising => advertisingState == AdvertisingState.advertising;
+
   /// Whether the given client has identified as a Bluey peer.
   bool isBlueyPeer(Client client) => blueyPeerClientIds.contains(client.id);
 
   ServerScreenState copyWith({
     bool? isSupported,
-    bool? isAdvertising,
+    AdvertisingState? advertisingState,
     List<Client>? connectedClients,
     Set<UUID>? blueyPeerClientIds,
     List<ServerLogEntry>? log,
@@ -43,7 +47,7 @@ class ServerScreenState {
   }) {
     return ServerScreenState(
       isSupported: isSupported ?? this.isSupported,
-      isAdvertising: isAdvertising ?? this.isAdvertising,
+      advertisingState: advertisingState ?? this.advertisingState,
       connectedClients: connectedClients ?? this.connectedClients,
       blueyPeerClientIds: blueyPeerClientIds ?? this.blueyPeerClientIds,
       log: log ?? this.log,
@@ -61,4 +65,10 @@ class ServerLogEntry {
   final DateTime timestamp;
 
   ServerLogEntry(this.tag, this.message) : timestamp = DateTime.now();
+
+  /// Creates a log entry from a [BlueyEvent], using the runtime type
+  /// as the tag and [event.toString()] as the message.
+  factory ServerLogEntry.fromBlueyEvent(BlueyEvent event) {
+    return ServerLogEntry(event.runtimeType.toString(), event.toString());
+  }
 }
