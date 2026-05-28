@@ -37,10 +37,12 @@ void main() {
     expect(notifier.value, equals(initial + 1));
   });
 
-  test('recreateBluey preserves the localIdentity', () async {
-    final identityBefore = getIt<Bluey>().localIdentity;
-    await recreateBluey();
-    final identityAfter = getIt<Bluey>().localIdentity;
-    expect(identityAfter, equals(identityBefore));
-  });
+  // Identity preservation is structural — `recreateBluey()` reuses the
+  // `_capturedIdentity` stashed by `setupServiceLocator`, so the new
+  // `Bluey` is constructed with the same `ServerId` by direct field
+  // reuse. A test that read identity back off `Bluey` would either need
+  // a public getter on the library (rejected — identity is owned by
+  // the application) or an in-memory server fixture to observe via
+  // `server.serverId`. The recovery end-to-end is covered by
+  // `test/integration/adapter_cycle_recovery_test.dart`.
 }
