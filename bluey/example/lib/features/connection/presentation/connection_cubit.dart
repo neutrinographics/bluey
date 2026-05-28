@@ -172,6 +172,13 @@ class ConnectionCubit extends Cubit<ConnectionScreenState> {
         },
       );
 
+      // Trigger initial discovery. `Connection.services()` is lazy —
+      // it's the only thing that populates the library's
+      // `_cachedServices` and emits onto `servicesChanges`. Without
+      // this call, the subscription above only replays an empty list
+      // and consumer UI gated on specific services (e.g. the "Stress
+      // Tests" button) stays hidden forever.
+      await loadServices();
     } on BlueyException catch (e) {
       emit(
         state.copyWith(

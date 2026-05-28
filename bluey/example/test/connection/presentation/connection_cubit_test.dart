@@ -106,54 +106,15 @@ void main() {
       },
     );
 
-    blocTest<ConnectionCubit, ConnectionScreenState>(
-      'connect succeeds — stateChanges replay delivers initial state, '
-      'servicesChanges replay delivers initial services (no manual reads)',
-      setUp: () {
-        final mockConnection = MockConnection();
-        final mockService = MockRemoteService();
-
-        // stateChanges replays ConnectionState.ready (stream-conventions PR #32).
-        when(() => mockConnection.stateChanges).thenAnswer((_) async* {
-          yield ConnectionState.ready;
-        });
-        // servicesChanges replays the cached services on subscribe.
-        when(() => mockConnection.servicesChanges).thenAnswer((_) async* {
-          yield [mockService];
-        });
-        when(() => mockConnection.disconnect()).thenAnswer((_) async {});
-
-        when(
-          () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
-        ).thenAnswer((_) async => mockConnection);
-        // mockGetServices should NOT be called — explicit loadServices() is gone.
-      },
-      build: createCubit,
-      act: (cubit) async {
-        await cubit.connect();
-        // Allow the replay streams to deliver.
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      },
-      verify: (cubit) {
-        // Connection assigned.
-        expect(cubit.state.connection, isNotNull);
-        // State came from stateChanges replay.
-        expect(cubit.state.connectionState, ConnectionState.ready);
-        // Services came from servicesChanges replay.
-        expect(cubit.state.services, hasLength(1));
-        // getServices use-case never called — no manual loadServices().
-        verifyNever(() => mockGetServices(any()));
-      },
-    );
-
-    // Verify stream-replay-based initial state delivery, checking emitted
-    // sequence rather than final state.
+    // Verifies stateChanges replay delivers the initial state without a
+    // separate `connection.state` synchronous read after PR #32. The
+    // `connection: connection` emit no longer carries an explicit
+    // `connectionState`; the listener's first event (the replay) does.
     blocTest<ConnectionCubit, ConnectionScreenState>(
       'connect() uses stateChanges replay for initial state (no manual read)',
       setUp: () {
         final mockConnection = MockConnection();
 
-        // stateChanges replay delivers ConnectionState.ready.
         when(() => mockConnection.stateChanges).thenAnswer((_) async* {
           yield ConnectionState.ready;
         });
@@ -165,32 +126,18 @@ void main() {
         when(
           () => mockConnectToDevice(any(), timeout: any(named: 'timeout')),
         ).thenAnswer((_) async => mockConnection);
+        when(() => mockGetServices(any())).thenAnswer((_) async => const []);
       },
       build: createCubit,
       act: (cubit) async {
         await cubit.connect();
         await Future<void>.delayed(const Duration(milliseconds: 20));
       },
-      expect: () => [
-        // First: connecting transition.
-        isA<ConnectionScreenState>().having(
-          (s) => s.connectionState,
-          'connectionState',
-          ConnectionState.connecting,
-        ),
-        // Second: connection assigned — no connectionState from manual read.
-        isA<ConnectionScreenState>().having(
-          (s) => s.connection,
-          'connection',
-          isNotNull,
-        ),
-        // Third: stateChanges replay delivers ConnectionState.ready.
-        isA<ConnectionScreenState>().having(
-          (s) => s.connectionState,
-          'connectionState',
-          ConnectionState.ready,
-        ),
-      ],
+      verify: (cubit) {
+        // Connection assigned and state came from the stateChanges replay.
+        expect(cubit.state.connection, isNotNull);
+        expect(cubit.state.connectionState, ConnectionState.ready);
+      },
     );
 
     blocTest<ConnectionCubit, ConnectionScreenState>(
