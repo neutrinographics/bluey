@@ -50,6 +50,13 @@ class BlueyServer implements Server {
 
   final Map<ClientAddress, BlueyClient> _connectedClients = {};
 
+  /// A client has an *established session* iff it is present in
+  /// [_connectedClients] via a real connect/announce (`centralConnections`).
+  /// The server services read/write requests only within an established
+  /// session — a request from a session-less client is evicted (I338).
+  bool _hasEstablishedSession(ClientAddress clientAddress) =>
+      _connectedClients.containsKey(clientAddress);
+
   /// Local handle table populated from `addService`'s populated return
   /// value. Keyed by `(serviceUuid, charUuid)` lowercase. Used by
   /// `notify` / `indicate` / `notifyTo` / `indicateTo` to resolve a
@@ -181,17 +188,47 @@ class BlueyServer implements Server {
     // Control service requests are handled here; all others are forwarded
     // to the filtered controllers for the public API.
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
+      final clientAddress = ClientAddress(req.centralId);
+      if (!_hasEstablishedSession(clientAddress)) {
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.server',
+          'rejecting read from session-less client (eviction)',
+          data: {'clientId': clientAddress.toString()},
+        );
+        // Reads always need a response.
+        _platform.respondToReadRequest(
+          req.requestId,
+          platform.PlatformGattStatus.lifecycleEviction,
+          null,
+        );
+        return;
+      }
       if (!_lifecycle.handleReadRequest(req)) {
         // Reads always need a response — pend until the app responds.
-        final clientAddress = ClientAddress(req.centralId);
         _lifecycle.requestStarted(clientAddress, req.requestId);
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
+      final clientAddress = ClientAddress(req.centralId);
+      if (!_hasEstablishedSession(clientAddress)) {
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.server',
+          'rejecting write from session-less client (eviction)',
+          data: {'clientId': clientAddress.toString()},
+        );
+        if (req.responseNeeded) {
+          _platform.respondToWriteRequest(
+            req.requestId,
+            platform.PlatformGattStatus.lifecycleEviction,
+          );
+        }
+        return;
+      }
       if (!_lifecycle.handleWriteRequest(req)) {
-        final clientAddress = ClientAddress(req.centralId);
         if (req.responseNeeded) {
           // Write-with-response — pend until the app responds.
           _lifecycle.requestStarted(clientAddress, req.requestId);
@@ -866,21 +903,15 @@ class BlueyServer implements Server {
   /// set is cleared in [_handleClientDisconnected] so a reconnect-then-
   /// heartbeat re-identifies.
   void _trackPeerClient(ClientAddress clientAddress, ServerId senderId) {
-    final wasNew = !_connectedClients.containsKey(clientAddress);
-    if (wasNew) {
-      _emitEvent(
-        ClientConnectedEvent(clientAddress: clientAddress, source: 'BlueyServer'),
-      );
-      final client = BlueyClient(
-        address: clientAddress,
-        mtu: 23, // Default MTU — actual MTU is unknown without platform event
-      );
-      _connectedClients[clientAddress] = client;
-      _connectionsController.add(client);
-    }
+    // Identification only — never establishes a session. A heartbeat from a
+    // client with no established session is rejected at the chokepoint before
+    // it can reach here (I338); if one still arrives (defensive), ignore it
+    // rather than silently re-creating the client and re-emitting
+    // peerConnections.
+    final client = _connectedClients[clientAddress];
+    if (client == null) return;
 
     if (_identifiedPeerClientAddresses.add(clientAddress)) {
-      final client = _connectedClients[clientAddress]!;
       _logger.log(
         BlueyLogLevel.info,
         'bluey.server',
