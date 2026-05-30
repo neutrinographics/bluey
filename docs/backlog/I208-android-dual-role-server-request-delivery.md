@@ -1,10 +1,10 @@
 ---
-id: I338
+id: I208
 title: Android stops delivering GATT-server ATT requests after a client↔server role reversal on a still-live link
 category: limitation
 severity: high
 platform: android
-status: open
+status: wontfix
 last_verified: 2026-05-29
 related: [I306, I063]
 ---
@@ -71,12 +71,16 @@ and iOS-as-server with the identical Dart works).
   toggle force-releases the ACL during development. Documented for app developers
   in `bluey/docs/cross-platform-quirks.md` ("Android stops delivering
   GATT-server requests after a client↔server role reversal on a still-live link").
-- **Open question (why this entry is `open`, not `wontfix`):** whether bluey
-  should detect and pre-empt the trap — e.g. before serving a peer, check for a
-  lingering same-peer *client* link and tear it down; and/or surface a faster,
-  clearer signal than a silent 10 s timeout when a server gets a connection but
-  no ATT traffic. These are real design calls (especially for bidirectional apps)
-  and are being brainstormed separately.
+- **Decision (2026-05-29): documentation-only — `wontfix`.** bluey will **not**
+  auto-detect or auto-tear-down; apps own role-reversal teardown. Mitigation
+  options (a server-side "connected but no ATT traffic" detector, or a
+  Bluey-level same-peer client-link teardown) were considered and declined: the
+  fingerprint is genuinely ambiguous (a non-Bluey central may legitimately stay
+  quiet; an app may intentionally hold a client link), so any auto-action risks
+  surprising teardowns, and Bluey-level correlation would require a new
+  connection registry that doesn't exist today. The consumer-side workaround is
+  reliable and is documented for app developers in
+  `bluey/docs/cross-platform-quirks.md`.
 - **Confirmation still pending real-device instrumentation** to nail the exact
   stack mechanism (vs a narrower bluey_android setup issue): an unconditional
   INFO log at the top of the server read/write callbacks, plus logging whether a

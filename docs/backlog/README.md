@@ -171,7 +171,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I024](I024-gatt-server-mtu-change-not-propagated.md) | Server-side MTU change not propagated to Dart | medium |
 | [I025](I025-gatt-server-phy-events-logging-only.md) | Server-side PHY update/read events are logging-only | low |
 | [I306](I306-android-server-no-disconnect-on-ios-client-cancel.md) | Android server doesn't observe non-Bluey iOS client disconnect (peer-protocol case fixed; raw-GATT case remains, supervision-timeout-bound) | low |
-| [I338](I338-android-dual-role-server-request-delivery.md) | Android stops delivering GATT-server ATT requests after a client↔server role reversal on a still-live link (platform limitation; consumer workaround documented; bluey-side mitigation under consideration) | high |
 
 ### Open — Android connection-level stubs
 
@@ -303,6 +302,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I205](I205-ios-device-name-restricted.md) | iOS 16+ `UIDevice.current.name` returns generic model name | ios |
 | [I206](I206-android-force-kill-cleanup.md) | Android force-kill has no cleanup hook | android |
 | [I207](I207-android-force-disconnect-remote-central.md) | Android cannot force-disconnect remote centrals | android |
+| [I208](I208-android-dual-role-server-request-delivery.md) | Android drops GATT-server ATT requests after a client↔server role reversal on a still-live link (documentation-only; apps handle teardown) | android |
 
 ---
 
