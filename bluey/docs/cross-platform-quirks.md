@@ -25,7 +25,7 @@ The typical loop:
 
 ### Recommended pattern: address-based dedup before `connectAsPeer`
 
-The `clientId` observed peripheral-side and `Device.address` observed central-side are the same identifier per platform — MAC on Android, `CBPeer.identifier` UUID on iOS. So an address-equality check answers the question "is this device already attached to me in some role?".
+The `ClientAddress` observed peripheral-side (`Client.address`, also the value on `Server.disconnections`) and the `DeviceAddress` observed central-side (`Device.address`) wrap the **same** raw platform identifier per platform — MAC on Android, `CBPeer.identifier` UUID on iOS. They are deliberately distinct types per bounded context (see I337), so cross them explicitly via `.value`: `ClientAddress(device.address.value)`. An address-equality check then answers "is this device already attached to me in some role?".
 
 ```dart
 final server = bluey.server()!;
@@ -36,8 +36,10 @@ scanner.scan().listen((scanResult) async {
 
   // Dedup BEFORE connecting. Skip any device already attached as a
   // client — on iOS, connecting and then disconnecting would tear down
-  // the existing peripheral-side link.
-  if (server.isClientConnected(device.address)) return;
+  // the existing peripheral-side link. `Client.address` and
+  // `Device.address` are distinct types over the same raw value, so
+  // bridge with `ClientAddress(device.address.value)`.
+  if (server.isClientConnected(ClientAddress(device.address.value))) return;
 
   try {
     final peer = await bluey.connectAsPeer(device);
@@ -53,3 +55,15 @@ Apps that hold multiple central-role peer connections concurrently should *also*
 ### Why `tryUpgrade` is also affected
 
 `tryUpgrade` doesn't open a new link itself — it wraps an existing `Connection`. But the trap is at *disconnect* time, not at connect time, so any code path that ends up calling `disconnect()` on a `PeerConnection` whose underlying connection shares an LL link with an existing peripheral-side handle hits the same trap. Guard the upstream connect, not the upgrade.
+
+## Android stops delivering GATT-server requests after a client↔server role reversal on a still-live link
+
+**Affects:** bidirectional apps that reverse GATT roles with the *same* peer — e.g. a session that ran A-server/B-client and then flips to B-server/A-client — **without first tearing the prior link down**.
+
+**Symptom on Android.** When Android becomes the GATT **server** for a peer it was, moments earlier, talking to under the opposite role (and that physical link is still alive), Android's `BluetoothGattServer` callbacks (`onCharacteristicReadRequest`, `onCharacteristicWriteRequest`, …) **silently never fire** for that central's requests. The central's reads and lifecycle heartbeat-writes get no ATT response at all and hang until the central's per-op timeout (~10 s) fires — so peer identification is delayed by a full timeout, and the heartbeat write-failures accumulate as dead-peer signals until the link is torn down. The connection *itself* is up (you see `onConnectionStateChange`, `onPhyUpdate`, `onMtuChanged`); only inbound ATT **requests** vanish. A full ACL teardown — disconnecting the prior link, or toggling Bluetooth on either device — clears the stale association, and the identical Android-server scenario then works.
+
+**Symptom on iOS.** iOS as server in the same role-reversal sequence answers the requests normally; this failure mode is Android-specific.
+
+**Why this happens.** Android multiplexes a single ACL link per peer (the same "one physical link per peer" reality behind the iOS trap above). When that link was established under one GATT-role association and the roles reverse while the link is still live, the stack keeps routing inbound ATT requests by the stale association and they never reach the new server-role callback. This is the Android *server-receive* cousin of the iOS shared-link trap — same underlying cause, different surface.
+
+**Recommended pattern: tear the prior link down before reversing roles.** Don't flip a peer between client and server roles while a link to it is live. Disconnect the existing connection (`connection.disconnect()` / `peerConn.disconnect()`) and wait for the platform to report it down before standing up the opposite role. If you're stuck in the failure state during development, toggling Bluetooth force-releases the ACL. Whether bluey should detect and pre-empt this (e.g. tearing down a stale same-peer link before serving it) is tracked in backlog **I338**.
