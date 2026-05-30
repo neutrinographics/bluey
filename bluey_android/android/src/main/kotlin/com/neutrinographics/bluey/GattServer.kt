@@ -704,6 +704,26 @@ class GattServer(
         }
     }
 
+    /**
+     * Re-announces every currently-tracked central to Dart by re-firing
+     * onCentralConnected with each central's known MTU. Lets a freshly-created
+     * BlueyServer re-establish sessions for centrals that survived a prior
+     * server instance (the native manager is reused across recreations)
+     * instead of evicting their next request (I338). Re-announce (not clear)
+     * preserves the negotiated MTU.
+     */
+    fun reannounceTrackedCentrals() {
+        // Snapshot keys first: we only read here, but guard against concurrent
+        // modification if a connection-state change races on another thread.
+        for (deviceId in connectedCentrals.keys.toList()) {
+            val mtu = (centralMtus[deviceId] ?: DEFAULT_MTU).toLong()
+            val central = CentralDto(id = deviceId, mtu = mtu)
+            handler.post {
+                flutterApi.onCentralConnected(central) {}
+            }
+        }
+    }
+
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         init {
             BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "BluetoothGattServerCallback created")

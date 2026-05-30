@@ -1658,6 +1658,17 @@ interface BlueyHostApi {
    */
   fun closeServer(callback: (Result<Unit>) -> Unit)
   /**
+   * Re-announce every currently-tracked central to Dart.
+   *
+   * The native GATT manager is reused across `BlueyServer` recreations, so a
+   * freshly-created server starts with no session state for centrals that
+   * survived a prior server instance. Calling this re-fires
+   * [BlueyFlutterApi.onCentralConnected] for each tracked central (preserving
+   * the negotiated MTU) so the new server re-establishes their sessions
+   * instead of evicting their next request (I338).
+   */
+  fun resetServerSessions(callback: (Result<Unit>) -> Unit)
+  /**
    * Set the minimum severity level for native log events forwarded to Dart.
    *
    * Events strictly below [level] are dropped on the native side before
@@ -2192,6 +2203,23 @@ interface BlueyHostApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.closeServer{ result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(MessagesPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluey_android.BlueyHostApi.resetServerSessions$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.resetServerSessions{ result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))

@@ -1417,6 +1417,15 @@ protocol BlueyHostApi {
   func respondToWriteRequest(requestId: Int64, status: GattStatusDto, completion: @escaping (Result<Void, Error>) -> Void)
   /// Close the GATT server and disconnect all centrals.
   func closeServer(completion: @escaping (Result<Void, Error>) -> Void)
+  /// Re-announce every currently-tracked central to Dart.
+  ///
+  /// The native peripheral manager is reused across `BlueyServer`
+  /// recreations, so a freshly-created server starts with no session state for
+  /// centrals that survived a prior server instance. Calling this re-fires
+  /// [BlueyFlutterApi.onCentralConnected] for each tracked central (preserving
+  /// the negotiated MTU) so the new server re-establishes their sessions
+  /// instead of evicting their next request (I338).
+  func resetServerSessions(completion: @escaping (Result<Void, Error>) -> Void)
   /// Set the minimum severity level for native log events forwarded to Dart.
   ///
   /// Events strictly below [level] are dropped on the native side before
@@ -1890,6 +1899,29 @@ class BlueyHostApiSetup {
       }
     } else {
       closeServerChannel.setMessageHandler(nil)
+    }
+    /// Re-announce every currently-tracked central to Dart.
+    ///
+    /// The native peripheral manager is reused across `BlueyServer`
+    /// recreations, so a freshly-created server starts with no session state for
+    /// centrals that survived a prior server instance. Calling this re-fires
+    /// [BlueyFlutterApi.onCentralConnected] for each tracked central (preserving
+    /// the negotiated MTU) so the new server re-establishes their sessions
+    /// instead of evicting their next request (I338).
+    let resetServerSessionsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluey_ios.BlueyHostApi.resetServerSessions\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      resetServerSessionsChannel.setMessageHandler { _, reply in
+        api.resetServerSessions { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      resetServerSessionsChannel.setMessageHandler(nil)
     }
     /// Set the minimum severity level for native log events forwarded to Dart.
     ///

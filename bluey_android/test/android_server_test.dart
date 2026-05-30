@@ -396,6 +396,18 @@ void main() {
       });
     });
 
+    group('resetServerSessions', () {
+      test('delegates to hostApi', () async {
+        when(
+          () => mockHostApi.resetServerSessions(),
+        ).thenAnswer((_) async {});
+
+        await server.resetServerSessions();
+
+        verify(() => mockHostApi.resetServerSessions()).called(1);
+      });
+    });
+
     group('onCentralConnected', () {
       test('emits to connections stream', () async {
         final stream = server.centralConnections;

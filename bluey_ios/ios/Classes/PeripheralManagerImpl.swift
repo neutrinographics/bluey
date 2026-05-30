@@ -430,6 +430,23 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
+    /// Re-announces every currently-tracked central to Dart by re-firing
+    /// onCentralConnected with each central's known MTU. Lets a freshly-created
+    /// BlueyServer re-establish sessions for centrals that survived a prior
+    /// server instance (the native manager is reused across recreations)
+    /// instead of evicting their next request (I338). Re-announce (not clear)
+    /// preserves the negotiated MTU — `maximumUpdateValueLength` is read live
+    /// from the retained `CBCentral`, the same source the connect-time announce
+    /// in `trackCentralIfNeeded` uses.
+    func reannounceTrackedCentrals() {
+        BlueyLog.shared.log(.info, "bluey.ios.peripheral", "resetServerSessions",
+                            data: ["centralCount": centrals.count])
+        for (_, central) in centrals {
+            let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
+            flutterApi.onCentralConnected(central: centralDto) { _ in }
+        }
+    }
+
     // MARK: - CBPeripheralManagerDelegate callbacks
 
     func didUpdateState(peripheral: CBPeripheralManager) {

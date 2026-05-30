@@ -1991,6 +1991,32 @@ class BlueyHostApi {
     );
   }
 
+  /// Re-announce every currently-tracked central to Dart.
+  ///
+  /// The native peripheral manager is reused across `BlueyServer`
+  /// recreations, so a freshly-created server starts with no session state for
+  /// centrals that survived a prior server instance. Calling this re-fires
+  /// [BlueyFlutterApi.onCentralConnected] for each tracked central (preserving
+  /// the negotiated MTU) so the new server re-establishes their sessions
+  /// instead of evicting their next request (I338).
+  Future<void> resetServerSessions() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluey_ios.BlueyHostApi.resetServerSessions$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
   /// Set the minimum severity level for native log events forwarded to Dart.
   ///
   /// Events strictly below [level] are dropped on the native side before

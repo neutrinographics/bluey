@@ -210,6 +210,15 @@ class AndroidServer {
     await _hostApi.closeServer();
   }
 
+  /// Re-announces every currently-tracked central to Dart.
+  ///
+  /// The native GATT manager is reused across [BlueyServer] recreations, so a
+  /// freshly-created server re-establishes sessions for centrals that survived
+  /// a prior server instance (instead of evicting their next request, I338).
+  Future<void> resetServerSessions() async {
+    await _hostApi.resetServerSessions();
+  }
+
   // === Callback Handlers ===
 
   /// Handles a central connection event from the platform.
