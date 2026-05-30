@@ -435,7 +435,7 @@ class Bluey {
       BlueyLogLevel.info,
       'bluey.connection',
       'connect started',
-      data: {'deviceId': device.address.value, 'address': device.address.value},
+      data: {'address': device.address.value},
     );
 
     _emitEvent(ConnectingEvent(deviceId: deviceUuid));
