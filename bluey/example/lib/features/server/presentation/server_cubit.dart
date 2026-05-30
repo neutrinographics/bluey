@@ -168,10 +168,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
       // Clear the peer-identification flag for this client so the
       // BLUEY badge disappears immediately on disconnect (and a
       // reconnect-then-heartbeat re-identifies cleanly).
-      final updated = Set<ClientAddress>.from(state.blueyPeerClientIds)
+      final updated = Set<ClientAddress>.from(state.blueyPeerClientAddresses)
         ..remove(clientAddress);
-      if (updated.length != state.blueyPeerClientIds.length) {
-        emit(state.copyWith(blueyPeerClientIds: updated));
+      if (updated.length != state.blueyPeerClientAddresses.length) {
+        emit(state.copyWith(blueyPeerClientAddresses: updated));
       }
       _addLog(
         'Connection',
@@ -181,9 +181,9 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
     // Listen for clients identifying as Bluey peers (first heartbeat).
     _peerConnectionSubscription = _observePeerConnections().listen((peer) {
-      final updated = Set<ClientAddress>.from(state.blueyPeerClientIds)
+      final updated = Set<ClientAddress>.from(state.blueyPeerClientAddresses)
         ..add(peer.client.address);
-      emit(state.copyWith(blueyPeerClientIds: updated));
+      emit(state.copyWith(blueyPeerClientAddresses: updated));
       _addLog(
         'Connection',
         'Bluey peer identified: ${peer.client.address.toShortString()}',
@@ -389,7 +389,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
       state.copyWith(
         serverId: newId,
         connectedClients: [],
-        blueyPeerClientIds: const {},
+        blueyPeerClientAddresses: const {},
       ),
     );
     _addLog(

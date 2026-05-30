@@ -76,7 +76,7 @@ class BlueyServer implements Server {
   /// session). Used to fire [PeerClient] emissions exactly once per
   /// identification — not once per heartbeat. Cleared on disconnect so
   /// a reconnect-then-heartbeat re-identifies.
-  final Set<ClientAddress> _identifiedPeerClientIds = {};
+  final Set<ClientAddress> _identifiedPeerClientAddresses = {};
 
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
@@ -278,7 +278,7 @@ class BlueyServer implements Server {
 
     // Clear cached state — connected clients are gone with the adapter.
     _connectedClients.clear();
-    _identifiedPeerClientIds.clear();
+    _identifiedPeerClientAddresses.clear();
 
     // Transition the advertising state machine into its terminal
     // `invalidated` state and close the broadcast controller so the
@@ -864,27 +864,27 @@ class BlueyServer implements Server {
   /// heartbeats from the same client are no-ops here. The identification
   /// set is cleared in [_handleClientDisconnected] so a reconnect-then-
   /// heartbeat re-identifies.
-  void _trackPeerClient(ClientAddress clientId, ServerId senderId) {
-    final wasNew = !_connectedClients.containsKey(clientId);
+  void _trackPeerClient(ClientAddress clientAddress, ServerId senderId) {
+    final wasNew = !_connectedClients.containsKey(clientAddress);
     if (wasNew) {
       _emitEvent(
-        ClientConnectedEvent(clientAddress: clientId, source: 'BlueyServer'),
+        ClientConnectedEvent(clientAddress: clientAddress, source: 'BlueyServer'),
       );
       final client = BlueyClient(
-        address: clientId,
+        address: clientAddress,
         mtu: 23, // Default MTU — actual MTU is unknown without platform event
       );
-      _connectedClients[clientId] = client;
+      _connectedClients[clientAddress] = client;
       _connectionsController.add(client);
     }
 
-    if (_identifiedPeerClientIds.add(clientId)) {
-      final client = _connectedClients[clientId]!;
+    if (_identifiedPeerClientAddresses.add(clientAddress)) {
+      final client = _connectedClients[clientAddress]!;
       _logger.log(
         BlueyLogLevel.info,
         'bluey.server',
         'central identified as Bluey peer',
-        data: {'clientId': clientId.toString(), 'senderId': senderId.toString()},
+        data: {'clientId': clientAddress.toString(), 'senderId': senderId.toString()},
       );
       _peerConnectionsController.add(
         PeerClient.create(client: client, serverId: senderId),
@@ -892,31 +892,31 @@ class BlueyServer implements Server {
     }
   }
 
-  void _handleClientDisconnected(ClientAddress clientId) {
+  void _handleClientDisconnected(ClientAddress clientAddress) {
     _logger.log(
       BlueyLogLevel.info,
       'bluey.server',
       'central disconnected',
-      data: {'clientId': clientId.toString()},
+      data: {'clientId': clientAddress.toString()},
     );
     // Cancel any heartbeat timer for this client
-    _lifecycle.cancelTimer(clientId);
+    _lifecycle.cancelTimer(clientAddress);
 
-    final client = _connectedClients.remove(clientId);
+    final client = _connectedClients.remove(clientAddress);
     if (client != null) {
       _emitEvent(
-        ClientDisconnectedEvent(clientAddress: clientId, source: 'BlueyServer'),
+        ClientDisconnectedEvent(clientAddress: clientAddress, source: 'BlueyServer'),
       );
     }
 
     // Clear peer identification — a reconnect-then-heartbeat must
     // re-identify, mirroring the connection-side semantics where
     // `tryUpgrade` is per-connection.
-    _identifiedPeerClientIds.remove(clientId);
+    _identifiedPeerClientAddresses.remove(clientAddress);
 
     // Always emit on the disconnections stream -- even for untracked clients
     // (e.g., stale connections from before a server restart).
-    _disconnectionsController.add(clientId);
+    _disconnectionsController.add(clientAddress);
   }
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(

@@ -200,7 +200,7 @@ class _ServerContent extends StatelessWidget {
         if (state.connectedClients.isNotEmpty) ...[
           _ConnectedClientsSection(
             clients: state.connectedClients,
-            blueyPeerClientIds: state.blueyPeerClientIds,
+            blueyPeerClientAddresses: state.blueyPeerClientAddresses,
           ),
           const SizedBox(height: 40),
         ],
@@ -478,11 +478,11 @@ class _ActiveClientsCard extends StatelessWidget {
 
 class _ConnectedClientsSection extends StatelessWidget {
   final List<Client> clients;
-  final Set<ClientAddress> blueyPeerClientIds;
+  final Set<ClientAddress> blueyPeerClientAddresses;
 
   const _ConnectedClientsSection({
     required this.clients,
-    required this.blueyPeerClientIds,
+    required this.blueyPeerClientAddresses,
   });
 
   @override
@@ -508,7 +508,7 @@ class _ConnectedClientsSection extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 16),
             child: _ClientCard(
               client: client,
-              isBlueyPeer: blueyPeerClientIds.contains(client.address),
+              isBlueyPeer: blueyPeerClientAddresses.contains(client.address),
             ),
           ),
         ),
