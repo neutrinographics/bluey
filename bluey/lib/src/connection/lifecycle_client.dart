@@ -560,6 +560,9 @@ class LifecycleClient {
         })
         .catchError((Object error) {
           if (!_isRunning) return;
+          // Checked before _isDeadPeerSignal: the eviction status (0x80) also
+          // satisfies _isDeadPeerSignal, so eviction must short-circuit here or
+          // it would be misrouted to the silence-timer path.
           if (_isEvictionSignal(error)) {
             _logger.log(
               BlueyLogLevel.warn,

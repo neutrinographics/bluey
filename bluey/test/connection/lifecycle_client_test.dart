@@ -2156,6 +2156,7 @@ void main() {
         expect(client.isRunning, isFalse,
             reason: 'stop() called before signalling');
         // NOTE: no async.elapse(...) anywhere — that is the whole point.
+        fakePlatform.simulateWriteStatusFailed = null;
       });
     });
   });
