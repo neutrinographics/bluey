@@ -119,8 +119,21 @@ abstract class Server {
 
   /// Stream of disconnected client addresses.
   ///
-  /// Emits the [ClientAddress] of a client when it disconnects from this
-  /// peripheral. The emitted value equals [Client.address] for the same
+  /// Emits the [ClientAddress] of a client when the transport link to it is
+  /// actually gone — not merely when the heartbeat goes quiet.
+  ///
+  /// **Source of truth by platform:**
+  /// - **Android** (`Capabilities.reportsCentralDisconnects == true`): driven
+  ///   by the platform's native `onConnectionStateChange` callback. A heartbeat
+  ///   lull (silence past the `lifecycleInterval` window) produces only a
+  ///   [ClientLifecycleTimeoutEvent] advisory; no `disconnections` event is
+  ///   emitted until the platform reports the link down.
+  /// - **iOS** (no native client-disconnect callback, I201): heartbeat silence
+  ///   past the timeout is still treated as a disconnect and drives this stream.
+  ///   The iOS clean-reconnect handling lands in a later stage (I338).
+  ///
+  /// Real platform disconnects and client CourtesyDisconnects always emit on
+  /// both platforms. The emitted value equals [Client.address] for the same
   /// physical client, enabling correct bridging of the [connections] and
   /// [disconnections] streams (fixes I337).
   Stream<ClientAddress> get disconnections;

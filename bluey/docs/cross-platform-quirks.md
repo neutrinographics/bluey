@@ -67,3 +67,17 @@ Apps that hold multiple central-role peer connections concurrently should *also*
 **Why this happens.** Android multiplexes a single ACL link per peer (the same "one physical link per peer" reality behind the iOS trap above). When that link was established under one GATT-role association and the roles reverse while the link is still live, the stack keeps routing inbound ATT requests by the stale association and they never reach the new server-role callback. This is the Android *server-receive* cousin of the iOS shared-link trap — same underlying cause, different surface.
 
 **Recommended pattern: tear the prior link down before reversing roles.** Don't flip a peer between client and server roles while a link to it is live. Disconnect the existing connection (`connection.disconnect()` / `peerConn.disconnect()`) and wait for the platform to report it down before standing up the opposite role. If you're stuck in the failure state during development, toggling Bluetooth force-releases the ACL. bluey intentionally does **not** auto-detect or auto-tear-down this state — the failure fingerprint is ambiguous and an auto-disconnect could surprise an app that holds a client link deliberately — so handling it is the app's responsibility (decision recorded in backlog **I208**).
+
+## Heartbeat silence is advisory on Android, a disconnect on iOS
+
+**Affects:** GATT-server apps using the Bluey lifecycle protocol (`peerDiscoverable: true`) that need to distinguish a paused peer from a truly disconnected one.
+
+**Background.** When a connected Bluey peer's central-side app is backgrounded or paused, its heartbeat writes to the lifecycle control characteristic stop. The server's silence detector fires after `lifecycleInterval` (default 10 s) with no write received.
+
+**Behavior on Android** (`Capabilities.reportsCentralDisconnects == true`). Android delivers a native `onConnectionStateChange` callback when a client link actually drops. Because bluey has a reliable disconnect signal, heartbeat silence is treated as **advisory only**: the server emits a `ClientLifecycleTimeoutEvent` on `Server.events` but does **not** emit on `Server.disconnections`. The peer remains in `connectedClients`; when it resumes and heartbeats again it is identified seamlessly with no reconnect overhead.
+
+**Behavior on iOS** (no native client-disconnect callback, I201). iOS does not deliver a peripheral-role disconnect event for a central that simply goes away. Heartbeat silence is therefore still the only signal available, and it **does** drive `Server.disconnections` — the client is evicted from `connectedClients` and a fresh connection + identification cycle is required when the peer returns. The iOS clean-reconnect handling (suppressing the eviction when the peer quickly reconnects) is planned for a later I338 stage.
+
+**Practical guidance.** On Android, treat a `ClientLifecycleTimeoutEvent` as a warning that a peer may be paused, not as confirmation it is gone — wait for the `Server.disconnections` emission before tearing down app state for that client. The timeout duration is configurable via `lifecycleInterval` on `ServerConfig` if your app's background-pause envelope differs from the 10 s default.
+
+*(I338 Stage 1 — lifecycle-silence transport reconciliation)*
