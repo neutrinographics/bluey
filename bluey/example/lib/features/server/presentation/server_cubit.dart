@@ -48,7 +48,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
 
   StreamSubscription<Client>? _connectionSubscription;
   StreamSubscription<PeerClient>? _peerConnectionSubscription;
-  StreamSubscription<String>? _disconnectionSubscription;
+  StreamSubscription<ClientAddress>? _disconnectionSubscription;
   StreamSubscription<ReadRequest>? _readRequestSubscription;
   StreamSubscription<WriteRequest>? _writeRequestSubscription;
   StreamSubscription<AdvertisingState>? _advertisingStateSubscription;
@@ -151,7 +151,10 @@ class ServerCubit extends Cubit<ServerScreenState> {
     _connectionSubscription = _observeConnections().listen(
       (client) {
         _refreshConnectedClients();
-        _addLog('Connection', 'Client connected: ${_shortId(client.id)}');
+        _addLog(
+          'Connection',
+          'Client connected: ${client.address.toShortString()}',
+        );
       },
       onError: (error) {
         _addLog('Error', 'Connection stream error: $error');
@@ -160,27 +163,30 @@ class ServerCubit extends Cubit<ServerScreenState> {
     );
 
     // Listen for central disconnections and refresh the list.
-    _disconnectionSubscription = _observeDisconnections().listen((clientId) {
+    _disconnectionSubscription = _observeDisconnections().listen((clientAddress) {
       _refreshConnectedClients();
       // Clear the peer-identification flag for this client so the
       // BLUEY badge disappears immediately on disconnect (and a
       // reconnect-then-heartbeat re-identifies cleanly).
-      final updated = Set<UUID>.from(state.blueyPeerClientIds)
-        ..removeWhere((id) => id.toString() == clientId);
+      final updated = Set<ClientAddress>.from(state.blueyPeerClientIds)
+        ..remove(clientAddress);
       if (updated.length != state.blueyPeerClientIds.length) {
         emit(state.copyWith(blueyPeerClientIds: updated));
       }
-      _addLog('Connection', 'Client disconnected: ${clientId.substring(0, 8)}');
+      _addLog(
+        'Connection',
+        'Client disconnected: ${clientAddress.toShortString()}',
+      );
     });
 
     // Listen for clients identifying as Bluey peers (first heartbeat).
     _peerConnectionSubscription = _observePeerConnections().listen((peer) {
-      final updated = Set<UUID>.from(state.blueyPeerClientIds)
-        ..add(peer.client.id);
+      final updated = Set<ClientAddress>.from(state.blueyPeerClientIds)
+        ..add(peer.client.address);
       emit(state.copyWith(blueyPeerClientIds: updated));
       _addLog(
         'Connection',
-        'Bluey peer identified: ${_shortId(peer.client.id)}',
+        'Bluey peer identified: ${peer.client.address.toShortString()}',
       );
     });
 
@@ -199,7 +205,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
         }
         return;
       }
-      _addLog('Read', 'From ${_shortId(request.client.id)}');
+      _addLog('Read', 'From ${request.client.address.toShortString()}');
       try {
         await _observeReadRequests.respond(
           request,
@@ -237,7 +243,7 @@ class ServerCubit extends Cubit<ServerScreenState> {
       _characteristicValue = request.value;
       _addLog(
         'Write',
-        'From ${_shortId(request.client.id)}: '
+        'From ${request.client.address.toShortString()}: '
             '${_formatHex(request.value)}',
       );
       if (request.responseNeeded) {
@@ -402,8 +408,6 @@ class ServerCubit extends Cubit<ServerScreenState> {
     if (log.length > 100) log.removeLast();
     emit(state.copyWith(log: log));
   }
-
-  String _shortId(UUID id) => id.toString().substring(0, 8);
 
   String _formatHex(Uint8List bytes) => bytes
       .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())

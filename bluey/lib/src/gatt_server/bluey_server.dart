@@ -16,7 +16,6 @@ import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
-import 'client_address.dart';
 import 'lifecycle_server.dart';
 import 'server.dart';
 
@@ -69,8 +68,8 @@ class BlueyServer implements Server {
       StreamController<Client>.broadcast();
   final StreamController<PeerClient> _peerConnectionsController =
       StreamController<PeerClient>.broadcast();
-  final StreamController<String> _disconnectionsController =
-      StreamController<String>.broadcast();
+  final StreamController<ClientAddress> _disconnectionsController =
+      StreamController<ClientAddress>.broadcast();
 
   /// Set of client addresses that have been identified as Bluey peers
   /// (i.e. have sent at least one lifecycle heartbeat in the current
@@ -154,13 +153,13 @@ class BlueyServer implements Server {
       );
       _emitEvent(
         ClientConnectedEvent(
-          clientId: clientAddress.value,
+          clientAddress: clientAddress,
           mtu: platformCentral.mtu,
           source: 'BlueyServer',
         ),
       );
       final client = BlueyClient(
-        id: clientAddress.value,
+        address: clientAddress,
         mtu: platformCentral.mtu,
       );
       _connectedClients[clientAddress] = client;
@@ -382,7 +381,7 @@ class BlueyServer implements Server {
   Stream<PeerClient> get peerConnections => _peerConnectionsController.stream;
 
   @override
-  Stream<String> get disconnections => _disconnectionsController.stream;
+  Stream<ClientAddress> get disconnections => _disconnectionsController.stream;
 
   @override
   List<Client> get connectedClients {
@@ -391,9 +390,9 @@ class BlueyServer implements Server {
   }
 
   @override
-  bool isClientConnected(String address) {
+  bool isClientConnected(ClientAddress address) {
     _ensureValid();
-    return _connectedClients.containsKey(ClientAddress(address));
+    return _connectedClients.containsKey(address);
   }
 
   @override
@@ -652,18 +651,18 @@ class BlueyServer implements Server {
     }
     await withErrorTranslation(
       () => _platform.notifyCharacteristicTo(
-        blueyClient._platformId,
+        blueyClient.address.value,
         handle,
         data,
       ),
       operation: 'notifyTo',
-      address: client.id.toString(),
+      address: blueyClient.address.value,
     );
     _emitEvent(
       NotificationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient._platformId,
+        clientId: blueyClient.address.value,
         source: 'BlueyServer',
       ),
     );
@@ -703,18 +702,18 @@ class BlueyServer implements Server {
     }
     await withErrorTranslation(
       () => _platform.indicateCharacteristicTo(
-        blueyClient._platformId,
+        blueyClient.address.value,
         handle,
         data,
       ),
       operation: 'indicateTo',
-      address: client.id.toString(),
+      address: blueyClient.address.value,
     );
     _emitEvent(
       IndicationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient._platformId,
+        clientId: blueyClient.address.value,
         source: 'BlueyServer',
       ),
     );
@@ -765,9 +764,8 @@ class BlueyServer implements Server {
     Uint8List? value,
   }) async {
     _ensureValid();
-    final clientAddress = ClientAddress(
-      (request.client as BlueyClient)._platformId,
-    );
+    final blueyClient = request.client as BlueyClient;
+    final clientAddress = blueyClient.address;
     // Drain pending state BEFORE the platform call so the obligation is
     // discharged even if respondToReadRequest throws (stale request id,
     // platform error, etc.).
@@ -780,13 +778,13 @@ class BlueyServer implements Server {
           value,
         ),
         operation: 'respondToRead',
-        address: request.client.id.toString(),
+        address: clientAddress.value,
       );
     } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(
         operation: 'respondToRead',
         status: e.status,
-        clientId: request.client.id,
+        clientAddress: clientAddress,
         characteristicId: request.characteristicId,
       );
     }
@@ -798,9 +796,8 @@ class BlueyServer implements Server {
     required GattResponseStatus status,
   }) async {
     _ensureValid();
-    final clientAddress = ClientAddress(
-      (request.client as BlueyClient)._platformId,
-    );
+    final blueyClient = request.client as BlueyClient;
+    final clientAddress = blueyClient.address;
     // Drain pending state BEFORE the platform call — see respondToRead.
     _lifecycle.requestCompleted(clientAddress, request.internalRequestId);
     try {
@@ -810,13 +807,13 @@ class BlueyServer implements Server {
           _mapGattResponseStatusToPlatform(status),
         ),
         operation: 'respondToWrite',
-        address: request.client.id.toString(),
+        address: clientAddress.value,
       );
     } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(
         operation: 'respondToWrite',
         status: e.status,
-        clientId: request.client.id,
+        clientAddress: clientAddress,
         characteristicId: request.characteristicId,
       );
     }
@@ -871,10 +868,10 @@ class BlueyServer implements Server {
     final wasNew = !_connectedClients.containsKey(clientId);
     if (wasNew) {
       _emitEvent(
-        ClientConnectedEvent(clientId: clientId.value, source: 'BlueyServer'),
+        ClientConnectedEvent(clientAddress: clientId, source: 'BlueyServer'),
       );
       final client = BlueyClient(
-        id: clientId.value,
+        address: clientId,
         mtu: 23, // Default MTU — actual MTU is unknown without platform event
       );
       _connectedClients[clientId] = client;
@@ -908,7 +905,7 @@ class BlueyServer implements Server {
     final client = _connectedClients.remove(clientId);
     if (client != null) {
       _emitEvent(
-        ClientDisconnectedEvent(clientId: clientId.value, source: 'BlueyServer'),
+        ClientDisconnectedEvent(clientAddress: clientId, source: 'BlueyServer'),
       );
     }
 
@@ -919,7 +916,7 @@ class BlueyServer implements Server {
 
     // Always emit on the disconnections stream -- even for untracked clients
     // (e.g., stale connections from before a server restart).
-    _disconnectionsController.add(clientId.value);
+    _disconnectionsController.add(clientId);
   }
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(
@@ -1035,30 +1032,15 @@ class BlueyServer implements Server {
 /// platform interface follows the BLE-spec terms. See the Ubiquitous
 /// Language section in `CLAUDE.md`.
 class BlueyClient implements Client {
-  final String _platformId;
+  final ClientAddress _address;
   final int _mtu;
 
-  BlueyClient({required String id, required int mtu})
-    : _platformId = id,
+  BlueyClient({required ClientAddress address, required int mtu})
+    : _address = address,
       _mtu = mtu;
 
   @override
-  UUID get id {
-    // Convert the platform ID to a UUID
-    // If it's already a UUID format, use it directly
-    if (_platformId.length == 36 && _platformId.contains('-')) {
-      return UUID(_platformId);
-    }
-    // Otherwise, create a UUID from the string by padding
-    final bytes = _platformId.codeUnits;
-    final padded = List<int>.filled(16, 0);
-    for (var i = 0; i < bytes.length && i < 16; i++) {
-      padded[i] = bytes[i];
-    }
-    // Convert to hex string
-    final hex = padded.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return UUID(hex);
-  }
+  ClientAddress get address => _address;
 
   @override
   int get mtu => _mtu;

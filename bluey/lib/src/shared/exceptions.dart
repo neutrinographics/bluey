@@ -1,4 +1,5 @@
 import '../discovery/device_address.dart';
+import '../gatt_server/client_address.dart';
 import '../peer/server_id.dart';
 import '../platform/bluetooth_state.dart';
 import 'uuid.dart';
@@ -311,10 +312,10 @@ class ServerRespondFailedException extends BlueyException {
   /// in the same range.
   final int status;
 
-  /// Identifier of the central (`Client.id`) whose request could not be
+  /// Address of the central ([Client.address]) whose request could not be
   /// responded to. The client may already be disconnected; consumers
   /// should not assume it is still live.
-  final UUID clientId;
+  final ClientAddress clientAddress;
 
   /// UUID of the characteristic the original request targeted. Useful
   /// for correlating with consumer-side request tracking.
@@ -323,10 +324,10 @@ class ServerRespondFailedException extends BlueyException {
   ServerRespondFailedException({
     required this.operation,
     required this.status,
-    required this.clientId,
+    required this.clientAddress,
     required this.characteristicId,
   }) : super(
-         'Server "$operation" failed for client $clientId on '
+         'Server "$operation" failed for client $clientAddress on '
          'characteristic $characteristicId (ATT status $status)',
          action:
              'The central likely disconnected before the response '

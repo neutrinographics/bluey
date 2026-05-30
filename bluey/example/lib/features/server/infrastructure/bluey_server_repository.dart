@@ -88,7 +88,7 @@ class BlueyServerRepository implements ServerRepository {
   }
 
   @override
-  Stream<String> get disconnections {
+  Stream<ClientAddress> get disconnections {
     final server = getServer();
     if (server == null) {
       return const Stream.empty();

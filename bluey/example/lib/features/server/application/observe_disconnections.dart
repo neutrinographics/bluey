@@ -1,3 +1,5 @@
+import 'package:bluey/bluey.dart';
+
 import '../domain/server_repository.dart';
 
 /// Use case for observing client device disconnections from the server.
@@ -6,8 +8,9 @@ class ObserveDisconnections {
 
   ObserveDisconnections(this._repository);
 
-  /// Returns a stream of client device IDs that disconnect from the server.
-  Stream<String> call() {
+  /// Returns a stream of [ClientAddress] values for clients that disconnect
+  /// from the server.
+  Stream<ClientAddress> call() {
     return _repository.disconnections;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'discovery/device_address.dart';
+import 'gatt_server/client_address.dart';
 import 'shared/uuid.dart';
 
 /// Base class for all Bluey diagnostic events.
@@ -319,49 +320,36 @@ final class AdvertisingStoppingEvent extends BlueyEvent {
 
 /// Client connected to server.
 final class ClientConnectedEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
   final int? mtu;
 
-  ClientConnectedEvent({required this.clientId, this.mtu, super.source});
+  ClientConnectedEvent({required this.clientAddress, this.mtu, super.source});
 
   @override
   String toString() {
     final m = mtu != null ? ' mtu=$mtu' : '';
-    return '[Server] Client connected: ${_shortId(clientId)}$m';
-  }
-
-  String _shortId(String id) {
-    if (id.length > 8) {
-      return '${id.substring(0, 8)}...';
-    }
-    return id;
+    return '[Server] Client connected: ${clientAddress.toShortString()}$m';
   }
 }
 
 /// Client disconnected from server.
 final class ClientDisconnectedEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
 
-  ClientDisconnectedEvent({required this.clientId, super.source});
+  ClientDisconnectedEvent({required this.clientAddress, super.source});
 
   @override
-  String toString() => '[Server] Client disconnected: ${_shortId(clientId)}';
-
-  String _shortId(String id) {
-    if (id.length > 8) {
-      return '${id.substring(0, 8)}...';
-    }
-    return id;
-  }
+  String toString() =>
+      '[Server] Client disconnected: ${clientAddress.toShortString()}';
 }
 
 /// Read request received from client.
 final class ReadRequestEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
   final UUID characteristicId;
 
   ReadRequestEvent({
-    required this.clientId,
+    required this.clientAddress,
     required this.characteristicId,
     super.source,
   });
@@ -373,12 +361,12 @@ final class ReadRequestEvent extends BlueyEvent {
 
 /// Write request received from client.
 final class WriteRequestEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
   final UUID characteristicId;
   final int valueLength;
 
   WriteRequestEvent({
-    required this.clientId,
+    required this.clientAddress,
     required this.characteristicId,
     required this.valueLength,
     super.source,
@@ -517,36 +505,29 @@ final class PeerDeclaredUnreachableEvent extends BlueyEvent {
 /// [ClientDisconnectedEvent] — the latter fires for any disconnect,
 /// while this fires only when the lifecycle protocol detects silence.
 final class ClientLifecycleTimeoutEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
 
-  ClientLifecycleTimeoutEvent({required this.clientId, super.source});
+  ClientLifecycleTimeoutEvent({required this.clientAddress, super.source});
 
   @override
   String toString() =>
-      '[Lifecycle] Client ${_shortId(clientId)} timed out (heartbeat silence)';
-
-  String _shortId(String id) {
-    if (id.length > 8) return '${id.substring(0, 8)}...';
-    return id;
-  }
+      '[Lifecycle] Client ${clientAddress.toShortString()} timed out (heartbeat silence)';
 }
 
 /// Server-side: the lifecycle silence timer was paused because a
 /// pending request from this client is in flight. The timer resumes
 /// once the request is responded to or drained.
 final class LifecyclePausedForPendingRequestEvent extends BlueyEvent {
-  final String clientId;
+  final ClientAddress clientAddress;
 
-  LifecyclePausedForPendingRequestEvent({required this.clientId, super.source});
+  LifecyclePausedForPendingRequestEvent({
+    required this.clientAddress,
+    super.source,
+  });
 
   @override
   String toString() =>
-      '[Lifecycle] Paused timer for ${_shortId(clientId)} (pending request)';
-
-  String _shortId(String id) {
-    if (id.length > 8) return '${id.substring(0, 8)}...';
-    return id;
-  }
+      '[Lifecycle] Paused timer for ${clientAddress.toShortString()} (pending request)';
 }
 
 /// An error occurred.

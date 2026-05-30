@@ -478,7 +478,7 @@ class _ActiveClientsCard extends StatelessWidget {
 
 class _ConnectedClientsSection extends StatelessWidget {
   final List<Client> clients;
-  final Set<UUID> blueyPeerClientIds;
+  final Set<ClientAddress> blueyPeerClientIds;
 
   const _ConnectedClientsSection({
     required this.clients,
@@ -508,7 +508,7 @@ class _ConnectedClientsSection extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 16),
             child: _ClientCard(
               client: client,
-              isBlueyPeer: blueyPeerClientIds.contains(client.id),
+              isBlueyPeer: blueyPeerClientIds.contains(client.address),
             ),
           ),
         ),
@@ -602,7 +602,7 @@ class _ClientCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            client.id.toShortString(),
+            client.address.toShortString(),
             style: GoogleFonts.manrope(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -611,7 +611,7 @@ class _ClientCard extends StatelessWidget {
             ),
           ),
           Text(
-            client.id.toString(),
+            client.address.toString(),
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 12,

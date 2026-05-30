@@ -39,8 +39,8 @@ abstract class ServerRepository {
   /// at least one lifecycle heartbeat).
   Stream<PeerClient> get peerConnections;
 
-  /// Stream of client device disconnections (emits central ID).
-  Stream<String> get disconnections;
+  /// Stream of client device disconnections (emits client address).
+  Stream<ClientAddress> get disconnections;
 
   /// Returns the currently connected clients.
   List<Client> get connectedClients;

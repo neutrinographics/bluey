@@ -301,7 +301,7 @@ class LifecycleServer {
       // fires once per pause edge, not on every subsequent request.
       _events?.emit(
         LifecyclePausedForPendingRequestEvent(
-          clientId: clientId.value,
+          clientAddress: clientId,
           source: 'LifecycleServer',
         ),
       );
@@ -363,7 +363,7 @@ class LifecycleServer {
       _clients.remove(clientId);
       _events?.emit(
         ClientLifecycleTimeoutEvent(
-          clientId: clientId.value,
+          clientAddress: clientId,
           source: 'LifecycleServer',
         ),
       );

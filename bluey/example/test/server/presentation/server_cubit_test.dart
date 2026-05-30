@@ -272,8 +272,8 @@ void main() {
       seed: () {
         final client = MockClient();
         when(
-          () => client.id,
-        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+          () => client.address,
+        ).thenReturn(const ClientAddress('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) => cubit.sendNotification(),
@@ -294,8 +294,8 @@ void main() {
       seed: () {
         final client = MockClient();
         when(
-          () => client.id,
-        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+          () => client.address,
+        ).thenReturn(const ClientAddress('00000000-0000-0000-0000-000000000001'));
         return ServerScreenState(connectedClients: [client]);
       },
       act: (cubit) => cubit.sendNotification(),
@@ -329,8 +329,8 @@ void main() {
       setUp: () {
         final client = MockClient();
         when(
-          () => client.id,
-        ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+          () => client.address,
+        ).thenReturn(const ClientAddress('00000000-0000-0000-0000-000000000001'));
         when(() => mockCheckServerSupport()).thenReturn(true);
         when(
           () => mockObserveConnections(),
@@ -518,8 +518,8 @@ void main() {
       writeController = StreamController<WriteRequest>();
       stressClient = MockClient();
       when(
-        () => stressClient.id,
-      ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+        () => stressClient.address,
+      ).thenReturn(const ClientAddress('00000000-0000-0000-0000-000000000001'));
       when(() => mockCheckServerSupport()).thenReturn(true);
       when(
         () => mockObserveConnections(),

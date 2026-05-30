@@ -6,10 +6,12 @@ import '../peer/server_id.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'advertising_state.dart';
+import 'client_address.dart';
 import 'gatt_request.dart';
 import 'hosted_gatt.dart';
 
 export 'advertising_state.dart';
+export 'client_address.dart';
 export 'gatt_request.dart';
 export 'hosted_gatt.dart';
 
@@ -37,8 +39,14 @@ enum AdvertiseMode {
 /// created to represent it. Use this to send notifications to specific
 /// clients.
 abstract class Client {
-  /// The unique identifier of this client.
-  UUID get id;
+  /// Opaque platform address of this connected client — the same value
+  /// emitted on [Server.disconnections]. Use it to bridge the
+  /// [Server.peerConnections] and [Server.disconnections] streams (fixes I337).
+  ///
+  /// On Android this is the MAC address string (e.g. `'46:F9:31:94:D7:F6'`);
+  /// on iOS it is the `CBCentral.identifier` UUID string. The format is
+  /// platform-specific and opaque — never parse it.
+  ClientAddress get address;
 
   /// The current MTU for this connection.
   int get mtu;
@@ -70,7 +78,7 @@ abstract class Client {
 ///
 /// // Listen for connections
 /// server.connections.listen((client) {
-///   print('Client connected: ${client.id}');
+///   print('Client connected: ${client.address}');
 /// });
 /// ```
 abstract class Server {
@@ -109,28 +117,32 @@ abstract class Server {
   /// ignore [connections]; raw / non-Bluey centrals are never emitted.
   Stream<PeerClient> get peerConnections;
 
-  /// Stream of disconnected client device IDs.
+  /// Stream of disconnected client addresses.
   ///
-  /// Emits the ID of a client when it disconnects from this peripheral.
-  Stream<String> get disconnections;
+  /// Emits the [ClientAddress] of a client when it disconnects from this
+  /// peripheral. The emitted value equals [Client.address] for the same
+  /// physical client, enabling correct bridging of the [connections] and
+  /// [disconnections] streams (fixes I337).
+  Stream<ClientAddress> get disconnections;
 
   /// Currently connected clients.
   List<Client> get connectedClients;
 
   /// Whether a client with [address] is currently attached to this server.
   ///
-  /// [address] is the platform-level identifier — MAC on Android,
-  /// `CBPeer.identifier` UUID string on iOS — and matches both
-  /// `Client.id` (peripheral side) and `Device.address` (central side)
-  /// for the same physical peer. Apps performing bidirectional discovery
-  /// can call `server.isClientConnected(device.address)` before
-  /// `bluey.connectAsPeer(device)` to avoid opening a redundant central
-  /// link to a device already attached as a client.
+  /// [address] wraps the platform-level identifier — MAC on Android,
+  /// `CBPeer.identifier` UUID string on iOS — and matches [Client.address]
+  /// (peripheral side) and can be derived from `Device.address` (central
+  /// side) for the same physical peer. Apps performing bidirectional
+  /// discovery can call
+  /// `server.isClientConnected(ClientAddress(device.address.value))` before
+  /// `bluey.connectAsPeer(device)` to avoid opening a redundant central link
+  /// to a device already attached as a client.
   ///
   /// On iOS this is critical: see I324 / `docs/cross-platform-quirks.md`.
   /// Returns true regardless of whether the client has identified itself
   /// as a Bluey peer via the lifecycle protocol.
-  bool isClientConnected(String address);
+  bool isClientConnected(ClientAddress address);
 
   /// Add a service to the GATT database.
   ///

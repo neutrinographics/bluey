@@ -313,7 +313,10 @@ void main() {
         hasLength(1),
         reason: 'first pending request should fire pause event exactly once',
       );
-      expect(paused.single.clientId, equals(clientId));
+      expect(
+        paused.single.clientAddress,
+        equals(const ClientAddress(clientId)),
+      );
 
       await server.dispose();
       await bluey.dispose();
@@ -365,7 +368,10 @@ void main() {
         final timedOut =
             eventLog.whereType<ClientLifecycleTimeoutEvent>().toList();
         expect(timedOut, hasLength(1));
-        expect(timedOut.single.clientId, equals(clientId));
+        expect(
+          timedOut.single.clientAddress,
+          equals(const ClientAddress(clientId)),
+        );
 
         server.dispose();
         bluey.dispose();
