@@ -655,6 +655,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// "tracks" but the next-created [BlueyServer] has not heard of. On the next
   /// [resetServerSessions] it is re-announced via `centralConnections`,
   /// modelling the native re-announce contract (I338 reset-on-init).
+  ///
+  /// Unlike [simulateCentralConnection], this does not require advertising to
+  /// be active — survivors pre-date the current advertising lifecycle, and the
+  /// reset fires at server construction before startAdvertising.
   void simulateSurvivingAnnouncedCentral(String centralId, {int mtu = 23}) {
     _survivingAnnounced[centralId] = mtu;
   }

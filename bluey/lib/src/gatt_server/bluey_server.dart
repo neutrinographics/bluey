@@ -189,7 +189,16 @@ class BlueyServer implements Server {
     // next request. Fired after the centralConnections/centralDisconnections
     // listeners are attached so the re-announce events are observed. No-op on
     // platforms without surviving centrals (default-no-op base method).
-    unawaited(_platform.resetServerSessions());
+    unawaited(
+      _platform.resetServerSessions().catchError((Object e) {
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey.server',
+          'resetServerSessions failed; surviving centrals may not be re-announced',
+          data: {'error': e.toString()},
+        );
+      }),
+    );
 
     // Subscribe to platform request streams and route internally.
     // Control service requests are handled here; all others are forwarded
