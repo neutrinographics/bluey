@@ -237,7 +237,19 @@ void main() {
     );
 
     test(
-      'DisconnectedException carries deviceId and DisconnectReason.linkLoss',
+      'connection.deviceAddress is a DeviceAddress typed by address string',
+      () async {
+        final conn = await bluey.connect(buildDevice());
+        expect(
+          conn.deviceAddress,
+          const DeviceAddress(TestDeviceIds.device1),
+        );
+        await conn.disconnect();
+      },
+    );
+
+    test(
+      'DisconnectedException carries raw address String and DisconnectReason.linkLoss',
       () async {
         final conn = await bluey.connect(buildDevice());
         final services = await conn.services();
@@ -250,12 +262,7 @@ void main() {
           await char.write(Uint8List.fromList([0x01]));
           fail('Expected DisconnectedException');
         } on DisconnectedException catch (e) {
-          // Task-3 bridge: Connection.deviceId is the MAC coerced to UUID
-          // via zero-padding (same logic as old deviceIdToUuid).
-          expect(
-            e.deviceId,
-            equals(UUID('00000000-0000-0000-0000-aabbccddee01')),
-          );
+          expect(e.address, equals(TestDeviceIds.device1));
           expect(e.reason, equals(DisconnectReason.linkLoss));
         }
 

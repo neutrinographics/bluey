@@ -31,7 +31,7 @@ import '../fakes/test_helpers.dart';
 /// I079 pending-request tests in `bluey_server_test.dart`.
 void main() {
   const deviceAddress = 'AA:BB:CC:DD:EE:01';
-  final deviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
+  const expectedDeviceAddress = DeviceAddress(deviceAddress);
 
   group('Client-side lifecycle events on bluey.events (I068)', () {
     test('HeartbeatSentEvent fires on every probe write; '
@@ -82,10 +82,10 @@ void main() {
         // ack corresponds to a prior send).
         expect(sent.length, greaterThanOrEqualTo(acked.length));
         for (final e in sent) {
-          expect(e.deviceId, equals(deviceId));
+          expect(e.deviceAddress, equals(expectedDeviceAddress));
         }
         for (final e in acked) {
-          expect(e.deviceId, equals(deviceId));
+          expect(e.deviceAddress, equals(expectedDeviceAddress));
         }
 
         peerConn.disconnect().catchError((_) {});
@@ -134,7 +134,7 @@ void main() {
           isTrue,
           reason: 'GattOperationTimeoutException is a dead-peer signal',
         );
-        expect(failed.first.deviceId, equals(deviceId));
+        expect(failed.first.deviceAddress, equals(expectedDeviceAddress));
 
         fakePlatform.simulateWriteTimeout = false;
         peerConn.disconnect().catchError((_) {});
@@ -229,7 +229,7 @@ void main() {
           hasLength(1),
           reason: 'silence detector should have tripped exactly once',
         );
-        expect(unreachable.single.deviceId, equals(deviceId));
+        expect(unreachable.single.deviceAddress, equals(expectedDeviceAddress));
 
         fakePlatform.simulateWriteTimeout = false;
         peerConn.disconnect().catchError((_) {});

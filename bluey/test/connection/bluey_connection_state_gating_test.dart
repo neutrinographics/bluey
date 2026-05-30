@@ -210,7 +210,7 @@ void main() {
           );
           fail('expected DisconnectedException');
         } on DisconnectedException catch (e) {
-          expect(e.deviceId, ctx.connection.deviceId);
+          expect(e.address, ctx.connection.deviceAddress.value);
           expect(e.reason, DisconnectReason.unknown);
         }
       },

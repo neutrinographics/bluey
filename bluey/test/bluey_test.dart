@@ -396,11 +396,7 @@ void main() {
         final connection = await bluey.connect(device);
 
         expect(connection, isA<Connection>());
-        // Connection.deviceId is a UUID bridged from device.address.value (Task 3 cleans this up)
-        expect(
-          connection.deviceId,
-          equals(UUID(device.address.value)),
-        );
+        expect(connection.deviceAddress, equals(device.address));
       });
 
       test('connection emits state changes', () async {

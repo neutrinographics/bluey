@@ -45,7 +45,7 @@ class MockAndroidConnectionExtensions implements AndroidConnectionExtensions {
 // Mock implementation for testing the interface
 class MockConnection implements Connection {
   @override
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
   @override
   ConnectionState state;
@@ -57,7 +57,7 @@ class MockConnection implements Connection {
   final _stateController = StreamController<ConnectionState>.broadcast();
 
   MockConnection({
-    required this.deviceId,
+    required this.deviceAddress,
     this.state = ConnectionState.ready,
     MockAndroidConnectionExtensions? android,
     List<RemoteService>? services,
@@ -154,7 +154,7 @@ void main() {
 
     setUp(() {
       connection = MockConnection(
-        deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+        deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
       );
     });
 
@@ -163,10 +163,10 @@ void main() {
     });
 
     group('Properties', () {
-      test('has deviceId', () {
+      test('has deviceAddress', () {
         expect(
-          connection.deviceId,
-          equals(UUID('00000000-0000-0000-0000-aabbccddeeff')),
+          connection.deviceAddress,
+          equals(const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff')),
         );
       });
 
@@ -207,7 +207,7 @@ void main() {
 
       test('returns services when available', () async {
         connection = MockConnection(
-          deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
           services: [
             MockRemoteServiceMinimal(Services.heartRate),
             MockRemoteServiceMinimal(Services.battery),
@@ -220,7 +220,7 @@ void main() {
 
       test('service() finds by UUID', () {
         connection = MockConnection(
-          deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
           services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 
@@ -237,7 +237,7 @@ void main() {
 
       test('hasService() returns true when found', () async {
         connection = MockConnection(
-          deviceId: UUID('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
           services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 

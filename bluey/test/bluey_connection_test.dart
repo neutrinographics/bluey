@@ -453,7 +453,7 @@ void main() {
       connection = BlueyConnection(
         platformInstance: mockPlatform,
         connectionId: deviceId.toString(),
-        deviceId: deviceId,
+        deviceAddress: DeviceAddress(deviceId.toString()),
         logger: BlueyLogger(),
       );
     });

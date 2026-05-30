@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/discovery/device_address.dart';
 import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey/src/shared/uuid.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
@@ -49,20 +50,20 @@ void main() {
 
   group('Connection Exceptions', () {
     test('ConnectionException with reason', () {
-      final deviceId = UUID.short(0x1234);
+      const deviceAddress = DeviceAddress('AA:BB:CC:DD:EE:FF');
       final exception = ConnectionException(
-        deviceId,
+        deviceAddress,
         ConnectionFailureReason.timeout,
       );
 
-      expect(exception.deviceId, equals(deviceId));
+      expect(exception.deviceAddress, equals(deviceAddress));
       expect(exception.reason, equals(ConnectionFailureReason.timeout));
       expect(exception.message, contains('timeout'));
     });
 
     test('ConnectionException has action', () {
       final exception = ConnectionException(
-        UUID.short(0x1234),
+        const DeviceAddress('AA:BB:CC:DD:EE:FF'),
         ConnectionFailureReason.timeout,
       );
       expect(exception.action, isNotNull);
@@ -70,20 +71,20 @@ void main() {
     });
 
     test('DisconnectedException with reason', () {
-      final deviceId = UUID.short(0x1234);
+      const address = 'AA:BB:CC:DD:EE:FF';
       final exception = DisconnectedException(
-        deviceId,
+        address,
         DisconnectReason.linkLoss,
       );
 
-      expect(exception.deviceId, equals(deviceId));
+      expect(exception.address, equals(address));
       expect(exception.reason, equals(DisconnectReason.linkLoss));
       expect(exception.message, contains('link'));
     });
 
     test('DisconnectedException has action', () {
       final exception = DisconnectedException(
-        UUID.short(0x1234),
+        'AA:BB:CC:DD:EE:FF',
         DisconnectReason.linkLoss,
       );
       expect(exception.action, isNotNull);

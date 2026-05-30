@@ -31,11 +31,11 @@ class _StubRemoteService implements RemoteService {
 /// can assert delegation. Same shape as `_SpyConnection` in
 /// `peer_connection_test.dart`, scoped to what the view exercises.
 class _SpyConnection implements Connection {
-  _SpyConnection({UUID? deviceId, List<RemoteService> services = const []})
-    : _deviceId = deviceId ?? UUID.short(0xAAAA),
+  _SpyConnection({DeviceAddress? deviceAddress, List<RemoteService> services = const []})
+    : _deviceAddress = deviceAddress ?? const DeviceAddress('AA:AA:AA:AA:AA:AA'),
       _services = services;
 
-  final UUID _deviceId;
+  final DeviceAddress _deviceAddress;
   final List<RemoteService> _services;
 
   /// Method-call log in invocation order.
@@ -49,7 +49,7 @@ class _SpyConnection implements Connection {
   final List<UUID> hasServiceArgs = [];
 
   @override
-  UUID get deviceId => _deviceId;
+  DeviceAddress get deviceAddress => _deviceAddress;
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {

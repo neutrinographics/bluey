@@ -22,11 +22,8 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  // Task-3 bridge: Connection.deviceId is coerced from the MAC address
-  // via zero-padding (old deviceIdToUuid logic preserved in _addressToUuid).
-  // 'AA:BB:CC:DD:EE:01' → '00000000-0000-0000-0000-aabbccddee01'
   const deviceAddress = 'AA:BB:CC:DD:EE:01';
-  final deviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
+  const expectedDeviceAddress = DeviceAddress(deviceAddress);
   const serviceUuidStr = '0000180d-0000-1000-8000-00805f9b34fb'; // Heart Rate
   const charUuidStr = '00002a37-0000-1000-8000-00805f9b34fb'; // HR Measurement
 
@@ -93,9 +90,9 @@ void main() {
       final discovering = events.whereType<DiscoveringServicesEvent>().toList();
       final discovered = events.whereType<ServicesDiscoveredEvent>().toList();
       expect(discovering, hasLength(1));
-      expect(discovering.single.deviceId, equals(deviceId));
+      expect(discovering.single.deviceAddress, equals(expectedDeviceAddress));
       expect(discovered, hasLength(1));
-      expect(discovered.single.deviceId, equals(deviceId));
+      expect(discovered.single.deviceAddress, equals(expectedDeviceAddress));
       expect(discovered.single.serviceCount, equals(services.length));
     });
 
@@ -115,7 +112,7 @@ void main() {
 
       final reads = events.whereType<CharacteristicReadEvent>().toList();
       expect(reads, hasLength(1));
-      expect(reads.single.deviceId, equals(deviceId));
+      expect(reads.single.deviceAddress, equals(expectedDeviceAddress));
       expect(reads.single.characteristicId, equals(UUID(charUuidStr)));
       expect(reads.single.valueLength, equals(value.length));
     });
@@ -138,7 +135,7 @@ void main() {
 
       final writes = events.whereType<CharacteristicWrittenEvent>().toList();
       expect(writes, hasLength(1));
-      expect(writes.single.deviceId, equals(deviceId));
+      expect(writes.single.deviceAddress, equals(expectedDeviceAddress));
       expect(writes.single.characteristicId, equals(UUID(charUuidStr)));
       expect(writes.single.valueLength, equals(payload.length));
       expect(writes.single.withResponse, isTrue);
@@ -166,7 +163,7 @@ void main() {
       final subs = events.whereType<NotificationSubscriptionEvent>().toList();
       expect(subs.where((e) => e.enabled), hasLength(1));
       final enable = subs.firstWhere((e) => e.enabled);
-      expect(enable.deviceId, equals(deviceId));
+      expect(enable.deviceAddress, equals(expectedDeviceAddress));
       expect(enable.characteristicId, equals(UUID(charUuidStr)));
     });
 
@@ -197,7 +194,7 @@ void main() {
 
       final received = events.whereType<NotificationReceivedEvent>().toList();
       expect(received, hasLength(1));
-      expect(received.single.deviceId, equals(deviceId));
+      expect(received.single.deviceAddress, equals(expectedDeviceAddress));
       expect(received.single.characteristicId, equals(UUID(charUuidStr)));
       expect(received.single.valueLength, equals(3));
     });
