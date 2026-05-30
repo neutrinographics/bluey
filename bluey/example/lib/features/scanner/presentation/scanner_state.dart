@@ -1,6 +1,6 @@
 import 'package:bluey/bluey.dart';
 
-enum SortMode { signalStrength, name, deviceId }
+enum SortMode { signalStrength, name, deviceAddress }
 
 class ScannerState {
   final BluetoothState bluetoothState;

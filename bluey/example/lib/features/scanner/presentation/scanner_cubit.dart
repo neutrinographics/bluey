@@ -202,7 +202,7 @@ class ScannerCubit extends Cubit<ScannerState> {
           if (bName == null) return -1;
           return aName.compareTo(bName);
         });
-      case SortMode.deviceId:
+      case SortMode.deviceAddress:
         sorted.sort(
           (a, b) => a.device.address.value.compareTo(b.device.address.value),
         );

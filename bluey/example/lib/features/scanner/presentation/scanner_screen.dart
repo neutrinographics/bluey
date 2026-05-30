@@ -451,7 +451,7 @@ class _SectionHeader extends StatelessWidget {
                 (context) => [
                   _sortMenuItem(SortMode.signalStrength, 'Signal Strength'),
                   _sortMenuItem(SortMode.name, 'Name'),
-                  _sortMenuItem(SortMode.deviceId, 'Device ID'),
+                  _sortMenuItem(SortMode.deviceAddress, 'Address'),
                 ],
             child: Icon(Icons.sort, size: 16, color: _kTextMedium),
           ),
