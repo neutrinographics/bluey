@@ -455,7 +455,7 @@ class Bluey {
         BlueyLogLevel.info,
         'bluey.connection',
         'connect succeeded',
-        data: {'deviceId': device.address.value},
+        data: {'address': device.address.value},
       );
 
       return connection;
@@ -465,7 +465,7 @@ class Bluey {
         'bluey.connection',
         'connect failed',
         data: {
-          'deviceId': device.address.value,
+          'address': device.address.value,
           'exception': e.runtimeType.toString(),
         },
         errorCode: e.runtimeType.toString(),
@@ -518,7 +518,7 @@ class Bluey {
       BlueyLogLevel.info,
       'bluey',
       'connectAsPeer entered',
-      data: {'deviceId': device.address.value},
+      data: {'address': device.address.value},
     );
     final connection = await connect(device, timeout: timeout);
     final peer = await _tryBuildPeerConnection(
@@ -767,7 +767,7 @@ class Bluey {
         logger: _logger,
         servicesChanges: rawConnection.servicesChanges,
         events: _eventBus,
-        deviceId: rawConnection.deviceAddress,
+        deviceAddress: rawConnection.deviceAddress,
       );
       lifecycleClient.start(allServices: services);
 

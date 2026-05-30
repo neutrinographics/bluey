@@ -31,7 +31,7 @@ class LifecycleClient {
   final void Function() onServerUnreachable;
   final BlueyLogger _logger;
   final EventPublisher? _events;
-  final DeviceAddress? _deviceId;
+  final DeviceAddress? _deviceAddress;
 
   late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
@@ -71,14 +71,14 @@ class LifecycleClient {
     required BlueyLogger logger,
     Stream<List<RemoteService>>? servicesChanges,
     EventPublisher? events,
-    DeviceAddress? deviceId,
+    DeviceAddress? deviceAddress,
   }) : _platform = platformApi,
        _connectionId = connectionId,
        _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
        _events = events,
-       _deviceId = deviceId {
+       _deviceAddress = deviceAddress {
     if (servicesChanges != null) {
       _servicesChangesSub = servicesChanges.listen(
         _refreshFromServices,
@@ -105,10 +105,10 @@ class LifecycleClient {
           'onServerUnreachable invoked',
           data: {'connectionId': _connectionId},
         );
-        if (_deviceId != null) {
+        if (_deviceAddress != null) {
           _events?.emit(
             PeerDeclaredUnreachableEvent(
-              deviceAddress: _deviceId,
+              deviceAddress: _deviceAddress,
               source: 'LifecycleClient',
             ),
           );
@@ -522,9 +522,9 @@ class LifecycleClient {
         'characteristicHandle': charHandle.value,
       },
     );
-    if (_deviceId != null) {
+    if (_deviceAddress != null) {
       _events?.emit(
-        HeartbeatSentEvent(deviceAddress: _deviceId, source: 'LifecycleClient'),
+        HeartbeatSentEvent(deviceAddress: _deviceAddress, source: 'LifecycleClient'),
       );
     }
     _monitor.markProbeInFlight();
@@ -545,10 +545,10 @@ class LifecycleClient {
             'heartbeat-response received',
             data: {'connectionId': _connectionId},
           );
-          if (_deviceId != null) {
+          if (_deviceAddress != null) {
             _events?.emit(
               HeartbeatAcknowledgedEvent(
-                deviceAddress: _deviceId,
+                deviceAddress: _deviceAddress,
                 source: 'LifecycleClient',
               ),
             );
@@ -575,10 +575,10 @@ class LifecycleClient {
               },
               errorCode: error.runtimeType.toString(),
             );
-            if (_deviceId != null) {
+            if (_deviceAddress != null) {
               _events?.emit(
                 HeartbeatFailedEvent(
-                  deviceAddress: _deviceId,
+                  deviceAddress: _deviceAddress,
                   isDeadPeerSignal: false,
                   reason: error.runtimeType.toString(),
                   source: 'LifecycleClient',
@@ -599,10 +599,10 @@ class LifecycleClient {
             },
             errorCode: error.runtimeType.toString(),
           );
-          if (_deviceId != null) {
+          if (_deviceAddress != null) {
             _events?.emit(
               HeartbeatFailedEvent(
-                deviceAddress: _deviceId,
+                deviceAddress: _deviceAddress,
                 isDeadPeerSignal: true,
                 reason: error.runtimeType.toString(),
                 source: 'LifecycleClient',

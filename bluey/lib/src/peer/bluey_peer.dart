@@ -123,7 +123,7 @@ class _BlueyPeer implements BlueyPeer {
         logger: _logger,
         servicesChanges: blueyConnection.servicesChanges,
         events: _events,
-        deviceId: blueyConnection.deviceAddress,
+        deviceAddress: blueyConnection.deviceAddress,
       );
       lifecycleClient.start(allServices: allServices);
 
