@@ -298,3 +298,157 @@ hardware — the design's load-bearing real-world claim.
 - Renumbering the I338 backlog entry (it sits in the `I300–I399` DDD band per the
   ID-allocation scheme; a both-platform domain bug would renumber out of it —
   flagged, not actioned here).
+
+## Phase 0 findings (2026-05-30)
+
+### 0.1 — Native callback queue & "announce before forward"
+
+**iOS — HOLDS.**
+
+`CBPeripheralManager` is created with `queue: nil` (`PeripheralManagerImpl.init`,
+line 57), which means CoreBluetooth delivers all callbacks on the **main thread**
+(Apple's documented nil-queue behavior). The impl uses a single `PeripheralManagerDelegate`
+(a serial single-thread context), so all callbacks are serialized.
+
+In both `didReceiveRead` (line 537) and `didReceiveWrite` (line 567):
+`trackCentralIfNeeded(request.central)` (which calls `flutterApi.onCentralConnected`
+when the central is new) is invoked **before** the request is forwarded.
+
+- `didReceiveRead`: announce call at line 537
+  (`trackCentralIfNeeded(request.central)`), forward call at line 555
+  (`flutterApi.onReadRequest(request:)`).
+- `didReceiveWrite`: announce call at line 567
+  (`trackCentralIfNeeded(firstRequest.central)`), forward call at line 590
+  (`flutterApi.onWriteRequest(request:)`).
+
+Both are synchronous sequential calls on the same main-thread context.
+Announce-before-forward holds trivially.
+
+**Android — DOES NOT HOLD as an in-callback invariant; race exists.**
+
+Android's `BluetoothGattServerCallback` methods run on binder threads (not a
+single serial queue). `onConnectionStateChange` (which emits `onCentralConnected`,
+line 701) and `onCharacteristicWriteRequest` (line 836) are independent binder
+callbacks. The connect announce is dispatched to the main thread via
+`handler.post { flutterApi.onCentralConnected(...) }` (line 701–703); the write
+request is also dispatched to the main thread via `handler.post { flutterApi.onWriteRequest(...) }` (line 881–883). Because both are `handler.post`
+from potentially different binder threads, **a write request arriving on a binder
+thread can be posted to the main looper ahead of a connect that was also recently
+posted**. The write handler does **not** announce the central itself (no
+`connectedCentrals[deviceId]` check or equivalent `trackCentralIfNeeded` in the
+write callback). Arrival order at the main looper is binder-thread-race-dependent.
+
+**Design implication:** The "announce-before-forward" invariant holds naturally on
+iOS, but not on Android. On Android, a write can reach Dart before the connect
+event in a race window. The epoch fallback described in the design ("per-central
+session epoch stamped on `onCentralConnected` and every request, so Dart matches
+the epoch rather than arrival order") is needed to make the session-gate safe on
+Android — or the write handler must be modified to announce first before posting
+the forward (mirroring the iOS `trackCentralIfNeeded` pattern). The latter is the
+simpler fix (no epoch field on the wire) and should be evaluated in Stage 2.
+
+### 0.2 — Flutter cross-channel ordering
+
+Each `BlueyFlutterApi` method (both platforms) is registered on a distinct
+`BasicMessageChannel` keyed by a per-method channel name of the form
+`dev.flutter.pigeon.<package>.BlueyFlutterApi.<method><suffix>`.
+
+Android (`bluey_android/lib/src/messages.g.dart`):
+- `onCentralConnected` → channel `dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onCentralConnected`
+- `onWriteRequest` → channel `dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onWriteRequest`
+
+iOS (`bluey_ios/lib/src/messages.g.dart`):
+- `onCentralConnected` → channel `dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onCentralConnected`
+- `onWriteRequest` → channel `dev.flutter.pigeon.bluey_ios.BlueyFlutterApi.onWriteRequest`
+
+These are **separate channels** on the same `BinaryMessenger`. Flutter's
+`BinaryMessenger` is backed by a single platform-message queue on the main thread
+(messages are dispatched in arrival order to the Dart isolate). Therefore: if the
+native side posts both calls from the same thread in order (connect then write),
+Flutter delivers them to Dart in that order — the single queue serializes them.
+This property is **not documented in the Pigeon/Flutter API surface** (no official
+guarantee is written), but it is the relied-upon property of the implementation
+that makes the serial-queue pattern on iOS sufficient. On Android the guarantee
+only holds if both `handler.post` calls come from the same execution context in
+the correct order — which the race in 0.1 may violate.
+
+**Design implication:** The cross-channel ordering guarantee is a relied-upon
+property of Flutter's main-thread message dispatch, not an explicit contract.
+It is safe to rely on for iOS (single-thread native delivery). On Android, the
+announcement-before-forward fix (posting both from the same binder-thread context
+before any `handler.post`, or using an explicit announce inside the write
+callback) is necessary to make the ordering reliable without the epoch fallback.
+
+### 0.3 — Server-recreation native-manager reuse
+
+**Android — native `GattServer` is REUSED across `BlueyServer` recreations.**
+
+`BlueyPlugin.kt` creates exactly one `GattServer` instance at plugin attach time
+(line 90–94: `gattServer = GattServer(context, bluetoothManager, flutterApi)`).
+When `Bluey.server()` is called a second time (`bluey.dart` line 859:
+`return BlueyServer(_platform, _eventBus, ...)`), a new Dart `BlueyServer` is
+constructed, but the underlying Kotlin `GattServer` object is the same singleton
+held by `BlueyPlugin`. The `GattServer` is only replaced when the plugin is
+detached and re-attached.
+
+`closeServer` (called from `BlueyServer.dispose()` at `bluey_server.dart` line
+833: `await _platform.closeServer()`) calls `gattServer?.cleanup()` (plugin line
+666), which clears `connectedCentrals`, `centralMtus`, `subscriptions`,
+`pendingReadRequests`, `pendingWriteRequests`, and `characteristicByHandle` (lines
+551–562 of `GattServer.kt`), and also sets `gattServer = null` (line 551),
+causing the next `addService` call to re-open the GATT server via
+`ensureServerOpen()`. So `cleanup()` resets the `connectedCentrals` map (the
+"announced" state) — **but only if `closeServer` (i.e., `BlueyServer.dispose()`)
+is called between recreations.**
+
+If `BlueyServer` is invalidated via adapter cycle (I333 path) rather than
+explicit `dispose()`, or if a second `bluey.server()` call is made without
+disposing the first, the `GattServer.connectedCentrals` map from the old server
+**survives** and the new Dart `BlueyServer` inherits stale "already announced"
+state.
+
+**iOS — `CBPeripheralManager` is REUSED; `centrals` map IS reset on `closeServer`.**
+
+`PeripheralManagerImpl` is created once in `BlueyIosPlugin` (not shown in
+inspection, but `PeripheralManagerImpl.init` at line 55 creates the
+`CBPeripheralManager` with `queue: nil`). `closeServer` (line 370) calls
+`centrals.removeAll()` (line 399), fully clearing the announced state.
+Same caveat: only if `closeServer` is called.
+
+**Design implication:** Stage 2 must add a "reset announced-state on server
+(re)init" step. Specifically, when a new `BlueyServer` is created (or when
+`closeServer` is called), the native `centrals`/`connectedCentrals` map must be
+cleared so each surviving central is re-announced on its next interaction.
+`closeServer` already does this on both platforms, so the invariant holds as long
+as `dispose()` is called between recreations — but the I333 adapter-cycle path
+must be verified to call `closeServer` (or the reset must be moved to a dedicated
+`resetServerState()` call triggered on `BlueyServer` construction). This is a
+required Stage 2 task.
+
+### 0.4 — Client-side application-range status delivery
+
+**Android — carry path EXISTS and is complete.**
+
+`ConnectionManager.kt` `onCharacteristicWrite` (lines 812–825): when
+`status != BluetoothGatt.GATT_SUCCESS`, it calls `statusFailedError("Write",
+status)` (line 821), which emits a `FlutterError` with code `"gatt-status-failed"`
+and `details = status` (the raw int). The `statusFailedError` helper is defined at
+lines 643–648. This reaches Dart as `GattOperationStatusFailedException(status)`
+via the existing error-translation layer. The raw status int (including any value
+in `0x80–0x9F`) is preserved without masking.
+
+**iOS — carry path EXISTS and is complete.**
+
+`CentralManagerImpl.swift` `didWriteValueForCharacteristic` (line 804): any
+`NSError` is translated via `nsError.toPigeonError()` (line 810). The
+`NSError+Pigeon.swift` extension (line 17): for `CBATTErrorDomain` errors, emits
+`PigeonError(code: "gatt-status-failed", message: ..., details: self.code)` where
+`self.code` is the numeric ATT status byte. Non-`CBATTErrorDomain` errors fall
+through to `"bluey-unknown"` — but `CBATTErrorDomain` is the domain for write
+responses, so the carry path is correct for application-range ATT status codes.
+
+**Design implication:** The carry path exists on both platforms. The residual
+question — whether the OS actually delivers a `0x80–0x9F` ATT write-response
+status code to the app rather than normalizing it — is explicitly deferred to
+empirical confirmation (as stated in the design spec). No code changes are needed
+to establish the carry path itself.
