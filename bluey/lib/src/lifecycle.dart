@@ -84,6 +84,19 @@ const protocolVersion = 0x01;
 const _markerHeartbeat = 0x01;
 const _markerCourtesyDisconnect = 0x00;
 
+/// Reserved ATT application-range status the GATT **server** returns to a
+/// client whose session it has evicted (heartbeat-silence timeout on an
+/// inferring platform). Any request from a client with no established
+/// session is answered with this status and is **not** dispatched —
+/// forcing the client through a clean reconnect (see I338 design).
+///
+/// In the ATT application range `0x80–0x9F`. The public [GattResponseStatus]
+/// enum deliberately excludes this range, so an app can never emit it
+/// through bluey's API — that exclusion is the collision-safety guard.
+/// If that enum is ever widened to allow application-range statuses, this
+/// value must remain reserved.
+const int kLifecycleEvictionAttStatus = 0x80;
+
 /// A message exchanged on the lifecycle control characteristic.
 ///
 /// The published-language type for the Bluey peer protocol's heartbeat

@@ -510,6 +510,16 @@ void main() {
     });
   });
 
+  group('kLifecycleEvictionAttStatus', () {
+    test('is the reserved ATT application-range status 0x80', () {
+      expect(kLifecycleEvictionAttStatus, 0x80);
+    });
+    test('is inside the ATT application range 0x80..0x9F', () {
+      expect(kLifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
+      expect(kLifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
+    });
+  });
+
   group('BlueyServer trackClientIfNeeded', () {
     // 24. untracked client sending heartbeat gets auto-tracked
     //

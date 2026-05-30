@@ -797,4 +797,11 @@ enum PlatformGattStatus {
   insufficientAuthentication,
   insufficientEncryption,
   requestNotSupported,
+
+  /// Reserved eviction status (ATT application range, see
+  /// `kLifecycleEvictionAttStatus`). Emitted by the GATT server to reject a
+  /// request from a client with no established session; the client
+  /// translates it into a self-disconnect (I338). Not part of the public
+  /// `GattResponseStatus` surface — an app cannot select it.
+  lifecycleEviction,
 }
