@@ -118,7 +118,7 @@ class FakeConnection implements Connection {
   // === Stubbed Connection interface members (not used by stress tests) ===
 
   @override
-  UUID get deviceId => throw UnimplementedError();
+  DeviceAddress get deviceAddress => throw UnimplementedError();
 
   @override
   Future<int> readRssi() => throw UnimplementedError();
