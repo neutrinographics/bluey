@@ -653,7 +653,7 @@ class BlueyServer implements Server {
         data,
       ),
       operation: 'notifyTo',
-      deviceId: client.id,
+      address: client.id.toString(),
     );
     _emitEvent(
       NotificationSentEvent(
@@ -704,7 +704,7 @@ class BlueyServer implements Server {
         data,
       ),
       operation: 'indicateTo',
-      deviceId: client.id,
+      address: client.id.toString(),
     );
     _emitEvent(
       IndicationSentEvent(
@@ -774,7 +774,7 @@ class BlueyServer implements Server {
           value,
         ),
         operation: 'respondToRead',
-        deviceId: request.client.id,
+        address: request.client.id.toString(),
       );
     } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(
@@ -802,7 +802,7 @@ class BlueyServer implements Server {
           _mapGattResponseStatusToPlatform(status),
         ),
         operation: 'respondToWrite',
-        deviceId: request.client.id,
+        address: request.client.id.toString(),
       );
     } on GattOperationFailedException catch (e) {
       throw ServerRespondFailedException(

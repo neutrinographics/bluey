@@ -1,3 +1,4 @@
+import '../discovery/device_address.dart';
 import '../peer/server_id.dart';
 import '../platform/bluetooth_state.dart';
 import 'uuid.dart';
@@ -58,10 +59,10 @@ enum ConnectionFailureReason {
 
 /// Failed to connect to device.
 class ConnectionException extends BlueyException {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final ConnectionFailureReason reason;
 
-  const ConnectionException(this.deviceId, this.reason)
+  const ConnectionException(this.deviceAddress, this.reason)
     : super(
         'Failed to connect to device: $reason',
         action: 'Check device is in range and advertising',
@@ -77,12 +78,14 @@ enum DisconnectReason {
   unknown,
 }
 
-/// Connection was lost unexpectedly.
+/// Connection was lost unexpectedly. [address] is the raw platform
+/// identifier of the endpoint that disconnected (device or client) — a
+/// leaf diagnostic value, opaque, do not parse.
 class DisconnectedException extends BlueyException {
-  final UUID deviceId;
+  final String address;
   final DisconnectReason reason;
 
-  const DisconnectedException(this.deviceId, this.reason)
+  const DisconnectedException(this.address, this.reason)
     : super('Device disconnected: $reason', action: 'Reconnect if needed');
 }
 
@@ -392,13 +395,13 @@ class PeerNotFoundException extends BlueyException {
 /// underlying GATT connection is closed before this exception is
 /// raised, so callers do not need to perform additional cleanup.
 class NotABlueyPeerException extends BlueyException {
-  /// Identifier of the device that connected but turned out not to be
+  /// Address of the device that connected but turned out not to be
   /// a Bluey peer.
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  NotABlueyPeerException(this.deviceId)
+  NotABlueyPeerException(this.deviceAddress)
     : super(
-        'Device $deviceId is not a Bluey peer '
+        'Device $deviceAddress is not a Bluey peer '
         '(no lifecycle control service)',
         action:
             'Use Bluey.connect for non-Bluey devices, or '
@@ -407,7 +410,7 @@ class NotABlueyPeerException extends BlueyException {
 
   @override
   String toString() =>
-      'NotABlueyPeerException: device $deviceId is not a '
+      'NotABlueyPeerException: device $deviceAddress is not a '
       'Bluey peer (no lifecycle control service)';
 }
 

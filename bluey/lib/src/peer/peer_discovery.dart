@@ -5,12 +5,12 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
+import '../discovery/device_address.dart';
 import '../event_bus.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../shared/exceptions.dart';
-import '../shared/uuid.dart';
 import 'server_id.dart';
 
 /// Stateless helper that orchestrates scan + connect + serverId read
@@ -123,7 +123,7 @@ class PeerDiscovery {
           return BlueyConnection(
             platformInstance: _platform,
             connectionId: address,
-            deviceId: _addressToUuid(address), // Task-3 bridge: Connection.deviceId still expects UUID
+            deviceAddress: DeviceAddress(address),
             logger: _logger,
             events: _events,
           );
@@ -210,20 +210,4 @@ class PeerDiscovery {
     );
     return lifecycle.lifecycleCodec.decodeAdvertisedIdentity(bytes);
   }
-}
-
-/// Task-3 bridge: coerces a raw platform address string to a [UUID] for
-/// [BlueyConnection.deviceId] which still expects a UUID.
-///
-/// iOS addresses are already UUIDs. Android MAC strings (e.g. "AA:BB:CC:DD:EE:FF")
-/// are zero-padded to 32 hex chars, replicating the old deviceIdToUuid logic.
-///
-/// Remove in Task 3 when Connection.deviceId becomes a typed DeviceAddress.
-UUID _addressToUuid(String address) {
-  if (address.length == 36 && address.contains('-')) {
-    return UUID(address);
-  }
-  final clean = address.replaceAll(':', '').toLowerCase();
-  final padded = clean.padLeft(32, '0');
-  return UUID(padded);
 }

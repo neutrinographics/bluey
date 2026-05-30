@@ -4,7 +4,6 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../connection/lifecycle_client.dart';
 import 'exceptions.dart';
-import 'uuid.dart';
 
 /// Translates a platform-interface exception (or any other [Object]) into
 /// the domain [BlueyException] hierarchy. Pure: usable from sync error
@@ -13,8 +12,9 @@ import 'uuid.dart';
 ///
 /// [operation] is a diagnostic label only — used in exception messages
 /// and log lines, never in control flow. Do not branch on its value.
-/// [deviceId] is optional; non-GATT call sites (connect, scan) pass
-/// `null`.
+/// [address] is optional; non-GATT call sites (connect, scan) pass
+/// `null`. It is the raw platform identifier (MAC on Android, UUID
+/// string on iOS) — context-neutral, do not parse.
 ///
 /// Already-translated [BlueyException] instances pass through unchanged
 /// — calling this twice on an exception is idempotent.
@@ -27,7 +27,7 @@ import 'uuid.dart';
 BlueyException translatePlatformException(
   Object error, {
   required String operation,
-  UUID? deviceId,
+  String? address,
 }) {
   if (error is BlueyException) return error;
 
@@ -36,7 +36,7 @@ BlueyException translatePlatformException(
   }
   if (error is platform.GattOperationDisconnectedException) {
     return DisconnectedException(
-      deviceId ?? UUID.short(0x0000),
+      address ?? '',
       DisconnectReason.linkLoss,
     );
   }
@@ -94,10 +94,12 @@ BlueyException translatePlatformException(
 ///
 /// [operation] is a diagnostic label only — used in exception messages
 /// and log lines, never in control flow. Do not branch on its value.
+/// [address] is the raw platform identifier (MAC on Android, UUID
+/// string on iOS) — context-neutral, do not parse.
 Future<T> withErrorTranslation<T>(
   Future<T> Function() body, {
   required String operation,
-  UUID? deviceId,
+  String? address,
   LifecycleClient? lifecycleClient,
 }) async {
   lifecycleClient?.markUserOpStarted();
@@ -110,7 +112,7 @@ Future<T> withErrorTranslation<T>(
     throw translatePlatformException(
       error,
       operation: operation,
-      deviceId: deviceId,
+      address: address,
     );
   } finally {
     lifecycleClient?.markUserOpEnded();

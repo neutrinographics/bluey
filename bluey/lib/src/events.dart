@@ -118,73 +118,75 @@ final class ScanStoppingEvent extends BlueyEvent {
 
 /// Connection attempt started.
 final class ConnectingEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  ConnectingEvent({required this.deviceId, super.source});
+  ConnectingEvent({required this.deviceAddress, super.source});
 
   @override
-  String toString() => '[Connection] Connecting to ${deviceId.toShortString()}';
+  String toString() =>
+      '[Connection] Connecting to ${deviceAddress.toShortString()}';
 }
 
 /// Connection established.
 final class ConnectedEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  ConnectedEvent({required this.deviceId, super.source});
+  ConnectedEvent({required this.deviceAddress, super.source});
 
   @override
-  String toString() => '[Connection] Connected to ${deviceId.toShortString()}';
+  String toString() =>
+      '[Connection] Connected to ${deviceAddress.toShortString()}';
 }
 
 /// Disconnection occurred.
 final class DisconnectedEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final String? reason;
 
-  DisconnectedEvent({required this.deviceId, this.reason, super.source});
+  DisconnectedEvent({required this.deviceAddress, this.reason, super.source});
 
   @override
   String toString() {
     final r = reason != null ? ' ($reason)' : '';
-    return '[Connection] Disconnected from ${deviceId.toShortString()}$r';
+    return '[Connection] Disconnected from ${deviceAddress.toShortString()}$r';
   }
 }
 
 /// Service discovery started.
 final class DiscoveringServicesEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  DiscoveringServicesEvent({required this.deviceId, super.source});
+  DiscoveringServicesEvent({required this.deviceAddress, super.source});
 
   @override
   String toString() =>
-      '[GATT] Discovering services on ${deviceId.toShortString()}';
+      '[GATT] Discovering services on ${deviceAddress.toShortString()}';
 }
 
 /// Services discovered.
 final class ServicesDiscoveredEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final int serviceCount;
 
   ServicesDiscoveredEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.serviceCount,
     super.source,
   });
 
   @override
   String toString() =>
-      '[GATT] Discovered $serviceCount services on ${deviceId.toShortString()}';
+      '[GATT] Discovered $serviceCount services on ${deviceAddress.toShortString()}';
 }
 
 /// Characteristic read.
 final class CharacteristicReadEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final UUID characteristicId;
   final int valueLength;
 
   CharacteristicReadEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.characteristicId,
     required this.valueLength,
     super.source,
@@ -197,13 +199,13 @@ final class CharacteristicReadEvent extends BlueyEvent {
 
 /// Characteristic written.
 final class CharacteristicWrittenEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final UUID characteristicId;
   final int valueLength;
   final bool withResponse;
 
   CharacteristicWrittenEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.characteristicId,
     required this.valueLength,
     required this.withResponse,
@@ -219,12 +221,12 @@ final class CharacteristicWrittenEvent extends BlueyEvent {
 
 /// Notification received.
 final class NotificationReceivedEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final UUID characteristicId;
   final int valueLength;
 
   NotificationReceivedEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.characteristicId,
     required this.valueLength,
     super.source,
@@ -237,12 +239,12 @@ final class NotificationReceivedEvent extends BlueyEvent {
 
 /// Notification subscription changed.
 final class NotificationSubscriptionEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final UUID characteristicId;
   final bool enabled;
 
   NotificationSubscriptionEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.characteristicId,
     required this.enabled,
     super.source,
@@ -453,24 +455,24 @@ final class IndicationSentEvent extends BlueyEvent {
 
 /// Heartbeat write was sent to the peer (client side).
 final class HeartbeatSentEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  HeartbeatSentEvent({required this.deviceId, super.source});
+  HeartbeatSentEvent({required this.deviceAddress, super.source});
 
   @override
   String toString() =>
-      '[Lifecycle] Heartbeat sent to ${deviceId.toShortString()}';
+      '[Lifecycle] Heartbeat sent to ${deviceAddress.toShortString()}';
 }
 
 /// Heartbeat write was acknowledged by the peer (client side).
 final class HeartbeatAcknowledgedEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  HeartbeatAcknowledgedEvent({required this.deviceId, super.source});
+  HeartbeatAcknowledgedEvent({required this.deviceAddress, super.source});
 
   @override
   String toString() =>
-      '[Lifecycle] Heartbeat ack from ${deviceId.toShortString()}';
+      '[Lifecycle] Heartbeat ack from ${deviceAddress.toShortString()}';
 }
 
 /// Heartbeat write failed (client side). [isDeadPeerSignal] is `true`
@@ -478,12 +480,12 @@ final class HeartbeatAcknowledgedEvent extends BlueyEvent {
 /// the dead-peer threshold (e.g. timeout, disconnected); `false` when
 /// it's a transient error that does not move the silence clock.
 final class HeartbeatFailedEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final bool isDeadPeerSignal;
   final String? reason;
 
   HeartbeatFailedEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     required this.isDeadPeerSignal,
     this.reason,
     super.source,
@@ -493,7 +495,7 @@ final class HeartbeatFailedEvent extends BlueyEvent {
   String toString() {
     final r = reason != null ? ' ($reason)' : '';
     final sig = isDeadPeerSignal ? ' [counts]' : ' [transient]';
-    return '[Lifecycle] Heartbeat failed to ${deviceId.toShortString()}$r$sig';
+    return '[Lifecycle] Heartbeat failed to ${deviceAddress.toShortString()}$r$sig';
   }
 }
 
@@ -501,13 +503,13 @@ final class HeartbeatFailedEvent extends BlueyEvent {
 /// long enough that we treat it as gone (client side). Followed by a
 /// local disconnect.
 final class PeerDeclaredUnreachableEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
 
-  PeerDeclaredUnreachableEvent({required this.deviceId, super.source});
+  PeerDeclaredUnreachableEvent({required this.deviceAddress, super.source});
 
   @override
   String toString() =>
-      '[Lifecycle] Peer ${deviceId.toShortString()} declared unreachable';
+      '[Lifecycle] Peer ${deviceAddress.toShortString()} declared unreachable';
 }
 
 /// Server-side: a heartbeat-silence threshold was reached and the

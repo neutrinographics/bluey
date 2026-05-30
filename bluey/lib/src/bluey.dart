@@ -26,7 +26,6 @@ import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
 import 'discovery/device_address.dart';
 import 'shared/error_translation.dart';
-import 'shared/uuid.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
 
@@ -418,17 +417,11 @@ class Bluey {
       mtu: null,
     );
 
-    // Bridge: Connection context still uses UUID (migrated in Task 3).
-    // device.address.value is the raw platform string (MAC on Android,
-    // CBPeripheral UUID string on iOS); wrapping it in UUID gives the
-    // same string-based identity that Connection.deviceId expects.
-    final deviceUuid = _addressToUuid(device.address); // Task-3 bridge
-
     _logger.log(
       BlueyLogLevel.info,
       'bluey',
       'connect entered',
-      data: {'deviceId': device.address.value},
+      data: {'address': device.address.value},
     );
 
     _logger.log(
@@ -438,22 +431,22 @@ class Bluey {
       data: {'address': device.address.value},
     );
 
-    _emitEvent(ConnectingEvent(deviceId: deviceUuid));
+    _emitEvent(ConnectingEvent(deviceAddress: device.address));
 
     try {
       // Use address for the actual connection (MAC address on Android)
       final connectionId = await withErrorTranslation(
         () => _platform.connect(device.address.value, config),
         operation: 'connect',
-        deviceId: deviceUuid,
+        address: device.address.value,
       );
 
-      _emitEvent(ConnectedEvent(deviceId: deviceUuid));
+      _emitEvent(ConnectedEvent(deviceAddress: device.address));
 
       final connection = BlueyConnection(
         platformInstance: _platform,
         connectionId: connectionId,
-        deviceId: deviceUuid,
+        deviceAddress: device.address,
         logger: _logger,
         events: _eventBus,
       );
@@ -536,7 +529,7 @@ class Bluey {
       // The device connected but isn't a Bluey peer — disconnect and
       // throw so we don't leak a half-formed connection.
       await connection.disconnect();
-      throw NotABlueyPeerException(_addressToUuid(device.address)); // Task-3 bridge
+      throw NotABlueyPeerException(device.address);
     }
     return peer;
   }
@@ -574,7 +567,7 @@ class Bluey {
       BlueyLogLevel.debug,
       'bluey',
       'tryUpgrade entered',
-      data: {'deviceId': connection.deviceId.toString()},
+      data: {'deviceId': connection.deviceAddress.toString()},
     );
     final result = await _tryBuildPeerConnection(connection);
     _logger.log(
@@ -582,7 +575,7 @@ class Bluey {
       'bluey',
       'tryUpgrade resolved',
       data: {
-        'deviceId': connection.deviceId.toString(),
+        'deviceId': connection.deviceAddress.toString(),
         'peer': result == null ? 'null' : 'present',
       },
     );
@@ -712,7 +705,7 @@ class Bluey {
         BlueyLogLevel.debug,
         'bluey.peer',
         'tryBuildPeerConnection',
-        data: {'deviceId': rawConnection.deviceId.toString()},
+        data: {'deviceId': rawConnection.deviceAddress.toString()},
       );
 
       final services = await rawConnection.services();
@@ -727,7 +720,7 @@ class Bluey {
           BlueyLogLevel.debug,
           'bluey.peer',
           'no control service — peer is not a bluey peer',
-          data: {'deviceId': rawConnection.deviceId.toString()},
+          data: {'deviceId': rawConnection.deviceAddress.toString()},
         );
         return null;
       }
@@ -761,7 +754,7 @@ class Bluey {
       final connectionId =
           rawConnection is BlueyConnection
               ? rawConnection.connectionId
-              : rawConnection.deviceId.toString();
+              : rawConnection.deviceAddress.toString();
 
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
@@ -774,7 +767,7 @@ class Bluey {
         logger: _logger,
         servicesChanges: rawConnection.servicesChanges,
         events: _eventBus,
-        deviceId: rawConnection.deviceId,
+        deviceId: rawConnection.deviceAddress,
       );
       lifecycleClient.start(allServices: services);
 
@@ -987,23 +980,5 @@ class Bluey {
   /// Emits an event to the event bus.
   void _emitEvent(BlueyEvent event) {
     _eventBus.emit(event);
-  }
-
-  /// Task-3 bridge: coerces a [DeviceAddress] to a [UUID] for call sites
-  /// that still expect a UUID (Connection.deviceId, events, etc.).
-  ///
-  /// iOS addresses are already UUIDs. Android addresses are MAC strings
-  /// (e.g. "AA:BB:CC:DD:EE:FF") that are zero-padded to 32 hex chars.
-  ///
-  /// Remove this method in Task 3 once Connection.deviceId becomes a
-  /// DeviceAddress (or equivalent typed identifier).
-  static UUID _addressToUuid(DeviceAddress address) {
-    final raw = address.value;
-    if (raw.length == 36 && raw.contains('-')) {
-      return UUID(raw);
-    }
-    final clean = raw.replaceAll(':', '').toLowerCase();
-    final padded = clean.padLeft(32, '0');
-    return UUID(padded);
   }
 }
