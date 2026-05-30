@@ -381,26 +381,20 @@ final class WriteRequestEvent extends BlueyEvent {
 final class NotificationSentEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
-  final String? clientId; // null means broadcast to all
+  final ClientAddress? clientAddress; // null means broadcast to all
 
   NotificationSentEvent({
     required this.characteristicId,
     required this.valueLength,
-    this.clientId,
+    this.clientAddress,
     super.source,
   });
 
   @override
   String toString() {
-    final target = clientId != null ? ' to ${_shortId(clientId!)}' : '';
+    final target =
+        clientAddress != null ? ' to ${clientAddress!.toShortString()}' : '';
     return '[Server] Sent notification$target ($valueLength bytes)';
-  }
-
-  String _shortId(String id) {
-    if (id.length > 8) {
-      return '${id.substring(0, 8)}...';
-    }
-    return id;
   }
 }
 
@@ -410,26 +404,20 @@ final class NotificationSentEvent extends BlueyEvent {
 final class IndicationSentEvent extends BlueyEvent {
   final UUID characteristicId;
   final int valueLength;
-  final String? clientId; // null means broadcast to all
+  final ClientAddress? clientAddress; // null means broadcast to all
 
   IndicationSentEvent({
     required this.characteristicId,
     required this.valueLength,
-    this.clientId,
+    this.clientAddress,
     super.source,
   });
 
   @override
   String toString() {
-    final target = clientId != null ? ' to ${_shortId(clientId!)}' : '';
+    final target =
+        clientAddress != null ? ' to ${clientAddress!.toShortString()}' : '';
     return '[Server] Sent indication$target ($valueLength bytes)';
-  }
-
-  String _shortId(String id) {
-    if (id.length > 8) {
-      return '${id.substring(0, 8)}...';
-    }
-    return id;
   }
 }
 

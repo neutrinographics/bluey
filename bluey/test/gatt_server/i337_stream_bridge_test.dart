@@ -1,9 +1,11 @@
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
+import '../fakes/test_helpers.dart';
 
 /// I337 regression: the identifier on a connected [Client] must EQUAL the
 /// value emitted on [Server.disconnections] for the same client.
@@ -101,6 +103,64 @@ void main() {
         connected.single,
         gone.single,
         reason: 'bridge key must be identical for iOS UUIDs too (I337)',
+      );
+
+      await bluey.dispose();
+    });
+
+    test(
+        'PeerClient.client.address equals the value emitted on disconnections '
+        '(peerConnections path)', () async {
+      final bluey = await Bluey.create();
+      final server = bluey.server()!;
+
+      const mac = '46:F9:31:94:D7:F6';
+
+      await server.startAdvertising();
+
+      final peers = <PeerClient>[];
+      final gone = <ClientAddress>[];
+      server.peerConnections.listen(peers.add);
+      server.disconnections.listen(gone.add);
+
+      // Simulate central connect.
+      fake.simulateCentralConnection(centralId: mac);
+      await Future<void>.delayed(Duration.zero);
+
+      // Simulate the heartbeat write that drives peer identification.
+      fake.simulateWriteRequest(
+        centralId: mac,
+        characteristicUuid: lifecycle.heartbeatCharUuid,
+        value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
+        responseNeeded: false,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(peers, hasLength(1), reason: 'first heartbeat should emit PeerClient');
+
+      // Simulate disconnect.
+      fake.simulateCentralDisconnection(mac);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(gone, hasLength(1));
+      expect(
+        peers.single.client.address,
+        const ClientAddress(mac),
+        reason: 'PeerClient.client.address must be the verbatim platform string',
+      );
+      expect(
+        gone.single,
+        const ClientAddress(mac),
+        reason: 'disconnections must emit the verbatim platform string',
+      );
+      // Core I337 invariant for the peerConnections path: the bridge key
+      // derived from peerConnections must match the key on disconnections.
+      expect(
+        peers.single.client.address,
+        gone.single,
+        reason:
+            'PeerClient.client.address must equal the disconnections value (I337 '
+            'peerConnections path)',
       );
 
       await bluey.dispose();

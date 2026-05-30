@@ -662,7 +662,7 @@ class BlueyServer implements Server {
       NotificationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient.address.value,
+        clientAddress: blueyClient.address,
         source: 'BlueyServer',
       ),
     );
@@ -713,7 +713,7 @@ class BlueyServer implements Server {
       IndicationSentEvent(
         characteristicId: characteristic,
         valueLength: data.length,
-        clientId: blueyClient.address.value,
+        clientAddress: blueyClient.address,
         source: 'BlueyServer',
       ),
     );
