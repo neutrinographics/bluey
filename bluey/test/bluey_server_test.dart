@@ -13,7 +13,15 @@ import 'fakes/test_helpers.dart';
 
 /// Mock platform implementation for testing Server functionality.
 final class MockBlueyPlatform extends platform.BlueyPlatform {
-  MockBlueyPlatform() : super.impl();
+  /// [reportsCentralDisconnects] controls the simulated platform capability.
+  /// Defaults to `true` (Android-like authoritative) so existing tests are
+  /// unaffected. Pass `false` to simulate an iOS-like inferring platform where
+  /// silence-timeout drives disconnect events (I338).
+  MockBlueyPlatform({bool reportsCentralDisconnects = true})
+    : _reportsCentralDisconnects = reportsCentralDisconnects,
+      super.impl();
+
+  final bool _reportsCentralDisconnects;
   platform.BluetoothState mockState = platform.BluetoothState.on;
 
   // Server mock state
@@ -71,7 +79,28 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   _connectionStateControllers = {};
 
   @override
-  platform.Capabilities get capabilities => platform.Capabilities.android;
+  platform.Capabilities get capabilities {
+    final base = platform.Capabilities.android;
+    if (_reportsCentralDisconnects == base.reportsCentralDisconnects) {
+      return base;
+    }
+    return platform.Capabilities(
+      platformKind: base.platformKind,
+      canScan: base.canScan,
+      canConnect: base.canConnect,
+      canAdvertise: base.canAdvertise,
+      canRequestMtu: base.canRequestMtu,
+      maxMtu: base.maxMtu,
+      canScanInBackground: base.canScanInBackground,
+      canAdvertiseInBackground: base.canAdvertiseInBackground,
+      canBond: base.canBond,
+      canRequestPhy: base.canRequestPhy,
+      canRequestConnectionParameters: base.canRequestConnectionParameters,
+      canRequestEnable: base.canRequestEnable,
+      canAdvertiseManufacturerData: base.canAdvertiseManufacturerData,
+      reportsCentralDisconnects: _reportsCentralDisconnects,
+    );
+  }
 
   @override
   Future<void> configure(platform.BlueyConfig config) async {}
@@ -1556,6 +1585,18 @@ void main() {
     });
 
     group('Lifecycle activity on non-control-service requests', () {
+      // These tests drive silence-timeout behaviour, which only emits
+      // disconnections on inferring platforms (reportsCentralDisconnects==false,
+      // i.e. iOS). Switch to an inferring MockBlueyPlatform so the existing
+      // silence→disconnect assertions hold. (I338 Stage 1 — Task 1.3)
+      setUp(() async {
+        await bluey.dispose();
+        mockPlatform.dispose();
+        mockPlatform = MockBlueyPlatform(reportsCentralDisconnects: false);
+        platform.BlueyPlatform.instance = mockPlatform;
+        bluey = await Bluey.create();
+      });
+
       test(
         'incoming write-without-response to a non-control-service char resets client liveness timer',
         () {
@@ -1642,6 +1683,18 @@ void main() {
     });
 
     group('I079 — pending-request tolerance', () {
+      // These tests drive silence-timeout behaviour, which only emits
+      // disconnections on inferring platforms (reportsCentralDisconnects==false,
+      // i.e. iOS). Switch to an inferring MockBlueyPlatform so the existing
+      // silence→disconnect assertions hold. (I338 Stage 1 — Task 1.3)
+      setUp(() async {
+        await bluey.dispose();
+        mockPlatform.dispose();
+        mockPlatform = MockBlueyPlatform(reportsCentralDisconnects: false);
+        platform.BlueyPlatform.instance = mockPlatform;
+        bluey = await Bluey.create();
+      });
+
       test('I079 — does not declare client gone while holding a pending '
           'write-with-response', () {
         fakeAsync((async) {
