@@ -42,8 +42,7 @@ void main() {
           bluey
               .connect(
                 Device(
-                  id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-                  address: TestDeviceIds.device1,
+                  address: DeviceAddress(TestDeviceIds.device1),
                   name: 'Test Device',
                 ),
               )

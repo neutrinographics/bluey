@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
-import 'package:bluey/src/shared/device_id_coercion.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
@@ -32,7 +31,7 @@ void main() {
   });
 
   Device deviceFromAddress(String address, {String? name}) {
-    return Device(id: deviceIdToUuid(address), address: address, name: name);
+    return Device(address: DeviceAddress(address), name: name);
   }
 
   // Build a control-service tree that mirrors what `simulateBlueyServer`

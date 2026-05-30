@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'discovery/device_address.dart';
 import 'shared/uuid.dart';
 
 /// Base class for all Bluey diagnostic events.
@@ -72,12 +73,12 @@ final class ScanStartingEvent extends BlueyEvent {
 
 /// Device discovered during scan.
 final class DeviceDiscoveredEvent extends BlueyEvent {
-  final UUID deviceId;
+  final DeviceAddress deviceAddress;
   final String? name;
   final int? rssi;
 
   DeviceDiscoveredEvent({
-    required this.deviceId,
+    required this.deviceAddress,
     this.name,
     this.rssi,
     super.source,
@@ -87,7 +88,7 @@ final class DeviceDiscoveredEvent extends BlueyEvent {
   String toString() {
     final n = name != null ? ' "$name"' : '';
     final r = rssi != null ? ' rssi=$rssi' : '';
-    return '[Scan] Discovered ${deviceId.toShortString()}$n$r';
+    return '[Scan] Discovered ${deviceAddress.toShortString()}$n$r';
   }
 }
 

@@ -46,11 +46,8 @@ void main() {
     await bluey.dispose();
   });
 
-  final deviceUuid = UUID('00000000-0000-0000-0000-aabbccddee01');
-
   Device buildDevice() => Device(
-    id: deviceUuid,
-    address: TestDeviceIds.device1,
+    address: DeviceAddress(TestDeviceIds.device1),
     name: 'Disconnect Test Device',
   );
 
@@ -253,7 +250,12 @@ void main() {
           await char.write(Uint8List.fromList([0x01]));
           fail('Expected DisconnectedException');
         } on DisconnectedException catch (e) {
-          expect(e.deviceId, equals(deviceUuid));
+          // Task-3 bridge: Connection.deviceId is the MAC coerced to UUID
+          // via zero-padding (same logic as old deviceIdToUuid).
+          expect(
+            e.deviceId,
+            equals(UUID('00000000-0000-0000-0000-aabbccddee01')),
+          );
           expect(e.reason, equals(DisconnectReason.linkLoss));
         }
 

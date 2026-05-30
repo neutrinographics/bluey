@@ -24,8 +24,7 @@ void main() {
     test('should call repository.connect and return connection', () async {
       // Arrange
       final mockDevice = Device(
-        id: UUID('00000000-0000-0000-0000-000000000001'),
-        address: '00:11:22:33:44:55',
+        address: const DeviceAddress('00:11:22:33:44:55'),
         name: 'Test Device',
       );
       final mockConnection = MockConnection();
@@ -45,8 +44,7 @@ void main() {
     test('should pass timeout to repository', () async {
       // Arrange
       final mockDevice = Device(
-        id: UUID('00000000-0000-0000-0000-000000000001'),
-        address: '00:11:22:33:44:55',
+        address: const DeviceAddress('00:11:22:33:44:55'),
         name: 'Test Device',
       );
       final mockConnection = MockConnection();

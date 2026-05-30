@@ -13,8 +13,7 @@ void main() {
   late Bluey bluey;
 
   Device deviceFor(String address) => Device(
-    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-    address: address,
+    address: DeviceAddress(address),
     name: 'Test',
   );
 

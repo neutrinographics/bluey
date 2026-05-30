@@ -26,8 +26,7 @@ import '../fakes/test_helpers.dart';
 /// connection.
 void main() {
   Device deviceFor(String address) => Device(
-    id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-    address: address,
+    address: DeviceAddress(address),
     name: 'Test Device',
   );
 

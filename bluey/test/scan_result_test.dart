@@ -3,13 +3,13 @@ import 'package:bluey/bluey.dart';
 
 void main() {
   group('ScanResult', () {
-    final testUuid = UUID.short(0x1234);
+    const testAddress = DeviceAddress('AA:BB:CC:DD:EE:FF');
     final testAdvertisement = Advertisement(
       serviceUuids: [Services.heartRate],
       serviceData: {},
       isConnectable: true,
     );
-    final testDevice = Device(id: testUuid, name: 'Test Device');
+    final testDevice = Device(address: testAddress, name: 'Test Device');
 
     group('Construction', () {
       test('creates with required fields', () {
@@ -115,7 +115,10 @@ void main() {
 
       test('different device are not equal', () {
         final time = DateTime(2024, 1, 1);
-        final otherDevice = Device(id: UUID.short(0x5678), name: 'Other');
+        final otherDevice = Device(
+          address: const DeviceAddress('11:22:33:44:55:66'),
+          name: 'Other',
+        );
         final result1 = ScanResult(
           device: testDevice,
           rssi: -60,

@@ -22,13 +22,16 @@ void main() {
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
 
-  final deviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
+  // Task-3 bridge: Connection.deviceId is coerced from the MAC address
+  // via zero-padding (old deviceIdToUuid logic preserved in _addressToUuid).
+  // 'AA:BB:CC:DD:EE:01' → '00000000-0000-0000-0000-aabbccddee01'
   const deviceAddress = 'AA:BB:CC:DD:EE:01';
+  final deviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
   const serviceUuidStr = '0000180d-0000-1000-8000-00805f9b34fb'; // Heart Rate
   const charUuidStr = '00002a37-0000-1000-8000-00805f9b34fb'; // HR Measurement
 
   Device deviceFor() =>
-      Device(id: deviceId, address: deviceAddress, name: 'Test Device');
+      Device(address: DeviceAddress(deviceAddress), name: 'Test Device');
 
   void simulatePeripheralWithReadableChar({Uint8List? value}) {
     fakePlatform.simulatePeripheral(

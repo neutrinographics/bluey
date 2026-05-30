@@ -538,7 +538,7 @@ class _DeviceCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        result.device.id.toString(),
+                        result.device.address.value,
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w400,
