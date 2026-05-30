@@ -4,14 +4,22 @@ title: Lifecycle-silence timeout fires `Server.disconnections` without tearing d
 category: bug
 severity: high
 platform: both
-status: fixed
+status: open
 last_verified: 2026-05-30
 related: [I017, I201, I202, I207, I337]
 ---
 
-## Resolution (2026-05-30)
+> **Status note (2026-05-30).** Android half (Stage 1) is fixed in HEAD
+> via PR #35 (`2a90fd1`). The iOS half (Stages 2–3) is implemented on the
+> unmerged `i338-stage2-eviction` branch and is **not yet verified in
+> HEAD**: it awaits merge plus the real-device dogfood in Task 4.2
+> (confirming on-wire `0x80` ATT delivery → frame-aligned reassembly).
+> Tracked as `open` until both land.
 
-Fixed across three stages on the `i338-stage2-eviction` branch. The
+## Resolution (implemented on branch `i338-stage2-eviction`; pending merge + dogfood)
+
+Implemented across three stages on the `i338-stage2-eviction` branch
+(Stage 1 already merged to HEAD via PR #35; Stages 2–3 branch-only). The
 `Server.disconnections` stream is now a faithful projection of
 transport-level connection lifetime, sourced from the most authoritative
 signal each platform offers (`Capabilities.reportsCentralDisconnects`):

@@ -148,6 +148,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md) | Lifecycle-silence timeout fires phantom `Server.disconnections`, corrupting downstream stream framing. Android half (Stage 1) fixed in HEAD (PR #35, `2a90fd1`): silence is advisory, `disconnections` driven by the native callback only. iOS half (Stages 2–3) implemented on branch `i338-stage2-eviction` (session eviction + reserved ATT eviction status) — pending merge + real-device dogfood (Task 4.2). | high |
 
 ### Open — Android native
 
@@ -288,7 +289,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I091](I091-ios-unmapped-cbatt-error-to-unknown.md) | iOS `NSError → PigeonError` translation now passes any `CBATTErrorDomain` status byte through unchanged; no allowlist | `8875f4c` |
 | [I093](I093-ios-notfound-maps-to-wrong-error.md) | Original characteristic/descriptor-miss premise resolved by I088 handle rewrite; remaining `peripherals[deviceId]` miss sites reviewed and left as `gatt-disconnected` intentionally | `8875f4c` |
 | [I313](I313-android-control-uuid-in-scan-response.md) | Auto-include control UUID in Android scan response so peerDiscoverable can default to true; iOS folds `scanResponseServiceUuids` into the unified advertisement; `ADVERTISE_FAILED_DATA_TOO_LARGE` now surfaces as typed `AdvertisingException(AdvertisingFailureReason.dataTooBig)` | `c91d32b` |
-| [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md) | Lifecycle-silence timeout fired phantom `Server.disconnections`, corrupting downstream stream framing. Stage 1 (PR #35) fixed the Android half: silence is advisory (`Capabilities.reportsCentralDisconnects == true`), `disconnections` driven by the native callback only. Stages 2–3 fixed iOS: silence evicts the session; the resumed peer's next request is rejected with a reserved ATT status (`DisconnectReason.evictedByServer`) and it reconnects cleanly into a fresh, frame-aligned session. Real-device dogfood confirmation of the iOS `0x80` ATT delivery is pending (Task 4.2) | `i338-stage2-eviction` branch |
 
 ### Wontfix — documented platform limitations & superseded premises
 
