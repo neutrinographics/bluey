@@ -1954,7 +1954,8 @@ void main() {
           );
           async.flushMicrotasks();
 
-          // Re-establish a real session, then re-track the same client.
+          // Re-establish a real session, then re-track the same client
+          // (client-A disconnected above; reconnect opens a fresh session).
           // Heartbeat-timer must run on its own fresh entry, with no phantom
           // pending state.
           mockPlatform.emitCentralConnected(

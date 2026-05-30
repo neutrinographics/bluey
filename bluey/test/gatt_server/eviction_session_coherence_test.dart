@@ -211,6 +211,7 @@ void main() {
         fake.fireLifecycleSilence(_mac);
         async.flushMicrotasks();
         async.elapse(_interval);
+        async.flushMicrotasks();
         expect(server.isClientConnected(const ClientAddress(_mac)), isFalse);
 
         // 3. Peer "resumes" mid-stream with an app write → MUST be rejected,
