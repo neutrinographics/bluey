@@ -112,7 +112,8 @@ class BlueyServer implements Server {
       platformApi: _platform,
       interval: lifecycleInterval,
       serverId: _serverId,
-      onClientGone: _handleClientDisconnected,
+      onClientGone: _handleLifecycleSilence,
+      onExplicitDisconnect: _handleClientDisconnected,
       onPeerIdentified: _trackPeerClient,
       logger: logger,
       events: _eventBus,
@@ -264,7 +265,7 @@ class BlueyServer implements Server {
 
     // Tear down the LifecycleServer so heartbeat timers stop firing. An
     // armed timer firing post-invalidation would hit `onClientGone` →
-    // `_handleClientDisconnected` → `.add(...)` on the now-closed
+    // `_handleLifecycleSilence` → `.add(...)` on the now-closed
     // disconnections controller. `dispose()` is idempotent so calling it
     // again from `dispose()` is safe.
     _lifecycle.dispose();
@@ -890,6 +891,25 @@ class BlueyServer implements Server {
         PeerClient.create(client: client, serverId: senderId),
       );
     }
+  }
+
+  /// Lifecycle heartbeat-silence timeout for [clientAddress].
+  ///
+  /// Distinct from a real platform disconnect (`_handleClientDisconnected`).
+  /// On platforms that report central disconnects natively the silence is
+  /// advisory only — the platform callback remains the sole source of
+  /// `disconnections`. On inferring platforms (iOS) silence is the disconnect
+  /// signal and is forwarded to the disconnect path. (Stage 2 adds session
+  /// removal + eviction on the inferring path.)
+  void _handleLifecycleSilence(ClientAddress clientAddress) {
+    if (_platform.capabilities.reportsCentralDisconnects) {
+      // Advisory only. The ClientLifecycleTimeoutEvent was already emitted by
+      // LifecycleServer; the platform's onConnectionStateChange will drive any
+      // real disconnect. Do not emit disconnections or clear identification.
+      return;
+    }
+    // Inferring platform: silence is the best disconnect signal available.
+    _handleClientDisconnected(clientAddress);
   }
 
   void _handleClientDisconnected(ClientAddress clientAddress) {

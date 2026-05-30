@@ -134,6 +134,12 @@ void main() {
     test(
       'heartbeat timeout fires disconnect after client opts into lifecycle',
       () async {
+        // Silence-timeout drives disconnections only on inferring platforms
+        // (reportsCentralDisconnects==false, i.e. iOS). Switch before
+        // creating the Bluey instance so the server sees inferring caps.
+        // (I338 Stage 1 — Task 1.3)
+        fakePlatform = FakeBlueyPlatform(reportsCentralDisconnects: false);
+        BlueyPlatform.instance = fakePlatform;
         final bluey = await Bluey.create();
         fakeAsync((async) {
           final server =
@@ -171,6 +177,12 @@ void main() {
     );
 
     test('heartbeat resets timer', () async {
+      // Silence-timeout drives disconnections only on inferring platforms
+      // (reportsCentralDisconnects==false, i.e. iOS). Switch before
+      // creating the Bluey instance so the server sees inferring caps.
+      // (I338 Stage 1 — Task 1.3)
+      fakePlatform = FakeBlueyPlatform(reportsCentralDisconnects: false);
+      BlueyPlatform.instance = fakePlatform;
       final bluey = await Bluey.create();
       fakeAsync((async) {
         final server =

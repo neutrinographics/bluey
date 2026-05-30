@@ -35,9 +35,39 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// e.g. to verify that the domain layer respects `canBond=false` /
   /// `canRequestPhy=false` / `canRequestConnectionParameters=false` and
   /// skips the corresponding platform calls (I035 / I065).
-  FakeBlueyPlatform({Capabilities capabilities = Capabilities.fake})
-    : _capabilities = capabilities,
-      super.impl();
+  ///
+  /// [reportsCentralDisconnects] overrides the `reportsCentralDisconnects`
+  /// field of [capabilities] when provided. Pass `false` to simulate an
+  /// iOS-like platform where the domain layer must infer disconnections from
+  /// lifecycle heartbeat silence (I338). Defaults to the value in
+  /// [capabilities] (which is `true` for `Capabilities.fake`), so existing
+  /// tests are unaffected.
+  FakeBlueyPlatform({
+    Capabilities capabilities = Capabilities.fake,
+    bool? reportsCentralDisconnects,
+  }) : _capabilities =
+           reportsCentralDisconnects == null
+               ? capabilities
+               : Capabilities(
+                   platformKind: capabilities.platformKind,
+                   canScan: capabilities.canScan,
+                   canConnect: capabilities.canConnect,
+                   canAdvertise: capabilities.canAdvertise,
+                   canRequestMtu: capabilities.canRequestMtu,
+                   maxMtu: capabilities.maxMtu,
+                   canScanInBackground: capabilities.canScanInBackground,
+                   canAdvertiseInBackground:
+                       capabilities.canAdvertiseInBackground,
+                   canBond: capabilities.canBond,
+                   canRequestPhy: capabilities.canRequestPhy,
+                   canRequestConnectionParameters:
+                       capabilities.canRequestConnectionParameters,
+                   canRequestEnable: capabilities.canRequestEnable,
+                   canAdvertiseManufacturerData:
+                       capabilities.canAdvertiseManufacturerData,
+                   reportsCentralDisconnects: reportsCentralDisconnects,
+                 ),
+       super.impl();
 
   // === Configuration ===
   BluetoothState _state = BluetoothState.on;
@@ -614,6 +644,40 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       subscribedCharacteristics: {},
     );
     _centralConnectionController.add(PlatformCentral(id: centralId, mtu: mtu));
+  }
+
+  /// Test-only helper: arms the lifecycle silence timer for [centralId] by
+  /// sending a heartbeat write from that central.
+  ///
+  /// After calling this, advance fake time by the lifecycle interval (e.g.
+  /// `async.elapse(lifecycleInterval)` inside a `fakeAsync` block) to
+  /// actually fire the silence timeout and observe the domain-layer
+  /// behaviour under test.
+  ///
+  /// This mirrors the pattern used in `lifecycle_test.dart`: the timer
+  /// is armed by the first heartbeat write from a central; silence fires
+  /// when no further heartbeat arrives within the configured interval.
+  void fireLifecycleSilence(String centralId) {
+    // A heartbeat write to the lifecycle control characteristic arms the
+    // silence timer in LifecycleServer. We piggyback on the existing
+    // write-request plumbing so the fake stays the single source of
+    // truth for simulated write traffic. The specific sender identity
+    // is irrelevant for silence-timeout tests — any valid heartbeat
+    // payload will arm the timer.
+    final payload = lifecycleCodec.encodeMessage(
+      Heartbeat(ServerId('ffffffff-ffff-4fff-ffff-ffffffffffff')),
+    );
+    _writeRequestController.add(
+      PlatformWriteRequest(
+        requestId: _nextRequestId++,
+        centralId: centralId,
+        characteristicUuid: heartbeatCharUuid,
+        value: payload,
+        offset: 0,
+        responseNeeded: false,
+        characteristicHandle: 0,
+      ),
+    );
   }
 
   /// Simulates a central disconnecting from our server.

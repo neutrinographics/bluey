@@ -61,6 +61,13 @@ class Capabilities {
   /// this flag when `manufacturerData != null`.
   final bool canAdvertiseManufacturerData;
 
+  /// Whether the platform delivers a reliable native callback when a
+  /// connected central disconnects from this device's GATT server.
+  /// `true` on Android (`onConnectionStateChange`); `false` on iOS
+  /// (`CBPeripheralManager` has no client-disconnect callback — I201),
+  /// where disconnects are inferred from lifecycle heartbeat silence.
+  final bool reportsCentralDisconnects;
+
   const Capabilities({
     required this.platformKind,
     this.canScan = true,
@@ -75,6 +82,7 @@ class Capabilities {
     this.canRequestConnectionParameters = false,
     this.canRequestEnable = false,
     this.canAdvertiseManufacturerData = false,
+    this.reportsCentralDisconnects = false,
   });
 
   /// Android capabilities.
@@ -94,6 +102,7 @@ class Capabilities {
     canRequestConnectionParameters: false,
     canRequestEnable: true,
     canAdvertiseManufacturerData: true,
+    reportsCentralDisconnects: true,
   );
 
   /// iOS capabilities.
@@ -113,6 +122,7 @@ class Capabilities {
     canRequestPhy: false,
     canRequestConnectionParameters: false,
     canAdvertiseManufacturerData: false,
+    reportsCentralDisconnects: false,
   );
 
   /// Permissive default for fakes / tests.
@@ -134,6 +144,7 @@ class Capabilities {
     canRequestConnectionParameters: true,
     canRequestEnable: true,
     canAdvertiseManufacturerData: true,
+    reportsCentralDisconnects: true,
   );
 
   /// macOS capabilities.
@@ -141,6 +152,7 @@ class Capabilities {
     platformKind: PlatformKind.other,
     canAdvertise: true,
     maxMtu: 185,
+    reportsCentralDisconnects: true,
   );
 
   /// Windows capabilities.
@@ -148,6 +160,7 @@ class Capabilities {
     platformKind: PlatformKind.other,
     canRequestMtu: true,
     maxMtu: 517,
+    reportsCentralDisconnects: true,
   );
 
   /// Linux capabilities.
@@ -157,6 +170,7 @@ class Capabilities {
     canRequestMtu: true,
     maxMtu: 517,
     canRequestEnable: true,
+    reportsCentralDisconnects: true,
   );
 
   @override
@@ -176,7 +190,8 @@ class Capabilities {
         other.canRequestConnectionParameters ==
             canRequestConnectionParameters &&
         other.canRequestEnable == canRequestEnable &&
-        other.canAdvertiseManufacturerData == canAdvertiseManufacturerData;
+        other.canAdvertiseManufacturerData == canAdvertiseManufacturerData &&
+        other.reportsCentralDisconnects == reportsCentralDisconnects;
   }
 
   @override
@@ -194,6 +209,7 @@ class Capabilities {
     canRequestConnectionParameters,
     canRequestEnable,
     canAdvertiseManufacturerData,
+    reportsCentralDisconnects,
   );
 
   @override
@@ -211,6 +227,7 @@ class Capabilities {
         'canRequestPhy: $canRequestPhy, '
         'canRequestConnectionParameters: $canRequestConnectionParameters, '
         'canRequestEnable: $canRequestEnable, '
-        'canAdvertiseManufacturerData: $canAdvertiseManufacturerData)';
+        'canAdvertiseManufacturerData: $canAdvertiseManufacturerData, '
+        'reportsCentralDisconnects: $reportsCentralDisconnects)';
   }
 }

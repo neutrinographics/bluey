@@ -23,7 +23,27 @@ class LifecycleServer {
   final platform.BlueyPlatform _platform;
   final Duration? _interval;
   final ServerId _serverId;
+
+  /// Called when the heartbeat silence timer fires (no heartbeat received
+  /// within the configured interval). On authoritative platforms (e.g.
+  /// Android) the domain layer treats this as advisory; on inferring
+  /// platforms (e.g. iOS) it is the primary disconnect signal.
+  ///
+  /// Distinct from [onExplicitDisconnect], which is called on receipt of
+  /// a courtesy-disconnect command — always a definitive disconnect.
   final void Function(ClientAddress clientAddress) onClientGone;
+
+  /// Called on receipt of a courtesy-disconnect write command from a
+  /// connected Bluey peer. Unlike [onClientGone] (silence timeout), a
+  /// courtesy disconnect is always a definitive signal regardless of the
+  /// platform's [Capabilities.reportsCentralDisconnects] value.
+  ///
+  /// When null, the silence-timeout handler ([onClientGone]) is used for
+  /// both paths, preserving the pre-I338 behaviour. Non-null callers
+  /// (post-I338 [BlueyServer]) should pass `_handleClientDisconnected` so
+  /// the two paths are handled independently.
+  final void Function(ClientAddress clientAddress)? onExplicitDisconnect;
+
   final void Function(ClientAddress clientAddress, ServerId senderId)? onPeerIdentified;
   final BlueyLogger _logger;
   final EventPublisher? _events;
@@ -37,6 +57,7 @@ class LifecycleServer {
     required ServerId serverId,
     required this.onClientGone,
     required BlueyLogger logger,
+    this.onExplicitDisconnect,
     this.onPeerIdentified,
     EventPublisher? events,
   }) : _platform = platformApi,
@@ -127,7 +148,14 @@ class LifecycleServer {
           data: {'clientId': clientAddress.toString()},
         );
         cancelTimer(clientAddress);
-        onClientGone(clientAddress);
+        // A courtesy-disconnect write is an explicit, definitive disconnect
+        // signal. Route through `onExplicitDisconnect` when provided so the
+        // domain layer can treat it differently from a heartbeat silence
+        // (which is advisory on authoritative platforms — see I338).
+        // Falls back to `onClientGone` when the caller passes no separate
+        // handler (preserves pre-I338 behaviour for callers that haven't
+        // been updated yet).
+        (onExplicitDisconnect ?? onClientGone)(clientAddress);
       case lifecycle.Heartbeat():
         _logger.log(
           BlueyLogLevel.debug,
