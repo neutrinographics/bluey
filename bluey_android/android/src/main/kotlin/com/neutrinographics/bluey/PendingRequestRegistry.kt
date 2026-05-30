@@ -73,4 +73,5 @@ internal fun GattStatusDto.toAndroidStatus(): Int = when (this) {
     GattStatusDto.INSUFFICIENT_AUTHENTICATION -> BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION
     GattStatusDto.INSUFFICIENT_ENCRYPTION -> BluetoothGatt.GATT_INSUFFICIENT_ENCRYPTION
     GattStatusDto.REQUEST_NOT_SUPPORTED -> BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED
+    GattStatusDto.LIFECYCLE_EVICTION -> 0x80  // lifecycleEvictionAttStatus — ATT application range
 }

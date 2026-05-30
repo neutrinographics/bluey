@@ -278,7 +278,13 @@ enum class GattStatusDto(val raw: Int) {
   INVALID_ATTRIBUTE_LENGTH(4),
   INSUFFICIENT_AUTHENTICATION(5),
   INSUFFICIENT_ENCRYPTION(6),
-  REQUEST_NOT_SUPPORTED(7);
+  REQUEST_NOT_SUPPORTED(7),
+  /**
+   * Reserved eviction status (ATT application range 0x80; see
+   * `lifecycleEvictionAttStatus`). Server-internal — rejects a
+   * session-less client's request (I338).
+   */
+  LIFECYCLE_EVICTION(8);
 
   companion object {
     fun ofRaw(raw: Int): GattStatusDto? {

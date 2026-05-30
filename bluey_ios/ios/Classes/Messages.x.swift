@@ -133,6 +133,10 @@ extension GattStatusDto {
             return .insufficientEncryption
         case .requestNotSupported:
             return .requestNotSupported
+        case .lifecycleEviction:
+            // lifecycleEvictionAttStatus (0x80). Application-range ATT status.
+            // TODO(I338 dogfood): verify CBATTError.Code(rawValue:0x80) constructs and iOS delivers 0x80 on the wire (Task 4.2)
+            return CBATTError.Code(rawValue: 0x80) ?? .unlikelyError
         }
     }
 }

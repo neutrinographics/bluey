@@ -379,6 +379,8 @@ class AndroidServer {
         return GattStatusDto.insufficientEncryption;
       case PlatformGattStatus.requestNotSupported:
         return GattStatusDto.requestNotSupported;
+      case PlatformGattStatus.lifecycleEviction:
+        return GattStatusDto.lifecycleEviction;
     }
   }
 

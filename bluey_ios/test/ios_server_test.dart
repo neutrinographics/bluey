@@ -292,6 +292,10 @@ void main() {
             PlatformGattStatus.requestNotSupported,
             GattStatusDto.requestNotSupported,
           ),
+          (
+            PlatformGattStatus.lifecycleEviction,
+            GattStatusDto.lifecycleEviction,
+          ),
         ]) {
           await server.respondToReadRequest(1, platformStatus, null);
 

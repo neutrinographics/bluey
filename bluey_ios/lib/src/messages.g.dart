@@ -130,6 +130,11 @@ enum GattStatusDto {
   insufficientAuthentication,
   insufficientEncryption,
   requestNotSupported,
+
+  /// Reserved eviction status (ATT application range 0x80; see
+  /// `lifecycleEvictionAttStatus`). Server-internal — rejects a
+  /// session-less client's request (I338).
+  lifecycleEviction,
 }
 
 /// Severity for a structured log event (DTO for platform channel).
