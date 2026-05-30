@@ -129,6 +129,17 @@ void main() {
     });
   });
 
+  group('reportsCentralDisconnects', () {
+    test('android reports central disconnects, iOS infers', () {
+      expect(Capabilities.android.reportsCentralDisconnects, isTrue);
+      expect(Capabilities.iOS.reportsCentralDisconnects, isFalse);
+    });
+
+    test('fake preset reports central disconnects by default', () {
+      expect(Capabilities.fake.reportsCentralDisconnects, isTrue);
+    });
+  });
+
   group('canAdvertiseManufacturerData', () {
     test('Capabilities.android sets canAdvertiseManufacturerData=true', () {
       expect(Capabilities.android.canAdvertiseManufacturerData, isTrue);
