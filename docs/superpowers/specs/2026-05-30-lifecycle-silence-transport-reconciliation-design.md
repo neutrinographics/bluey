@@ -64,7 +64,7 @@ that conflation is the root surface of the bug:
 
 - `_handleClientDisconnected(clientAddress)` — wired to the **platform** disconnect
   callback (`centralDisconnections`) only. Emits `disconnections`, clears
-  identification, clears eviction state. Behavior unchanged; trigger narrowed.
+  identification, removes the session (`_connectedClients`). Behavior unchanged; trigger narrowed.
 - `_handleLifecycleSilence(clientAddress)` — **new**, wired to the lifecycle
   timer's `onClientGone`. Branches on the capability:
   - **`reportsCentralDisconnects == true` (Android — "authoritative"):** advisory
@@ -74,8 +74,9 @@ that conflation is the root surface of the bug:
     seamlessly; the decoder is never torn down.
   - **`reportsCentralDisconnects == false` (iOS — "inferring"):** silence *is* the
     disconnect signal. Emit `disconnections` + clear identification (as today)
-    **and** arm eviction for that client, so any return is forced through a clean
-    reconnect instead of a corrupting mid-stream resume.
+    **and** remove its session, so any return is rejected (no established
+    session) and forced through a clean reconnect instead of a corrupting
+    mid-stream resume — see *Eviction & session coherence*.
 
 **Platform-awareness lives in `BlueyServer`** (the domain↔platform seam that
 already knows capabilities). `LifecycleServer` stays platform-agnostic — it runs
@@ -91,19 +92,20 @@ can drop its own link. Untouched.
 **iOS-server (inferring) — peer pauses then resumes (the repro):**
 1. Heartbeats stop → silence timer fires → `_handleLifecycleSilence`.
 2. `reportsCentralDisconnects == false` → emit `ClientLifecycleTimeoutEvent` +
-   `disconnections(clientAddress)`, clear identification, add to `_evicted`.
-   Consumer tears down its decoder; no bytes are flowing (peer paused).
+   `disconnections(clientAddress)`, clear identification, **remove the session**
+   (`_connectedClients.remove`). Consumer tears down its decoder; no bytes are
+   flowing (peer paused).
 3. Peer resumes → first request (heartbeat or app write) hits `BlueyServer`'s
-   chokepoint → in `_evicted` → answered with the reserved ATT status, not
-   dispatched.
+   chokepoint → no established session → answered with the reserved ATT status,
+   not dispatched.
 4. Client's bluey layer translates that status → clean `disconnect()`. App's
    existing reconnect logic runs.
-5. Fresh connection → `centralConnections` (clears `_evicted`) → next heartbeat
-   re-identifies → `peerConnections`. Consumer builds a fresh decoder on a
+5. Fresh connection → `centralConnections` (re-establishes the session) → next
+   heartbeat re-identifies → `peerConnections`. Consumer builds a fresh decoder on a
    frame-aligned stream. No corruption.
 
 **iOS-server — peer truly drops:** silence fires → as step 2. Peer never returns
-→ eviction never triggers; the entry ages out. `disconnections` was correct.
+→ no resumed request arrives, so the rejection never fires and no state lingers. `disconnections` was correct.
 
 **Android-server (authoritative) — peer pauses then resumes:**
 1. Heartbeats stop → silence timer fires → `_handleLifecycleSilence`.
@@ -117,18 +119,31 @@ can drop its own link. Untouched.
 fire first if silence beats the supervision timeout — a heads-up, not a
 disconnect.)
 
-## Eviction handshake
+## Eviction & session coherence
 
-**State:** `BlueyServer` holds an `_evicted` set of `ClientAddress`, armed only on
-the inferring path (in `_handleLifecycleSilence` when capability is `false`).
+Eviction is a special case of one rule, not its own bookkeeping:
 
-**Server chokepoint:** `BlueyServer`'s read and write request listeners check
-`_evicted` *before* dispatch. A request from an evicted client is answered with
-the **reserved ATT status** and returned — `_lifecycle.handleWriteRequest` is not
-run, the app is not forwarded to. Catches the first request after resume (read or
-write), so the stray-byte window is one request wide.
+> **The server services read/write requests only within an *established session*.
+> A request from a client it has no session for is answered with the reserved ATT
+> status and not dispatched — forcing a clean (re)connect.**
 
-**Client translation:** bluey's error-translation layer (which already preserves
+An "established session" = the client is present in `_connectedClients` via a
+real connect/announce event (`centralConnections`). Eviction (the inferring-path
+silence timeout) simply **removes the session** (`_connectedClients.remove`,
+clear identification) — the resumed write then finds no session and is rejected.
+So there is **no separate `_evicted` set** (it would need bounding/expiry, and
+expiry could reopen the hole); the absence of a session *is* the eviction state,
+and it also subsumes the "stale connection from before a server restart" case.
+
+**Server chokepoint.** `BlueyServer`'s read and write listeners check for an
+established session *before* dispatch. No session → respond with the reserved ATT
+status and return (`_lifecycle.handleWriteRequest` not run, app not forwarded
+to). Note this requires **removing the "establish from an unknown heartbeat"
+behavior** in `_trackPeerClient` on the inferring path: a heartbeat from a client
+with no session must reject, not silently re-create the client and re-emit
+`peerConnections` (that re-creation is the corruption path this fix closes).
+
+**Client translation.** bluey's error-translation layer (which already preserves
 the raw ATT status byte post-I091) maps the reserved status to a
 connection-fatal condition: `BlueyConnection` initiates its own `disconnect()`
 and surfaces `DisconnectedException(reason: evictedByServer)`. Handled at the
@@ -136,15 +151,45 @@ connection layer, so it's uniform whether the status lands on a `LifecycleClient
 heartbeat write or an app data write. **The app sees a normal disconnect** and
 reconnects via existing logic; it never learns "eviction" exists.
 
-**Eviction-state lifecycle:**
-- Cleared on fresh reconnect: the `centralConnections` listener removes the
-  address from `_evicted`. Straggler requests on the old link before teardown
-  completes still hit the chokepoint and are re-rejected — correct.
-- Cleared on a real platform disconnect (`_handleClientDisconnected`) too — belt
-  and suspenders (Android never arms eviction).
-- Bounded: a client evicted and never returning (truly-gone on iOS) would linger;
-  the set is capped (drop-oldest) or entries expire after a few heartbeat
-  intervals, so it can't grow unbounded.
+### Precise establishment ordering (no grace window)
+
+For the rule above to be safe, a *legitimate* fresh client must already have a
+session by the time its first request is serviced — deterministically, not via a
+timing window. Both a benign "first contact" and a dangerous "stale mid-stream"
+client present identically (a request from a client not in `_connectedClients`),
+so the discriminator must be enforced at the source:
+
+1. **Native invariant — "announce before forward."** The native layer never hands
+   a request to Dart for a central it hasn't already announced via
+   `onCentralConnected`. Because both are emitted from the same serial callback
+   queue (CBPeripheralManager queue / Android GATT callback), announcing first
+   and forwarding second means Dart receives them in that order — establishment
+   is processed before the request by construction. (iOS already calls
+   `trackCentralIfNeeded` inside `didReceiveWrite`; the invariant makes it run
+   *before* the forward.)
+2. **Reset "announced" state on server (re)init.** The stale-restart case breaks
+   the invariant only because the native `centrals` map's "already announced"
+   notion survives a Dart-server recreation, so it won't re-announce a central
+   the *new* Dart server never heard of. On `BlueyServer` init, the native side
+   clears its per-central announced-flags, so each surviving central is
+   re-announced on its next interaction. No replay race.
+3. **Dart reject** of a genuinely-unestablished request (reserved status) is the
+   safety net — with (1)+(2) it should essentially never fire for a live central.
+
+This is precise because the ordering is an enforced native invariant on a serial
+queue, not a Dart-side window. **Fallback if a platform can't guarantee (1):** a
+per-central session epoch stamped on `onCentralConnected` and every request, so
+Dart matches the epoch rather than arrival order — adopted only if the invariant
+can't be met.
+
+**Gating verification items** (confirm before/while planning):
+- CBPeripheralManager and the Android GATT callbacks run on a single serial
+  queue, and the announce (`trackCentralIfNeeded` / Android equivalent) runs
+  *before* the request is forwarded.
+- Flutter delivers sequential same-queue channel messages to Dart in order
+  (relied-upon property; state it).
+- Whether a recreated `BlueyServer` reuses the native manager (→ reset-on-init
+  required) or gets a fresh one (→ no stale central; invariant holds trivially).
 
 ## Reserved protocol constants & collision-safety
 
@@ -197,20 +242,23 @@ TDD throughout; domain layer ≥90%. `FakeBlueyPlatform` gains a
 on a request.
 
 1. **iOS / inferring (`false`):** silence fires → `disconnections` + identification
-   cleared + advisory event + client in `_evicted`; resumed **read and write** from
-   an evicted client → reserved ATT status, not forwarded, lifecycle handler not
-   run; fresh `centralConnections` → `_evicted` cleared → re-identify →
-   `peerConnections` re-emits.
+   cleared + advisory event + **session removed** from `_connectedClients`;
+   resumed **read and write** from a session-less client → reserved ATT status,
+   not forwarded, lifecycle handler not run; fresh `centralConnections` →
+   session re-established → re-identify → `peerConnections` re-emits.
 2. **Android / authoritative (`true`):** silence fires → advisory event only, **no**
-   `disconnections`, identification intact, not evicted, still in
+   `disconnections`, identification intact, session intact in
    `_connectedClients`; real platform disconnect → `disconnections` via
    `_handleClientDisconnected`; heartbeat resumes after a silence fire → timer
    re-arms, no disruption.
 3. **Client-side translation:** GATT op failing with the reserved status →
    `BlueyConnection` self-disconnects + `DisconnectedException(evictedByServer)` —
    verified for a heartbeat write and an app data write.
-4. **Bounded `_evicted`:** many evicted-never-returning clients → set stays within
-   its cap/expiry.
+4. **Session coherence:** a request from a client with no established session is
+   rejected with the reserved status (not silently re-tracked via
+   `_trackPeerClient`); and a fresh client's `centralConnections` is processed
+   before its first request is serviced (establishment precedes dispatch — the
+   "announce before forward" invariant).
 5. **Headline regression (I338 contract):** on the inferring path, a
    silence-then-resume cannot continue mid-stream — the resumed request is
    rejected (forcing reconnect), not processed. Fails today.
