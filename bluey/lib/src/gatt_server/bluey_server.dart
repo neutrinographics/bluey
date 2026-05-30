@@ -72,8 +72,8 @@ class BlueyServer implements Server {
   final StreamController<String> _disconnectionsController =
       StreamController<String>.broadcast();
 
-  /// Set of clientIds that have been identified as Bluey peers (i.e.
-  /// have sent at least one lifecycle heartbeat in the current
+  /// Set of client addresses that have been identified as Bluey peers
+  /// (i.e. have sent at least one lifecycle heartbeat in the current
   /// session). Used to fire [PeerClient] emissions exactly once per
   /// identification — not once per heartbeat. Cleared on disconnect so
   /// a reconnect-then-heartbeat re-identifies.
@@ -150,17 +150,17 @@ class BlueyServer implements Server {
         BlueyLogLevel.info,
         'bluey.server',
         'central connected',
-        data: {'clientId': platformCentral.id, 'mtu': platformCentral.mtu},
+        data: {'clientId': clientAddress.value, 'mtu': platformCentral.mtu},
       );
       _emitEvent(
         ClientConnectedEvent(
-          clientId: platformCentral.id,
+          clientId: clientAddress.value,
           mtu: platformCentral.mtu,
           source: 'BlueyServer',
         ),
       );
       final client = BlueyClient(
-        id: platformCentral.id,
+        id: clientAddress.value,
         mtu: platformCentral.mtu,
       );
       _connectedClients[clientAddress] = client;
@@ -183,20 +183,22 @@ class BlueyServer implements Server {
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
       if (!_lifecycle.handleReadRequest(req)) {
         // Reads always need a response — pend until the app responds.
-        _lifecycle.requestStarted(ClientAddress(req.centralId), req.requestId);
+        final clientAddress = ClientAddress(req.centralId);
+        _lifecycle.requestStarted(clientAddress, req.requestId);
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
       if (!_lifecycle.handleWriteRequest(req)) {
+        final clientAddress = ClientAddress(req.centralId);
         if (req.responseNeeded) {
           // Write-with-response — pend until the app responds.
-          _lifecycle.requestStarted(ClientAddress(req.centralId), req.requestId);
+          _lifecycle.requestStarted(clientAddress, req.requestId);
         } else {
           // Write-without-response — no obligation to pend; treat as
           // activity (current behaviour).
-          _lifecycle.recordActivity(ClientAddress(req.centralId));
+          _lifecycle.recordActivity(clientAddress);
         }
         _filteredWriteRequestsController.add(req);
       }
@@ -763,11 +765,13 @@ class BlueyServer implements Server {
     Uint8List? value,
   }) async {
     _ensureValid();
-    final clientId = ClientAddress((request.client as BlueyClient)._platformId);
+    final clientAddress = ClientAddress(
+      (request.client as BlueyClient)._platformId,
+    );
     // Drain pending state BEFORE the platform call so the obligation is
     // discharged even if respondToReadRequest throws (stale request id,
     // platform error, etc.).
-    _lifecycle.requestCompleted(clientId, request.internalRequestId);
+    _lifecycle.requestCompleted(clientAddress, request.internalRequestId);
     try {
       await withErrorTranslation(
         () => _platform.respondToReadRequest(
@@ -794,9 +798,11 @@ class BlueyServer implements Server {
     required GattResponseStatus status,
   }) async {
     _ensureValid();
-    final clientId = ClientAddress((request.client as BlueyClient)._platformId);
+    final clientAddress = ClientAddress(
+      (request.client as BlueyClient)._platformId,
+    );
     // Drain pending state BEFORE the platform call — see respondToRead.
-    _lifecycle.requestCompleted(clientId, request.internalRequestId);
+    _lifecycle.requestCompleted(clientAddress, request.internalRequestId);
     try {
       await withErrorTranslation(
         () => _platform.respondToWriteRequest(
