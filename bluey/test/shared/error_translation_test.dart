@@ -1,4 +1,5 @@
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/lifecycle.dart' show lifecycleEvictionAttStatus;
 import 'package:bluey/src/shared/error_translation.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -182,6 +183,28 @@ void main() {
         operation: 'configure',
       );
       expect(result, isA<BlueyPlatformException>());
+    });
+  });
+
+  group('eviction-status translation', () {
+    test('reserved eviction status becomes DisconnectedException(evictedByServer)', () {
+      final translated = translatePlatformException(
+        platform.GattOperationStatusFailedException('write', lifecycleEvictionAttStatus),
+        operation: 'write',
+        address: 'AA:BB:CC:DD:EE:FF',
+      );
+      expect(translated, isA<DisconnectedException>());
+      final dx = translated as DisconnectedException;
+      expect(dx.reason, DisconnectReason.evictedByServer);
+      expect(dx.address, 'AA:BB:CC:DD:EE:FF');
+    });
+
+    test('a non-reserved status still maps to GattOperationFailedException', () {
+      final translated = translatePlatformException(
+        platform.GattOperationStatusFailedException('write', 0x01),
+        operation: 'write',
+      );
+      expect(translated, isA<GattOperationFailedException>());
     });
   });
 }

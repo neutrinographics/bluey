@@ -3,6 +3,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter/services.dart' show PlatformException;
 
 import '../connection/lifecycle_client.dart';
+import '../lifecycle.dart' show lifecycleEvictionAttStatus;
 import 'exceptions.dart';
 
 /// Translates a platform-interface exception (or any other [Object]) into
@@ -41,6 +42,13 @@ BlueyException translatePlatformException(
     );
   }
   if (error is platform.GattOperationStatusFailedException) {
+    if (error.status == lifecycleEvictionAttStatus) {
+      // Server evicted us: our session is gone (heartbeat-silence timeout on
+      // an inferring server). Surface as a connection-fatal disconnect so the
+      // app reconnects via existing logic (I338). The connection layer drives
+      // the actual teardown (LifecycleClient eviction fast-path / disconnect).
+      return DisconnectedException(address ?? '', DisconnectReason.evictedByServer);
+    }
     return GattOperationFailedException(operation, error.status);
   }
   if (error is platform.GattOperationUnknownPlatformException) {
