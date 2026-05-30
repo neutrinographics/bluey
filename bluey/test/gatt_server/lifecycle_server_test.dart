@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:bluey/src/gatt_server/client_address.dart';
 import 'package:bluey/src/gatt_server/lifecycle_server.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey/src/log/bluey_logger.dart';
@@ -72,7 +73,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -95,7 +96,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -125,7 +126,7 @@ void main() {
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
-        onClientGone: gone.add,
+        onClientGone: (ca) => gone.add(ca.value),
         logger: testLogger(),
       );
 
@@ -272,7 +273,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -284,7 +285,7 @@ void main() {
           ),
         );
 
-        server.cancelTimer(_clientId);
+        server.cancelTimer(const ClientAddress(_clientId));
 
         async.elapse(const Duration(seconds: 10));
         expect(gone, isEmpty);
@@ -300,7 +301,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 5),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -328,8 +329,8 @@ void main() {
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
-        onClientGone: gone.add,
-        onPeerIdentified: (id, sender) => identifications.add((id, sender)),
+        onClientGone: (ca) => gone.add(ca.value),
+        onPeerIdentified: (ca, sender) => identifications.add((ca.value, sender)),
         logger: testLogger(),
       );
 
@@ -353,8 +354,8 @@ void main() {
         platformApi: fakePlatform,
         interval: const Duration(seconds: 5),
         serverId: ServerId.generate(),
-        onClientGone: gone.add,
-        onPeerIdentified: (id, sender) => identifications.add((id, sender)),
+        onClientGone: (ca) => gone.add(ca.value),
+        onPeerIdentified: (ca, sender) => identifications.add((ca.value, sender)),
         logger: testLogger(),
       );
 
@@ -380,7 +381,7 @@ void main() {
           platformApi: fakePlatform,
           interval: null,
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -485,7 +486,7 @@ void main() {
           platformApi: FakeBlueyPlatform(),
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: (id) => events.add('gone:$id'),
+          onClientGone: (ca) => events.add('gone:${ca.value}'),
           logger: testLogger(),
         );
 
@@ -509,7 +510,7 @@ void main() {
         expect(events, isEmpty);
 
         // Record activity (simulates a non-control-service write arriving).
-        server.recordActivity(clientId);
+        server.recordActivity(const ClientAddress(clientId));
 
         // Advance another 9s — total 18s since first heartbeat, but only
         // 9s since recordActivity, so still within the window.
@@ -541,7 +542,10 @@ void main() {
 
         // Calling recordActivity when lifecycle is disabled should be safe
         // and do nothing.
-        expect(() => server.recordActivity('client'), returnsNormally);
+        expect(
+          () => server.recordActivity(const ClientAddress('client')),
+          returnsNormally,
+        );
 
         server.dispose();
       },
@@ -556,14 +560,14 @@ void main() {
             platformApi: FakeBlueyPlatform(),
             interval: const Duration(seconds: 10),
             serverId: ServerId.generate(),
-            onClientGone: (id) => events.add('gone:$id'),
+            onClientGone: (ca) => events.add('gone:${ca.value}'),
             logger: testLogger(),
           );
 
           // Client never sent a heartbeat — activity alone must not start
           // tracking them. Otherwise a generic BLE central reading a hosted
           // service would be spuriously flagged as "gone" after the interval.
-          server.recordActivity('stranger');
+          server.recordActivity(const ClientAddress('stranger'));
           async.elapse(const Duration(seconds: 20));
           expect(events, isEmpty);
 
@@ -579,7 +583,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -592,7 +596,7 @@ void main() {
         );
 
         // App-level request begins. Server is now holding it.
-        server.requestStarted(_clientId, 42);
+        server.requestStarted(const ClientAddress(_clientId), 42);
 
         // Advance well past the 10s heartbeat-timeout window.
         async.elapse(const Duration(seconds: 30));
@@ -611,7 +615,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -621,14 +625,14 @@ void main() {
             value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
           ),
         );
-        server.requestStarted(_clientId, 42);
+        server.requestStarted(const ClientAddress(_clientId), 42);
 
         // Hold for 30s — still alive (suppressed).
         async.elapse(const Duration(seconds: 30));
         expect(gone, isEmpty);
 
         // Response sent — pending drains.
-        server.requestCompleted(_clientId, 42);
+        server.requestCompleted(const ClientAddress(_clientId), 42);
 
         // Within the fresh interval: still alive.
         async.elapse(const Duration(seconds: 9));
@@ -649,7 +653,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -660,17 +664,17 @@ void main() {
           ),
         );
 
-        server.requestStarted(_clientId, 1);
-        server.requestStarted(_clientId, 2);
+        server.requestStarted(const ClientAddress(_clientId), 1);
+        server.requestStarted(const ClientAddress(_clientId), 2);
 
         // Complete one — the other is still open.
-        server.requestCompleted(_clientId, 1);
+        server.requestCompleted(const ClientAddress(_clientId), 1);
 
         async.elapse(const Duration(seconds: 30));
         expect(gone, isEmpty, reason: 'request 2 still pending');
 
         // Complete the other — set is now empty, timer re-arms.
-        server.requestCompleted(_clientId, 2);
+        server.requestCompleted(const ClientAddress(_clientId), 2);
 
         async.elapse(const Duration(seconds: 11));
         expect(gone, [_clientId]);
@@ -686,7 +690,7 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
@@ -696,13 +700,13 @@ void main() {
             value: heartbeatPayloadFrom(TestServerIds.remoteIdentity),
           ),
         );
-        server.requestStarted(_clientId, 1);
+        server.requestStarted(const ClientAddress(_clientId), 1);
 
         // Simulate platform-level disconnect cleanup.
-        server.cancelTimer(_clientId);
+        server.cancelTimer(const ClientAddress(_clientId));
 
         // Late respond from the app — must be a no-op.
-        server.requestCompleted(_clientId, 1);
+        server.requestCompleted(const ClientAddress(_clientId), 1);
 
         async.elapse(const Duration(seconds: 30));
         expect(
@@ -724,13 +728,13 @@ void main() {
           platformApi: fakePlatform,
           interval: const Duration(seconds: 10),
           serverId: ServerId.generate(),
-          onClientGone: gone.add,
+          onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
         );
 
         // No prior heartbeat — client is untracked. requestStarted must
         // not implicitly track them.
-        server.requestStarted('stranger', 1);
+        server.requestStarted(const ClientAddress('stranger'), 1);
 
         async.elapse(const Duration(seconds: 30));
         expect(gone, isEmpty);

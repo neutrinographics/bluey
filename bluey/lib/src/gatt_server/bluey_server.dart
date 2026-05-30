@@ -16,6 +16,7 @@ import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
+import 'client_address.dart';
 import 'lifecycle_server.dart';
 import 'server.dart';
 
@@ -48,7 +49,7 @@ class BlueyServer implements Server {
   final StreamController<AdvertisingState> _advertisingStateController =
       StreamController<AdvertisingState>.broadcast();
 
-  final Map<String, BlueyClient> _connectedClients = {};
+  final Map<ClientAddress, BlueyClient> _connectedClients = {};
 
   /// Local handle table populated from `addService`'s populated return
   /// value. Keyed by `(serviceUuid, charUuid)` lowercase. Used by
@@ -76,7 +77,7 @@ class BlueyServer implements Server {
   /// session). Used to fire [PeerClient] emissions exactly once per
   /// identification — not once per heartbeat. Cleared on disconnect so
   /// a reconnect-then-heartbeat re-identifies.
-  final Set<String> _identifiedPeerClientIds = {};
+  final Set<ClientAddress> _identifiedPeerClientIds = {};
 
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
@@ -144,6 +145,7 @@ class BlueyServer implements Server {
     _centralConnectionsSub = _platform.centralConnections.listen((
       platformCentral,
     ) {
+      final clientAddress = ClientAddress(platformCentral.id);
       _logger.log(
         BlueyLogLevel.info,
         'bluey.server',
@@ -161,7 +163,7 @@ class BlueyServer implements Server {
         id: platformCentral.id,
         mtu: platformCentral.mtu,
       );
-      _connectedClients[platformCentral.id] = client;
+      _connectedClients[clientAddress] = client;
       _connectionsController.add(client);
       // No heartbeat timer here. The timer starts only when the client sends
       // its first heartbeat write, proving it speaks the lifecycle protocol.
@@ -170,9 +172,9 @@ class BlueyServer implements Server {
     });
 
     _centralDisconnectionsSub = _platform.centralDisconnections.listen((
-      clientId,
+      rawClientId,
     ) {
-      _handleClientDisconnected(clientId);
+      _handleClientDisconnected(ClientAddress(rawClientId));
     });
 
     // Subscribe to platform request streams and route internally.
@@ -181,7 +183,7 @@ class BlueyServer implements Server {
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
       if (!_lifecycle.handleReadRequest(req)) {
         // Reads always need a response — pend until the app responds.
-        _lifecycle.requestStarted(req.centralId, req.requestId);
+        _lifecycle.requestStarted(ClientAddress(req.centralId), req.requestId);
         _filteredReadRequestsController.add(req);
       }
     });
@@ -190,11 +192,11 @@ class BlueyServer implements Server {
       if (!_lifecycle.handleWriteRequest(req)) {
         if (req.responseNeeded) {
           // Write-with-response — pend until the app responds.
-          _lifecycle.requestStarted(req.centralId, req.requestId);
+          _lifecycle.requestStarted(ClientAddress(req.centralId), req.requestId);
         } else {
           // Write-without-response — no obligation to pend; treat as
           // activity (current behaviour).
-          _lifecycle.recordActivity(req.centralId);
+          _lifecycle.recordActivity(ClientAddress(req.centralId));
         }
         _filteredWriteRequestsController.add(req);
       }
@@ -389,7 +391,7 @@ class BlueyServer implements Server {
   @override
   bool isClientConnected(String address) {
     _ensureValid();
-    return _connectedClients.containsKey(address);
+    return _connectedClients.containsKey(ClientAddress(address));
   }
 
   @override
@@ -719,7 +721,7 @@ class BlueyServer implements Server {
   @override
   Stream<ReadRequest> get readRequests {
     return _filteredReadRequestsController.stream.map((platformRequest) {
-      final client = _connectedClients[platformRequest.centralId];
+      final client = _connectedClients[ClientAddress(platformRequest.centralId)];
       if (client == null) {
         throw StateError(
           'Read request from unknown client: ${platformRequest.centralId}',
@@ -737,7 +739,7 @@ class BlueyServer implements Server {
   @override
   Stream<WriteRequest> get writeRequests {
     return _filteredWriteRequestsController.stream.map((platformRequest) {
-      final client = _connectedClients[platformRequest.centralId];
+      final client = _connectedClients[ClientAddress(platformRequest.centralId)];
       if (client == null) {
         throw StateError(
           'Write request from unknown client: ${platformRequest.centralId}',
@@ -761,7 +763,7 @@ class BlueyServer implements Server {
     Uint8List? value,
   }) async {
     _ensureValid();
-    final clientId = (request.client as BlueyClient)._platformId;
+    final clientId = ClientAddress((request.client as BlueyClient)._platformId);
     // Drain pending state BEFORE the platform call so the obligation is
     // discharged even if respondToReadRequest throws (stale request id,
     // platform error, etc.).
@@ -792,7 +794,7 @@ class BlueyServer implements Server {
     required GattResponseStatus status,
   }) async {
     _ensureValid();
-    final clientId = (request.client as BlueyClient)._platformId;
+    final clientId = ClientAddress((request.client as BlueyClient)._platformId);
     // Drain pending state BEFORE the platform call — see respondToRead.
     _lifecycle.requestCompleted(clientId, request.internalRequestId);
     try {
@@ -859,14 +861,14 @@ class BlueyServer implements Server {
   /// heartbeats from the same client are no-ops here. The identification
   /// set is cleared in [_handleClientDisconnected] so a reconnect-then-
   /// heartbeat re-identifies.
-  void _trackPeerClient(String clientId, ServerId senderId) {
+  void _trackPeerClient(ClientAddress clientId, ServerId senderId) {
     final wasNew = !_connectedClients.containsKey(clientId);
     if (wasNew) {
       _emitEvent(
-        ClientConnectedEvent(clientId: clientId, source: 'BlueyServer'),
+        ClientConnectedEvent(clientId: clientId.value, source: 'BlueyServer'),
       );
       final client = BlueyClient(
-        id: clientId,
+        id: clientId.value,
         mtu: 23, // Default MTU — actual MTU is unknown without platform event
       );
       _connectedClients[clientId] = client;
@@ -879,7 +881,7 @@ class BlueyServer implements Server {
         BlueyLogLevel.info,
         'bluey.server',
         'central identified as Bluey peer',
-        data: {'clientId': clientId, 'senderId': senderId.toString()},
+        data: {'clientId': clientId.toString(), 'senderId': senderId.toString()},
       );
       _peerConnectionsController.add(
         PeerClient.create(client: client, serverId: senderId),
@@ -887,12 +889,12 @@ class BlueyServer implements Server {
     }
   }
 
-  void _handleClientDisconnected(String clientId) {
+  void _handleClientDisconnected(ClientAddress clientId) {
     _logger.log(
       BlueyLogLevel.info,
       'bluey.server',
       'central disconnected',
-      data: {'clientId': clientId},
+      data: {'clientId': clientId.toString()},
     );
     // Cancel any heartbeat timer for this client
     _lifecycle.cancelTimer(clientId);
@@ -900,7 +902,7 @@ class BlueyServer implements Server {
     final client = _connectedClients.remove(clientId);
     if (client != null) {
       _emitEvent(
-        ClientDisconnectedEvent(clientId: clientId, source: 'BlueyServer'),
+        ClientDisconnectedEvent(clientId: clientId.value, source: 'BlueyServer'),
       );
     }
 
@@ -911,7 +913,7 @@ class BlueyServer implements Server {
 
     // Always emit on the disconnections stream -- even for untracked clients
     // (e.g., stale connections from before a server restart).
-    _disconnectionsController.add(clientId);
+    _disconnectionsController.add(clientId.value);
   }
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(

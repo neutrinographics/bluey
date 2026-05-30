@@ -12,6 +12,7 @@ import '../log/log_level.dart';
 import '../peer/server_id.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
+import 'client_address.dart';
 
 /// Server-side lifecycle management.
 ///
@@ -22,13 +23,13 @@ class LifecycleServer {
   final platform.BlueyPlatform _platform;
   final Duration? _interval;
   final ServerId _serverId;
-  final void Function(String clientId) onClientGone;
-  final void Function(String clientId, ServerId senderId)? onPeerIdentified;
+  final void Function(ClientAddress clientId) onClientGone;
+  final void Function(ClientAddress clientId, ServerId senderId)? onPeerIdentified;
   final BlueyLogger _logger;
   final EventPublisher? _events;
 
   bool _controlServiceAdded = false;
-  final Map<String, _ClientLiveness> _clients = {};
+  final Map<ClientAddress, _ClientLiveness> _clients = {};
 
   LifecycleServer({
     required platform.BlueyPlatform platformApi,
@@ -88,7 +89,7 @@ class LifecycleServer {
       );
     }
 
-    final clientId = req.centralId;
+    final clientId = ClientAddress(req.centralId);
 
     final lifecycle.LifecycleMessage message;
     try {
@@ -98,7 +99,7 @@ class LifecycleServer {
         BlueyLogLevel.warn,
         'bluey.server.lifecycle',
         'malformed lifecycle write — dropping',
-        data: {'clientId': clientId, 'reason': e.reason},
+        data: {'clientId': clientId.toString(), 'reason': e.reason},
       );
       return true;
     } on lifecycle.UnsupportedLifecycleProtocolVersion catch (e) {
@@ -106,7 +107,7 @@ class LifecycleServer {
         BlueyLogLevel.warn,
         'bluey.server.lifecycle',
         'unsupported lifecycle protocol version — dropping',
-        data: {'clientId': clientId, 'version': e.version},
+        data: {'clientId': clientId.toString(), 'version': e.version},
       );
       return true;
     }
@@ -123,7 +124,7 @@ class LifecycleServer {
           BlueyLogLevel.info,
           'bluey.server.lifecycle',
           'disconnect command received',
-          data: {'clientId': clientId},
+          data: {'clientId': clientId.toString()},
         );
         cancelTimer(clientId);
         onClientGone(clientId);
@@ -132,7 +133,7 @@ class LifecycleServer {
           BlueyLogLevel.debug,
           'bluey.server.lifecycle',
           'heartbeat received',
-          data: {'clientId': clientId},
+          data: {'clientId': clientId.toString()},
         );
         _resetTimer(clientId);
     }
@@ -243,7 +244,7 @@ class LifecycleServer {
 
   /// Cancels the heartbeat timer for a specific client and clears any
   /// pending-request state. Removes the client entirely from tracking.
-  void cancelTimer(String clientId) {
+  void cancelTimer(ClientAddress clientId) {
     _clients.remove(clientId)?.timer?.cancel();
   }
 
@@ -258,14 +259,14 @@ class LifecycleServer {
   /// we never promised to track.
   ///
   /// No-op if lifecycle is disabled (interval is null).
-  void recordActivity(String clientId) {
+  void recordActivity(ClientAddress clientId) {
     if (_interval == null) return;
     if (!_clients.containsKey(clientId)) {
       _logger.log(
         BlueyLogLevel.trace,
         'bluey.server.lifecycle',
         'recordActivity ignored (untracked client)',
-        data: {'clientId': clientId},
+        data: {'clientId': clientId.toString()},
       );
       return;
     }
@@ -282,7 +283,7 @@ class LifecycleServer {
   /// be implicitly tracked as a Bluey peer.
   ///
   /// No-op if lifecycle is disabled (interval is null).
-  void requestStarted(String clientId, int requestId) {
+  void requestStarted(ClientAddress clientId, int requestId) {
     if (_interval == null) return;
     final state = _clients[clientId];
     if (state == null) return;
@@ -290,7 +291,7 @@ class LifecycleServer {
       BlueyLogLevel.debug,
       'bluey.server.lifecycle',
       'requestStarted',
-      data: {'clientId': clientId, 'requestId': requestId},
+      data: {'clientId': clientId.toString(), 'requestId': requestId},
     );
     final wasIdle = state.pendingRequests.isEmpty;
     state.pendingRequests.add(requestId);
@@ -300,7 +301,7 @@ class LifecycleServer {
       // fires once per pause edge, not on every subsequent request.
       _events?.emit(
         LifecyclePausedForPendingRequestEvent(
-          clientId: clientId,
+          clientId: clientId.value,
           source: 'LifecycleServer',
         ),
       );
@@ -315,7 +316,7 @@ class LifecycleServer {
   /// Idempotent: completing an unknown id is a no-op.
   ///
   /// No-op if lifecycle is disabled (interval is null).
-  void requestCompleted(String clientId, int requestId) {
+  void requestCompleted(ClientAddress clientId, int requestId) {
     if (_interval == null) return;
     final state = _clients[clientId];
     if (state == null) return;
@@ -324,7 +325,7 @@ class LifecycleServer {
       BlueyLogLevel.debug,
       'bluey.server.lifecycle',
       'requestEnded',
-      data: {'clientId': clientId, 'requestId': requestId},
+      data: {'clientId': clientId.toString(), 'requestId': requestId},
     );
     if (state.pendingRequests.isEmpty) {
       _resetTimer(clientId);
@@ -339,7 +340,7 @@ class LifecycleServer {
     _clients.clear();
   }
 
-  void _resetTimer(String clientId) {
+  void _resetTimer(ClientAddress clientId) {
     final interval = _interval;
     if (interval == null) return;
 
@@ -357,12 +358,12 @@ class LifecycleServer {
         BlueyLogLevel.warn,
         'bluey.server.lifecycle',
         'client gone',
-        data: {'clientId': clientId},
+        data: {'clientId': clientId.toString()},
       );
       _clients.remove(clientId);
       _events?.emit(
         ClientLifecycleTimeoutEvent(
-          clientId: clientId,
+          clientId: clientId.value,
           source: 'LifecycleServer',
         ),
       );
