@@ -240,4 +240,27 @@ void main() {
       });
     },
   );
+
+  test('reset-on-init: a surviving native-announced central is re-announced, '
+      'so the fresh server re-establishes its session (not evicted)', () async {
+    final fake = FakeBlueyPlatform(reportsCentralDisconnects: false);
+    BlueyPlatform.instance = fake;
+    final bluey = await Bluey.create();
+    // A central the native side still tracks but the new Dart server has not
+    // heard of.
+    fake.simulateSurvivingAnnouncedCentral(_mac);
+    fakeAsync((async) {
+      final server =
+          bluey.server(lifecycleInterval: _interval)!; // resetServerSessions()
+      server.startAdvertising(name: 't');
+      async.flushMicrotasks();
+
+      // On reset, the fake re-announces survivors via centralConnections.
+      expect(server.isClientConnected(const ClientAddress(_mac)), isTrue,
+          reason: 'survivor re-announced → session re-established, not evicted');
+
+      server.dispose();
+      bluey.dispose();
+    });
+  });
 }

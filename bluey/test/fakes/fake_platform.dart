@@ -302,6 +302,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   final Map<String, _ConnectedCentral> _connectedCentrals = {};
   int _nextRequestId = 1;
 
+  /// Test-only: centrals the (reused) native manager still "tracks" but the
+  /// next-created [BlueyServer] has not heard of. Keyed centralId -> mtu.
+  /// Drained by [resetServerSessions] (I338 reset-on-init).
+  final Map<String, int> _survivingAnnounced = {};
+
   /// Module-wide counter for handles minted by [addService] (mirrors
   /// the server-role behaviour on iOS / Android). Starts at 1.
   int _nextLocalHandle = 1;
@@ -644,6 +649,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       subscribedCharacteristics: {},
     );
     _centralConnectionController.add(PlatformCentral(id: centralId, mtu: mtu));
+  }
+
+  /// Test-only: records a central that the (reused) native manager still
+  /// "tracks" but the next-created [BlueyServer] has not heard of. On the next
+  /// [resetServerSessions] it is re-announced via `centralConnections`,
+  /// modelling the native re-announce contract (I338 reset-on-init).
+  void simulateSurvivingAnnouncedCentral(String centralId, {int mtu = 23}) {
+    _survivingAnnounced[centralId] = mtu;
   }
 
   /// Test-only helper: arms the lifecycle silence timer for [centralId] by
@@ -1757,6 +1770,25 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       simulateCentralDisconnection(centralId);
     }
     _localServices.clear();
+  }
+
+  @override
+  Future<void> resetServerSessions() async {
+    final survivors = Map<String, int>.from(_survivingAnnounced);
+    _survivingAnnounced.clear();
+    for (final entry in survivors.entries) {
+      // Mirror a real re-announce: register transport + emit
+      // centralConnections. Does not require advertising to be active — this
+      // is called at server construction, before startAdvertising.
+      _connectedCentrals[entry.key] = _ConnectedCentral(
+        id: entry.key,
+        mtu: entry.value,
+        subscribedCharacteristics: {},
+      );
+      _centralConnectionController.add(
+        PlatformCentral(id: entry.key, mtu: entry.value),
+      );
+    }
   }
 
   /// Disposes all resources.

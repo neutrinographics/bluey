@@ -577,6 +577,13 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// After calling this, the server instance should not be reused.
   Future<void> closeServer();
 
+  /// Re-announces every central the native server still tracks, so a
+  /// freshly-created [BlueyServer] re-establishes sessions for centrals that
+  /// survived from a prior server instance. Required because the native
+  /// manager is reused across recreations and the I333 invalidation path does
+  /// not close it (I338). Default no-op; platform implementations override.
+  Future<void> resetServerSessions() async {}
+
   // === Structured logging ===
 
   /// Stream of structured log events emitted by the platform implementation.

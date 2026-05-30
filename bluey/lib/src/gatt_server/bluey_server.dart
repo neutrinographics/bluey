@@ -184,6 +184,13 @@ class BlueyServer implements Server {
       _handleClientDisconnected(ClientAddress(rawClientId));
     });
 
+    // I338: re-announce any central that survived a prior server instance so
+    // this fresh server re-establishes its session instead of evicting its
+    // next request. Fired after the centralConnections/centralDisconnections
+    // listeners are attached so the re-announce events are observed. No-op on
+    // platforms without surviving centrals (default-no-op base method).
+    unawaited(_platform.resetServerSessions());
+
     // Subscribe to platform request streams and route internally.
     // Control service requests are handled here; all others are forwarded
     // to the filtered controllers for the public API.
