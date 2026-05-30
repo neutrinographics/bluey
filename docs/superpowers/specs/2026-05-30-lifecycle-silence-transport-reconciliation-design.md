@@ -119,7 +119,14 @@ can drop its own link. Untouched.
 fire first if silence beats the supervision timeout — a heads-up, not a
 disconnect.)
 
-## Eviction & session coherence
+**Platform-pair coverage.** The branch keys on the *server's*
+`reportsCentralDisconnects`, not on the client's platform, and the client side
+(send heartbeats; on the reserved status, self-disconnect) is uniform Dart logic.
+So all four pairings reduce to the two paths above: **Android-server**
+(Android↔Android and iOS→Android) takes the authoritative path; **iOS-server**
+(iOS↔iOS and Android→iOS) takes the inferring path. Same-platform *bidirectional*
+setups still face the orthogonal shared-link trap (Android: I208; iOS:
+`cross-platform-quirks.md`) — out of scope here; neither fixed nor regressed.
 
 Eviction is a special case of one rule, not its own bookkeeping:
 
@@ -190,6 +197,17 @@ can't be met.
   (relied-upon property; state it).
 - Whether a recreated `BlueyServer` reuses the native manager (→ reset-on-init
   required) or gets a fresh one (→ no stale central; invariant holds trivially).
+- **Client-side reserved-status delivery (all four configs):** both client
+  platforms must surface an application-range (`0x80–0x9F`) ATT *write-response*
+  status faithfully to Dart so the eviction handshake's client leg fires. The
+  carry path already exists — iOS preserves the numeric byte post-I091; Android
+  routes it via `statusFailedError(op, status)` →
+  `GattOperationStatusFailedException(status)` → `GattOperationFailedException(status)`.
+  Residual to confirm: the OS actually delivers a `0x80–0x9F` code on a write
+  response rather than masking/normalizing it (low risk; iOS handled, Android
+  generally passes through). If a platform masks it, the eviction status moves to
+  the heartbeat-write path only (the `LifecycleClient` can treat any heartbeat
+  write failure on a session it believes live as an evict-and-reconnect trigger).
 
 ## Reserved protocol constants & collision-safety
 
