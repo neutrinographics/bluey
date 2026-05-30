@@ -62,8 +62,7 @@ void main() {
     );
 
     final device = Device(
-      id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-      address: TestDeviceIds.device1,
+      address: DeviceAddress(TestDeviceIds.device1),
       name: 'Sensor',
     );
     final connection = await bluey.connect(device);
@@ -211,7 +210,7 @@ void main() {
           );
           fail('expected DisconnectedException');
         } on DisconnectedException catch (e) {
-          expect(e.deviceId, ctx.connection.deviceId);
+          expect(e.address, ctx.connection.deviceAddress.value);
           expect(e.reason, DisconnectReason.unknown);
         }
       },

@@ -105,7 +105,9 @@ void main() {
       mockPlatform.connectError = const platform.GattOperationTimeoutException(
         'connect',
       );
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddee01'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddee01'),
+      );
       await expectLater(bluey.connect(device), throwsA(isA<BlueyException>()));
     });
 

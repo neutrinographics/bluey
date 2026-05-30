@@ -184,14 +184,18 @@ void main() {
   });
 
   group('Client', () {
-    test('has id property', () {
-      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
+    test('has address property', () {
+      const addr = ClientAddress('test-address');
+      final central = MockClient(address: addr, mtu: 23);
 
-      expect(central.id, equals(UUID.short(0x1234)));
+      expect(central.address, equals(addr));
     });
 
     test('has mtu property', () {
-      final central = MockClient(id: UUID.short(0x1234), mtu: 512);
+      final central = MockClient(
+        address: const ClientAddress('test-address'),
+        mtu: 512,
+      );
 
       expect(central.mtu, equals(512));
     });
@@ -257,7 +261,10 @@ void main() {
     });
 
     test('can notify specific central', () async {
-      final central = MockClient(id: UUID.short(0x1234), mtu: 23);
+      final central = MockClient(
+        address: const ClientAddress('test-central'),
+        mtu: 23,
+      );
       final data = Uint8List.fromList([0x01, 0x02]);
       await expectLater(
         server.notifyTo(central, UUID.short(0x2A37), data: data),
@@ -274,12 +281,12 @@ void main() {
 /// Mock implementation of Client for testing.
 class MockClient implements Client {
   @override
-  final UUID id;
+  final ClientAddress address;
 
   @override
   final int mtu;
 
-  MockClient({required this.id, required this.mtu});
+  MockClient({required this.address, required this.mtu});
 }
 
 /// Mock implementation of Server for testing.
@@ -289,7 +296,7 @@ class MockServer implements Server {
   final _advertisingStateController =
       StreamController<AdvertisingState>.broadcast();
   final _connectionsController = StreamController<Client>.broadcast();
-  final _disconnectionsController = StreamController<String>.broadcast();
+  final _disconnectionsController = StreamController<ClientAddress>.broadcast();
   final ServerId _serverId = ServerId.generate();
 
   @override
@@ -313,13 +320,13 @@ class MockServer implements Server {
   Stream<PeerClient> get peerConnections => const Stream.empty();
 
   @override
-  Stream<String> get disconnections => _disconnectionsController.stream;
+  Stream<ClientAddress> get disconnections => _disconnectionsController.stream;
 
   @override
   List<Client> get connectedClients => [];
 
   @override
-  bool isClientConnected(String address) => false;
+  bool isClientConnected(ClientAddress address) => false;
 
   List<HostedService> get services => _services;
 

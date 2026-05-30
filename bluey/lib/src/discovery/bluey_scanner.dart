@@ -13,6 +13,7 @@ import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'advertisement.dart';
 import 'device.dart';
+import 'device_address.dart';
 import 'scan_result.dart';
 import 'scan_state.dart';
 import 'scanner.dart';
@@ -257,7 +258,7 @@ class BlueyScanner implements Scanner {
             final result = _mapScanResult(platformDevice);
             _eventBus.emit(
               DeviceDiscoveredEvent(
-                deviceId: result.device.id,
+                deviceAddress: result.device.address,
                 name: result.device.name,
                 rssi: result.rssi,
               ),
@@ -385,8 +386,7 @@ class BlueyScanner implements Scanner {
     );
 
     final device = Device(
-      id: _deviceIdToUuid(platformDevice.id),
-      address: platformDevice.id,
+      address: DeviceAddress(platformDevice.id),
       name: platformDevice.name,
     );
 
@@ -397,16 +397,4 @@ class BlueyScanner implements Scanner {
     );
   }
 
-  /// Converts a platform device ID to a UUID.
-  ///
-  /// On Android, the ID is a MAC address (e.g., "AA:BB:CC:DD:EE:FF").
-  /// On iOS, the ID is already a UUID.
-  UUID _deviceIdToUuid(String id) {
-    if (id.length == 36 && id.contains('-')) {
-      return UUID(id);
-    }
-    final clean = id.replaceAll(':', '').toLowerCase();
-    final padded = clean.padLeft(32, '0');
-    return UUID(padded);
-  }
 }

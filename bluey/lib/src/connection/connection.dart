@@ -1,3 +1,4 @@
+import '../discovery/device_address.dart';
 import '../gatt_client/gatt.dart';
 import '../shared/uuid.dart';
 import 'android_connection_extensions.dart';
@@ -93,8 +94,8 @@ enum Phy {
 /// await connection.disconnect();
 /// ```
 abstract class Connection {
-  /// The connected device's ID.
-  UUID get deviceId;
+  /// The connected device's address.
+  DeviceAddress get deviceAddress;
 
   /// Current connection state.
   ConnectionState get state;

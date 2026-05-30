@@ -118,8 +118,7 @@ void main() {
         final bluey = await Bluey.create();
 
         final fakeDevice = Device(
-          id: UUID('00000000-0000-0000-0000-000000000000'),
-          address: 'FF:FF:FF:FF:FF:FF',
+          address: const DeviceAddress('FF:FF:FF:FF:FF:FF'),
           name: 'Ghost Device',
         );
 

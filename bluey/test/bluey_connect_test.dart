@@ -22,16 +22,20 @@ void main() {
     });
 
     test('returns a Connection object', () async {
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+      );
 
       final connection = await bluey.connect(device);
 
       expect(connection, isA<Connection>());
-      expect(connection.deviceId, equals(device.id));
+      expect(connection.deviceAddress, equals(device.address));
     });
 
     test('connection is connected after connect completes', () async {
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+      );
 
       final connection = await bluey.connect(device);
 
@@ -49,7 +53,9 @@ void main() {
       // service tree and promotes to `ready`. We capture the full
       // transition sequence here: platform CONNECTED → `linked` (link
       // up) → `ready` once services() completes.
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+      );
 
       final connection = await bluey.connect(device);
       expect(connection.state, equals(ConnectionState.linked));
@@ -63,7 +69,7 @@ void main() {
       // Re-poke the platform state stream to verify the listener filter
       // does not regress us from `ready` back to `linked`.
       mockPlatform.emitConnectionState(
-        device.id.toString(),
+        device.address.value,
         platform.PlatformConnectionState.connected,
       );
       await Future.delayed(Duration(milliseconds: 10));
@@ -78,7 +84,9 @@ void main() {
     });
 
     test('platform-driven state changes are emitted post-connect', () async {
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+      );
 
       // After bluey.connect() completes, the connection is at `ready`
       // (platform-CONNECTED → linked, then services() promotes to
@@ -92,7 +100,7 @@ void main() {
       final subscription = connection.stateChanges.listen(states.add);
 
       mockPlatform.emitConnectionState(
-        device.id.toString(),
+        device.address.value,
         platform.PlatformConnectionState.disconnecting,
       );
 
@@ -103,7 +111,9 @@ void main() {
     });
 
     test('disconnect closes the connection', () async {
-      final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+      final device = Device(
+        address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+      );
 
       final connection = await bluey.connect(device);
       await connection.disconnect();

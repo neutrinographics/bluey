@@ -5,11 +5,11 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
+import '../discovery/device_address.dart';
 import '../event_bus.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
-import '../shared/device_id_coercion.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
 
@@ -123,7 +123,7 @@ class PeerDiscovery {
           return BlueyConnection(
             platformInstance: _platform,
             connectionId: address,
-            deviceId: deviceIdToUuid(address),
+            deviceAddress: DeviceAddress(address),
             logger: _logger,
             events: _events,
           );

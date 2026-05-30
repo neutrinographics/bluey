@@ -24,7 +24,7 @@ import 'peer/peer.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
-import 'shared/device_id_coercion.dart';
+import 'discovery/device_address.dart';
 import 'shared/error_translation.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
@@ -421,32 +421,32 @@ class Bluey {
       BlueyLogLevel.info,
       'bluey',
       'connect entered',
-      data: {'deviceId': device.id.toString()},
+      data: {'address': device.address.value},
     );
 
     _logger.log(
       BlueyLogLevel.info,
       'bluey.connection',
       'connect started',
-      data: {'deviceId': device.id.toString(), 'address': device.address},
+      data: {'address': device.address.value},
     );
 
-    _emitEvent(ConnectingEvent(deviceId: device.id));
+    _emitEvent(ConnectingEvent(deviceAddress: device.address));
 
     try {
       // Use address for the actual connection (MAC address on Android)
       final connectionId = await withErrorTranslation(
-        () => _platform.connect(device.address, config),
+        () => _platform.connect(device.address.value, config),
         operation: 'connect',
-        deviceId: device.id,
+        address: device.address.value,
       );
 
-      _emitEvent(ConnectedEvent(deviceId: device.id));
+      _emitEvent(ConnectedEvent(deviceAddress: device.address));
 
       final connection = BlueyConnection(
         platformInstance: _platform,
         connectionId: connectionId,
-        deviceId: device.id,
+        deviceAddress: device.address,
         logger: _logger,
         events: _eventBus,
       );
@@ -455,7 +455,7 @@ class Bluey {
         BlueyLogLevel.info,
         'bluey.connection',
         'connect succeeded',
-        data: {'deviceId': device.id.toString()},
+        data: {'address': device.address.value},
       );
 
       return connection;
@@ -465,14 +465,14 @@ class Bluey {
         'bluey.connection',
         'connect failed',
         data: {
-          'deviceId': device.id.toString(),
+          'address': device.address.value,
           'exception': e.runtimeType.toString(),
         },
         errorCode: e.runtimeType.toString(),
       );
       _emitEvent(
         ErrorEvent(
-          message: 'Connection failed to ${device.id.toShortString()}',
+          message: 'Connection failed to ${device.address.toShortString()}',
           error: e,
         ),
       );
@@ -518,7 +518,7 @@ class Bluey {
       BlueyLogLevel.info,
       'bluey',
       'connectAsPeer entered',
-      data: {'deviceId': device.id.toString()},
+      data: {'address': device.address.value},
     );
     final connection = await connect(device, timeout: timeout);
     final peer = await _tryBuildPeerConnection(
@@ -529,7 +529,7 @@ class Bluey {
       // The device connected but isn't a Bluey peer — disconnect and
       // throw so we don't leak a half-formed connection.
       await connection.disconnect();
-      throw NotABlueyPeerException(device.id);
+      throw NotABlueyPeerException(device.address);
     }
     return peer;
   }
@@ -567,7 +567,7 @@ class Bluey {
       BlueyLogLevel.debug,
       'bluey',
       'tryUpgrade entered',
-      data: {'deviceId': connection.deviceId.toString()},
+      data: {'deviceId': connection.deviceAddress.toString()},
     );
     final result = await _tryBuildPeerConnection(connection);
     _logger.log(
@@ -575,7 +575,7 @@ class Bluey {
       'bluey',
       'tryUpgrade resolved',
       data: {
-        'deviceId': connection.deviceId.toString(),
+        'deviceId': connection.deviceAddress.toString(),
         'peer': result == null ? 'null' : 'present',
       },
     );
@@ -705,7 +705,7 @@ class Bluey {
         BlueyLogLevel.debug,
         'bluey.peer',
         'tryBuildPeerConnection',
-        data: {'deviceId': rawConnection.deviceId.toString()},
+        data: {'deviceId': rawConnection.deviceAddress.toString()},
       );
 
       final services = await rawConnection.services();
@@ -720,7 +720,7 @@ class Bluey {
           BlueyLogLevel.debug,
           'bluey.peer',
           'no control service — peer is not a bluey peer',
-          data: {'deviceId': rawConnection.deviceId.toString()},
+          data: {'deviceId': rawConnection.deviceAddress.toString()},
         );
         return null;
       }
@@ -754,7 +754,7 @@ class Bluey {
       final connectionId =
           rawConnection is BlueyConnection
               ? rawConnection.connectionId
-              : rawConnection.deviceId.toString();
+              : rawConnection.deviceAddress.toString();
 
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
@@ -767,7 +767,7 @@ class Bluey {
         logger: _logger,
         servicesChanges: rawConnection.servicesChanges,
         events: _eventBus,
-        deviceId: rawConnection.deviceId,
+        deviceAddress: rawConnection.deviceAddress,
       );
       lifecycleClient.start(allServices: services);
 
@@ -823,8 +823,7 @@ class Bluey {
   /// handled separately by the scanner pipeline.
   Device _mapDevice(platform.PlatformDevice platformDevice) {
     return Device(
-      id: deviceIdToUuid(platformDevice.id),
-      address: platformDevice.id,
+      address: DeviceAddress(platformDevice.id),
       name: platformDevice.name,
     );
   }

@@ -60,8 +60,7 @@ void main() {
 
       final bluey = await Bluey.create();
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: TestDeviceIds.device1,
+        address: DeviceAddress(TestDeviceIds.device1),
         name: 'Heart Rate Monitor',
       );
       final connection = await bluey.connect(device);
@@ -139,8 +138,7 @@ void main() {
 
       final bluey = await Bluey.create();
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: TestDeviceIds.device1,
+        address: DeviceAddress(TestDeviceIds.device1),
         name: 'Multi-Char Sensor',
       );
       final connection = await bluey.connect(device);
@@ -214,8 +212,7 @@ void main() {
 
       final bluey = await Bluey.create();
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: TestDeviceIds.device1,
+        address: DeviceAddress(TestDeviceIds.device1),
         name: 'Unread Sensor',
       );
       final connection = await bluey.connect(device);

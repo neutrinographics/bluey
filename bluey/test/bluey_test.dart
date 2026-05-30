@@ -389,27 +389,31 @@ void main() {
 
     group('connect', () {
       test('returns Connection object', () async {
-        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+        final device = Device(
+          address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+        );
 
         final connection = await bluey.connect(device);
 
         expect(connection, isA<Connection>());
-        expect(connection.deviceId, equals(device.id));
+        expect(connection.deviceAddress, equals(device.address));
       });
 
       test('connection emits state changes', () async {
-        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+        final device = Device(
+          address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+        );
 
         final states = <ConnectionState>[];
         final connection = await bluey.connect(device);
         final subscription = connection.stateChanges.listen(states.add);
 
         mockPlatform.emitConnectionState(
-          device.id.toString(),
+          device.address.value,
           platform.PlatformConnectionState.connecting,
         );
         mockPlatform.emitConnectionState(
-          device.id.toString(),
+          device.address.value,
           platform.PlatformConnectionState.connected,
         );
 
@@ -426,7 +430,9 @@ void main() {
 
     group('disconnect', () {
       test('disconnects from device via Connection', () async {
-        final device = Device(id: UUID('00000000-0000-0000-0000-aabbccddeeff'));
+        final device = Device(
+          address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+        );
 
         // Connect and get Connection object
         final connection = await bluey.connect(device);

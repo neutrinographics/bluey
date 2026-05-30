@@ -29,3 +29,5 @@ class FakeRemoteDescriptor extends Fake implements RemoteDescriptor {}
 class FakeHostedService extends Fake implements HostedService {}
 
 class FakeUUID extends Fake implements UUID {}
+
+class FakeClientAddress extends Fake implements ClientAddress {}

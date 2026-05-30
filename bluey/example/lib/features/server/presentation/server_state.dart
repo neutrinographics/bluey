@@ -6,11 +6,11 @@ class ServerScreenState {
   final AdvertisingState advertisingState;
   final List<Client> connectedClients;
 
-  /// IDs of currently-connected clients that have identified as Bluey
+  /// Addresses of currently-connected clients that have identified as Bluey
   /// peers (sent at least one lifecycle heartbeat). Cleared on
   /// disconnect; re-populated on reconnect-then-heartbeat. Used to
   /// render the BLUEY badge in the connected-clients list.
-  final Set<UUID> blueyPeerClientIds;
+  final Set<ClientAddress> blueyPeerClientAddresses;
 
   final List<ServerLogEntry> log;
   final int notificationCount;
@@ -21,7 +21,7 @@ class ServerScreenState {
     this.isSupported = true,
     this.advertisingState = AdvertisingState.idle,
     this.connectedClients = const [],
-    this.blueyPeerClientIds = const {},
+    this.blueyPeerClientAddresses = const <ClientAddress>{},
     this.log = const [],
     this.notificationCount = 0,
     this.serverId,
@@ -33,13 +33,14 @@ class ServerScreenState {
   bool get isAdvertising => advertisingState == AdvertisingState.advertising;
 
   /// Whether the given client has identified as a Bluey peer.
-  bool isBlueyPeer(Client client) => blueyPeerClientIds.contains(client.id);
+  bool isBlueyPeer(Client client) =>
+      blueyPeerClientAddresses.contains(client.address);
 
   ServerScreenState copyWith({
     bool? isSupported,
     AdvertisingState? advertisingState,
     List<Client>? connectedClients,
-    Set<UUID>? blueyPeerClientIds,
+    Set<ClientAddress>? blueyPeerClientAddresses,
     List<ServerLogEntry>? log,
     int? notificationCount,
     ServerId? serverId,
@@ -49,7 +50,7 @@ class ServerScreenState {
       isSupported: isSupported ?? this.isSupported,
       advertisingState: advertisingState ?? this.advertisingState,
       connectedClients: connectedClients ?? this.connectedClients,
-      blueyPeerClientIds: blueyPeerClientIds ?? this.blueyPeerClientIds,
+      blueyPeerClientAddresses: blueyPeerClientAddresses ?? this.blueyPeerClientAddresses,
       log: log ?? this.log,
       notificationCount: notificationCount ?? this.notificationCount,
       serverId: serverId ?? this.serverId,

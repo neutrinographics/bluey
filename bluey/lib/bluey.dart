@@ -17,6 +17,7 @@ export 'src/shared/gatt_timeouts.dart';
 // Discovery bounded context
 export 'src/discovery/scanner.dart';
 export 'src/discovery/device.dart';
+export 'src/discovery/device_address.dart';
 export 'src/discovery/advertisement.dart';
 export 'src/discovery/scan_result.dart';
 export 'src/discovery/scan_state.dart';

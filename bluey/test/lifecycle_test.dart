@@ -142,7 +142,7 @@ void main() {
           server.startAdvertising();
           async.elapse(Duration.zero);
 
-          final disconnections = <String>[];
+          final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
           fakePlatform.simulateCentralConnection(centralId: _clientId1);
@@ -161,7 +161,7 @@ void main() {
           // No further heartbeats — wait for timeout.
           async.elapse(const Duration(seconds: 5));
 
-          expect(disconnections, contains(_clientId1));
+          expect(disconnections, contains(const ClientAddress(_clientId1)));
           expect(server.connectedClients, isEmpty);
 
           server.dispose();
@@ -179,7 +179,7 @@ void main() {
         server.startAdvertising();
         async.elapse(Duration.zero);
 
-        final disconnections = <String>[];
+        final disconnections = <ClientAddress>[];
         server.disconnections.listen(disconnections.add);
 
         fakePlatform.simulateCentralConnection(centralId: _clientId1);
@@ -203,7 +203,7 @@ void main() {
 
         // Wait 2 more seconds (5 since last heartbeat) — should disconnect
         async.elapse(const Duration(seconds: 2));
-        expect(disconnections, contains(_clientId1));
+        expect(disconnections, contains(const ClientAddress(_clientId1)));
 
         server.dispose();
         bluey.dispose();
@@ -215,7 +215,7 @@ void main() {
       final server = bluey.server()!;
       await server.startAdvertising();
 
-      final disconnections = <String>[];
+      final disconnections = <ClientAddress>[];
       server.disconnections.listen(disconnections.add);
 
       fakePlatform.simulateCentralConnection(centralId: _clientId1);
@@ -230,7 +230,7 @@ void main() {
       );
       await Future.delayed(Duration.zero);
 
-      expect(disconnections, contains(_clientId1));
+      expect(disconnections, contains(const ClientAddress(_clientId1)));
       expect(server.connectedClients, isEmpty);
 
       await server.dispose();
@@ -246,7 +246,7 @@ void main() {
         server.startAdvertising();
         async.elapse(Duration.zero);
 
-        final disconnections = <String>[];
+        final disconnections = <ClientAddress>[];
         server.disconnections.listen(disconnections.add);
 
         // A non-Bluey central connects but never writes to the heartbeat
@@ -299,7 +299,7 @@ void main() {
         server.startAdvertising();
         async.elapse(Duration.zero);
 
-        final disconnections = <String>[];
+        final disconnections = <ClientAddress>[];
         server.disconnections.listen(disconnections.add);
 
         fakePlatform.simulateCentralConnection(centralId: _clientId1);
@@ -370,7 +370,7 @@ void main() {
         final server = bluey.server()!;
         await server.startAdvertising();
 
-        final disconnections = <String>[];
+        final disconnections = <ClientAddress>[];
         server.disconnections.listen(disconnections.add);
 
         // Simulate a central that was connected before the server restarted.
@@ -380,7 +380,10 @@ void main() {
         await Future.delayed(Duration.zero);
 
         // The server should still emit the disconnect event.
-        expect(disconnections, contains('stale-client-id'));
+        expect(
+          disconnections,
+          contains(const ClientAddress('stale-client-id')),
+        );
 
         await server.dispose();
         await bluey.dispose();

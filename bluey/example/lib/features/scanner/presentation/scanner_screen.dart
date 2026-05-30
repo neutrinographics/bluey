@@ -451,7 +451,7 @@ class _SectionHeader extends StatelessWidget {
                 (context) => [
                   _sortMenuItem(SortMode.signalStrength, 'Signal Strength'),
                   _sortMenuItem(SortMode.name, 'Name'),
-                  _sortMenuItem(SortMode.deviceId, 'Device ID'),
+                  _sortMenuItem(SortMode.deviceAddress, 'Address'),
                 ],
             child: Icon(Icons.sort, size: 16, color: _kTextMedium),
           ),
@@ -538,7 +538,7 @@ class _DeviceCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        result.device.id.toString(),
+                        result.device.address.value,
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w400,

@@ -674,7 +674,7 @@ void main() {
         final bluey = await Bluey.create();
 
         final scanner = bluey.scanner();
-        final deviceIds = <String>{};
+        final deviceIds = <DeviceAddress>{};
         final subscription = scanner.scan().listen((result) {
           deviceIds.add(result.device.address);
         });

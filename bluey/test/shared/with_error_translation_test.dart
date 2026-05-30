@@ -21,14 +21,14 @@ import '../fakes/test_helpers.dart';
 /// - No-lifecycle (lifecycleClient: null): translation runs, hooks
 ///   skipped entirely.
 void main() {
-  final testDeviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
+  const testAddress = 'AA:BB:CC:DD:EE:01';
 
   group('withErrorTranslation', () {
     test('returns body value on success', () async {
       final result = await withErrorTranslation<int>(
         () async => 42,
         operation: 'readCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, 42);
     });
@@ -44,7 +44,7 @@ void main() {
               );
             },
             operation: 'readCharacteristic',
-            deviceId: testDeviceId,
+            address: testAddress,
           ),
           throwsA(isA<GattTimeoutException>()),
         );
@@ -57,7 +57,7 @@ void main() {
       await withErrorTranslation<int>(
         () async => 1,
         operation: 'readCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
         lifecycleClient: spy,
       );
 
@@ -81,7 +81,7 @@ void main() {
             throw original;
           },
           operation: 'readCharacteristic',
-          deviceId: testDeviceId,
+          address: testAddress,
           lifecycleClient: spy,
         ),
         throwsA(isA<GattTimeoutException>()),

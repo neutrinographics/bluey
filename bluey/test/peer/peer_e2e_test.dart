@@ -102,8 +102,7 @@ void main() {
 
       final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: 'AA:BB:CC:DD:EE:01',
+        address: const DeviceAddress('AA:BB:CC:DD:EE:01'),
         name: 'Bluey Server',
       );
       final peerConn = await bluey.connectAsPeer(device);
@@ -140,8 +139,7 @@ void main() {
 
       final bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: 'AA:BB:CC:DD:EE:01',
+        address: const DeviceAddress('AA:BB:CC:DD:EE:01'),
         name: 'Generic Device',
       );
       final conn = await bluey.connect(device);

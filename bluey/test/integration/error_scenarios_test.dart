@@ -26,8 +26,7 @@ void main() {
         final bluey = await Bluey.create();
 
         final unknownDevice = Device(
-          id: UUID('00000000-0000-0000-0000-000000000001'),
-          address: 'FF:FF:FF:FF:FF:FF',
+          address: const DeviceAddress('FF:FF:FF:FF:FF:FF'),
           name: 'Unknown Device',
         );
 

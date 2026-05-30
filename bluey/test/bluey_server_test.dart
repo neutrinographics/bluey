@@ -951,8 +951,8 @@ void main() {
         await subscription.cancel();
 
         expect(centrals, hasLength(1));
-        // The ID is converted from platform string to UUID
-        expect(centrals.first.id, isA<UUID>());
+        // The address is the verbatim platform string wrapped in ClientAddress.
+        expect(centrals.first.address, isA<ClientAddress>());
         expect(centrals.first.mtu, equals(512));
       });
 
@@ -1002,7 +1002,10 @@ void main() {
         test('returns false before any connection', () {
           final server = bluey.server()!;
 
-          expect(server.isClientConnected('central-1'), isFalse);
+          expect(
+            server.isClientConnected(const ClientAddress('central-1')),
+            isFalse,
+          );
         });
 
         test('returns true once the central has connected', () async {
@@ -1014,7 +1017,10 @@ void main() {
           );
           await Future<void>.delayed(const Duration(milliseconds: 10));
 
-          expect(server.isClientConnected('central-1'), isTrue);
+          expect(
+            server.isClientConnected(const ClientAddress('central-1')),
+            isTrue,
+          );
         });
 
         test('returns true regardless of whether the central has identified '
@@ -1030,7 +1036,10 @@ void main() {
           // No heartbeat written, so the central has not been promoted
           // to a PeerClient — but it is still connected and the guard
           // must report it as such.
-          expect(server.isClientConnected('central-1'), isTrue);
+          expect(
+            server.isClientConnected(const ClientAddress('central-1')),
+            isTrue,
+          );
         });
 
         test('returns false after the central disconnects', () async {
@@ -1044,7 +1053,10 @@ void main() {
           mockPlatform.emitCentralDisconnected('central-1');
           await Future<void>.delayed(const Duration(milliseconds: 10));
 
-          expect(server.isClientConnected('central-1'), isFalse);
+          expect(
+            server.isClientConnected(const ClientAddress('central-1')),
+            isFalse,
+          );
         });
 
         test('does not match other connected centrals by address', () async {
@@ -1056,7 +1068,10 @@ void main() {
           );
           await Future<void>.delayed(const Duration(milliseconds: 10));
 
-          expect(server.isClientConnected('central-2'), isFalse);
+          expect(
+            server.isClientConnected(const ClientAddress('central-2')),
+            isFalse,
+          );
         });
       });
     });
@@ -1566,7 +1581,7 @@ void main() {
             );
             async.flushMicrotasks();
 
-            final disconnections = <String>[];
+            final disconnections = <ClientAddress>[];
             server.disconnections.listen(disconnections.add);
 
             // Prime: send a heartbeat from client-1 to start the liveness timer.
@@ -1615,7 +1630,10 @@ void main() {
 
             // 2s more → past the 10s window from the user write → should fire.
             async.elapse(const Duration(seconds: 2));
-            expect(disconnections, equals(['client-1']));
+            expect(
+              disconnections,
+              equals([const ClientAddress('client-1')]),
+            );
 
             server.dispose();
           });
@@ -1630,7 +1648,7 @@ void main() {
           final server =
               bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-          final disconnections = <String>[];
+          final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
           // 1. Track the client by simulating a heartbeat write arrival.
@@ -1685,7 +1703,7 @@ void main() {
           // 5. After response, the heartbeat clock restarts. 11s later,
           //    no further activity, client times out normally.
           async.elapse(const Duration(seconds: 11));
-          expect(disconnections, ['client-A']);
+          expect(disconnections, [const ClientAddress('client-A')]);
 
           server.dispose();
         });
@@ -1698,7 +1716,7 @@ void main() {
             final server =
                 bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-            final disconnections = <String>[];
+            final disconnections = <ClientAddress>[];
             server.disconnections.listen(disconnections.add);
 
             mockPlatform.emitWriteRequest(
@@ -1742,7 +1760,7 @@ void main() {
             async.flushMicrotasks();
 
             async.elapse(const Duration(seconds: 11));
-            expect(disconnections, ['client-A']);
+            expect(disconnections, [const ClientAddress('client-A')]);
 
             server.dispose();
           });
@@ -1754,7 +1772,7 @@ void main() {
           final server =
               bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-          final disconnections = <String>[];
+          final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
           mockPlatform.emitWriteRequest(
@@ -1796,7 +1814,7 @@ void main() {
 
           // 2s more — past the window from the last activity.
           async.elapse(const Duration(seconds: 2));
-          expect(disconnections, ['client-A']);
+          expect(disconnections, [const ClientAddress('client-A')]);
 
           server.dispose();
         });
@@ -1807,7 +1825,7 @@ void main() {
           final server =
               bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-          final disconnections = <String>[];
+          final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
           // Track + arrive a pending write-with-response.
@@ -1841,7 +1859,7 @@ void main() {
           // Platform disconnect mid-request.
           mockPlatform.emitCentralDisconnected('client-A');
           async.flushMicrotasks();
-          expect(disconnections, ['client-A']);
+          expect(disconnections, [const ClientAddress('client-A')]);
 
           // Late respond from the app — must be a no-op (no throw, no
           // double-fire of disconnections).
@@ -1870,8 +1888,8 @@ void main() {
 
           async.elapse(const Duration(seconds: 11));
           expect(disconnections, [
-            'client-A',
-            'client-A',
+            const ClientAddress('client-A'),
+            const ClientAddress('client-A'),
           ], reason: 'second timeout fires on the new entry');
 
           server.dispose();
@@ -1883,7 +1901,7 @@ void main() {
           final server =
               bluey.server(lifecycleInterval: const Duration(seconds: 10))!;
 
-          final disconnections = <String>[];
+          final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
           // Track + arrive a pending write-with-response.
@@ -1940,7 +1958,7 @@ void main() {
           async.elapse(const Duration(seconds: 11));
           expect(
             disconnections,
-            ['client-A'],
+            [const ClientAddress('client-A')],
             reason:
                 'pending must drain before platform call; otherwise '
                 'the timer would stay paused forever',
@@ -2070,7 +2088,11 @@ void main() {
             isA<ServerRespondFailedException>()
                 .having((e) => e.operation, 'operation', 'respondToRead')
                 .having((e) => e.status, 'status', 0x0A)
-                .having((e) => e.clientId, 'clientId', request.client.id)
+                .having(
+                  (e) => e.clientAddress,
+                  'clientAddress',
+                  request.client.address,
+                )
                 .having(
                   (e) => e.characteristicId,
                   'characteristicId',
@@ -2100,7 +2122,11 @@ void main() {
             isA<ServerRespondFailedException>()
                 .having((e) => e.operation, 'operation', 'respondToWrite')
                 .having((e) => e.status, 'status', 0x0A)
-                .having((e) => e.clientId, 'clientId', request.client.id)
+                .having(
+                  (e) => e.clientAddress,
+                  'clientAddress',
+                  request.client.address,
+                )
                 .having(
                   (e) => e.characteristicId,
                   'characteristicId',
@@ -2114,7 +2140,7 @@ void main() {
         final e = ServerRespondFailedException(
           operation: 'respondToRead',
           status: 0x0A,
-          clientId: UUID('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+          clientAddress: const ClientAddress('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
           characteristicId: UUID('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
         );
         expect(e, isA<BlueyException>());

@@ -593,7 +593,7 @@ class _DeviceInfoCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              device.id.toString(),
+              device.address.value,
               style: const TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12,

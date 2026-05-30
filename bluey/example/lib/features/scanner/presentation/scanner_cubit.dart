@@ -114,7 +114,7 @@ class ScannerCubit extends Cubit<ScannerState> {
       (result) {
         // Update existing result or add new one
         final index = results.indexWhere(
-          (r) => r.device.id == result.device.id,
+          (r) => r.device.address == result.device.address,
         );
         if (index >= 0) {
           results[index] = result;
@@ -202,9 +202,9 @@ class ScannerCubit extends Cubit<ScannerState> {
           if (bName == null) return -1;
           return aName.compareTo(bName);
         });
-      case SortMode.deviceId:
+      case SortMode.deviceAddress:
         sorted.sort(
-          (a, b) => a.device.id.toString().compareTo(b.device.id.toString()),
+          (a, b) => a.device.address.value.compareTo(b.device.address.value),
         );
     }
     return sorted;

@@ -249,7 +249,9 @@ void main() {
         cubit.initialize();
         eventsController.add(
           DeviceDiscoveredEvent(
-            deviceId: UUID('00000000-0000-0000-0000-000000000001'),
+            deviceAddress: const DeviceAddress(
+              '00000000-0000-0000-0000-000000000001',
+            ),
             name: 'Test Device',
             rssi: -70,
           ),

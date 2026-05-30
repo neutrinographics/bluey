@@ -47,8 +47,7 @@ void main() {
       'writeCharacteristic rewraps platform timeout into GattTimeoutException',
       () async {
         final device = Device(
-          id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-          address: TestDeviceIds.device1,
+          address: DeviceAddress(TestDeviceIds.device1),
           name: 'Timeout Test Device',
         );
         final conn = await bluey.connect(device);
@@ -70,8 +69,7 @@ void main() {
 
     test('thrown GattTimeoutException is also a BlueyException', () async {
       final device = Device(
-        id: UUID('00000000-0000-0000-0000-aabbccddee01'),
-        address: TestDeviceIds.device1,
+        address: DeviceAddress(TestDeviceIds.device1),
         name: 'Timeout Test Device',
       );
       final conn = await bluey.connect(device);

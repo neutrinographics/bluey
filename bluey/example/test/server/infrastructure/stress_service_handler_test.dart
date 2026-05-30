@@ -32,8 +32,8 @@ void main() {
     mockServer = MockServer();
     mockClient = MockClient();
     when(
-      () => mockClient.id,
-    ).thenReturn(UUID('00000000-0000-0000-0000-000000000001'));
+      () => mockClient.address,
+    ).thenReturn(const ClientAddress('00000000-0000-0000-0000-000000000001'));
     when(
       () => mockServer.respondToWrite(any(), status: any(named: 'status')),
     ).thenAnswer((_) async {});

@@ -44,7 +44,7 @@ class ScanResult {
 
   @override
   String toString() {
-    return 'ScanResult(device: ${device.id}, rssi: $rssi dBm, '
+    return 'ScanResult(device: ${device.address}, rssi: $rssi dBm, '
         'advertisement: $advertisement)';
   }
 }

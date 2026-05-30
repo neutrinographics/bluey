@@ -12,18 +12,18 @@ import 'package:flutter_test/flutter_test.dart';
 /// One test per platform exception type → expected domain type. Plus
 /// defensive-backstop tests that nothing leaks raw.
 void main() {
-  final testDeviceId = UUID('00000000-0000-0000-0000-aabbccddee01');
+  const testAddress = 'AA:BB:CC:DD:EE:01';
 
   group('translatePlatformException', () {
     test('passes BlueyException through unchanged (already-translated)', () {
       final original = ConnectionException(
-        testDeviceId,
+        DeviceAddress(testAddress),
         ConnectionFailureReason.timeout,
       );
       final result = translatePlatformException(
         original,
         operation: 'connect',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(identical(result, original), isTrue);
     });
@@ -32,23 +32,23 @@ void main() {
       final result = translatePlatformException(
         const platform.GattOperationTimeoutException('readCharacteristic'),
         operation: 'readCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<GattTimeoutException>());
     });
 
     test('GattOperationDisconnectedException → '
-        'DisconnectedException(deviceId, linkLoss)', () {
+        'DisconnectedException(address, linkLoss)', () {
       final result = translatePlatformException(
         const platform.GattOperationDisconnectedException(
           'writeCharacteristic',
         ),
         operation: 'writeCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<DisconnectedException>());
       final disconnected = result as DisconnectedException;
-      expect(disconnected.deviceId, testDeviceId);
+      expect(disconnected.address, testAddress);
       expect(disconnected.reason, DisconnectReason.linkLoss);
     });
 
@@ -70,7 +70,7 @@ void main() {
           0x03,
         ),
         operation: 'writeCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<GattOperationFailedException>());
       final failed = result as GattOperationFailedException;
@@ -85,7 +85,7 @@ void main() {
           code: 'gatt-handle-invalidated',
         ),
         operation: 'readCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<AttributeHandleInvalidatedException>());
     });
@@ -99,7 +99,7 @@ void main() {
           message: 'native-side message',
         ),
         operation: 'readCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<BlueyPlatformException>());
       final platformExc = result as BlueyPlatformException;
@@ -159,7 +159,7 @@ void main() {
           message: 'Bluetooth adapter is unavailable: remote object is dead',
         ),
         operation: 'writeCharacteristic',
-        deviceId: testDeviceId,
+        address: testAddress,
       );
       expect(result, isA<BluetoothUnavailableException>());
     });

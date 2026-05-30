@@ -12,10 +12,10 @@ import '../fakes/test_helpers.dart';
 /// delegation. Only stubs the methods the C.1 PeerConnection actually
 /// invokes; everything else throws [UnimplementedError].
 class _SpyConnection implements Connection {
-  _SpyConnection({UUID? deviceId, this.servicesResult = const []})
-    : _deviceId = deviceId ?? UUID.short(0xAAAA);
+  _SpyConnection({DeviceAddress? deviceAddress, this.servicesResult = const []})
+    : _deviceAddress = deviceAddress ?? const DeviceAddress('AA:AA:AA:AA:AA:AA');
 
-  final UUID _deviceId;
+  final DeviceAddress _deviceAddress;
   final List<RemoteService> servicesResult;
 
   /// Ordered list of method names invoked on this stub. The
@@ -31,7 +31,7 @@ class _SpyConnection implements Connection {
   final List<UUID> hasServiceArgs = [];
 
   @override
-  UUID get deviceId => _deviceId;
+  DeviceAddress get deviceAddress => _deviceAddress;
 
   @override
   Future<List<RemoteService>> services({bool cache = false}) async {
@@ -459,7 +459,7 @@ class _OrderingSpyConnection implements Connection {
 
   // Everything else is unused for the ordering test — throw if touched.
   @override
-  UUID get deviceId => throw UnimplementedError();
+  DeviceAddress get deviceAddress => throw UnimplementedError();
   @override
   ConnectionState get state => throw UnimplementedError();
   @override

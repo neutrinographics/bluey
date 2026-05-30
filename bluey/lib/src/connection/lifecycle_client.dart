@@ -10,8 +10,8 @@ import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
+import '../discovery/device_address.dart';
 import '../peer/server_id.dart';
-import '../shared/uuid.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -31,7 +31,7 @@ class LifecycleClient {
   final void Function() onServerUnreachable;
   final BlueyLogger _logger;
   final EventPublisher? _events;
-  final UUID? _deviceId;
+  final DeviceAddress? _deviceAddress;
 
   late final PeerSilenceMonitor _monitor;
   Timer? _probeTimer;
@@ -71,14 +71,14 @@ class LifecycleClient {
     required BlueyLogger logger,
     Stream<List<RemoteService>>? servicesChanges,
     EventPublisher? events,
-    UUID? deviceId,
+    DeviceAddress? deviceAddress,
   }) : _platform = platformApi,
        _connectionId = connectionId,
        _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
        _events = events,
-       _deviceId = deviceId {
+       _deviceAddress = deviceAddress {
     if (servicesChanges != null) {
       _servicesChangesSub = servicesChanges.listen(
         _refreshFromServices,
@@ -105,10 +105,10 @@ class LifecycleClient {
           'onServerUnreachable invoked',
           data: {'connectionId': _connectionId},
         );
-        if (_deviceId != null) {
+        if (_deviceAddress != null) {
           _events?.emit(
             PeerDeclaredUnreachableEvent(
-              deviceId: _deviceId,
+              deviceAddress: _deviceAddress,
               source: 'LifecycleClient',
             ),
           );
@@ -522,9 +522,9 @@ class LifecycleClient {
         'characteristicHandle': charHandle.value,
       },
     );
-    if (_deviceId != null) {
+    if (_deviceAddress != null) {
       _events?.emit(
-        HeartbeatSentEvent(deviceId: _deviceId, source: 'LifecycleClient'),
+        HeartbeatSentEvent(deviceAddress: _deviceAddress, source: 'LifecycleClient'),
       );
     }
     _monitor.markProbeInFlight();
@@ -545,10 +545,10 @@ class LifecycleClient {
             'heartbeat-response received',
             data: {'connectionId': _connectionId},
           );
-          if (_deviceId != null) {
+          if (_deviceAddress != null) {
             _events?.emit(
               HeartbeatAcknowledgedEvent(
-                deviceId: _deviceId,
+                deviceAddress: _deviceAddress,
                 source: 'LifecycleClient',
               ),
             );
@@ -575,10 +575,10 @@ class LifecycleClient {
               },
               errorCode: error.runtimeType.toString(),
             );
-            if (_deviceId != null) {
+            if (_deviceAddress != null) {
               _events?.emit(
                 HeartbeatFailedEvent(
-                  deviceId: _deviceId,
+                  deviceAddress: _deviceAddress,
                   isDeadPeerSignal: false,
                   reason: error.runtimeType.toString(),
                   source: 'LifecycleClient',
@@ -599,10 +599,10 @@ class LifecycleClient {
             },
             errorCode: error.runtimeType.toString(),
           );
-          if (_deviceId != null) {
+          if (_deviceAddress != null) {
             _events?.emit(
               HeartbeatFailedEvent(
-                deviceId: _deviceId,
+                deviceAddress: _deviceAddress,
                 isDeadPeerSignal: true,
                 reason: error.runtimeType.toString(),
                 source: 'LifecycleClient',
