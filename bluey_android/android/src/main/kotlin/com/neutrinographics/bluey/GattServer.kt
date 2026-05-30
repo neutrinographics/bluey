@@ -713,6 +713,11 @@ class GattServer(
      * preserves the negotiated MTU.
      */
     fun reannounceTrackedCentrals() {
+        BlueyLog.log(
+            LogLevelDto.INFO, GATT_SERVER_CONTEXT,
+            "reannounceTrackedCentrals",
+            data = mapOf("centralCount" to connectedCentrals.size),
+        )
         // Snapshot keys first: we only read here, but guard against concurrent
         // modification if a connection-state change races on another thread.
         for (deviceId in connectedCentrals.keys.toList()) {
