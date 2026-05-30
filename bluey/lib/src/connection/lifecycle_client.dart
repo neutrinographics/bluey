@@ -560,6 +560,28 @@ class LifecycleClient {
         })
         .catchError((Object error) {
           if (!_isRunning) return;
+          if (_isEvictionSignal(error)) {
+            _logger.log(
+              BlueyLogLevel.warn,
+              'bluey.connection.lifecycle',
+              'evicted by server (reserved status) — self-disconnecting',
+              data: {'connectionId': _connectionId},
+            );
+            if (_deviceAddress != null) {
+              _events?.emit(
+                HeartbeatFailedEvent(
+                  deviceAddress: _deviceAddress,
+                  isDeadPeerSignal: true,
+                  reason: 'evictedByServer',
+                  source: 'LifecycleClient',
+                ),
+              );
+            }
+            _monitor.cancelProbe();
+            stop();
+            onServerUnreachable();
+            return;
+          }
           if (!_isDeadPeerSignal(error)) {
             // Transient platform error — release in-flight, retry after a
             // full activityWindow (the monitor deadline has already elapsed
@@ -646,4 +668,14 @@ class LifecycleClient {
     if (error is platform.GattOperationStatusFailedException) return true;
     return false;
   }
+
+  /// Whether [error] is the server's reserved *eviction* status (our session
+  /// was removed). Distinct from a generic dead-peer signal: eviction is
+  /// definitive and immediate — we self-disconnect now rather than waiting
+  /// out the silence timer, so the app reconnects into a fresh session
+  /// (I338). Only the eviction byte qualifies; every other status failure
+  /// stays a dead-peer signal fed to the silence monitor.
+  bool _isEvictionSignal(Object error) =>
+      error is platform.GattOperationStatusFailedException &&
+      error.status == lifecycle.lifecycleEvictionAttStatus;
 }

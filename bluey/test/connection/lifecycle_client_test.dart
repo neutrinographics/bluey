@@ -2121,6 +2121,43 @@ void main() {
         client.stop();
       });
     });
+
+    test('reserved eviction status triggers onServerUnreachable immediately '
+        '(no silence-timer wait)', () {
+      fakeAsync((async) {
+        var unreachable = 0;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        // Long silence window: if the impl waited on it, the assertion below
+        // (with NO async.elapse) would fail — proving eviction is immediate.
+        _setUpConnectedClient(
+          onServerUnreachable: () => unreachable++,
+          peerSilenceTimeout: const Duration(seconds: 30),
+          intervalValue: const Duration(seconds: 10),
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        // Next heartbeat write throws the reserved eviction status (0x80).
+        fakePlatform.simulateWriteStatusFailed =
+            lifecycle.lifecycleEvictionAttStatus;
+
+        client.start(allServices: services); // first probe fires synchronously
+        async.flushMicrotasks(); // let the failed write's catchError run
+
+        expect(unreachable, 1,
+            reason: 'eviction is immediate on the first probe, '
+                'not silence-gated');
+        expect(client.isRunning, isFalse,
+            reason: 'stop() called before signalling');
+        // NOTE: no async.elapse(...) anywhere — that is the whole point.
+      });
+    });
   });
 }
 
