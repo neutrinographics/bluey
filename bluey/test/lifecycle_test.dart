@@ -510,13 +510,15 @@ void main() {
     });
   });
 
-  group('kLifecycleEvictionAttStatus', () {
+  group('lifecycleEvictionAttStatus', () {
     test('is the reserved ATT application-range status 0x80', () {
-      expect(kLifecycleEvictionAttStatus, 0x80);
-    });
-    test('is inside the ATT application range 0x80..0x9F', () {
-      expect(kLifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
-      expect(kLifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
+      // Pinned to exactly 0x80: the Android and iOS native respond paths and
+      // the client-side eviction detection all independently encode this byte
+      // and must agree on it; it must also stay within the ATT application
+      // range 0x80..0x9F (so an app cannot collide with it via standard errors).
+      expect(lifecycleEvictionAttStatus, 0x80);
+      expect(lifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
+      expect(lifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
     });
   });
 

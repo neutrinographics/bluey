@@ -95,7 +95,7 @@ const _markerCourtesyDisconnect = 0x00;
 /// through bluey's API — that exclusion is the collision-safety guard.
 /// If that enum is ever widened to allow application-range statuses, this
 /// value must remain reserved.
-const int kLifecycleEvictionAttStatus = 0x80;
+const int lifecycleEvictionAttStatus = 0x80;
 
 /// A message exchanged on the lifecycle control characteristic.
 ///
