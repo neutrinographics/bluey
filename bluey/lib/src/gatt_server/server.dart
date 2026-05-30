@@ -113,6 +113,13 @@ abstract class Server {
   /// same client. On disconnect the identification resets; a
   /// reconnect-then-heartbeat produces a fresh emission.
   ///
+  /// On inferring platforms (iOS), a paused peer whose session is evicted
+  /// by heartbeat-silence (see [disconnections]) does **not** silently
+  /// re-identify mid-stream when it resumes — its first post-eviction
+  /// request is rejected, forcing a real reconnect, and this stream only
+  /// re-emits *after* that fresh connect. (That mid-stream re-identification
+  /// was the I338 stream-framing corruption path; it is now closed.)
+  ///
   /// Consumers that only care about Bluey peers can subscribe here and
   /// ignore [connections]; raw / non-Bluey centrals are never emitted.
   Stream<PeerClient> get peerConnections;
@@ -128,9 +135,15 @@ abstract class Server {
   ///   lull (silence past the `lifecycleInterval` window) produces only a
   ///   [ClientLifecycleTimeoutEvent] advisory; no `disconnections` event is
   ///   emitted until the platform reports the link down.
-  /// - **iOS** (no native client-disconnect callback, I201): heartbeat silence
-  ///   past the timeout is still treated as a disconnect and drives this stream.
-  ///   The iOS clean-reconnect handling lands in a later stage (I338).
+  /// - **iOS** (`Capabilities.reportsCentralDisconnects == false`, no native
+  ///   client-disconnect callback, I201): heartbeat silence past the timeout is
+  ///   the only disconnect signal available, so it drives this stream — the
+  ///   client's session is *evicted* (removed from `connectedClients`,
+  ///   identification cleared). The link itself stays up, so the evicted peer's
+  ///   next request is rejected with a reserved ATT status and it self-
+  ///   disconnects (`DisconnectReason.evictedByServer`), reconnecting cleanly
+  ///   into a fresh, frame-aligned session rather than resuming mid-stream
+  ///   (I338).
   ///
   /// Real platform disconnects and client CourtesyDisconnects always emit on
   /// both platforms. The emitted value equals [Client.address] for the same
