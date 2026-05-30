@@ -668,6 +668,39 @@ class GattServer(
         }
     }
 
+    /**
+     * Announce [device] as connected exactly once, before any read/write
+     * request from it is forwarded to Dart. Mirrors iOS
+     * `trackCentralIfNeeded`. Idempotent: a central already in
+     * [connectedCentrals] is not re-announced.
+     *
+     * Establishes the announce-before-forward invariant the Dart
+     * session-gate relies on (I338 Stage 3). `onConnectionStateChange`
+     * remains the primary announce; this is the idempotent backstop for
+     * the binder-thread race where a read/write request can reach Dart
+     * before the STATE_CONNECTED post. Because the read/write handlers
+     * call this and then post the forward from the same binder
+     * invocation in order, the `onCentralConnected` and the forward
+     * arrive at the main looper — and thus Dart — in that order.
+     *
+     * The DTO / MTU / reply-callback shape is copied verbatim from the
+     * `isNew` branch of [onConnectionStateChange].
+     */
+    private fun announceCentralIfNeeded(device: BluetoothDevice) {
+        val deviceId = device.address
+        if (connectedCentrals.containsKey(deviceId)) return
+        connectedCentrals[deviceId] = device
+        centralMtus[deviceId] = DEFAULT_MTU
+        val central = CentralDto(
+            id = deviceId,
+            mtu = DEFAULT_MTU.toLong()
+        )
+        // Must dispatch to main thread for Flutter platform channel.
+        handler.post {
+            flutterApi.onCentralConnected(central) {}
+        }
+    }
+
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         init {
             BlueyLog.log(LogLevelDto.DEBUG, GATT_SERVER_CONTEXT, "BluetoothGattServerCallback created")
@@ -825,6 +858,14 @@ class GattServer(
                 offset = offset.toLong(),
                 characteristicHandle = charHandle,
             )
+            // I338 Stage 3: announce the central (once) BEFORE forwarding
+            // the request, so the Dart session-gate never evicts a live
+            // central that connected via a binder thread whose
+            // STATE_CONNECTED post hasn't yet reached the main looper.
+            // Both posts originate from this binder invocation in order
+            // (announce first, forward second), so they arrive at Dart in
+            // that order.
+            announceCentralIfNeeded(device)
             // Must dispatch to main thread for Flutter platform channel.
             handler.post {
                 flutterApi.onReadRequest(request) {}
@@ -877,6 +918,15 @@ class GattServer(
                     PendingWrite(device, requestId, offset, value)
                 )
             }
+
+            // I338 Stage 3: announce the central (once) BEFORE forwarding
+            // the request, so the Dart session-gate never evicts a live
+            // central that connected via a binder thread whose
+            // STATE_CONNECTED post hasn't yet reached the main looper.
+            // Both posts originate from this binder invocation in order
+            // (announce first, forward second), so they arrive at Dart in
+            // that order.
+            announceCentralIfNeeded(device)
 
             handler.post {
                 flutterApi.onWriteRequest(request) {}
