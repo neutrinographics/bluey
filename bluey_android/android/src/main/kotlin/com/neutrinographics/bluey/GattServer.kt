@@ -689,6 +689,9 @@ class GattServer(
     private fun announceCentralIfNeeded(device: BluetoothDevice) {
         val deviceId = device.address
         if (connectedCentrals.containsKey(deviceId)) return
+        // Mutate state synchronously on the binder thread (before the post)
+        // so a subsequent onConnectionStateChange for the same device sees
+        // isNew=false and skips the duplicate announce.
         connectedCentrals[deviceId] = device
         centralMtus[deviceId] = DEFAULT_MTU
         val central = CentralDto(
@@ -716,6 +719,7 @@ class GattServer(
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
+                    // false also when announceCentralIfNeeded already registered this central
                     val isNew = connectedCentrals[deviceId] == null
                     BlueyLog.log(
                         LogLevelDto.INFO, GATT_SERVER_CONTEXT,
