@@ -1625,6 +1625,12 @@ void main() {
             final disconnections = <ClientAddress>[];
             server.disconnections.listen(disconnections.add);
 
+            // Establish a real session (I338 Stage 2 eviction gate).
+            mockPlatform.emitCentralConnected(
+              const platform.PlatformCentral(id: 'client-1', mtu: 247),
+            );
+            async.flushMicrotasks();
+
             // Prime: send a heartbeat from client-1 to start the liveness timer.
             mockPlatform.emitWriteRequest(
               platform.PlatformWriteRequest(
@@ -1704,6 +1710,12 @@ void main() {
           final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
+          // 0. Establish a real session (I338 Stage 2 eviction gate).
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'client-A', mtu: 247),
+          );
+          async.flushMicrotasks();
+
           // 1. Track the client by simulating a heartbeat write arrival.
           mockPlatform.emitWriteRequest(
             platform.PlatformWriteRequest(
@@ -1772,6 +1784,12 @@ void main() {
             final disconnections = <ClientAddress>[];
             server.disconnections.listen(disconnections.add);
 
+            // Establish a real session (I338 Stage 2 eviction gate).
+            mockPlatform.emitCentralConnected(
+              const platform.PlatformCentral(id: 'client-A', mtu: 247),
+            );
+            async.flushMicrotasks();
+
             mockPlatform.emitWriteRequest(
               platform.PlatformWriteRequest(
                 requestId: 1,
@@ -1828,6 +1846,12 @@ void main() {
           final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
+          // Establish a real session (I338 Stage 2 eviction gate).
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'client-A', mtu: 247),
+          );
+          async.flushMicrotasks();
+
           mockPlatform.emitWriteRequest(
             platform.PlatformWriteRequest(
               requestId: 1,
@@ -1881,6 +1905,12 @@ void main() {
           final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
 
+          // Establish a real session (I338 Stage 2 eviction gate).
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'client-A', mtu: 247),
+          );
+          async.flushMicrotasks();
+
           // Track + arrive a pending write-with-response.
           mockPlatform.emitWriteRequest(
             platform.PlatformWriteRequest(
@@ -1924,8 +1954,13 @@ void main() {
           );
           async.flushMicrotasks();
 
-          // Re-track the same client. Heartbeat-timer must run on its
-          // own fresh entry, with no phantom pending state.
+          // Re-establish a real session, then re-track the same client.
+          // Heartbeat-timer must run on its own fresh entry, with no phantom
+          // pending state.
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'client-A', mtu: 247),
+          );
+          async.flushMicrotasks();
           mockPlatform.emitWriteRequest(
             platform.PlatformWriteRequest(
               requestId: 200,
@@ -1956,6 +1991,12 @@ void main() {
 
           final disconnections = <ClientAddress>[];
           server.disconnections.listen(disconnections.add);
+
+          // Establish a real session (I338 Stage 2 eviction gate).
+          mockPlatform.emitCentralConnected(
+            const platform.PlatformCentral(id: 'client-A', mtu: 247),
+          );
+          async.flushMicrotasks();
 
           // Track + arrive a pending write-with-response.
           mockPlatform.emitWriteRequest(

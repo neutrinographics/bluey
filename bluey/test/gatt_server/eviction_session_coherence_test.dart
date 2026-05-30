@@ -186,4 +186,57 @@ void main() {
       bluey.dispose();
     });
   });
+
+  test(
+    'I338 contract: inferring server — silence-then-resume is rejected, '
+    'forcing reconnect (cannot continue mid-stream)',
+    () async {
+      final fake = FakeBlueyPlatform(reportsCentralDisconnects: false);
+      BlueyPlatform.instance = fake;
+      final bluey = await Bluey.create();
+      fakeAsync((async) {
+        final server = bluey.server(lifecycleInterval: _interval)!;
+        server.startAdvertising(name: 't');
+        async.flushMicrotasks();
+
+        final forwarded = <WriteRequest>[];
+        server.writeRequests.listen(forwarded.add);
+
+        // 1. Real connect → established session.
+        fake.simulateCentralConnection(centralId: _mac);
+        async.flushMicrotasks();
+
+        // 2. Heartbeat silence removes the domain session (Stage 1 inferring
+        //    path).
+        fake.fireLifecycleSilence(_mac);
+        async.flushMicrotasks();
+        async.elapse(_interval);
+        expect(server.isClientConnected(const ClientAddress(_mac)), isFalse);
+
+        // 3. Peer "resumes" mid-stream with an app write → MUST be rejected,
+        //    not forwarded.
+        fake
+            .simulateWriteRequest(
+              centralId: _mac,
+              characteristicUuid: _someCharUuid,
+              value: Uint8List.fromList([0xAA, 0xBB]),
+            )
+            .catchError((_) {});
+        async.flushMicrotasks();
+
+        expect(
+          forwarded,
+          isEmpty,
+          reason: 'resumed write from a removed session must not reach the app',
+        );
+        expect(
+          fake.respondWriteCalls.last.status,
+          PlatformGattStatus.lifecycleEviction,
+        );
+
+        server.dispose();
+        bluey.dispose();
+      });
+    },
+  );
 }
