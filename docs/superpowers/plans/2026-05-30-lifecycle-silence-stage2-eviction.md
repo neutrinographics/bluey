@@ -4,7 +4,7 @@
 
 **Goal:** Fix the **iOS half** of I338 — when the GATT-server's heartbeat-silence timeout removes a client's session, a paused-then-resumed peer must be forced through a *clean reconnect* (rejected with a reserved ATT status that the client translates into a self-disconnect) instead of resuming mid-stream and corrupting frame reassembly.
 
-**Architecture:** Build on Stage 1's capability-gated split (Android silence advisory, iOS silence removes the session). Stage 2 adds the **eviction handshake**: the server services read/write requests *only within an established session*; a request from a session-less client is answered with a reserved ATT application-range status (`0x80`, `kLifecycleEvictionAttStatus`) and **not** dispatched. The client's error-translation layer maps that status → `BlueyConnection` self-disconnect → `DisconnectedException(evictedByServer)` → the app's existing reconnect logic runs. Stage 3 makes the "established session precedes its first serviced request" guarantee *precise* via a native **announce-before-forward** invariant (iOS already holds it per Phase 0; Android's write/read handlers are fixed to mirror it) plus **reset-announced-state on server (re)init**.
+**Architecture:** Build on Stage 1's capability-gated split (Android silence advisory, iOS silence removes the session). Stage 2 adds the **eviction handshake**: the server services read/write requests *only within an established session*; a request from a session-less client is answered with a reserved ATT application-range status (`0x80`, `lifecycleEvictionAttStatus`) and **not** dispatched. The client's error-translation layer maps that status → `BlueyConnection` self-disconnect → `DisconnectedException(evictedByServer)` → the app's existing reconnect logic runs. Stage 3 makes the "established session precedes its first serviced request" guarantee *precise* via a native **announce-before-forward** invariant (iOS already holds it per Phase 0; Android's write/read handlers are fixed to mirror it) plus **reset-announced-state on server (re)init**.
 
 **Tech Stack:** Dart/Flutter (`bluey`, `bluey_platform_interface`), Pigeon, Kotlin (`bluey_android`), Swift (`bluey_ios`), `flutter_test`.
 
@@ -33,12 +33,43 @@ Do **not** push or open a PR at any point unless explicitly asked (user pushes).
 
 | Symbol | Where it lives | Value / type |
 |--------|----------------|--------------|
-| `kLifecycleEvictionAttStatus` | `bluey/lib/src/lifecycle.dart` (next to the other reserved lifecycle constants) | `const int kLifecycleEvictionAttStatus = 0x80;` |
+| `lifecycleEvictionAttStatus` | `bluey/lib/src/lifecycle.dart` (next to the other reserved lifecycle constants) | `const int lifecycleEvictionAttStatus = 0x80;` |
 | `PlatformGattStatus.lifecycleEviction` | `bluey_platform_interface/lib/src/platform_interface.dart` | new enum case (last) |
 | `GattStatusDto.lifecycleEviction` | `bluey_{android,ios}/pigeons/messages.dart` (+ regenerated `messages.g.*`) | new enum case (last) |
 | `DisconnectReason.evictedByServer` | `bluey/lib/src/shared/exceptions.dart` | new enum case (last) |
 
 **Invariant guard (do NOT break):** the *public* domain enum `GattResponseStatus` in `bluey/lib/src/gatt_server/gatt_request.dart` stays `0x01–0x0F` only. The reserved eviction status is **never** added there — that absence is the collision-safety guard (an app cannot emit an application-range code through bluey's public API). The server emits the reserved status by calling `_platform.respondTo{Read,Write}Request(..., PlatformGattStatus.lifecycleEviction, ...)` **directly**, bypassing `_mapGattResponseStatusToPlatform`.
+
+---
+
+## Testing conventions (apply to EVERY task — non-negotiable)
+
+These mirror the existing suite (`bluey/test/gatt_server/lifecycle_silence_test.dart` is the reference). The test **skeletons below are illustrative** — match these conventions over the skeleton wherever they differ:
+
+1. **Simulate time — never wait it out.** Any test touching a timer (lifecycle interval, silence timeout, heartbeat probe, `peerSilenceTimeout`) MUST use `fakeAsync((async) { ... })` and advance with `async.elapse(Duration(...))`. Flush pending microtasks with `async.flushMicrotasks()`. **Do not** use `await Future.delayed(Duration(...))` with a non-zero duration anywhere.
+
+2. **Fake injection API.** Construct via `BlueyPlatform.instance = fake; final bluey = await Bluey.create();` (NOT `Bluey.create(platform: fake)` — that named param does not exist). `await Bluey.create()` runs *before* the `fakeAsync` block; everything after (server creation, advertising, simulated requests, timer firing, `server.dispose(); bluey.dispose();`) runs *inside* `fakeAsync` using `async.flushMicrotasks()`.
+
+3. **Short interval constant.** Use a short `lifecycleInterval` (e.g. `const _silenceInterval = Duration(seconds: 5);`) passed to `bluey.server(lifecycleInterval: _silenceInterval)` so `async.elapse(_silenceInterval)` fires the silence timer deterministically.
+
+4. **Firing silence.** `fake.simulateCentralConnection(centralId: mac)` establishes a session; `fake.fireLifecycleSilence(mac)` arms the silence timer; `async.elapse(_silenceInterval)` fires it. (Reference file lines 44–55.)
+
+5. **Rejected futures.** A simulated request the server rejects completes its future with an error — attach `.catchError((_) {})` (reads: `.catchError((_) => Uint8List(0))`) then `async.flushMicrotasks()`; never leave it unhandled.
+
+Canonical shape:
+```dart
+final fake = FakeBlueyPlatform(reportsCentralDisconnects: false);
+BlueyPlatform.instance = fake;
+final bluey = await Bluey.create();
+fakeAsync((async) {
+  final server = bluey.server(lifecycleInterval: _silenceInterval)!;
+  server.startAdvertising(name: 't');
+  async.flushMicrotasks();
+  // ... simulate, elapse, assert ...
+  server.dispose();
+  bluey.dispose();
+});
+```
 
 ---
 
@@ -48,7 +79,7 @@ Do **not** push or open a PR at any point unless explicitly asked (user pushes).
 
 **Files:**
 - Modify: `bluey_platform_interface/lib/src/platform_interface.dart` (the `PlatformGattStatus` enum, ~line 790–800)
-- Modify: `bluey/lib/src/lifecycle.dart` (add `kLifecycleEvictionAttStatus` next to the marker constants, ~line 85)
+- Modify: `bluey/lib/src/lifecycle.dart` (add `lifecycleEvictionAttStatus` next to the marker constants, ~line 85)
 - Test: `bluey_platform_interface/test/platform_gatt_status_test.dart` (create) and `bluey/test/lifecycle_test.dart` (append, or create if absent)
 
 - [ ] **Step 1: Write the failing test** for the constant. Append to / create `bluey/test/lifecycle_test.dart`:
@@ -58,19 +89,19 @@ import 'package:bluey/src/lifecycle.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('kLifecycleEvictionAttStatus', () {
+  group('lifecycleEvictionAttStatus', () {
     test('is the reserved ATT application-range status 0x80', () {
-      expect(kLifecycleEvictionAttStatus, 0x80);
+      expect(lifecycleEvictionAttStatus, 0x80);
     });
     test('is inside the ATT application range 0x80..0x9F', () {
-      expect(kLifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
-      expect(kLifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
+      expect(lifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
+      expect(lifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
     });
   });
 }
 ```
 
-- [ ] **Step 2: Run, confirm FAIL** (`kLifecycleEvictionAttStatus` undefined):
+- [ ] **Step 2: Run, confirm FAIL** (`lifecycleEvictionAttStatus` undefined):
 
 ```bash
 cd bluey && flutter test test/lifecycle_test.dart
@@ -91,7 +122,7 @@ Expected: compile error / FAIL.
 /// through bluey's API — that exclusion is the collision-safety guard.
 /// If that enum is ever widened to allow application-range statuses, this
 /// value must remain reserved.
-const int kLifecycleEvictionAttStatus = 0x80;
+const int lifecycleEvictionAttStatus = 0x80;
 ```
 
 - [ ] **Step 4: Run, confirm PASS:**
@@ -135,7 +166,7 @@ enum PlatformGattStatus {
   requestNotSupported,
 
   /// Reserved eviction status (ATT application range, see
-  /// `kLifecycleEvictionAttStatus`). Emitted by the GATT server to reject a
+  /// `lifecycleEvictionAttStatus`). Emitted by the GATT server to reject a
   /// request from a client with no established session; the client
   /// translates it into a self-disconnect (I338). Not part of the public
   /// `GattResponseStatus` surface — an app cannot select it.
@@ -206,7 +237,7 @@ enum GattStatusDto {
   requestNotSupported,
 
   /// Reserved eviction status (ATT application range 0x80; see
-  /// `kLifecycleEvictionAttStatus`). Server-internal — rejects a
+  /// `lifecycleEvictionAttStatus`). Server-internal — rejects a
   /// session-less client's request (I338).
   lifecycleEviction,
 }
@@ -231,13 +262,13 @@ Add the identical case to `bluey_ios/lib/src/ios_server.dart` `_mapGattStatusToD
 
 In `bluey_android/.../PendingRequestRegistry.kt` `toAndroidStatus()` (~line 67–76), add:
 ```kotlin
-    GattStatusDto.LIFECYCLE_EVICTION -> 0x80  // kLifecycleEvictionAttStatus — ATT application range
+    GattStatusDto.LIFECYCLE_EVICTION -> 0x80  // lifecycleEvictionAttStatus — ATT application range
 ```
 
 In `bluey_ios/ios/Classes/Messages.x.swift` `toCBATTError()` (~line 117–138), add:
 ```swift
         case .lifecycleEviction:
-            // kLifecycleEvictionAttStatus (0x80). CBATTError.Code is open;
+            // lifecycleEvictionAttStatus (0x80). CBATTError.Code is open;
             // an application-range raw value is delivered verbatim to the central.
             return CBATTError.Code(rawValue: 0x80) ?? .unlikelyError
 ```
@@ -274,7 +305,7 @@ git commit -m "feat(platform): carry lifecycleEviction status through Pigeon to 
 - [ ] **Step 1: Write the failing test.** Append to `bluey/test/shared/error_translation_test.dart`:
 
 ```dart
-import 'package:bluey/src/lifecycle.dart' show kLifecycleEvictionAttStatus;
+import 'package:bluey/src/lifecycle.dart' show lifecycleEvictionAttStatus;
 import 'package:bluey/src/shared/error_translation.dart';
 import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart' as platform;
@@ -284,7 +315,7 @@ void main() {
   group('eviction-status translation', () {
     test('reserved eviction status becomes DisconnectedException(evictedByServer)', () {
       final translated = translatePlatformException(
-        platform.GattOperationStatusFailedException('write', kLifecycleEvictionAttStatus),
+        platform.GattOperationStatusFailedException('write', lifecycleEvictionAttStatus),
         operation: 'write',
         address: 'AA:BB:CC:DD:EE:FF',
       );
@@ -326,12 +357,12 @@ enum DisconnectReason {
 - [ ] **Step 4: Implement the translation branch.** In `bluey/lib/src/shared/error_translation.dart`, add an import and reorder the `GattOperationStatusFailedException` handling so the reserved status is caught first:
 
 ```dart
-import '../lifecycle.dart' show kLifecycleEvictionAttStatus;
+import '../lifecycle.dart' show lifecycleEvictionAttStatus;
 ```
 Replace the existing branch (~line 43–44):
 ```dart
   if (error is platform.GattOperationStatusFailedException) {
-    if (error.status == kLifecycleEvictionAttStatus) {
+    if (error.status == lifecycleEvictionAttStatus) {
       // Server evicted us: our session is gone (heartbeat-silence timeout on
       // an inferring server). Surface as a connection-fatal disconnect so the
       // app reconnects via existing logic (I338). The connection layer drives
@@ -365,30 +396,48 @@ The heartbeat write is the most frequent client→server request, so after evict
 - Modify: `bluey/lib/src/connection/lifecycle_client.dart` (`_sendProbe` catchError ~line 561; add `_isEvictionSignal` near `_isDeadPeerSignal` ~line 643)
 - Test: `bluey/test/connection/lifecycle_client_test.dart` (append; match the file's existing fake/harness for driving a failing heartbeat write)
 
-- [ ] **Step 1: Write the failing test.** Append a case that drives a heartbeat write to fail with `GattOperationStatusFailedException('Write', kLifecycleEvictionAttStatus)` and asserts `onServerUnreachable` fires **immediately** (within one probe, without waiting out `peerSilenceTimeout`). Use the file's existing pattern for constructing a `LifecycleClient` over a fake platform whose `writeCharacteristic` throws. Skeleton:
+- [ ] **Step 1: Write the failing test.** Append a case that drives a heartbeat write to fail with `GattOperationStatusFailedException('Write', lifecycleEvictionAttStatus)` and asserts `onServerUnreachable` fires **immediately** — on the *first* probe, with **no** elapsed virtual time (proving it is not gated on `peerSilenceTimeout`).
+
+**Use `fakeAsync` — do NOT use real `Future.delayed` durations.** This is a hard project rule: timer-driven behaviour is tested by simulating time (`fakeAsync((async){ ... async.flushMicrotasks(); async.elapse(...); })`), never by waiting out a wall-clock delay. Reuse the file's existing `_setUpConnectedClient(...)` helper and its fake write-failure injection. The load-bearing assertion is that `onServerUnreachable` fires after the *first* failed probe **without** any `async.elapse` of the silence window. Skeleton (mirror the existing `'keeps re-sending probes after a transient write failure'` test's structure for setup):
 
 ```dart
-test('reserved eviction status triggers onServerUnreachable immediately', () async {
-  var unreachable = 0;
-  // Construct fake platform so writeCharacteristic throws
-  //   platform.GattOperationStatusFailedException('Write', kLifecycleEvictionAttStatus)
-  final client = LifecycleClient(
-    platformApi: fake,
-    connectionId: 'conn-1',
-    localIdentity: ServerId.generate(),
-    peerSilenceTimeout: const Duration(seconds: 30), // long — proves we don't wait it out
-    onServerUnreachable: () => unreachable++,
-    logger: BlueyLogger.silent(), // match the file's logger helper
-  );
-  client.start(allServices: servicesWithHeartbeatChar); // file's helper
+test('reserved eviction status triggers onServerUnreachable immediately', () {
+  fakeAsync((async) {
+    var unreachable = 0;
+    late LifecycleClient client;
+    late List<RemoteService> services;
+    late FakeBlueyPlatform fakePlatform;
 
-  // Let the first probe fire and fail.
-  await Future<void>.delayed(const Duration(milliseconds: 50)); // or pump per file convention
-  expect(unreachable, 1, reason: 'eviction is immediate, not silence-timer gated');
-  expect(client.isRunning, isFalse, reason: 'stop() called before signalling');
+    _setUpConnectedClient(
+      onServerUnreachable: () => unreachable++,
+      // long silence window — if the impl waited on it, the assertion below
+      // (no elapse) would fail, proving eviction is immediate.
+      peerSilenceTimeout: const Duration(seconds: 30),
+    ).then((setup) {
+      client = setup.client;
+      services = setup.services;
+      fakePlatform = setup.fakePlatform;
+    });
+    async.flushMicrotasks();
+
+    // Next heartbeat write throws the reserved eviction status (typed).
+    // (Task 2.6 adds this injector if the fake lacks a typed-error hook;
+    // do NOT reuse the generic `simulateWriteFailure` — it throws a plain
+    // Exception, which is a transient signal, not the eviction status.)
+    fakePlatform.writeCharacteristicError =
+        platform.GattOperationStatusFailedException('Write', lifecycleEvictionAttStatus);
+
+    client.start(allServices: services); // first probe fires synchronously
+    async.flushMicrotasks();             // let the failed write's catchError run
+
+    expect(unreachable, 1,
+        reason: 'eviction is immediate on the first probe, not silence-timer gated');
+    expect(client.isRunning, isFalse, reason: 'stop() called before signalling');
+    // No async.elapse(...) anywhere — that is the point of the test.
+  });
 });
 ```
-> Adapt logger/fake construction to whatever `lifecycle_client_test.dart` already uses (e.g. `fakeAsync` + `elapse`, or a real delay). The load-bearing assertion is: `onServerUnreachable` fires after a *single* failed probe, not after `peerSilenceTimeout`.
+> Match `_setUpConnectedClient`'s actual parameter names (it may be `intervalValue:` for the server interval; add/forward a `peerSilenceTimeout:` if needed, or assert via "no elapse" alone). The non-negotiable property: `onServerUnreachable` fires from a *single* failed probe with **zero** simulated silence-window elapse.
 
 - [ ] **Step 2: Run, confirm FAIL** (today a reserved status is just a `_isDeadPeerSignal`, so it waits for the silence timer):
 ```bash
@@ -407,11 +456,11 @@ Add the predicate next to `_isDeadPeerSignal` (~line 648):
   /// stays a dead-peer signal fed to the silence monitor.
   bool _isEvictionSignal(Object error) =>
       error is platform.GattOperationStatusFailedException &&
-      error.status == kLifecycleEvictionAttStatus;
+      error.status == lifecycleEvictionAttStatus;
 ```
 Add the import at the top of the file (if not already importing it):
 ```dart
-import '../lifecycle.dart' show kLifecycleEvictionAttStatus;
+import '../lifecycle.dart' show lifecycleEvictionAttStatus;
 ```
 In `_sendProbe`'s `catchError` (the first lines of the callback, ~line 561, before the `_isDeadPeerSignal` check), add:
 ```dart
@@ -710,7 +759,7 @@ Most hooks exist from Stage 1 / the Phase 0 inventory (`simulateCentralConnectio
 
 - [ ] **Step 1:** Verify `respondToReadRequest` / `respondToWriteRequest` record the `PlatformGattStatus` into `respondReadCalls` / `respondWriteCalls` (Phase 0 confirmed they do). If a recorded element doesn't expose `.status`, add it. No change if already present.
 
-- [ ] **Step 2:** Ensure a client-side heartbeat/write failure can be injected for the Task 2.4 `lifecycle_client_test` harness — i.e. a way to make `writeCharacteristic(connectionId, handle, value, withResponse)` throw `platform.GattOperationStatusFailedException('Write', kLifecycleEvictionAttStatus)`. If the fake already has a per-op failure injector (Phase 0 noted `respondToReadFailure` one-shot and `simulateWriteDisconnected`), add an analogous one-shot:
+- [ ] **Step 2:** Ensure a client-side heartbeat/write failure can be injected for the Task 2.4 `lifecycle_client_test` harness — i.e. a way to make `writeCharacteristic(connectionId, handle, value, withResponse)` throw `platform.GattOperationStatusFailedException('Write', lifecycleEvictionAttStatus)`. If the fake already has a per-op failure injector (Phase 0 noted `respondToReadFailure` one-shot and `simulateWriteDisconnected`), add an analogous one-shot:
 
 ```dart
   /// One-shot: the next `writeCharacteristic` throws this error, then clears.
@@ -990,6 +1039,6 @@ This confirms the design's empirical residual from Phase 0: that an iOS central 
 
 **Placeholder scan:** native Kotlin/Swift steps reference exact Phase-0 file:line sites and mirror the documented iOS pattern; the two parametric areas (the file's existing test-double/fakeAsync conventions in `lifecycle_client_test.dart` and the per-package server-test mocking) are explicitly flagged to match the existing file, not left as "TODO."
 
-**Type consistency:** `kLifecycleEvictionAttStatus` (int 0x80), `PlatformGattStatus.lifecycleEviction`, `GattStatusDto.lifecycleEviction` / `GattStatusDto.LIFECYCLE_EVICTION` (Kotlin), `DisconnectReason.evictedByServer`, `_hasEstablishedSession(ClientAddress)`, `resetServerSessions()`, `announceCentralIfNeeded(BluetoothDevice)` used consistently across tasks. `respondToWriteRequest(int, PlatformGattStatus)` and `respondToReadRequest(int, PlatformGattStatus, Uint8List?)` signatures match the Phase-0 platform-interface map.
+**Type consistency:** `lifecycleEvictionAttStatus` (int 0x80), `PlatformGattStatus.lifecycleEviction`, `GattStatusDto.lifecycleEviction` / `GattStatusDto.LIFECYCLE_EVICTION` (Kotlin), `DisconnectReason.evictedByServer`, `_hasEstablishedSession(ClientAddress)`, `resetServerSessions()`, `announceCentralIfNeeded(BluetoothDevice)` used consistently across tasks. `respondToWriteRequest(int, PlatformGattStatus)` and `respondToReadRequest(int, PlatformGattStatus, Uint8List?)` signatures match the Phase-0 platform-interface map.
 
 **Ordering safety:** the Stage 2 gate (Task 2.5) is uniform, but it only ever evicts a *live* central during the Android connect-race window — closed by Task 3.1 (announce-before-forward). Execute Stage 3 in the same branch before the dogfood; on Android the gate + advisory-silence (Stage 1) mean a live central always retains its session once ordering is enforced.
