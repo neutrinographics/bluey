@@ -26,10 +26,20 @@ bluey/example/                 Demo app with scanner, connection, GATT, server f
 ## Build & Test Commands
 
 ```bash
-# Run all tests in a package
+# Run the Dart tests in a package (all four have Dart suites)
 cd bluey && flutter test
 cd bluey_platform_interface && flutter test
 cd bluey_android && flutter test
+cd bluey_ios && flutter test
+
+# Run the Android native (Kotlin/JVM) unit tests — standalone Gradle.
+# Needs the Flutter SDK path: set FLUTTER_ROOT or bluey_android/android/local.properties (flutter.sdk=...).
+cd bluey_android/android && FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")" ./gradlew test
+
+# Run the iOS native (XCTest) unit tests — RunnerTests target via xcodebuild (macOS + Xcode + CocoaPods).
+cd bluey_ios/example && flutter build ios --config-only && (cd ios && pod install)
+cd bluey_ios/example/ios && xcodebuild test -workspace Runner.xcworkspace -scheme Runner \
+  -destination 'platform=iOS Simulator,name=iPhone 16'   # substitute an available sim: xcrun simctl list devices
 
 # Run a single test file
 cd bluey && flutter test test/uuid_test.dart
