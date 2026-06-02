@@ -5,7 +5,7 @@ category: bug
 severity: high
 platform: ios
 status: open
-last_verified: 2026-06-01
+last_verified: 2026-06-02
 related: [I050, I338]
 ---
 
@@ -82,6 +82,73 @@ burst. A 10–12 s hang is on the high side of normal but absolutely a
 real condition — the dogfood hang here was caused by the iOS remote
 keyboard XPC reconnect after the QR-scan flow, which is observable
 behavior on any user device.
+
+### Update 2026-06-02: the desync is PERMANENT, not transient
+
+Second dogfood run (post-I338 Pattern B, `bluey` HEAD `a8a807d`) with
+the same scenario (iOS keyboard XPC reconnect → 16.07 s `Hang detected`)
+reproduces the corruption and reveals a worse property: **the
+misalignment never self-heals.** Confirmed by the consumer: 10+ minutes
+after the burst, iOS's frames remain unparseable on Android with the
+identical `}]}GS` tail signature; Android-as-server receives nothing
+useful from this iOS client until something forces a fresh GATT session
+(disconnect/reconnect, app restart, BT adapter cycle). The frame
+decoder's scan-forward recovery does fire on each corrupt frame and
+"succeeds" in the sense that it lands on a subsequent magic — but every
+*next* frame iOS produces inherits the same defect, so the recovery
+never finds a sustained good-stream-tail to lock back on.
+
+What this means in practice:
+
+- A single `Hang detected` event past ~10 s permanently dead-ends the
+  iOS-as-central → Android-as-peripheral data path for that GATT
+  session. The bidirectional behavior degrades to one-way (Android →
+  iOS still works, because the inverse path uses `notify(...)` plus
+  `peripheralManagerIsReadyToUpdateSubscribers:` flow control — already
+  correct, see I040).
+- Application-layer observable: in `gossip_chat`, typing indicators and
+  messages typed on Android land on iOS; typing indicators and messages
+  typed on iOS never reach Android. Users perceive this as a one-way
+  connection that "won't go away" — no error UI, just silent
+  unidirectional drop.
+- Severity of consumer impact is closer to a **persistent connection
+  fault** than a "burst-corruption" event. Without a forced
+  disconnect/reconnect (which the Pattern B I338 fix now correctly
+  *avoids*, by design — heartbeat silence is no longer a disconnect),
+  the GATT link stays up indefinitely, broken.
+
+### Why the desync persists (mechanism sketch)
+
+The corruption tail is consistently the first 2 bytes of the next
+frame's magic prefix (`G`, `S` = `0x47 0x53`). The decoder reads
+`length = N` from the prefix, reads N bytes, and the JSON parser finds
+`}]}` (valid JSON tail) followed by `GS` (junk). The most parsimonious
+read of this is: the wire bytes for frame F1 are interleaved or
+reordered with the bytes for F2 such that F1's apparent payload
+contains F2's magic head. Two candidate root causes:
+
+1. **CoreBluetooth's `WriteWithoutResponse` queue, under burst, will
+   coalesce or partially-deliver writes.** This is documented Apple
+   behavior for the case where `canSendWriteWithoutResponse == false`
+   and the caller pushes anyway: writes "may be silently dropped or
+   coalesced." Coalescing two adjacent `writeValue` payloads with no
+   delimiter, where the payloads each begin with a `GSP1` magic, would
+   produce exactly this byte pattern on the wire from Android's GATT
+   server's perspective.
+2. **CoreBluetooth's internal write-queue state remains permanently
+   degraded** after a saturation event until the peripheral connection
+   is torn down. Other reports of similar `writeValue
+   .withoutResponse` foot-guns on iOS describe "the queue is poisoned
+   until reconnect." A flow-control gate via
+   `canSendWriteWithoutResponse` +
+   `peripheralIsReady(toSendWriteWithoutResponse:)` is exactly the
+   prophylaxis Apple's API provides to keep the queue from entering
+   this state.
+
+Either way, the fix surface is the same: implement the
+`canSendWriteWithoutResponse` gate + `peripheralIsReady` drain. If the
+queue can be kept from saturating in the first place, neither root
+cause has the chance to fire.
 
 ## Root cause
 
@@ -295,6 +362,14 @@ later for advanced consumers that want to do their own throttling.
   corruption and "recovers" — meaning the wire-level loss is invisible
   unless you happen to be looking for `frame decoder recovered from
   corruption` warnings.
+- **Permanent for the GATT session.** Per the 2026-06-02 dogfood
+  update above, a single qualifying hang dead-ends the iOS-as-central
+  → peer-as-peripheral data path for the *lifetime of the GATT link*.
+  The link does not self-heal. Combined with I338 Pattern B — which
+  (correctly) no longer disconnects on heartbeat silence — the
+  application sees a persistent half-broken connection with no
+  built-in recovery path. This pushes severity from "transient
+  throughput degradation" to "persistent connection fault."
 - **Triggered by routine iOS behavior.** Any Dart isolate stall ≥ a
   few hundred ms (keyboard XPC reconnect, image decode, large JSON
   parse, GC pause, debugger pause) is a candidate. Real apps stall.
