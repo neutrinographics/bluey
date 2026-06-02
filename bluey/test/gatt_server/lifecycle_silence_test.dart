@@ -76,48 +76,28 @@ void main() {
     },
   );
 
-  test(
-    'I338: inferring platform — silence DOES emit disconnections '
-    '(current iOS behaviour)',
-    () async {
-      // reportsCentralDisconnects == false → iOS-like inferring platform
-      final fake = FakeBlueyPlatform(reportsCentralDisconnects: false);
-      BlueyPlatform.instance = fake;
-      final bluey = await Bluey.create();
-
-      fakeAsync((async) {
-        final server =
-            bluey.server(lifecycleInterval: _silenceInterval)!;
-
-        server.startAdvertising(name: 't');
-        async.flushMicrotasks();
-
-        final gone = <ClientAddress>[];
-        server.disconnections.listen(gone.add);
-
-        // A central connects.
-        fake.simulateCentralConnection(centralId: _mac);
-        async.flushMicrotasks();
-
-        // Arm the silence timer.
-        fake.fireLifecycleSilence(_mac);
-        async.flushMicrotasks();
-
-        // Fire the silence timer — on an inferring platform this should
-        // propagate to the full disconnect path.
-        async.elapse(_silenceInterval);
-
-        expect(
-          gone,
-          equals([const ClientAddress(_mac)]),
-          reason:
-              'silence is the authoritative disconnect signal on '
-              'inferring platforms (iOS has no central-disconnect callback).',
-        );
-
-        server.dispose();
-        bluey.dispose();
-      });
-    },
-  );
+  test('Pattern B: iOS (authoritative) — silence does NOT emit disconnections',
+      () async {
+    final fake = FakeBlueyPlatform(reportsCentralDisconnects: true);
+    BlueyPlatform.instance = fake;
+    final bluey = await Bluey.create();
+    fakeAsync((async) {
+      final server = bluey.server(lifecycleInterval: _silenceInterval)!;
+      server.startAdvertising(name: 't');
+      async.flushMicrotasks();
+      final gone = <ClientAddress>[];
+      server.disconnections.listen(gone.add);
+      fake.simulateCentralConnection(centralId: _mac);
+      async.flushMicrotasks();
+      fake.fireLifecycleSilence(_mac);
+      async.flushMicrotasks();
+      async.elapse(_silenceInterval);
+      expect(gone, isEmpty,
+          reason: 'silence is advisory on iOS under Pattern B; '
+              'disconnects come from presence-unsubscribe');
+      expect(server.isClientConnected(const ClientAddress(_mac)), isTrue);
+      server.dispose();
+      bluey.dispose();
+    });
+  });
 }

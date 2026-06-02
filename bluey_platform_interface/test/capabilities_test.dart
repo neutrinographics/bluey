@@ -130,9 +130,13 @@ void main() {
   });
 
   group('reportsCentralDisconnects', () {
-    test('android reports central disconnects, iOS infers', () {
+    test('android reports central disconnects', () {
       expect(Capabilities.android.reportsCentralDisconnects, isTrue);
-      expect(Capabilities.iOS.reportsCentralDisconnects, isFalse);
+    });
+
+    test('iOS reports central disconnects (Pattern B — presence-unsubscribe)',
+        () {
+      expect(Capabilities.iOS.reportsCentralDisconnects, isTrue);
     });
 
     test('fake preset reports central disconnects by default', () {
