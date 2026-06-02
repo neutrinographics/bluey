@@ -943,19 +943,22 @@ class BlueyServer implements Server {
   /// Lifecycle heartbeat-silence timeout for [clientAddress].
   ///
   /// Distinct from a real platform disconnect (`_handleClientDisconnected`).
-  /// On platforms that report central disconnects natively the silence is
-  /// advisory only — the platform callback remains the sole source of
-  /// `disconnections`. On inferring platforms (iOS) silence is the disconnect
-  /// signal and is forwarded to the disconnect path. (Stage 2 adds session
-  /// removal + eviction on the inferring path.)
+  /// On platforms that report central disconnects authoritatively
+  /// (`reportsCentralDisconnects == true` — Android via `onConnectionStateChange`,
+  /// and iOS under Pattern B via presence-characteristic unsubscribe) silence is
+  /// advisory only: the authoritative signal remains the sole source of
+  /// `disconnections`. On a platform without that signal
+  /// (`reportsCentralDisconnects == false`) the dormant silence-eviction
+  /// handshake forwards silence to the disconnect path as the fallback.
   void _handleLifecycleSilence(ClientAddress clientAddress) {
     if (_platform.capabilities.reportsCentralDisconnects) {
       // Advisory only. The ClientLifecycleTimeoutEvent was already emitted by
-      // LifecycleServer; the platform's onConnectionStateChange will drive any
+      // LifecycleServer; the authoritative disconnect signal (Android's
+      // onConnectionStateChange / iOS's presence-unsubscribe) will drive any
       // real disconnect. Do not emit disconnections or clear identification.
       return;
     }
-    // Inferring platform: silence is the best disconnect signal available.
+    // No authoritative disconnect signal: silence is the best one available.
     _handleClientDisconnected(clientAddress);
   }
 
