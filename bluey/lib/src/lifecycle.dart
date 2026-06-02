@@ -280,6 +280,12 @@ PlatformLocalService buildControlService() {
         permissions: const [PlatformGattPermission.read],
         descriptors: const [],
       ),
+      // Presence: notify-only. The client subscribes on connect and never
+      // voluntarily unsubscribes while connected, so the server (iOS) infers
+      // a disconnect from `didUnsubscribe`. The `read` permission is retained
+      // deliberately — the subscribe path is validated on-device with it
+      // (Android's CCCD/notify setup); a tighter permission model is a
+      // separate, device-verified change (see backlog I340).
       PlatformLocalCharacteristic(
         uuid: _presenceCharUuidString,
         properties: const PlatformCharacteristicProperties(

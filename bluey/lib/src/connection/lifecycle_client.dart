@@ -296,7 +296,30 @@ class LifecycleClient {
     if (presenceChar != null) {
       _presenceSub = presenceChar.notifications.listen(
         (_) {}, // the subscription itself IS the signal; no payload expected
-        onError: (_) {},
+        onError: (Object e) {
+          // A failed subscription means the server (iOS) won't get a
+          // presence-unsubscribe disconnect signal for this link, so the
+          // disconnect falls back to advisory silence — which, under
+          // Pattern B, does nothing. Surface it rather than fail silently.
+          _logger.log(
+            BlueyLogLevel.warn,
+            'bluey.connection.lifecycle',
+            'presence subscription error — server may not detect this '
+                'link\'s disconnect',
+            data: {'connectionId': _connectionId, 'error': e.toString()},
+          );
+        },
+      );
+    } else {
+      // Expected against a server that predates the presence characteristic;
+      // logged at info so the missing disconnect signal is visible without
+      // alarming. Pattern-B servers always expose it.
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.connection.lifecycle',
+        'presence characteristic absent on control service — no '
+            'presence-unsubscribe disconnect signal for this link',
+        data: {'connectionId': _connectionId},
       );
     }
 

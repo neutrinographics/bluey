@@ -276,6 +276,40 @@ void main() {
       });
     });
 
+    // 4c. stop() unsubscribes from the presence characteristic so the
+    // subscription does not linger after teardown (the client must not
+    // voluntarily unsubscribe while running, but stop() is teardown).
+    test('unsubscribes from the presence characteristic on stop', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        fakePlatform.setNotificationCalls.clear();
+
+        client.stop();
+        async.flushMicrotasks();
+
+        expect(
+          fakePlatform.setNotificationCalls.any(
+            (c) =>
+                !c.enable &&
+                c.characteristicUuid == lifecycle.presenceCharUuid,
+          ),
+          isTrue,
+          reason: 'presence subscription must be disabled on stop',
+        );
+      });
+    });
+
     // 5. start() reads interval and sets heartbeat to half
     test('start() reads interval and sets heartbeat to half', () {
       fakeAsync((async) {

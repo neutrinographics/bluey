@@ -131,4 +131,57 @@ void main() {
       bluey.dispose();
     });
   });
+
+  test(
+      'a duplicate disconnect signal emits disconnections only once (idempotent)',
+      () async {
+    final fake = FakeBlueyPlatform(reportsCentralDisconnects: true);
+    BlueyPlatform.instance = fake;
+    final bluey = await Bluey.create();
+    fakeAsync((async) {
+      final server = bluey.server(lifecycleInterval: _interval)!;
+      server.startAdvertising(name: 't');
+      async.flushMicrotasks();
+      final gone = <ClientAddress>[];
+      server.disconnections.listen(gone.add);
+      fake.simulateCentralConnection(centralId: _mac);
+      async.flushMicrotasks();
+      // iOS can fire didUnsubscribe(presence) more than once for a single
+      // link drop; the domain layer must not surface two disconnections.
+      fake.simulateCentralDisconnection(_mac);
+      fake.simulateCentralDisconnection(_mac);
+      async.flushMicrotasks();
+      expect(gone, equals([const ClientAddress(_mac)]),
+          reason: 'a repeated disconnect signal must not double-emit');
+      server.dispose();
+      bluey.dispose();
+    });
+  });
+
+  test('a reconnect re-arms the disconnect emission', () async {
+    final fake = FakeBlueyPlatform(reportsCentralDisconnects: true);
+    BlueyPlatform.instance = fake;
+    final bluey = await Bluey.create();
+    fakeAsync((async) {
+      final server = bluey.server(lifecycleInterval: _interval)!;
+      server.startAdvertising(name: 't');
+      async.flushMicrotasks();
+      final gone = <ClientAddress>[];
+      server.disconnections.listen(gone.add);
+      fake.simulateCentralConnection(centralId: _mac);
+      async.flushMicrotasks();
+      fake.simulateCentralDisconnection(_mac);
+      async.flushMicrotasks();
+      // Same identity reconnects, then drops again — a distinct connection,
+      // so it must surface its own disconnection.
+      fake.simulateCentralConnection(centralId: _mac);
+      async.flushMicrotasks();
+      fake.simulateCentralDisconnection(_mac);
+      async.flushMicrotasks();
+      expect(gone, equals([const ClientAddress(_mac), const ClientAddress(_mac)]),
+          reason: 'each distinct connection surfaces its own disconnection');
+      server.dispose();
+      bluey.dispose();
+    });
+  });
 }

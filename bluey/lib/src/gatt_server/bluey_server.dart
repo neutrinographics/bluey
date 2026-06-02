@@ -85,6 +85,15 @@ class BlueyServer implements Server {
   /// a reconnect-then-heartbeat re-identifies.
   final Set<ClientAddress> _identifiedPeerClientAddresses = {};
 
+  /// Addresses for which a `disconnections` event has already been emitted
+  /// and not since re-armed by a (re)connection. Makes disconnect handling
+  /// idempotent: a repeated disconnect signal for the same address — e.g.
+  /// iOS firing `didUnsubscribe(presence)` twice for one link drop, or
+  /// silence racing the native callback — surfaces exactly one event.
+  /// Re-armed in the `centralConnections` handler so a reconnect's eventual
+  /// disconnect is surfaced again.
+  final Set<ClientAddress> _disconnectionsAnnounced = {};
+
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
   final StreamController<platform.PlatformReadRequest>
@@ -171,6 +180,9 @@ class BlueyServer implements Server {
         mtu: platformCentral.mtu,
       );
       _connectedClients[clientAddress] = client;
+      // Re-arm disconnect emission for this fresh connection (a prior
+      // connection with the same address may have left the guard set).
+      _disconnectionsAnnounced.remove(clientAddress);
       _connectionsController.add(client);
       // No heartbeat timer here. The timer starts only when the client sends
       // its first heartbeat write, proving it speaks the lifecycle protocol.
@@ -984,9 +996,15 @@ class BlueyServer implements Server {
     // `tryUpgrade` is per-connection.
     _identifiedPeerClientAddresses.remove(clientAddress);
 
-    // Always emit on the disconnections stream -- even for untracked clients
-    // (e.g., stale connections from before a server restart).
-    _disconnectionsController.add(clientAddress);
+    // Emit on the disconnections stream at most once per connection. The
+    // guard suppresses a repeated disconnect signal for the same address
+    // (a duplicate iOS `didUnsubscribe`, or silence racing the native
+    // callback). Untracked clients (e.g. a stale connection from before a
+    // server restart) are still surfaced once — `add` returns true the
+    // first time the address is seen.
+    if (_disconnectionsAnnounced.add(clientAddress)) {
+      _disconnectionsController.add(clientAddress);
+    }
   }
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(
