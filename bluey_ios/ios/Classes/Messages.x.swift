@@ -134,8 +134,15 @@ extension GattStatusDto {
         case .requestNotSupported:
             return .requestNotSupported
         case .lifecycleEviction:
-            // lifecycleEvictionAttStatus (0x80). Application-range ATT status.
-            // TODO(I338 dogfood): verify CBATTError.Code(rawValue:0x80) constructs and iOS delivers 0x80 on the wire (Task 4.2)
+            // lifecycleEvictionAttStatus (0x80) — an application-range ATT
+            // status. PLATFORM LIMITATION: CBPeripheralManager.respond(to:
+            // withResult:) only accepts CBATTError.Code (≈0x00–0x11), so 0x80
+            // cannot be put on the wire from iOS at all — it falls back to
+            // .unlikelyError (0x0E). The reserved-status eviction handshake is
+            // therefore Android-only; on iOS, Pattern B (presence-unsubscribe)
+            // is the disconnect mechanism and this path is unreachable in
+            // normal operation. Slated for removal with the eviction machinery
+            // (see backlog I340).
             return CBATTError.Code(rawValue: 0x80) ?? .unlikelyError
         }
     }

@@ -69,7 +69,11 @@ class Capabilities {
   /// (I201), so a central unsubscribing from the dedicated lifecycle presence
   /// characteristic stands in as the signal (`didUnsubscribeFrom`).
   /// Flipping this to `false` re-enables the dormant silence-eviction handshake
-  /// as a fallback if the presence signal proves unreliable on hardware.
+  /// as a fallback if the presence signal proves unreliable on hardware. Note
+  /// the reserved-status eviction is Android-only: iOS `CBPeripheralManager`
+  /// cannot put an application-range ATT status (0x80) on the wire, so on iOS
+  /// the fallback degrades to Stage-1 silence-disconnect, not the full
+  /// handshake. The eviction machinery is slated for removal (backlog I340).
   final bool reportsCentralDisconnects;
 
   const Capabilities({

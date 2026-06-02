@@ -9,12 +9,23 @@ last_verified: 2026-06-02
 related: [I338, I201]
 ---
 
-> **Status note (2026-06-02).** Deferred follow-up to [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md).
-> Do **not** action until Pattern B (presence-subscription disconnect
-> detection) has soaked in production across a range of iOS versions /
-> Bluetooth chipsets / field loss conditions. This is a deliberate
-> "delete the fallback only after the primary is seasoned" item, not a
-> bug.
+> **Status note (2026-06-02).** Follow-up to [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md).
+> **Full removal is the expected outcome** once the presence-based fix has
+> been exercised in real use — the dormant eviction is being kept only as a
+> short-lived safety net, not a long-term path. Action once Pattern B has
+> soaked across a range of iOS versions / Bluetooth chipsets / field loss
+> conditions.
+>
+> **The iOS eviction fallback is already non-functional (platform limit).**
+> `CBPeripheralManager.respond(to:withResult:)` only accepts
+> `CBATTError.Code` (≈0x00–0x11), so the reserved eviction status `0x80`
+> cannot be delivered from iOS — it falls back to `.unlikelyError` (0x0E),
+> and the client never recognizes the eviction. The reserved-status
+> handshake is therefore **Android-only**; on iOS, flipping
+> `reportsCentralDisconnects` back to `false` degrades to Stage-1
+> silence-disconnect, not the full handshake. This strengthens the case for
+> removing the whole mechanism rather than maintaining an iOS path that
+> cannot work.
 
 ## Background
 
