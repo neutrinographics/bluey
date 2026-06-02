@@ -4,6 +4,12 @@ import Flutter
 
 /// Implementation of the Peripheral (server) role BLE operations.
 class PeripheralManagerImpl: NSObject {
+    // Pattern B — the dedicated Bluey lifecycle presence characteristic.
+    // A central unsubscribing from THIS characteristic is treated as a
+    // real client disconnect (see `didUnsubscribe`). Must match the Dart
+    // constant exactly.
+    private static let presenceCharUuid = "b1e70005-0000-1000-8000-00805f9b34fb"
+
     private let flutterApi: BlueyFlutterApi
     private let peripheralManager: CBPeripheralManager
 
@@ -535,11 +541,16 @@ class PeripheralManagerImpl: NSObject {
         // Notify Flutter
         flutterApi.onCharacteristicUnsubscribed(centralId: centralId, characteristicUuid: charUuid) { _ in }
 
-        // Note: We do NOT infer disconnection from unsubscribe events.
-        // Disconnect detection is handled by the Bluey lifecycle control
-        // service at the Dart layer via heartbeat timeouts and explicit
-        // disconnect commands. This avoids false disconnections when a
-        // client unsubscribes from notifications but stays connected.
+        // Pattern B: a central unsubscribing from the dedicated presence
+        // characteristic means it disconnected (graceful, or a supervision-timeout
+        // link loss) — the iOS server's real client-disconnect signal (I201 has no
+        // native peripheral-side disconnect callback). Only the presence char
+        // triggers this; a data-characteristic unsubscribe stays a no-op (a client
+        // may toggle data notifications while staying connected).
+        if charUuid == PeripheralManagerImpl.presenceCharUuid {
+            centrals.removeValue(forKey: centralId)
+            flutterApi.onCentralDisconnected(centralId: centralId) { _ in }
+        }
     }
 
     func didReceiveRead(peripheral: CBPeripheralManager, request: CBATTRequest) {
