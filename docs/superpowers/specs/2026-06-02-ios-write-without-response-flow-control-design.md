@@ -25,14 +25,26 @@ The flow-control loop lives in native Swift, right at the CoreBluetooth boundary
 
 ### Mechanism
 
-1. A per-peripheral FIFO of pending WriteNoResponse writes:
-   ```
-   private var pendingWriteNoResponse: [String: [PendingWnR]]   // keyed by deviceId
-   struct PendingWnR { characteristic; data; completion; enqueuedAt / timeout token }
-   ```
-2. `writeCharacteristic(... withResponse: false)` appends a `PendingWnR` to the FIFO for that `deviceId` and calls `drainWriteNoResponse(deviceId:)`. The `.withResponse` branch (the existing `OpSlot` path) is untouched.
-3. `drainWriteNoResponse(deviceId:)` loops while `peripheral.canSendWriteWithoutResponse == true` **and** the FIFO is non-empty: pop head → `peripheral.writeValue(head.data, for: head.characteristic, type: .withoutResponse)` → fire `head.completion(.success(()))` → cancel its timeout.
-4. A new delegate method `peripheralIsReady(toSendWriteWithoutResponse: CBPeripheral)` re-pumps `drainWriteNoResponse(deviceId:)` when the gate reopens.
+The FIFO/drain is a **standalone, unit-testable type** — `PendingWriteQueue` — mirroring the existing `PendingNotificationQueue` (I040) and `OpSlot` (with-response writes). It depends on **injected closures**, not a live `CBPeripheral`, so its logic is testable in isolation:
+
+```
+internal final class PendingWriteQueue {
+    struct Entry { let characteristic: CBCharacteristic; let data: Data; let completion: (Result<Void, Error>) -> Void; /* + timeout token */ }
+    func enqueue(_ entry: Entry)
+    func drain(canSend: () -> Bool, send: (Entry) -> Void)   // pops + sends + completes(success) while canSend() && non-empty
+    func failAll(_ error: Error)                              // disconnect: fail every pending completion, empty the queue
+    // per-entry timeout fires completion(.failure(gatt-timeout)) and removes the entry
+}
+```
+
+`CentralManagerImpl` holds one `PendingWriteQueue` per `deviceId` and wires the real CoreBluetooth surface into it:
+
+1. `writeCharacteristic(... withResponse: false)` → `queue.enqueue(...)` then `pump(deviceId)`. The `.withResponse` branch (the existing `OpSlot` path) is untouched.
+2. `pump(deviceId)` calls `queue.drain(canSend: { peripheral.canSendWriteWithoutResponse }, send: { peripheral.writeValue($0.data, for: $0.characteristic, type: .withoutResponse) })`.
+3. The new delegate `peripheralIsReady(toSendWriteWithoutResponse: CBPeripheral)` re-pumps that peripheral's queue when the gate reopens.
+4. The disconnect/cleanup path calls `queue.failAll(notConnected)`.
+
+The queue owns the FIFO, completion, and timeout logic (testable); the manager owns only the thin wiring of CoreBluetooth's `canSendWriteWithoutResponse` / `writeValue` / `peripheralIsReady` / disconnect into it (dogfood-confirmed).
 
 ### Completion semantics — complete-on-hand-off (Android parity)
 
@@ -61,18 +73,27 @@ Consequence — automatic backpressure: a serial consumer that `await`s each wri
 
 ## Testing & verification
 
-This fix is entirely below the Pigeon seam (native Swift); there is **no Dart-domain behavior change** to assert against `FakeBlueyPlatform`, and `bluey_ios` has no XCTest harness. Verification is therefore **dogfood-gated**, matching the I338 native-work posture:
+The fix is native Swift, but it is **not** dogfood-only: `bluey_ios` already has an XCTest harness (`bluey_ios/example/ios/RunnerTests/`) where the direct prior art — `PendingNotificationQueueTests.swift` (I040's drain) and `OpSlotTests.swift` (the with-response slot) — is thoroughly unit-tested. Extracting `PendingWriteQueue` as a closure-driven type (above) makes the flow-control logic unit-testable the same way. TDD applies.
 
-1. **Careful native review** of the new FIFO/gate/drain/`peripheralIsReady`/disconnect-cleanup/timeout code (Swift cannot be compiled or unit-tested in this environment).
-2. **Real-device dogfood** — re-run the corruption scenario in `gossip_chat`, iPhone (central) ↔ Pixel 6a (peripheral): induce a ≥10 s isolate hang (e.g. the keyboard XPC reconnect via the QR-scan flow), then confirm:
+1. **XCTest unit tests for `PendingWriteQueue`** (TDD red→green; mirror `PendingNotificationQueueTests.swift`), covering at least:
+   - drain while `canSend` stays true sends + completes-success every entry in order, empties the queue;
+   - `canSend` false from the start → entry stays queued, completion does **not** fire;
+   - partial drain (`canSend` flips false mid-drain) stops and preserves the tail in order;
+   - re-drain after a partial drain resumes from the head (the `peripheralIsReady` re-pump path);
+   - `failAll` fires `.failure(notConnected)` for every pending entry and empties (the disconnect path);
+   - per-entry timeout fires `.failure(gatt-timeout)` and removes that entry;
+   - no cap (unbounded) — large enqueue then full drain completes all.
+2. **Real-device dogfood** — *confirmation* of the wiring end-to-end. Re-run the corruption scenario in `gossip_chat`, iPhone (central) ↔ Pixel 6a (peripheral): induce a ≥10 s isolate hang (e.g. the keyboard XPC reconnect via the QR-scan flow), then confirm:
    - no `}]}GS`-tail `Malformed gossip message` / `frame decoder recovered from corruption` events on the Android side after the burst;
    - the iOS-central → Android-peripheral data path keeps working after the hang (typing/messages from iOS continue to land on Android — no permanent one-way degradation);
    - normal (non-burst) writes are unaffected.
-3. A clean `flutter analyze` on the Dart side (the change should not touch Dart, so this is a no-regression check).
+3. A clean `flutter analyze` on the Dart side (the change should not touch Dart — a no-regression check).
 
-If a future need for CI coverage arises, standing up an iOS XCTest harness to test the FIFO/drain directly is the follow-up — explicitly out of scope here.
+**Execution note.** Running the XCTest target needs `xcodebuild` (available) + a simulator + the example iOS build (CocoaPods + `flutter assemble`). That may be a CI / developer-Mac step rather than this sandbox; the tests are nonetheless real, runnable unit tests (red→green), not a dogfood substitute.
 
 ## Implementation footprint
 
-- `bluey_ios/ios/Classes/CentralManagerImpl.swift`: the `pendingWriteNoResponse` FIFO + `PendingWnR` struct; rewrite the `.withoutResponse` branch of `writeCharacteristic` to enqueue+drain; add `drainWriteNoResponse(deviceId:)`; add the `peripheralIsReady(toSendWriteWithoutResponse:)` delegate; per-write timeout; fail-pending-on-disconnect wired into the existing disconnect/cleanup path.
+- `bluey_ios/ios/Classes/PendingWriteQueue.swift` (**new**): the standalone, closure-driven FIFO/drain/`failAll`/timeout type, modeled on `PendingNotificationQueue.swift`.
+- `bluey_ios/example/ios/RunnerTests/PendingWriteQueueTests.swift` (**new**): the XCTest unit suite (above), modeled on `PendingNotificationQueueTests.swift`.
+- `bluey_ios/ios/Classes/CentralManagerImpl.swift`: hold one `PendingWriteQueue` per `deviceId`; rewrite the `.withoutResponse` branch of `writeCharacteristic` to `enqueue` + `pump`; add `pump(deviceId:)` wiring `canSendWriteWithoutResponse` / `writeValue`; add the `peripheralIsReady(toSendWriteWithoutResponse:)` delegate; call `failAll(notConnected)` from the existing disconnect/cleanup path. The `.withResponse` (`OpSlot`) path is untouched.
 - No Pigeon, platform-interface, domain, or Android changes.

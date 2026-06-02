@@ -90,14 +90,56 @@ All code built following strict TDD:
 - **Green**: Implement minimum code to pass
 - **Refactor**: Improve while keeping tests green
 
+### Running the Tests
+
+The suite spans three toolchains — Dart, Android (Kotlin/JVM), and iOS (XCTest). Run all three before shipping a change.
+
+#### Dart (all packages)
+
+```bash
+# Domain + platform-interface + each platform package's Dart tests
+cd bluey                     && flutter test && flutter analyze
+cd bluey_platform_interface  && flutter test && flutter analyze
+cd bluey_android             && flutter test && flutter analyze
+cd bluey_ios                 && flutter test && flutter analyze
+```
+
+#### Android (Kotlin/JVM unit tests)
+
+The plugin's Android library runs its JVM unit tests standalone via Gradle. It needs the Flutter SDK path — set `FLUTTER_ROOT`, or create `bluey_android/android/local.properties` with `flutter.sdk=/path/to/flutter`.
+
+```bash
+cd bluey_android/android
+FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")" ./gradlew test
+```
+
+#### iOS (XCTest)
+
+The Swift unit tests (`PendingNotificationQueue`, `OpSlot`, error mapping, handle stores, …) live in the iOS example's `RunnerTests` target and run via `xcodebuild` against a simulator. Requires macOS + Xcode + CocoaPods.
+
+```bash
+cd bluey_ios/example
+flutter pub get
+flutter build ios --config-only          # generates the Flutter xcconfig
+cd ios && pod install                      # first run / after dependency changes
+xcodebuild test \
+  -workspace Runner.xcworkspace \
+  -scheme Runner \
+  -destination 'platform=iOS Simulator,name=iPhone 16'   # substitute an available simulator: xcrun simctl list devices
+```
+
 ### Test Coverage
 
-| Package | Tests | Status |
-|---------|-------|--------|
-| bluey | 424 | ✅ All passing |
-| bluey_platform_interface | 20 | ✅ All passing |
-| bluey_android | 2 | ✅ All passing |
-| **Total** | **446** | ✅ **All passing** |
+Dart suites (counts drift as the suite grows; treat as indicative):
+
+| Package | Dart tests | Native suite |
+|---------|-----------|--------------|
+| bluey | ~1000 | — |
+| bluey_platform_interface | ~65 | — |
+| bluey_android | ~76 | Kotlin/JVM (`./gradlew test`) |
+| bluey_ios | ~92 | XCTest (`RunnerTests`) |
+
+Domain-layer coverage target is 90%, overall 80% (`flutter test --coverage`).
 
 ## 🚀 Usage
 
