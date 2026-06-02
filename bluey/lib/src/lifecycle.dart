@@ -24,6 +24,7 @@ const _controlServiceUuidString = 'b1e70001-0000-1000-8000-00805f9b34fb';
 const _heartbeatCharUuidString = 'b1e70002-0000-1000-8000-00805f9b34fb';
 const _intervalCharUuidString = 'b1e70003-0000-1000-8000-00805f9b34fb';
 const _serverIdCharUuidString = 'b1e70004-0000-1000-8000-00805f9b34fb';
+const _presenceCharUuidString = 'b1e70005-0000-1000-8000-00805f9b34fb';
 
 /// UUID of the internal Bluey lifecycle control service.
 final controlServiceUuid = _controlServiceUuidString;
@@ -37,6 +38,10 @@ final intervalCharUuid = _intervalCharUuidString;
 /// UUID of the serverId characteristic (readable, returns the server's
 /// stable [ServerId] as 16 raw bytes).
 final serverIdCharUuid = _serverIdCharUuidString;
+
+/// UUID of the presence characteristic (notify-only; client subscribes so that
+/// an unsubscription event acts as a real disconnect signal on iOS).
+final presenceCharUuid = _presenceCharUuidString;
 
 /// Default lifecycle interval.
 const defaultLifecycleInterval = Duration(seconds: 10);
@@ -57,7 +62,8 @@ bool isControlServiceCharacteristic(String characteristicUuid) {
   final normalized = characteristicUuid.toLowerCase();
   return normalized == _heartbeatCharUuidString ||
       normalized == _intervalCharUuidString ||
-      normalized == _serverIdCharUuidString;
+      normalized == _serverIdCharUuidString ||
+      normalized == _presenceCharUuidString;
 }
 
 /// Checks whether a service UUID is the control service.
@@ -269,6 +275,18 @@ PlatformLocalService buildControlService() {
           canWrite: false,
           canWriteWithoutResponse: false,
           canNotify: false,
+          canIndicate: false,
+        ),
+        permissions: const [PlatformGattPermission.read],
+        descriptors: const [],
+      ),
+      PlatformLocalCharacteristic(
+        uuid: _presenceCharUuidString,
+        properties: const PlatformCharacteristicProperties(
+          canRead: false,
+          canWrite: false,
+          canWriteWithoutResponse: false,
+          canNotify: true,
           canIndicate: false,
         ),
         permissions: const [PlatformGattPermission.read],

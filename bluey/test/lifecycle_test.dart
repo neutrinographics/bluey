@@ -522,6 +522,21 @@ void main() {
     });
   });
 
+  group('presence characteristic', () {
+    test('control service includes a notify-only presence characteristic', () {
+      final svc = buildControlService();
+      final presence = svc.characteristics
+          .firstWhere((c) => c.uuid.toLowerCase() == presenceCharUuid);
+      expect(presence.properties.canNotify, isTrue);
+      expect(presence.properties.canWrite, isFalse);
+      expect(presence.properties.canRead, isFalse);
+    });
+
+    test('isControlServiceCharacteristic recognises the presence char', () {
+      expect(isControlServiceCharacteristic(presenceCharUuid), isTrue);
+    });
+  });
+
   group('BlueyServer trackClientIfNeeded', () {
     // 24. untracked client sending heartbeat gets auto-tracked
     //
