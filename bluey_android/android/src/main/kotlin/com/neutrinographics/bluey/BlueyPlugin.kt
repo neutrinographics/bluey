@@ -670,6 +670,16 @@ class BlueyPlugin : FlutterPlugin, ActivityAware, BlueyHostApi, PluginRegistry.R
         }
     }
 
+    override fun resetServerSessions(callback: (Result<Unit>) -> Unit) {
+        try {
+            BlueyLog.log(LogLevelDto.INFO, "bluey.android.plugin", "resetServerSessions called")
+            gattServer?.reannounceTrackedCentrals()
+            callback(Result.success(Unit))
+        } catch (e: Throwable) {
+            callback(Result.failure(e.toServerFlutterError()))
+        }
+    }
+
     // Private helper methods
 
     private fun getCurrentBluetoothState(): BluetoothStateDto {

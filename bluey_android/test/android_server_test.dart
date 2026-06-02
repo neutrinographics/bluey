@@ -302,6 +302,10 @@ void main() {
             PlatformGattStatus.requestNotSupported,
             GattStatusDto.requestNotSupported,
           ),
+          (
+            PlatformGattStatus.lifecycleEviction,
+            GattStatusDto.lifecycleEviction,
+          ),
         ]) {
           await server.respondToReadRequest(1, platformStatus, null);
 
@@ -389,6 +393,18 @@ void main() {
         await server.closeServer();
 
         verify(() => mockHostApi.closeServer()).called(1);
+      });
+    });
+
+    group('resetServerSessions', () {
+      test('delegates to hostApi', () async {
+        when(
+          () => mockHostApi.resetServerSessions(),
+        ).thenAnswer((_) async {});
+
+        await server.resetServerSessions();
+
+        verify(() => mockHostApi.resetServerSessions()).called(1);
       });
     });
 

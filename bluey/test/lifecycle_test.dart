@@ -510,6 +510,33 @@ void main() {
     });
   });
 
+  group('lifecycleEvictionAttStatus', () {
+    test('is the reserved ATT application-range status 0x80', () {
+      // Pinned to exactly 0x80: the Android and iOS native respond paths and
+      // the client-side eviction detection all independently encode this byte
+      // and must agree on it; it must also stay within the ATT application
+      // range 0x80..0x9F (so an app cannot collide with it via standard errors).
+      expect(lifecycleEvictionAttStatus, 0x80);
+      expect(lifecycleEvictionAttStatus, greaterThanOrEqualTo(0x80));
+      expect(lifecycleEvictionAttStatus, lessThanOrEqualTo(0x9F));
+    });
+  });
+
+  group('presence characteristic', () {
+    test('control service includes a notify-only presence characteristic', () {
+      final svc = buildControlService();
+      final presence = svc.characteristics
+          .firstWhere((c) => c.uuid.toLowerCase() == presenceCharUuid);
+      expect(presence.properties.canNotify, isTrue);
+      expect(presence.properties.canWrite, isFalse);
+      expect(presence.properties.canRead, isFalse);
+    });
+
+    test('isControlServiceCharacteristic recognises the presence char', () {
+      expect(isControlServiceCharacteristic(presenceCharUuid), isTrue);
+    });
+  });
+
   group('BlueyServer trackClientIfNeeded', () {
     // 24. untracked client sending heartbeat gets auto-tracked
     //

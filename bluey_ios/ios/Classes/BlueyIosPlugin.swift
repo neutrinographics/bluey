@@ -153,6 +153,11 @@ class BlueyHostApiImpl: BlueyHostApi {
         peripheralManager.closeServer(completion: completion)
     }
 
+    func resetServerSessions(completion: @escaping (Result<Void, any Error>) -> Void) {
+        peripheralManager.reannounceTrackedCentrals()
+        completion(.success(()))
+    }
+
     // MARK: - Logging (I307)
 
     func setLogLevel(level: LogLevelDto, completion: @escaping (Result<Void, any Error>) -> Void) {

@@ -302,6 +302,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   final Map<String, _ConnectedCentral> _connectedCentrals = {};
   int _nextRequestId = 1;
 
+  /// Test-only: centrals the (reused) native manager still "tracks" but the
+  /// next-created [BlueyServer] has not heard of. Keyed centralId -> mtu.
+  /// Drained by [resetServerSessions] (I338 reset-on-init).
+  final Map<String, int> _survivingAnnounced = {};
+
   /// Module-wide counter for handles minted by [addService] (mirrors
   /// the server-role behaviour on iOS / Android). Starts at 1.
   int _nextLocalHandle = 1;
@@ -351,6 +356,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   /// Records every call to [readCharacteristic] in order.
   final List<ReadCharacteristicCall> readCharacteristicCalls = [];
+
+  /// Records every call to [setNotification] in order. Carries both the
+  /// wire-level handle and the fake-resolved characteristic UUID so tests
+  /// can assert on UUID without knowing the per-device handle mapping.
+  final List<SetNotificationCall> setNotificationCalls = [];
 
   /// Records every call to [discoverServices] by deviceId, in order.
   /// Used by tests that need to assert re-discovery happened (e.g. after
@@ -616,6 +626,21 @@ base class FakeBlueyPlatform extends BlueyPlatform {
               descriptors: [],
               handle: 0,
             ),
+            // Presence char: notify-only. The client subscribes to this on
+            // connect so the iOS server learns of the disconnect via
+            // didUnsubscribe when the link drops.
+            PlatformCharacteristic(
+              uuid: 'b1e70005-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: false,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: true,
+                canIndicate: false,
+              ),
+              descriptors: [],
+              handle: 0,
+            ),
           ],
           includedServices: [],
         ),
@@ -644,6 +669,18 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       subscribedCharacteristics: {},
     );
     _centralConnectionController.add(PlatformCentral(id: centralId, mtu: mtu));
+  }
+
+  /// Test-only: records a central that the (reused) native manager still
+  /// "tracks" but the next-created [BlueyServer] has not heard of. On the next
+  /// [resetServerSessions] it is re-announced via `centralConnections`,
+  /// modelling the native re-announce contract (I338 reset-on-init).
+  ///
+  /// Unlike [simulateCentralConnection], this does not require advertising to
+  /// be active — survivors pre-date the current advertising lifecycle, and the
+  /// reset fires at server construction before startAdvertising.
+  void simulateSurvivingAnnouncedCentral(String centralId, {int mtu = 23}) {
+    _survivingAnnounced[centralId] = mtu;
   }
 
   /// Test-only helper: arms the lifecycle silence timer for [centralId] by
@@ -684,6 +721,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   void simulateCentralDisconnection(String centralId) {
     _connectedCentrals.remove(centralId);
     _centralDisconnectionController.add(centralId);
+  }
+
+  /// Models an iOS link loss where `didUnsubscribe` did NOT fire (the flaky
+  /// case): the transport central is gone, but NO `centralDisconnections`
+  /// signal is emitted — so the server never learns. Used to make Pattern B's
+  /// empirical dependency on `didUnsubscribe` reliability explicit.
+  void simulateSilentLinkLoss(String centralId) {
+    _connectedCentrals.remove(centralId);
+    // Deliberately does NOT add to _centralDisconnectionController.
   }
 
   /// Simulates a read request from a connected central.
@@ -1279,6 +1325,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
     final state = _stateFor(deviceId);
     final charUuid = state.charUuidByHandle[characteristicHandle];
+    setNotificationCalls.add(
+      SetNotificationCall(
+        deviceId: deviceId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid ?? '',
+        enable: enable,
+      ),
+    );
     if (charUuid != null) {
       if (enable) {
         connection.subscribedCharacteristics.add(charUuid);
@@ -1759,6 +1813,25 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _localServices.clear();
   }
 
+  @override
+  Future<void> resetServerSessions() async {
+    final survivors = Map<String, int>.from(_survivingAnnounced);
+    _survivingAnnounced.clear();
+    for (final entry in survivors.entries) {
+      // Mirror a real re-announce: register transport + emit
+      // centralConnections. Does not require advertising to be active — this
+      // is called at server construction, before startAdvertising.
+      _connectedCentrals[entry.key] = _ConnectedCentral(
+        id: entry.key,
+        mtu: entry.value,
+        subscribedCharacteristics: {},
+      );
+      _centralConnectionController.add(
+        PlatformCentral(id: entry.key, mtu: entry.value),
+      );
+    }
+  }
+
   /// Disposes all resources.
   Future<void> dispose() async {
     await _stateController.close();
@@ -1903,6 +1976,26 @@ class ReadCharacteristicCall {
     required this.deviceId,
     required this.characteristicHandle,
     required this.characteristicUuid,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.setNotification].
+///
+/// Carries both the wire-level [characteristicHandle] and the
+/// fake-resolved [characteristicUuid] (lowercase) so tests can assert on
+/// the subscribed characteristic by UUID without knowing the per-device
+/// handle mapping.
+class SetNotificationCall {
+  final String deviceId;
+  final int characteristicHandle;
+  final String characteristicUuid;
+  final bool enable;
+
+  const SetNotificationCall({
+    required this.deviceId,
+    required this.characteristicHandle,
+    required this.characteristicUuid,
+    required this.enable,
   });
 }
 

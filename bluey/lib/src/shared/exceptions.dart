@@ -77,6 +77,7 @@ enum DisconnectReason {
   linkLoss, // Connection lost (out of range, etc.)
   timeout, // Operation timeout
   unknown,
+  evictedByServer, // Server rejected us (no established session) — I338; reconnect
 }
 
 /// Connection was lost unexpectedly. [address] is the raw platform

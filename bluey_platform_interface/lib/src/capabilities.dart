@@ -61,11 +61,19 @@ class Capabilities {
   /// this flag when `manufacturerData != null`.
   final bool canAdvertiseManufacturerData;
 
-  /// Whether the platform delivers a reliable native callback when a
-  /// connected central disconnects from this device's GATT server.
-  /// `true` on Android (`onConnectionStateChange`); `false` on iOS
-  /// (`CBPeripheralManager` has no client-disconnect callback — I201),
-  /// where disconnects are inferred from lifecycle heartbeat silence.
+  /// Whether the platform delivers an authoritative client-disconnect signal
+  /// for this device's GATT server — making heartbeat silence advisory rather
+  /// than a disconnect inference.
+  /// `true` on Android (`onConnectionStateChange`). `true` on iOS via Pattern B
+  /// (I338): `CBPeripheralManager` has no native client-disconnect callback
+  /// (I201), so a central unsubscribing from the dedicated lifecycle presence
+  /// characteristic stands in as the signal (`didUnsubscribeFrom`).
+  /// Flipping this to `false` re-enables the dormant silence-eviction handshake
+  /// as a fallback if the presence signal proves unreliable on hardware. Note
+  /// the reserved-status eviction is Android-only: iOS `CBPeripheralManager`
+  /// cannot put an application-range ATT status (0x80) on the wire, so on iOS
+  /// the fallback degrades to Stage-1 silence-disconnect, not the full
+  /// handshake. The eviction machinery is slated for removal (backlog I340).
   final bool reportsCentralDisconnects;
 
   const Capabilities({
@@ -112,6 +120,17 @@ class Capabilities {
   /// state, PHY information, or connection parameters via CoreBluetooth
   /// (see I200 wontfix), and `CBPeripheralManager` rejects manufacturer
   /// data in advertisement payloads (see I204 wontfix).
+  ///
+  /// `reportsCentralDisconnects` is `true` (I338, Pattern B). Although
+  /// `CBPeripheralManager` has no native client-disconnect callback (I201),
+  /// iOS now derives an authoritative central-disconnect signal from the
+  /// presence-characteristic unsubscribe event: when a central stops
+  /// subscribing to the lifecycle presence characteristic, the native layer
+  /// emits `onCentralDisconnected`, which feeds the existing
+  /// `centralDisconnections` authoritative disconnect path. iOS therefore
+  /// takes the AUTHORITATIVE branch in `BlueyServer._handleLifecycleSilence`,
+  /// making heartbeat silence advisory (no eviction) — it is NOT inferred
+  /// from heartbeat-silence and NOT a generic native callback.
   static const iOS = Capabilities(
     platformKind: PlatformKind.ios,
     canAdvertise: true,
@@ -122,7 +141,7 @@ class Capabilities {
     canRequestPhy: false,
     canRequestConnectionParameters: false,
     canAdvertiseManufacturerData: false,
-    reportsCentralDisconnects: false,
+    reportsCentralDisconnects: true,
   );
 
   /// Permissive default for fakes / tests.

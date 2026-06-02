@@ -50,6 +50,13 @@ class BlueyServer implements Server {
 
   final Map<ClientAddress, BlueyClient> _connectedClients = {};
 
+  /// A client has an *established session* iff it is present in
+  /// [_connectedClients] via a real connect/announce (`centralConnections`).
+  /// The server services read/write requests only within an established
+  /// session — a request from a session-less client is evicted (I338).
+  bool _hasEstablishedSession(ClientAddress clientAddress) =>
+      _connectedClients.containsKey(clientAddress);
+
   /// Local handle table populated from `addService`'s populated return
   /// value. Keyed by `(serviceUuid, charUuid)` lowercase. Used by
   /// `notify` / `indicate` / `notifyTo` / `indicateTo` to resolve a
@@ -77,6 +84,15 @@ class BlueyServer implements Server {
   /// identification — not once per heartbeat. Cleared on disconnect so
   /// a reconnect-then-heartbeat re-identifies.
   final Set<ClientAddress> _identifiedPeerClientAddresses = {};
+
+  /// Addresses for which a `disconnections` event has already been emitted
+  /// and not since re-armed by a (re)connection. Makes disconnect handling
+  /// idempotent: a repeated disconnect signal for the same address — e.g.
+  /// iOS firing `didUnsubscribe(presence)` twice for one link drop, or
+  /// silence racing the native callback — surfaces exactly one event.
+  /// Re-armed in the `centralConnections` handler so a reconnect's eventual
+  /// disconnect is surfaced again.
+  final Set<ClientAddress> _disconnectionsAnnounced = {};
 
   // Filtered stream controllers — control service requests are intercepted
   // and handled internally, never reaching the public API.
@@ -164,6 +180,9 @@ class BlueyServer implements Server {
         mtu: platformCentral.mtu,
       );
       _connectedClients[clientAddress] = client;
+      // Re-arm disconnect emission for this fresh connection (a prior
+      // connection with the same address may have left the guard set).
+      _disconnectionsAnnounced.remove(clientAddress);
       _connectionsController.add(client);
       // No heartbeat timer here. The timer starts only when the client sends
       // its first heartbeat write, proving it speaks the lifecycle protocol.
@@ -177,21 +196,67 @@ class BlueyServer implements Server {
       _handleClientDisconnected(ClientAddress(rawClientId));
     });
 
+    // I338: re-announce any central that survived a prior server instance so
+    // this fresh server re-establishes its session instead of evicting its
+    // next request. Fired after the centralConnections/centralDisconnections
+    // listeners are attached so the re-announce events are observed. No-op on
+    // platforms without surviving centrals (default-no-op base method).
+    unawaited(
+      _platform.resetServerSessions().catchError((Object e) {
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey.server',
+          'resetServerSessions failed; surviving centrals may not be re-announced',
+          data: {'error': e.toString()},
+        );
+      }),
+    );
+
     // Subscribe to platform request streams and route internally.
     // Control service requests are handled here; all others are forwarded
     // to the filtered controllers for the public API.
     _platformReadRequestsSub = _platform.readRequests.listen((req) {
+      final clientAddress = ClientAddress(req.centralId);
+      if (!_hasEstablishedSession(clientAddress)) {
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.server',
+          'rejecting read from session-less client (eviction)',
+          data: {'clientId': clientAddress.toString()},
+        );
+        // Reads always need a response.
+        _platform.respondToReadRequest(
+          req.requestId,
+          platform.PlatformGattStatus.lifecycleEviction,
+          null,
+        );
+        return;
+      }
       if (!_lifecycle.handleReadRequest(req)) {
         // Reads always need a response — pend until the app responds.
-        final clientAddress = ClientAddress(req.centralId);
         _lifecycle.requestStarted(clientAddress, req.requestId);
         _filteredReadRequestsController.add(req);
       }
     });
 
     _platformWriteRequestsSub = _platform.writeRequests.listen((req) {
+      final clientAddress = ClientAddress(req.centralId);
+      if (!_hasEstablishedSession(clientAddress)) {
+        _logger.log(
+          BlueyLogLevel.info,
+          'bluey.server',
+          'rejecting write from session-less client (eviction)',
+          data: {'clientId': clientAddress.toString()},
+        );
+        if (req.responseNeeded) {
+          _platform.respondToWriteRequest(
+            req.requestId,
+            platform.PlatformGattStatus.lifecycleEviction,
+          );
+        }
+        return;
+      }
       if (!_lifecycle.handleWriteRequest(req)) {
-        final clientAddress = ClientAddress(req.centralId);
         if (req.responseNeeded) {
           // Write-with-response — pend until the app responds.
           _lifecycle.requestStarted(clientAddress, req.requestId);
@@ -866,21 +931,15 @@ class BlueyServer implements Server {
   /// set is cleared in [_handleClientDisconnected] so a reconnect-then-
   /// heartbeat re-identifies.
   void _trackPeerClient(ClientAddress clientAddress, ServerId senderId) {
-    final wasNew = !_connectedClients.containsKey(clientAddress);
-    if (wasNew) {
-      _emitEvent(
-        ClientConnectedEvent(clientAddress: clientAddress, source: 'BlueyServer'),
-      );
-      final client = BlueyClient(
-        address: clientAddress,
-        mtu: 23, // Default MTU — actual MTU is unknown without platform event
-      );
-      _connectedClients[clientAddress] = client;
-      _connectionsController.add(client);
-    }
+    // Identification only — never establishes a session. A heartbeat from a
+    // client with no established session is rejected at the chokepoint before
+    // it can reach here (I338); if one still arrives (defensive), ignore it
+    // rather than silently re-creating the client and re-emitting
+    // peerConnections.
+    final client = _connectedClients[clientAddress];
+    if (client == null) return;
 
     if (_identifiedPeerClientAddresses.add(clientAddress)) {
-      final client = _connectedClients[clientAddress]!;
       _logger.log(
         BlueyLogLevel.info,
         'bluey.server',
@@ -896,19 +955,22 @@ class BlueyServer implements Server {
   /// Lifecycle heartbeat-silence timeout for [clientAddress].
   ///
   /// Distinct from a real platform disconnect (`_handleClientDisconnected`).
-  /// On platforms that report central disconnects natively the silence is
-  /// advisory only — the platform callback remains the sole source of
-  /// `disconnections`. On inferring platforms (iOS) silence is the disconnect
-  /// signal and is forwarded to the disconnect path. (Stage 2 adds session
-  /// removal + eviction on the inferring path.)
+  /// On platforms that report central disconnects authoritatively
+  /// (`reportsCentralDisconnects == true` — Android via `onConnectionStateChange`,
+  /// and iOS under Pattern B via presence-characteristic unsubscribe) silence is
+  /// advisory only: the authoritative signal remains the sole source of
+  /// `disconnections`. On a platform without that signal
+  /// (`reportsCentralDisconnects == false`) the dormant silence-eviction
+  /// handshake forwards silence to the disconnect path as the fallback.
   void _handleLifecycleSilence(ClientAddress clientAddress) {
     if (_platform.capabilities.reportsCentralDisconnects) {
       // Advisory only. The ClientLifecycleTimeoutEvent was already emitted by
-      // LifecycleServer; the platform's onConnectionStateChange will drive any
+      // LifecycleServer; the authoritative disconnect signal (Android's
+      // onConnectionStateChange / iOS's presence-unsubscribe) will drive any
       // real disconnect. Do not emit disconnections or clear identification.
       return;
     }
-    // Inferring platform: silence is the best disconnect signal available.
+    // No authoritative disconnect signal: silence is the best one available.
     _handleClientDisconnected(clientAddress);
   }
 
@@ -934,9 +996,15 @@ class BlueyServer implements Server {
     // `tryUpgrade` is per-connection.
     _identifiedPeerClientAddresses.remove(clientAddress);
 
-    // Always emit on the disconnections stream -- even for untracked clients
-    // (e.g., stale connections from before a server restart).
-    _disconnectionsController.add(clientAddress);
+    // Emit on the disconnections stream at most once per connection. The
+    // guard suppresses a repeated disconnect signal for the same address
+    // (a duplicate iOS `didUnsubscribe`, or silence racing the native
+    // callback). Untracked clients (e.g. a stale connection from before a
+    // server restart) are still surfaced once — `add` returns true the
+    // first time the address is seen.
+    if (_disconnectionsAnnounced.add(clientAddress)) {
+      _disconnectionsController.add(clientAddress);
+    }
   }
 
   platform.PlatformLocalService _mapHostedServiceToPlatform(

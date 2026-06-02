@@ -244,6 +244,72 @@ void main() {
       });
     });
 
+    // 4b. start() subscribes to the presence characteristic so the server
+    // (iOS) gets a real disconnect signal via didUnsubscribe when this link
+    // drops on link loss.
+    test('subscribes to the presence characteristic on start', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Assert the presence characteristic was subscribed
+        // (setNotification enable=true).
+        expect(
+          fakePlatform.setNotificationCalls.any(
+            (c) => c.enable && c.characteristicUuid == lifecycle.presenceCharUuid,
+          ),
+          isTrue,
+          reason: 'presence subscription must be enabled on start',
+        );
+
+        client.stop();
+      });
+    });
+
+    // 4c. stop() unsubscribes from the presence characteristic so the
+    // subscription does not linger after teardown (the client must not
+    // voluntarily unsubscribe while running, but stop() is teardown).
+    test('unsubscribes from the presence characteristic on stop', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+        fakePlatform.setNotificationCalls.clear();
+
+        client.stop();
+        async.flushMicrotasks();
+
+        expect(
+          fakePlatform.setNotificationCalls.any(
+            (c) =>
+                !c.enable &&
+                c.characteristicUuid == lifecycle.presenceCharUuid,
+          ),
+          isTrue,
+          reason: 'presence subscription must be disabled on stop',
+        );
+      });
+    });
+
     // 5. start() reads interval and sets heartbeat to half
     test('start() reads interval and sets heartbeat to half', () {
       fakeAsync((async) {
@@ -2121,6 +2187,44 @@ void main() {
         client.stop();
       });
     });
+
+    test('reserved eviction status triggers onServerUnreachable immediately '
+        '(no silence-timer wait)', () {
+      fakeAsync((async) {
+        var unreachable = 0;
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+
+        // Long silence window: if the impl waited on it, the assertion below
+        // (with NO async.elapse) would fail — proving eviction is immediate.
+        _setUpConnectedClient(
+          onServerUnreachable: () => unreachable++,
+          peerSilenceTimeout: const Duration(seconds: 30),
+          intervalValue: const Duration(seconds: 10),
+        ).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        // Next heartbeat write throws the reserved eviction status (0x80).
+        fakePlatform.simulateWriteStatusFailed =
+            lifecycle.lifecycleEvictionAttStatus;
+
+        client.start(allServices: services); // first probe fires synchronously
+        async.flushMicrotasks(); // let the failed write's catchError run
+
+        expect(unreachable, 1,
+            reason: 'eviction is immediate on the first probe, '
+                'not silence-gated');
+        expect(client.isRunning, isFalse,
+            reason: 'stop() called before signalling');
+        // NOTE: no async.elapse(...) anywhere — that is the whole point.
+        fakePlatform.simulateWriteStatusFailed = null;
+      });
+    });
   });
 }
 
@@ -2217,7 +2321,22 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
       );
 
   @override
-  Stream<Uint8List> get notifications => const Stream.empty();
+  Stream<Uint8List> get notifications {
+    // Mirror BlueyRemoteCharacteristic: listening auto-enables
+    // notifications via the platform's setNotification, and the last
+    // cancellation disables them. The lifecycle client subscribes to the
+    // presence char this way, so the fake must observe the enable call.
+    late final StreamController<Uint8List> controller;
+    controller = StreamController<Uint8List>(
+      onListen: () {
+        _fakePlatform.setNotification(_connectionId, handle.value, true);
+      },
+      onCancel: () {
+        _fakePlatform.setNotification(_connectionId, handle.value, false);
+      },
+    );
+    return controller.stream;
+  }
 
   @override
   RemoteDescriptor descriptor(UUID uuid) =>

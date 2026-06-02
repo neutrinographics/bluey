@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.5.0
+
+**Lifecycle-silence ⇄ transport reconciliation (I338):**
+
+- `Server.disconnections` is now a faithful projection of transport-level
+  connection lifetime on **both** platforms. The source of truth is the
+  most authoritative signal the platform offers — a native disconnect
+  callback where one exists (Android), inferred from heartbeat silence
+  where it does not (iOS).
+- **Behavior change (Android):** a mere heartbeat lull no longer fires
+  `Server.disconnections`. Silence is advisory on Android — it surfaces
+  only as a `ClientLifecycleTimeoutEvent`; the real `disconnections`
+  emission waits for the platform's native disconnect callback. A peer
+  that pauses past the timeout and resumes is now identified seamlessly
+  with no phantom disconnect. Consumers that leaned on the old
+  phantom-disconnect will see fewer, truthful `disconnections` events.
+- **iOS clean reconnect on eviction:** on iOS (no native client-disconnect
+  callback), heartbeat silence still drives `disconnections` and now
+  *evicts* the client's session. Because the GATT link stays up, the
+  evicted peer's next request is rejected with a reserved application-range
+  ATT status and not dispatched; the peer self-disconnects and reconnects
+  cleanly into a fresh, frame-aligned session instead of resuming
+  mid-stream. This closes the I338 stream-framing corruption path (a
+  paused-then-resumed peer no longer re-identifies mid-frame on
+  `peerConnections`).
+- New additive `DisconnectReason.evictedByServer` — lets a consumer
+  distinguish an eviction-driven reconnect from a link-loss one. The
+  underlying GATT link is dropped before the exception surfaces, so no
+  extra cleanup is required.
+- `ClientLifecycleTimeoutEvent` remains the public "peer went
+  heartbeat-silent" advisory; on Android it is now emitted *without* a
+  co-emitted `disconnections`.
+- Native "announce-before-forward" ordering plus `resetServerSessions()`
+  re-announce survivors of a prior server instance on (re)init, so a
+  legitimately-connected central re-establishes its session rather than
+  being evicted.
+- See `bluey/docs/cross-platform-quirks.md` (section "Heartbeat silence is
+  advisory on Android, a disconnect on iOS") for the consumer-facing
+  divergence and tuning via `lifecycleInterval` / `peerSilenceTimeout`.
+
+*`Capabilities.reportsCentralDisconnects` (Android `true`, iOS `false`)
+was added in the Stage 1 increment that drives the branch above.*
+
 ## 0.4.0
 
 **Peer-discovery scan-response slot (I313):**

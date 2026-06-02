@@ -113,6 +113,13 @@ abstract class Server {
   /// same client. On disconnect the identification resets; a
   /// reconnect-then-heartbeat produces a fresh emission.
   ///
+  /// On both platforms, heartbeat silence is advisory — a paused peer whose
+  /// heartbeats stop does **not** trigger a [disconnections] event. When it
+  /// resumes and sends a heartbeat it is re-identified seamlessly; this stream
+  /// does **not** re-emit between the pause and the resume. (The mid-stream
+  /// re-identification that was the I338 stream-framing corruption path is
+  /// closed: silence never evicts a session.)
+  ///
   /// Consumers that only care about Bluey peers can subscribe here and
   /// ignore [connections]; raw / non-Bluey centrals are never emitted.
   Stream<PeerClient> get peerConnections;
@@ -124,15 +131,20 @@ abstract class Server {
   ///
   /// **Source of truth by platform:**
   /// - **Android** (`Capabilities.reportsCentralDisconnects == true`): driven
-  ///   by the platform's native `onConnectionStateChange` callback. A heartbeat
-  ///   lull (silence past the `lifecycleInterval` window) produces only a
-  ///   [ClientLifecycleTimeoutEvent] advisory; no `disconnections` event is
-  ///   emitted until the platform reports the link down.
-  /// - **iOS** (no native client-disconnect callback, I201): heartbeat silence
-  ///   past the timeout is still treated as a disconnect and drives this stream.
-  ///   The iOS clean-reconnect handling lands in a later stage (I338).
+  ///   by the platform's native `onConnectionStateChange` callback.
+  /// - **iOS** (`Capabilities.reportsCentralDisconnects == true`): driven by
+  ///   `peripheralManager(_:central:didUnsubscribeFrom:)` on the dedicated
+  ///   presence notify characteristic. When a Bluey client connects it
+  ///   subscribes to that characteristic and never voluntarily unsubscribes
+  ///   while connected, so an unsubscription event is a reliable proxy for
+  ///   link loss (I338 Pattern B).
   ///
-  /// Real platform disconnects and client CourtesyDisconnects always emit on
+  /// On **both** platforms, heartbeat silence is **advisory only** — it emits
+  /// [ClientLifecycleTimeoutEvent] but never drives this stream. A paused peer
+  /// resumes seamlessly without a disconnect/reconnect cycle (no decoder
+  /// teardown, no session eviction).
+  ///
+  /// Real platform disconnects and client courtesy-disconnects always emit on
   /// both platforms. The emitted value equals [Client.address] for the same
   /// physical client, enabling correct bridging of the [connections] and
   /// [disconnections] streams (fixes I337).

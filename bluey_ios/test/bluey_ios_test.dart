@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey_ios/bluey_ios.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
@@ -19,6 +20,38 @@ void main() {
 
     test('has iOS capabilities', () {
       expect(bluey.capabilities, equals(Capabilities.iOS));
+    });
+
+    test('resetServerSessions forwards to the host API channel', () async {
+      const channelName =
+          'dev.flutter.pigeon.bluey_ios.BlueyHostApi.resetServerSessions';
+      const codec = StandardMessageCodec();
+      var invoked = false;
+
+      TestDefaultBinaryMessengerBinding
+          .instance
+          .defaultBinaryMessenger
+          .setMockMessageHandler(channelName, (message) async {
+            invoked = true;
+            // Pigeon void reply: a single-element list wrapping the result.
+            return codec.encodeMessage(<Object?>[null]);
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding
+            .instance
+            .defaultBinaryMessenger
+            .setMockMessageHandler(channelName, null),
+      );
+
+      await bluey.resetServerSessions();
+
+      expect(
+        invoked,
+        isTrue,
+        reason:
+            'BlueyIos.resetServerSessions() must delegate to the native host '
+            'API instead of no-opping via the BlueyPlatform base method.',
+      );
     });
 
     group('iOS-unsupported features', () {

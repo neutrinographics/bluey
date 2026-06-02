@@ -236,6 +236,19 @@ class IosServer {
     );
   }
 
+  /// Re-announces every currently-tracked central to Dart.
+  ///
+  /// The native peripheral manager is reused across [BlueyServer] recreations,
+  /// so a freshly-created server re-establishes sessions for centrals that
+  /// survived a prior server instance (instead of evicting their next request,
+  /// I338).
+  Future<void> resetServerSessions() async {
+    await _translateServerPlatformError(
+      'resetServerSessions',
+      () => _hostApi.resetServerSessions(),
+    );
+  }
+
   // === Callback Handlers ===
 
   /// Handles a central connection event from the platform.
@@ -409,6 +422,8 @@ class IosServer {
         return GattStatusDto.insufficientEncryption;
       case PlatformGattStatus.requestNotSupported:
         return GattStatusDto.requestNotSupported;
+      case PlatformGattStatus.lifecycleEviction:
+        return GattStatusDto.lifecycleEviction;
     }
   }
 }

@@ -8,6 +8,13 @@ import 'server.dart';
 /// Response status for GATT operations.
 ///
 /// Used when responding to read or write requests from clients.
+///
+/// This enum is intentionally limited to the standard ATT error codes
+/// (0x01–0x0F). The reserved [lifecycleEvictionAttStatus] (0x80, in the
+/// application-defined range) is deliberately excluded so an app can never
+/// select it through this enum and collide with the eviction signal. If this
+/// enum is ever widened to application-range values, that reserved value must
+/// remain excluded.
 enum GattResponseStatus {
   /// Operation completed successfully.
   success,

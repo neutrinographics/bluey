@@ -18,7 +18,7 @@ None of these directly indicate a BLE connection or disconnection.
 
 **Our approach:** We infer client connections from any interaction (subscribe, read, or write). The first time we see a `CBCentral` from any of these callbacks, we fire `onCentralConnected`. See `trackCentralIfNeeded()` in `PeripheralManagerImpl.swift`.
 
-### Unsubscribe vs Disconnect Ambiguity
+### Unsubscribe vs Disconnect Ambiguity — General Case
 
 When a client disconnects (gracefully or by going out of range), CoreBluetooth automatically cleans up its subscriptions and fires `didUnsubscribeFromCharacteristic:` for each subscribed characteristic. This is the **same callback** that fires when a client explicitly unsubscribes but stays connected.
 
@@ -26,49 +26,45 @@ There is no way to distinguish between:
 1. Client explicitly unsubscribed but is still connected (can still read/write)
 2. Client disconnected and CoreBluetooth is cleaning up subscriptions
 
-**Current behavior:** We treat the last unsubscription as a disconnection (`onCentralDisconnected`). This means:
-- If a client unsubscribes from all characteristics but stays connected, we incorrectly report it as disconnected
-- The client reappears when it performs its next read or write (via `trackCentralIfNeeded`)
+For generic (non-Bluey) characteristics, treating the last unsubscription as disconnection is still the fallback. The client reappears when it performs its next read or write (via `trackCentralIfNeeded`). Every major BLE peripheral library uses the same workaround; there is no better solution within the CoreBluetooth API.
 
-**Industry standard:** Every major BLE peripheral library (`ble_peripheral`, `flutter_ble_peripheral`, `RxBluetoothKit`) uses the same workaround. There is no better solution within the CoreBluetooth API.
+### Solution: Presence Notify Characteristic (Bluey Lifecycle Protocol, I338 Pattern B)
 
-**Alternative approaches considered:**
-- **L2CAP channels (iOS 11+):** Publishing an L2CAP channel and monitoring the `NSStream` for `endEncountered` provides a definitive disconnect signal. However, this requires the client to explicitly open the channel and adds protocol-level complexity on both sides.
-- **Application-level heartbeat:** Having the client periodically write to a characteristic and treating timeout as disconnection. Requires client cooperation and adds BLE traffic.
-- **Polling `subscribedCentrals`:** Periodically checking `CBMutableCharacteristic.subscribedCentrals`. Not event-driven and unreliable.
+Bluey resolves the unsubscribe/disconnect ambiguity for Bluey peers by using a **dedicated presence notify characteristic** (`b1e70005-0000-1000-8000-00805f9b34fb`) on the hidden lifecycle control service.
+
+**Why a dedicated characteristic?** A client can toggle notifications on a data characteristic while remaining connected (e.g., to pause a stream). Using a general data-characteristic `didUnsubscribe` callback would produce false-positive disconnect signals. A dedicated presence characteristic that the client subscribes to on connect and **never voluntarily unsubscribes from** while live eliminates that false positive: any `didUnsubscribeFrom(presenceCharacteristic)` event means the link is gone.
+
+**How it works:**
+
+1. The Bluey server adds the lifecycle control service (including the presence characteristic) before advertising.
+2. When a Bluey client connects it discovers the control service, subscribes to the presence characteristic, and starts sending periodic heartbeat writes.
+3. `peripheralManager(_:central:didSubscribeTo:)` on the presence characteristic confirms the central is a Bluey peer. The server fires `onCentralConnected` and begins session tracking.
+4. `peripheralManager(_:central:didUnsubscribeFrom:)` on **the presence characteristic specifically** fires when the link drops (gracefully or via supervision timeout). This is treated as the definitive disconnect signal: the server removes the central and fires `onCentralDisconnected`, which propagates to `Server.disconnections`.
+5. Heartbeat silence (no write within `lifecycleInterval`) produces only a `ClientLifecycleTimeoutEvent` advisory — the session is **not** evicted and `Server.disconnections` is **not** emitted. A paused peer resumes seamlessly.
+6. The control service and presence characteristic are filtered from the public `services()`, `readRequests`, and `writeRequests` APIs. Consumers never see them.
+
+**Disconnect timing:**
+- **Graceful disconnect** (client calls `disconnect()`): the client writes a courtesy-disconnect command and unsubscribes before the link closes. `didUnsubscribeFrom(presence)` fires within milliseconds.
+- **Ungraceful loss** (crash, radio killed, out of range): CoreBluetooth waits for the BLE link-supervision timeout (~30 s at the default connection interval) before cleaning up subscriptions and firing `didUnsubscribeFrom(presence)`.
+
+**Empirical bet.** This mechanism relies on the assumption that every genuine link loss eventually fires `didUnsubscribeFrom(presence)`. In practice CoreBluetooth cleans up all subscriptions as part of link teardown regardless of cause, and this has been consistent across iOS 11–18. If a platform bug causes a loss to be missed (i.e. the callback never fires), that disconnect goes undetected until the link-supervision timeout fires anyway.
+
+**Dormant eviction fallback.** The eviction handshake implemented during the earlier I338 Stages 2–3 (heartbeat silence → evict session → force-reconnect via `0x80` ATT status) is retained in `LifecycleServer` but is **dormant** — it is only active when `Capabilities.reportsCentralDisconnects == false`. With Pattern B live, iOS reports `reportsCentralDisconnects == true`, so the eviction path never runs. If the presence mechanism proves unreliable in the field, flipping that capability flag re-enables the eviction handshake without any code changes. See I338 for the full history.
+
+**Configuration:**
+```dart
+final server = bluey.server();                                        // lifecycle enabled, 10s default
+final server = bluey.server(lifecycleInterval: Duration(seconds: 5)); // custom interval
+final server = bluey.server(lifecycleInterval: null);                 // disabled, raw BLE behavior
+```
+
+**Non-Bluey clients.** A central that does not speak the Bluey lifecycle protocol will not subscribe to the presence characteristic and will not send heartbeats. The server infers such a client's presence via the first read/write interaction (`trackCentralIfNeeded`) and uses the generic last-unsubscription fallback for disconnect detection (or the heartbeat timeout if they never subscribed to anything).
 
 ### Client Tracking Without Subscriptions
 
 If a client only reads and writes without subscribing to any characteristic, we will never receive a disconnection signal. The client will remain in our tracked list indefinitely until:
 - The server is disposed (`closeServer`)
-- The lifecycle heartbeat timeout fires (see below)
-
-### Solution: Lifecycle Control Service
-
-Bluey solves the disconnect detection problem with an internal control service that is invisible to library consumers. When `Bluey.server()` is called with a non-null `lifecycleInterval` (the default is 10 seconds), the server automatically adds a hidden GATT service with a heartbeat characteristic.
-
-**How it works:**
-
-1. The Bluey server adds the control service before advertising starts
-2. When a Bluey client connects and discovers services, it recognizes the control service by its UUID and starts sending periodic heartbeat writes (at half the server's interval)
-3. The server maintains a per-client timer. Each heartbeat resets the timer. If no heartbeat arrives within `lifecycleInterval`, the server fires a disconnect event
-4. Before disconnecting, the client writes a special disconnect command for immediate cleanup — no timer wait
-5. The control service is filtered from the public `services()`, `readRequests`, and `writeRequests` APIs. Consumers never see it
-
-**What this solves:**
-- Reliable disconnect detection on iOS without native API support
-- Clean disconnect notification even when `cancelPeripheralConnection` doesn't terminate the physical link
-- Force-kill detection via heartbeat timeout
-- Consistent behavior across iOS and Android
-
-**Configuration:**
-```dart
-final server = bluey.server();                                    // lifecycle enabled, 10s default
-final server = bluey.server(lifecycleInterval: Duration(seconds: 5)); // custom interval
-final server = bluey.server(lifecycleInterval: null);             // disabled, raw BLE behavior
-```
-
-**Limitation:** Non-Bluey clients connecting to a Bluey server won't send heartbeats. They will be timed out after `lifecycleInterval` unless lifecycle management is disabled.
+- The lifecycle heartbeat timeout fires (see above)
 
 ## Advertising
 
@@ -165,9 +161,9 @@ Starting with iOS 16, `UIDevice.current.name` returns only the generic model nam
 
 ## Known Limitations
 
-1. **No client disconnection callback** — `CBPeripheralManager` does not report when clients disconnect. We infer connections from interactions and use subscription cleanup as a proxy for disconnection.
+1. **No general client disconnection callback** — `CBPeripheralManager` does not provide a direct client-disconnect event. Bluey peers are handled via the presence notify characteristic (see above); non-Bluey clients fall back to last-unsubscription inference.
 2. **Cannot force-disconnect clients** — No API to disconnect a client from the peripheral side.
-3. **Unsubscribe/disconnect ambiguity** — Cannot distinguish between explicit unsubscribe and link loss.
+3. **Unsubscribe/disconnect ambiguity (non-Bluey clients)** — For non-Bluey centrals, cannot distinguish between explicit unsubscribe and link loss. Bluey peers are unambiguous via the dedicated presence characteristic.
 4. **Background advertising limitations** — Name dropped, service UUIDs moved to overflow area, not visible to Android scanners.
 5. **No manufacturer data in advertising** — CoreBluetooth ignores manufacturer data in the advertising dictionary.
 6. **GAP name not controllable** — The name shown after connection is the system device name, not the advertised name.

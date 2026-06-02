@@ -514,6 +514,12 @@ final class BlueyAndroid extends BlueyPlatform {
     await _server.closeServer();
   }
 
+  @override
+  Future<void> resetServerSessions() async {
+    _ensureInitialized();
+    await _server.resetServerSessions();
+  }
+
   // === Structured logging (I307) ===
 
   @override

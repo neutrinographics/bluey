@@ -293,6 +293,11 @@ enum GattStatusDto {
   insufficientAuthentication,
   insufficientEncryption,
   requestNotSupported,
+
+  /// Reserved eviction status (ATT application range 0x80; see
+  /// `lifecycleEvictionAttStatus`). Server-internal — rejects a
+  /// session-less client's request (I338).
+  lifecycleEviction,
 }
 
 /// Severity for a structured log event (DTO for platform channel).
@@ -487,6 +492,17 @@ abstract class BlueyHostApi {
   /// Close the GATT server and disconnect all centrals.
   @async
   void closeServer();
+
+  /// Re-announce every currently-tracked central to Dart.
+  ///
+  /// The native peripheral manager is reused across `BlueyServer`
+  /// recreations, so a freshly-created server starts with no session state for
+  /// centrals that survived a prior server instance. Calling this re-fires
+  /// [BlueyFlutterApi.onCentralConnected] for each tracked central (preserving
+  /// the negotiated MTU) so the new server re-establishes their sessions
+  /// instead of evicting their next request (I338).
+  @async
+  void resetServerSessions();
 
   /// Set the minimum severity level for native log events forwarded to Dart.
   ///

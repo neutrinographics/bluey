@@ -148,6 +148,9 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
+| [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md) | Lifecycle-silence timeout fires phantom `Server.disconnections`, corrupting downstream stream framing. Android half (Stage 1) fixed in HEAD (PR #35, `2a90fd1`): silence is advisory, `disconnections` driven by the native callback only. iOS half implemented via Pattern B (presence-subscription disconnect detection) on branch `i338-disconnect-via-presence` — dogfood PASSED across the role matrix; pending merge. | high |
+| [I340](I340-remove-dormant-silence-eviction-machinery.md) | Remove the dormant silence-eviction machinery (reserved ATT status, Pigeon carry, client fast-path, server gate) once Pattern B has soaked in production. Deferred cleanup follow-up to I338 — do not action yet. | low |
+| [I341](I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) | A failed presence-characteristic subscription silently leaves an iOS-server peer's disconnect undetectable (session leaks until restart). Corner case; fix = client-side bounded retry. Deferred. | low |
 
 ### Open — Android native
 

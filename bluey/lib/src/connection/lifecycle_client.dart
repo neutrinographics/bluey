@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -61,6 +62,14 @@ class LifecycleClient {
   /// iOS-client side, where handle stability across re-discovery is
   /// not guaranteed).
   StreamSubscription<List<RemoteService>>? _servicesChangesSub;
+
+  /// Subscription to the server's presence characteristic. Listening
+  /// auto-enables notifications via the platform's `setNotification`; the
+  /// subscription itself IS the disconnect signal the iOS server watches
+  /// for (it gets a `didUnsubscribe` callback when this link drops). The
+  /// client never voluntarily unsubscribes while running — only `stop()`
+  /// cancels it.
+  StreamSubscription<Uint8List>? _presenceSub;
 
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
@@ -273,6 +282,47 @@ class LifecycleClient {
       },
     );
 
+    // Subscribe to the presence characteristic so the server (iOS) gets a
+    // real disconnect signal via didUnsubscribe when this link drops. The
+    // client never voluntarily unsubscribes while running; stop() cancels it.
+    final presenceChar =
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() == lifecycle.presenceCharUuid,
+            )
+            .firstOrNull;
+    if (presenceChar != null) {
+      _presenceSub = presenceChar.notifications.listen(
+        (_) {}, // the subscription itself IS the signal; no payload expected
+        onError: (Object e) {
+          // A failed subscription means the server (iOS) won't get a
+          // presence-unsubscribe disconnect signal for this link, so the
+          // disconnect falls back to advisory silence — which, under
+          // Pattern B, does nothing. Surface it rather than fail silently.
+          _logger.log(
+            BlueyLogLevel.warn,
+            'bluey.connection.lifecycle',
+            'presence subscription error — server may not detect this '
+                'link\'s disconnect',
+            data: {'connectionId': _connectionId, 'error': e.toString()},
+          );
+        },
+      );
+    } else {
+      // Expected against a server that predates the presence characteristic;
+      // logged at info so the missing disconnect signal is visible without
+      // alarming. Pattern-B servers always expose it.
+      _logger.log(
+        BlueyLogLevel.info,
+        'bluey.connection.lifecycle',
+        'presence characteristic absent on control service — no '
+            'presence-unsubscribe disconnect signal for this link',
+        data: {'connectionId': _connectionId},
+      );
+    }
+
     try {
       // Send the first heartbeat immediately so the server (especially
       // iOS, which has no connection callback) learns about this client
@@ -360,6 +410,8 @@ class LifecycleClient {
     _monitor.stop();
     _servicesChangesSub?.cancel();
     _servicesChangesSub = null;
+    _presenceSub?.cancel();
+    _presenceSub = null;
   }
 
   /// Re-acquire the heartbeat-char handle from a freshly-discovered
@@ -560,6 +612,31 @@ class LifecycleClient {
         })
         .catchError((Object error) {
           if (!_isRunning) return;
+          // Checked before _isDeadPeerSignal: the eviction status (0x80) also
+          // satisfies _isDeadPeerSignal, so eviction must short-circuit here or
+          // it would be misrouted to the silence-timer path.
+          if (_isEvictionSignal(error)) {
+            _logger.log(
+              BlueyLogLevel.warn,
+              'bluey.connection.lifecycle',
+              'evicted by server (reserved status) — self-disconnecting',
+              data: {'connectionId': _connectionId},
+            );
+            if (_deviceAddress != null) {
+              _events?.emit(
+                HeartbeatFailedEvent(
+                  deviceAddress: _deviceAddress,
+                  isDeadPeerSignal: true,
+                  reason: 'evictedByServer',
+                  source: 'LifecycleClient',
+                ),
+              );
+            }
+            _monitor.cancelProbe();
+            stop();
+            onServerUnreachable();
+            return;
+          }
           if (!_isDeadPeerSignal(error)) {
             // Transient platform error — release in-flight, retry after a
             // full activityWindow (the monitor deadline has already elapsed
@@ -646,4 +723,14 @@ class LifecycleClient {
     if (error is platform.GattOperationStatusFailedException) return true;
     return false;
   }
+
+  /// Whether [error] is the server's reserved *eviction* status (our session
+  /// was removed). Distinct from a generic dead-peer signal: eviction is
+  /// definitive and immediate — we self-disconnect now rather than waiting
+  /// out the silence timer, so the app reconnects into a fresh session
+  /// (I338). Only the eviction byte qualifies; every other status failure
+  /// stays a dead-peer signal fed to the silence monitor.
+  bool _isEvictionSignal(Object error) =>
+      error is platform.GattOperationStatusFailedException &&
+      error.status == lifecycle.lifecycleEvictionAttStatus;
 }

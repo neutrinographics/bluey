@@ -577,6 +577,13 @@ abstract base class BlueyPlatform extends PlatformInterface {
   /// After calling this, the server instance should not be reused.
   Future<void> closeServer();
 
+  /// Re-announces every central the native server still tracks, so a
+  /// freshly-created [BlueyServer] re-establishes sessions for centrals that
+  /// survived from a prior server instance. Required because the native
+  /// manager is reused across recreations and the I333 invalidation path does
+  /// not close it (I338). Default no-op; platform implementations override.
+  Future<void> resetServerSessions() async {}
+
   // === Structured logging ===
 
   /// Stream of structured log events emitted by the platform implementation.
@@ -797,4 +804,11 @@ enum PlatformGattStatus {
   insufficientAuthentication,
   insufficientEncryption,
   requestNotSupported,
+
+  /// Reserved eviction status (ATT application range, see
+  /// `lifecycleEvictionAttStatus`). Emitted by the GATT server to reject a
+  /// request from a client with no established session; the client
+  /// translates it into a self-disconnect (I338). Not part of the public
+  /// `GattResponseStatus` surface — an app cannot select it.
+  lifecycleEviction,
 }

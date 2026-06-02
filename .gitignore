@@ -47,3 +47,5 @@ bluey_android/android/.gradle/
 bluey_android/android/gradle/
 bluey_android/android/gradlew
 bluey_android/android/gradlew.bat
+
+coverage/
