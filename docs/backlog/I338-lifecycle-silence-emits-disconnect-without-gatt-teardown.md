@@ -5,82 +5,95 @@ category: bug
 severity: high
 platform: both
 status: open
-last_verified: 2026-05-30
+last_verified: 2026-06-01
 related: [I017, I201, I202, I207, I337]
 ---
 
-> **Status note (2026-05-30).** Android half (Stage 1) is fixed in HEAD
-> via PR #35 (`2a90fd1`). The iOS half (Stages 2–3) is implemented on the
-> unmerged `i338-stage2-eviction` branch and is **not yet verified in
-> HEAD**: it awaits merge plus the real-device dogfood in Task 4.2
-> (confirming on-wire `0x80` ATT delivery → frame-aligned reassembly).
-> Tracked as `open` until both land.
+> **Status note (2026-06-01).** Android half (Stage 1) is fixed in HEAD
+> via PR #35 (`2a90fd1`). The iOS half took a different path than the
+> original Stage 2 eviction plan: Pattern B (presence-subscription
+> disconnect detection) is implemented on the
+> `i338-disconnect-via-presence` branch and is **not yet merged**. It
+> awaits merge plus real-device dogfood (confirming that
+> `didUnsubscribeFrom(presence)` fires promptly on genuine link loss).
+> Tracked as `open` until both land and dogfood confirms.
 
-## Resolution (implemented on branch `i338-stage2-eviction`; pending merge + dogfood)
+## Resolution
 
-Implemented across three stages on the `i338-stage2-eviction` branch
-(Stage 1 already merged to HEAD via PR #35; Stages 2–3 branch-only). The
-`Server.disconnections` stream is now a faithful projection of
-transport-level connection lifetime, sourced from the most authoritative
-signal each platform offers (`Capabilities.reportsCentralDisconnects`):
+### Android (Stage 1 — shipped in PR #35 / `2a90fd1`)
 
-- **Stage 1 (Android half — shipped in PR #35).** Added
-  `Capabilities.reportsCentralDisconnects` (Android `true`, iOS `false`).
-  `BlueyServer` dis-conflates the two events that previously shared
-  `_handleClientDisconnected`: a new `_handleLifecycleSilence` branches on
-  the capability. On Android (authoritative — a native
-  `onConnectionStateChange` disconnect callback exists), heartbeat silence
-  is **advisory only**: it emits `ClientLifecycleTimeoutEvent` and does
-  **not** touch `disconnections`, clear identification, or evict. The
-  native callback remains the sole source of `disconnections`. A paused
-  peer resumes seamlessly; the decoder is never torn down. This closes the
-  Android half: a heartbeat lull no longer produces a phantom disconnect.
+Added `Capabilities.reportsCentralDisconnects` (Android `true`, iOS
+`false` at the time). `BlueyServer` dis-conflates the two events that
+previously shared `_handleClientDisconnected`: a new
+`_handleLifecycleSilence` branches on the capability. On Android
+(authoritative — a native `onConnectionStateChange` disconnect callback
+exists), heartbeat silence is **advisory only**: it emits
+`ClientLifecycleTimeoutEvent` and does **not** touch `disconnections`,
+clear identification, or evict. The native callback remains the sole
+source of `disconnections`. A paused peer resumes seamlessly; the decoder
+is never torn down. This closes the Android half: a heartbeat lull no
+longer produces a phantom disconnect.
 
-- **Stage 2 (iOS half — this branch).** The "force a real GATT disconnect
-  on silence" fix originally sketched below (Option A) is **not achievable**
-  (Android `cancelConnection` is unreliable per I207; iOS has no per-central
-  disconnect per I202). Instead the server now services read/write requests
-  only within an *established session*. On the inferring path (iOS), silence
-  **evicts** the session (removes it from `_connectedClients`, clears
-  identification) and emits `disconnections`. Because the link stays up, the
-  resumed peer's next request finds no session and is answered with a
-  reserved application-range ATT status (`0x80`, `lifecycleEvictionAttStatus`
-  in `bluey/lib/src/lifecycle.dart`) and **not dispatched**. The client's
-  error-translation maps that status → `DisconnectedException(
-  DisconnectReason.evictedByServer)`; the `LifecycleClient` heartbeat path
-  self-disconnects immediately. The peer reconnects cleanly into a fresh,
-  frame-aligned session instead of resuming mid-stream. `_trackPeerClient`
-  no longer establishes a session from an unknown heartbeat (that
-  re-creation was the corruption path). The absence of a session *is* the
-  eviction state — there is no separate `_evicted` set to bound or expire.
+### iOS (Pattern B — branch `i338-disconnect-via-presence`; pending merge)
 
-- **Stage 3 (native ordering — this branch).** "Announce-before-forward"
-  (Android `GattServer.announceCentralIfNeeded` before forwarding a
-  read/write; iOS already held this on its serial `CBPeripheralManager`
-  queue) plus `resetServerSessions()`, which re-announces tracked centrals
-  on server (re)init so survivors of a prior server instance re-establish
-  their session instead of being wrongly evicted on their next request.
+The eviction handshake originally sketched as Option A/Stage 2 (silence →
+evict session → force-reconnect via `0x80` ATT status) gave iOS a
+real-ish disconnect signal at the cost of a reconnect blip on every long
+pause. Pattern B replaces that with a **genuine native disconnect signal**
+using a dedicated presence notify characteristic
+(`b1e70005-0000-1000-8000-00805f9b34fb`) on the lifecycle control service.
 
-**Net effect.** Both platforms are now non-corrupting. Android resumes a
-transient pause seamlessly; iOS forces a clean disconnect→reconnect (a
-brief reconnect blip) — the only visible cross-platform difference. The
-consumer-facing divergence is documented in
-`bluey/docs/cross-platform-quirks.md` ("Heartbeat silence is advisory on
-Android, a disconnect on iOS"). Spec:
+**Mechanism.** A Bluey client subscribes to the presence characteristic
+on connect and never voluntarily unsubscribes while connected.
+`peripheralManager(_:central:didUnsubscribeFrom:)` on that specific
+characteristic is treated as the authoritative client-disconnect signal —
+it fires promptly on graceful disconnect and after the BLE
+link-supervision timeout on ungraceful loss. The server removes the
+central and fires `onCentralDisconnected`, which propagates to
+`Server.disconnections`. This flips `Capabilities.iOS.reportsCentralDisconnects`
+to `true`, so the `_handleLifecycleSilence` branch now treats silence as
+**advisory on iOS too**: no session eviction, no `disconnections` emission.
+
+**Why a dedicated characteristic?** A client can toggle notifications on
+data characteristics while staying connected. Using a data-characteristic
+`didUnsubscribe` callback would produce false-positive disconnects. The
+dedicated presence characteristic — never voluntarily unsubscribed from
+while live — is unambiguous.
+
+**Codex-P1 reconnect loop resolved.** The eviction path (Stages 2–3)
+cleared the central on a *silence* event while the link was still live.
+When the peer reconnected, the server saw a "new" central and re-announced
+it — triggering a reconnect loop in clients that relied on a stable
+`ServerId` across the pause. Pattern B clears the central only on the real
+disconnect signal, so a reconnect on the same link is impossible; the
+central is only cleared when the link is actually gone.
+
+**Eviction code is NOT deleted — it is dormant.** The `_handleLifecycleSilence`
+eviction branch (heartbeat silence → evict → `0x80` ATT status → force
+reconnect) remains in `LifecycleServer` but is gated behind
+`Capabilities.reportsCentralDisconnects == false`. With Pattern B live,
+iOS reports `true`, so the branch never runs. If the presence mechanism
+proves unreliable in the field (a real loss fails to fire
+`didUnsubscribeFrom(presence)` before the supervision timeout), flipping
+the capability flag re-enables the eviction handshake without any code
+changes.
+
+**Empirical residual (real-device dogfood, pending).** The presence
+mechanism relies on CoreBluetooth cleaning up subscriptions on link
+teardown for every genuine loss. This has been consistent across iOS
+11–18. What is not yet confirmed on hardware for this specific
+characteristic: that `didUnsubscribeFrom(presenceChar)` fires reliably on
+ungraceful loss within the supervision-timeout window (expected: ~30 s).
+The gossip_chat dogfood run confirming both graceful and ungraceful
+disconnect paths is the load-bearing real-world check and is still
+outstanding.
+
+**Net effect.** Both platforms are now non-corrupting with **no reconnect
+blip**: a paused peer resumes seamlessly on both Android and iOS — no
+`disconnections` event, no decoder teardown. The consumer-facing behavior
+is documented in `bluey/docs/cross-platform-quirks.md` ("Heartbeat silence
+is advisory on both platforms"). Spec:
 `docs/superpowers/specs/2026-05-30-lifecycle-silence-transport-reconciliation-design.md`.
-
-**Empirical residual (Task 4.2 — real-device dogfood, pending).** The
-client-side application-range ATT status carry path is verified in code on
-both platforms (iOS preserves the byte post-I091; Android routes it via
-`statusFailedError`). What is **not yet confirmed on hardware** is that iOS
-actually *delivers* a `0x80` ATT write-response status to the app —
-i.e. that `CBATTError.Code(rawValue: 0x80)` reaches CoreBluetooth's write
-callback rather than being masked/normalized by the OS. If a platform masks
-it, the eviction status falls back to the heartbeat-write path only (the
-`LifecycleClient` already treats a heartbeat-write failure on a session it
-believes live as an evict-and-reconnect trigger). The gossip_chat dogfood
-run confirming frame-aligned reassembly on the iOS eviction→reconnect path
-is the load-bearing real-world check and is still outstanding.
 
 ## Original report (pre-fix)
 

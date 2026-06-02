@@ -113,12 +113,12 @@ abstract class Server {
   /// same client. On disconnect the identification resets; a
   /// reconnect-then-heartbeat produces a fresh emission.
   ///
-  /// On inferring platforms (iOS), a paused peer whose session is evicted
-  /// by heartbeat-silence (see [disconnections]) does **not** silently
-  /// re-identify mid-stream when it resumes — its first post-eviction
-  /// request is rejected, forcing a real reconnect, and this stream only
-  /// re-emits *after* that fresh connect. (That mid-stream re-identification
-  /// was the I338 stream-framing corruption path; it is now closed.)
+  /// On both platforms, heartbeat silence is advisory — a paused peer whose
+  /// heartbeats stop does **not** trigger a [disconnections] event. When it
+  /// resumes and sends a heartbeat it is re-identified seamlessly; this stream
+  /// does **not** re-emit between the pause and the resume. (The mid-stream
+  /// re-identification that was the I338 stream-framing corruption path is
+  /// closed: silence never evicts a session.)
   ///
   /// Consumers that only care about Bluey peers can subscribe here and
   /// ignore [connections]; raw / non-Bluey centrals are never emitted.
@@ -131,21 +131,20 @@ abstract class Server {
   ///
   /// **Source of truth by platform:**
   /// - **Android** (`Capabilities.reportsCentralDisconnects == true`): driven
-  ///   by the platform's native `onConnectionStateChange` callback. A heartbeat
-  ///   lull (silence past the `lifecycleInterval` window) produces only a
-  ///   [ClientLifecycleTimeoutEvent] advisory; no `disconnections` event is
-  ///   emitted until the platform reports the link down.
-  /// - **iOS** (`Capabilities.reportsCentralDisconnects == false`, no native
-  ///   client-disconnect callback, I201): heartbeat silence past the timeout is
-  ///   the only disconnect signal available, so it drives this stream — the
-  ///   client's session is *evicted* (removed from `connectedClients`,
-  ///   identification cleared). The link itself stays up, so the evicted peer's
-  ///   next request is rejected with a reserved ATT status and it self-
-  ///   disconnects (`DisconnectReason.evictedByServer`), reconnecting cleanly
-  ///   into a fresh, frame-aligned session rather than resuming mid-stream
-  ///   (I338).
+  ///   by the platform's native `onConnectionStateChange` callback.
+  /// - **iOS** (`Capabilities.reportsCentralDisconnects == true`): driven by
+  ///   `peripheralManager(_:central:didUnsubscribeFrom:)` on the dedicated
+  ///   presence notify characteristic. When a Bluey client connects it
+  ///   subscribes to that characteristic and never voluntarily unsubscribes
+  ///   while connected, so an unsubscription event is a reliable proxy for
+  ///   link loss (I338 Pattern B).
   ///
-  /// Real platform disconnects and client CourtesyDisconnects always emit on
+  /// On **both** platforms, heartbeat silence is **advisory only** — it emits
+  /// [ClientLifecycleTimeoutEvent] but never drives this stream. A paused peer
+  /// resumes seamlessly without a disconnect/reconnect cycle (no decoder
+  /// teardown, no session eviction).
+  ///
+  /// Real platform disconnects and client courtesy-disconnects always emit on
   /// both platforms. The emitted value equals [Client.address] for the same
   /// physical client, enabling correct bridging of the [connections] and
   /// [disconnections] streams (fixes I337).
