@@ -104,4 +104,31 @@ void main() {
       bluey.dispose();
     });
   });
+
+  test(
+      'didUnsubscribe-miss: a silent link loss is NOT detected (justifies the dormant eviction fallback)',
+      () async {
+    final fake = FakeBlueyPlatform(reportsCentralDisconnects: true);
+    BlueyPlatform.instance = fake;
+    final bluey = await Bluey.create();
+    fakeAsync((async) {
+      final server = bluey.server(lifecycleInterval: _interval)!;
+      server.startAdvertising(name: 't');
+      async.flushMicrotasks();
+      final gone = <ClientAddress>[];
+      server.disconnections.listen(gone.add);
+      fake.simulateCentralConnection(centralId: _mac);
+      async.flushMicrotasks();
+      fake.simulateSilentLinkLoss(_mac); // didUnsubscribe didn't fire
+      async.flushMicrotasks();
+      async.elapse(_interval * 3); // even long silence is advisory under the flip
+      expect(gone, isEmpty,
+          reason: 'without the didUnsubscribe signal, the loss is missed — '
+              'the explicit, visible cost of Pattern B; covered by re-enabling '
+              'the dormant eviction (reportsCentralDisconnects=false) if hardware proves the signal flaky');
+      expect(server.isClientConnected(const ClientAddress(_mac)), isTrue);
+      server.dispose();
+      bluey.dispose();
+    });
+  });
 }

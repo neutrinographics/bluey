@@ -723,6 +723,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _centralDisconnectionController.add(centralId);
   }
 
+  /// Models an iOS link loss where `didUnsubscribe` did NOT fire (the flaky
+  /// case): the transport central is gone, but NO `centralDisconnections`
+  /// signal is emitted — so the server never learns. Used to make Pattern B's
+  /// empirical dependency on `didUnsubscribe` reliability explicit.
+  void simulateSilentLinkLoss(String centralId) {
+    _connectedCentrals.remove(centralId);
+    // Deliberately does NOT add to _centralDisconnectionController.
+  }
+
   /// Simulates a read request from a connected central.
   Future<Uint8List> simulateReadRequest({
     required String centralId,
