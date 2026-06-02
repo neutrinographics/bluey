@@ -61,11 +61,15 @@ class Capabilities {
   /// this flag when `manufacturerData != null`.
   final bool canAdvertiseManufacturerData;
 
-  /// Whether the platform delivers a reliable native callback when a
-  /// connected central disconnects from this device's GATT server.
-  /// `true` on Android (`onConnectionStateChange`); `false` on iOS
-  /// (`CBPeripheralManager` has no client-disconnect callback — I201),
-  /// where disconnects are inferred from lifecycle heartbeat silence.
+  /// Whether the platform delivers an authoritative client-disconnect signal
+  /// for this device's GATT server — making heartbeat silence advisory rather
+  /// than a disconnect inference.
+  /// `true` on Android (`onConnectionStateChange`). `true` on iOS via Pattern B
+  /// (I338): `CBPeripheralManager` has no native client-disconnect callback
+  /// (I201), so a central unsubscribing from the dedicated lifecycle presence
+  /// characteristic stands in as the signal (`didUnsubscribeFrom`).
+  /// Flipping this to `false` re-enables the dormant silence-eviction handshake
+  /// as a fallback if the presence signal proves unreliable on hardware.
   final bool reportsCentralDisconnects;
 
   const Capabilities({
