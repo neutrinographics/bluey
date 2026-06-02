@@ -6,7 +6,7 @@ severity: medium
 platform: ios
 status: wontfix
 last_verified: 2026-04-25
-related: [I079, I091, I090, I096]
+related: [I079, I091, I090, I096, I342]
 ---
 
 ## Symptom
