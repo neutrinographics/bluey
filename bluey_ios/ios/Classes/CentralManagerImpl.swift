@@ -39,6 +39,9 @@ class CentralManagerImpl: NSObject {
     private var writeDescriptorSlots: [String: [String: OpSlot<Void>]] = [:]
     private var readRssiSlots: [String: OpSlot<Int64>] = [:]
 
+    /// I339 — per-device WriteNoResponse flow-control queue. See PendingWriteQueue.
+    private var pendingWriteQueues: [String: PendingWriteQueue<CBCharacteristic>] = [:]
+
     // Configurable timeout values — set via configure(), defaults match previous hardcoded values
     private var connectTimeout: TimeInterval = 30.0
     private var discoverServicesTimeout: TimeInterval = 15.0
@@ -332,8 +335,6 @@ class CentralManagerImpl: NSObject {
             return
         }
 
-        let type: CBCharacteristicWriteType = withResponse ? .withResponse : .withoutResponse
-
         if withResponse {
             let cacheKey = characteristic.uuid.uuidString.lowercased()
             let slot = writeCharacteristicSlots[deviceId, default: [:]][cacheKey] ?? OpSlot<Void>()
@@ -343,13 +344,29 @@ class CentralManagerImpl: NSObject {
                 timeoutSeconds: writeCharacteristicTimeout,
                 makeTimeoutError: PigeonError(code: "gatt-timeout", message: "Write characteristic timed out", details: nil)
             )
+            peripheral.writeValue(value.data, for: characteristic, type: .withResponse)
+            return
         }
 
-        peripheral.writeValue(value.data, for: characteristic, type: type)
-
-        if !withResponse {
-            completion(.success(()))
+        // .withoutResponse — pace against CoreBluetooth's TX gate so bursts
+        // are not silently dropped/coalesced (I339). The queue fires the
+        // Pigeon completion only when the write is actually handed off.
+        let queue = pendingWriteQueues[deviceId] ?? PendingWriteQueue<CBCharacteristic>()
+        pendingWriteQueues[deviceId] = queue
+        let accepted = queue.enqueue(
+            PendingWriteQueue.Entry(
+                characteristic: characteristic,
+                data: value.data,
+                completion: completion
+            )
+        )
+        guard accepted else {
+            // Runaway back-pressure past the 1024 cap (effectively unreachable
+            // under complete-on-hand-off). Surface rather than silently drop.
+            completion(.failure(PigeonError(code: "gatt-busy", message: "Write-without-response queue saturated", details: nil)))
+            return
         }
+        pumpWriteNoResponse(deviceId: deviceId, peripheral: peripheral)
     }
 
     func setNotification(deviceId: String, characteristicHandle: Int64, enable: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -568,6 +585,13 @@ class CentralManagerImpl: NSObject {
     }
 
     // MARK: - CBPeripheralDelegate callbacks
+
+    /// I339 — CoreBluetooth's TX gate reopened; resume draining this
+    /// peripheral's deferred WriteNoResponse writes.
+    func peripheralIsReadyToSendWriteWithoutResponse(peripheral: CBPeripheral) {
+        let deviceId = peripheral.identifier.uuidString.lowercased()
+        pumpWriteNoResponse(deviceId: deviceId, peripheral: peripheral)
+    }
 
     func didDiscoverServices(peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString.lowercased()
@@ -909,6 +933,18 @@ class CentralManagerImpl: NSObject {
 
     // MARK: - Helpers
 
+    /// I339 — drain the device's WriteNoResponse queue while CoreBluetooth's
+    /// TX gate is open. Each accepted write fires its Pigeon completion
+    /// `.success`. Stops at the first shut gate; `peripheralIsReady` re-pumps.
+    private func pumpWriteNoResponse(deviceId: String, peripheral: CBPeripheral) {
+        guard let queue = pendingWriteQueues[deviceId] else { return }
+        queue.drain(send: { entry in
+            guard peripheral.canSendWriteWithoutResponse else { return false }
+            peripheral.writeValue(entry.data, for: entry.characteristic, type: .withoutResponse)
+            return true
+        })
+    }
+
     private func clearPendingCompletions(for deviceId: String, error: Error) {
         BlueyLog.shared.log(.debug, "bluey.ios.central", "clearPendingCompletions: drain all op-slots",
                             data: ["deviceId": deviceId])
@@ -929,6 +965,8 @@ class CentralManagerImpl: NSObject {
                 slot.drainAll(error)
             }
         }
+        // I339 — fail any deferred WriteNoResponse writes; the link is gone.
+        pendingWriteQueues.removeValue(forKey: deviceId)?.failAll(error: error)
         if let slots = notifySlots.removeValue(forKey: deviceId) {
             for (_, slot) in slots {
                 slot.drainAll(error)
