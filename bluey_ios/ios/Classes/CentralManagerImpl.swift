@@ -362,7 +362,11 @@ class CentralManagerImpl: NSObject {
         )
         guard accepted else {
             // Runaway back-pressure past the 1024 cap (effectively unreachable
-            // under complete-on-hand-off). Surface rather than silently drop.
+            // under complete-on-hand-off — a serial consumer holds depth at ~1).
+            // `gatt-busy` is intentionally left out of the Dart error-translation
+            // table: this backstop is not expected to fire in practice, so it
+            // surfaces as a generic BlueyPlatformException rather than warranting
+            // its own typed exception. Surface it rather than silently drop.
             completion(.failure(PigeonError(code: "gatt-busy", message: "Write-without-response queue saturated", details: nil)))
             return
         }
