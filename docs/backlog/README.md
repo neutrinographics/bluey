@@ -64,6 +64,8 @@ Ordered by impact per hour, refreshed 2026-04-30 after the capabilities-matrix b
 
 Tiers 1–3 are cleared and the Tier 4 capabilities-matrix bundle landed 2026-04-30 (`ec40c41..e177f1d`), closing I053 + I065 + I069 + I303 + I310 + the I045 follow-up. The remaining backlog is the long tail of Tier 4: smaller opportunistic bundles plus low-severity stubs and limitations. Everything below is genuinely opportunistic — pick up when in nearby code or when a concrete consumer needs it.
 
+**Update 2026-06-02.** I337 (address value objects), I338 (lifecycle-silence, both platforms via Pattern B), and the I088/I012/I067/I325 bundles have landed; a backlog audit reclassified I001/I006/I023/I034/I042/I046 as fixed. The one **high-severity open bug** is now **I339** (iOS write-without-response flow control) — the recommended next target. Everything else open is medium-or-lower and opportunistic.
+
 ### Tier 1 — Quick wins (sub-day each) — DONE
 
 Tier 1 cleared. Done in this cycle:
@@ -139,16 +141,13 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I001](I001-disconnect-state-double-emission.md) | Disconnect state double-emission | medium |
 | [I004](I004-mtu-not-synced-with-platform-callbacks.md) | MTU not synced with platform-initiated changes | medium |
 | [I005](I005-async-init-without-error-handling.md) | Async initialization without error handling | medium |
-| [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC → UUID truncation | medium |
 | [I007](I007-connection-state-init-race.md) | Connection state init race (mitigated, not prevented) | low |
 | [I008](I008-notification-subscription-race.md) | Notification subscription race (mitigated, not prevented) | low |
 | [I072](I072-lifecycle-server-record-activity-race.md) | `LifecycleServer.recordActivity` races with timer cancellation | medium |
 | [I075](I075-cached-services-race-with-invalidation.md) | `_cachedServices` race between `services()` and invalidation | medium |
 | [I076](I076-handle-service-change-silent-swallow.md) | `_handleServiceChange` swallows exceptions silently | medium |
-| [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md) | Lifecycle-silence timeout fires phantom `Server.disconnections`, corrupting downstream stream framing. Android half (Stage 1) fixed in HEAD (PR #35, `2a90fd1`): silence is advisory, `disconnections` driven by the native callback only. iOS half implemented via Pattern B (presence-subscription disconnect detection) on branch `i338-disconnect-via-presence` — dogfood PASSED across the role matrix; pending merge. | high |
 | [I340](I340-remove-dormant-silence-eviction-machinery.md) | Remove the dormant silence-eviction machinery (reserved ATT status, Pigeon carry, client fast-path, server gate) once Pattern B has soaked in production. Deferred cleanup follow-up to I338 — do not action yet. | low |
 | [I341](I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) | A failed presence-characteristic subscription silently leaves an iOS-server peer's disconnect undetectable (session leaks until restart). Corner case; fix = client-side bounded retry. Deferred. | low |
 
@@ -170,7 +169,6 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | ID | Title | Severity |
 |---|---|---|
 | [I022](I022-gatt-server-descriptor-read-no-dart-api.md) | Descriptor read auto-responded; no Dart API | medium |
-| [I023](I023-gatt-server-notification-sent-no-tracking.md) | `onNotificationSent` not tracked for completion | medium |
 | [I024](I024-gatt-server-mtu-change-not-propagated.md) | Server-side MTU change not propagated to Dart | medium |
 | [I025](I025-gatt-server-phy-events-logging-only.md) | Server-side PHY update/read events are logging-only | low |
 | [I306](I306-android-server-no-disconnect-on-ios-client-cancel.md) | Android server doesn't observe non-Bluey iOS client disconnect (peer-protocol case fixed; raw-GATT case remains, supervision-timeout-bound) | low |
@@ -179,26 +177,24 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Severity |
 |---|---|---|
-| [I030](I030-android-bonding-stub.md) | Bonding API stubbed (hardcoded returns) | high |
-| [I031](I031-android-phy-stub.md) | PHY API stubbed (hardcoded returns) | high |
-| [I032](I032-android-connection-parameters-stub.md) | Connection parameters API stubbed (hardcoded returns) | high |
+| [I030](I030-android-bonding-stub.md) | Bonding API stubbed (hardcoded returns) | medium |
+| [I031](I031-android-phy-stub.md) | PHY API stubbed (hardcoded returns) | medium |
+| [I032](I032-android-connection-parameters-stub.md) | Connection parameters API stubbed (hardcoded returns) | medium |
 | [I033](I033-android-connection-priority-not-exposed.md) | Connection priority request not exposed | medium |
-| [I034](I034-android-maximum-write-length-not-exposed.md) | Maximum write length query not exposed | medium |
-| [I035](I035-android-bond-phy-conn-param-stubs.md) | Dart-side bonding/PHY/connection-parameter methods return silent success (umbrella for I030–I034) | high |
+| [I035](I035-android-bond-phy-conn-param-stubs.md) | Dart-side bonding/PHY/connection-parameter methods return silent success (umbrella for I030–I034) | medium |
 
 ### Open — iOS stubs / no-ops / bugs
 
 | ID | Title | Severity |
 |---|---|---|
 | [I041](I041-ios-read-notification-race.md) | `didUpdateCharacteristicValue` conflates read response with notification | medium |
-| [I042](I042-ios-services-cache-dead.md) | `services` cache dict is dead storage | low |
 | [I043](I043-ios-no-retrieve-peripherals.md) | No `retrievePeripherals` / `retrieveConnectedPeripherals` API | medium |
-| [I046](I046-ios-max-write-length-not-exposed.md) | `getMaximumWriteLength` implemented but not exposed via Pigeon | medium |
 | [I047](I047-ios-pending-write-requests-batch.md) | `respondToWriteRequest` only responds to first of batched ATT requests | medium |
 | [I048](I048-ios-no-state-restoration.md) | iOS managers initialized without restore identifier; state restoration disabled | medium |
 | [I083](I083-ios-powered-off-no-state-clear.md) | `peripheralManagerDidUpdateState(.poweredOff)` doesn't clear state | medium |
 | [I315](I315-ios-pending-notification-stale-entries-on-disconnect.md) | `PendingNotificationQueue` (post-I040) may hold stale entries for centrals that disconnect mid-burst — bounded by cap + `closeServer` | low |
 | [I321](I321-ios-bond-mismatch-opaque-error.md) | `connect` surfaces `CBError.peerRemovedPairingInformation` (code 14) as opaque `BlueyPlatformException`; no actionable UX path for stale-bond recovery | medium |
+| [I339](I339-ios-write-without-response-no-flow-control.md) | iOS central `writeValue(.withoutResponse)` has no flow control (no `canSendWriteWithoutResponse` gate / `peripheralIsReady` drain); bursts silently drop/coalesce writes → frame corruption | high |
 | [I342](I342-failure-injection-ios-server-att-wedge.md) | Failure-injection stress test (iOS server → Android client) wedges the sequential ATT channel by never acking the dropped write; client's subsequent writes cascade as opaque `bluey-unknown`. Pre-existing (reproduces on `main`); role-reversed sibling of I087 | low |
 
 ### Open — cross-platform unimplemented features
@@ -228,6 +224,13 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 
 | ID | Title | Fixed in |
 |---|---|---|
+| [I001](I001-disconnect-state-double-emission.md) | Disconnect state double-emission | `8b02ccf` |
+| [I006](I006-mac-to-uuid-truncation.md) | BlueyCentral MAC → UUID truncation | `3863358` |
+| [I023](I023-gatt-server-notification-sent-no-tracking.md) | `onNotificationSent` not tracked for completion | `aa588f1` |
+| [I034](I034-android-maximum-write-length-not-exposed.md) | Maximum write length query not exposed | `47c3e5b` |
+| [I042](I042-ios-services-cache-dead.md) | iOS `services` cache dict is dead storage | `99893fd` |
+| [I046](I046-ios-max-write-length-not-exposed.md) | iOS `getMaximumWriteLength` not exposed via Pigeon | `47c3e5b` |
+| [I338](I338-lifecycle-silence-emits-disconnect-without-gatt-teardown.md) | Lifecycle-silence phantom `Server.disconnections` (Android Stage 1 + iOS Pattern B) | `d173d39` |
 | [I020](I020-gatt-server-auto-respond-characteristic-write.md) | GATT server auto-respond on characteristic write | `3539a42` |
 | [I021](I021-gatt-server-auto-respond-characteristic-read.md) | GATT server auto-respond on characteristic read | `3539a42` |
 | [I070](I070-lifecycle-client-late-promise-callbacks.md) | LifecycleClient late promise callbacks fire after `stop()` | `136fa47` |

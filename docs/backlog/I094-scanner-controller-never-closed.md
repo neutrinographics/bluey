@@ -27,3 +27,5 @@ No `dispose()` method on the scanner class. The parent `Bluey` object also doesn
 Fix: add `dispose()` to each platform scanner that closes `_scanController` (and cancels any active scan). Wire through `Bluey.dispose()` (which... may not exist as a public method yet; worth verifying).
 
 Same pattern as the Android/iOS server controllers (I095). Consider a uniform disposal pattern across both.
+
+**Update (2026-06-02):** Narrowed — the domain `BlueyScanner.dispose()` now closes its controllers; the remaining leak is in the platform adapters (`android_scanner.dart` / `ios_scanner.dart`), which never dispose their `_scanController`.

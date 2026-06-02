@@ -2,7 +2,7 @@
 id: I032
 title: Connection parameters API stubbed (hardcoded returns)
 category: no-op
-severity: high
+severity: medium
 platform: android
 status: open
 last_verified: 2026-04-23
@@ -35,3 +35,5 @@ Fix direction: rename / reshape the API to `requestConnectionPriority(Connection
 iOS exposes `requestConnectionParameters(MinInterval, MaxInterval, SlaveLatency, Timeout)` only when advertising as a peripheral, and only on macOS (CBPeripheralManager). Not on iOS for centrals. So this is essentially Android-only.
 
 See also I033 (the connection-priority regression called out in ANDROID_IMPLEMENTATION_COMPARISON).
+
+**Severity note (2026-06-02):** Downgraded high→medium — Stage A landed (methods now throw `UnimplementedError` and are capability-gated rather than silently succeeding); only Stage B (Pigeon + native impl) remains, and these are rarely-used APIs (bonding is legacy; PHY/conn-params niche).

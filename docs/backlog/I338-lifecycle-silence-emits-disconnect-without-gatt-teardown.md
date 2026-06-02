@@ -4,25 +4,19 @@ title: Lifecycle-silence timeout fires `Server.disconnections` without tearing d
 category: bug
 severity: high
 platform: both
-status: open
+status: fixed
+fixed_in: d173d39
 last_verified: 2026-06-02
 related: [I017, I201, I202, I207, I337, I340]
 ---
 
-> **Status note (2026-06-02).** Android half (Stage 1) is fixed in HEAD
-> via PR #35 (`2a90fd1`). The iOS half took a different path than the
-> original Stage 2 eviction plan: Pattern B (presence-subscription
-> disconnect detection) is implemented on the
-> `i338-disconnect-via-presence` branch. Real-device dogfood is **PASSED**
-> across the role matrix: iOS-server detects disconnects via
-> `didUnsubscribeFrom(presence)` on all four loss modes (BT-off,
-> command-line kill, on-device close, out-of-range via the supervision
-> timeout) with clean reconnect (no Codex-P1 loop); Android-server detects
-> via its native `onConnectionStateChange` (pre-existing path, unchanged).
-> The eviction machinery (Stage 2) is retained **dormant** behind
-> `reportsCentralDisconnects == false` as a re-enable-able fallback — its
-> eventual removal is tracked in [I340](I340-remove-dormant-silence-eviction-machinery.md).
-> Tracked as `open` until the branch merges.
+> **Status note (2026-06-02). DONE.** Android half (Stage 1) shipped in
+> PR #35 (`2a90fd1`); iOS half (Pattern B — presence-subscription
+> disconnect detection) merged in PR #37 (`d173d39`). Dogfood passed
+> across the full role matrix (iOS-server + Android-server, all four loss
+> modes). Dormant eviction machinery removal tracked in
+> [I340](I340-remove-dormant-silence-eviction-machinery.md); subscription-failure
+> corner case tracked in [I341](I341-presence-subscription-failure-degrades-ios-disconnect-detection.md).
 
 ## Resolution
 

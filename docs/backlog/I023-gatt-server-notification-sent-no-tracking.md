@@ -4,8 +4,9 @@ title: "`onNotificationSent` not tracked for completion"
 category: no-op
 severity: medium
 platform: android
-status: open
-last_verified: 2026-04-23
+status: fixed
+fixed_in: aa588f1
+last_verified: 2026-06-02
 related: [I012]
 ---
 
@@ -24,3 +25,7 @@ No tracking map between `notifyCharacteristic()` calls and the `onNotificationSe
 ## Notes
 
 Closely coupled to I012 — consider merging them into one PR. I012 describes the desired user-facing shape; I023 describes the native-side plumbing change. Both are the same fix.
+
+## Resolution (verified 2026-06-02)
+
+I012 added per-central FIFO completion tracking (`pendingNotifications` in `GattServer.kt`); `onNotificationSent` now pops the queue and fires the per-notify completion. Verified in HEAD.

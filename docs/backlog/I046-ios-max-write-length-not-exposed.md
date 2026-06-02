@@ -4,8 +4,9 @@ title: iOS `getMaximumWriteLength` implemented but not exposed via Pigeon
 category: unimplemented
 severity: medium
 platform: ios
-status: open
-last_verified: 2026-04-26
+status: fixed
+fixed_in: 47c3e5b
+last_verified: 2026-06-02
 related: [I034]
 ---
 
@@ -36,3 +37,7 @@ Companion to I034 (Android side has the same gap). Fix should be coherent across
 External references:
 - Apple [`CBPeripheral.maximumWriteValueLength(for:)`](https://developer.apple.com/documentation/corebluetooth/cbperipheral/maximumwritevaluelength(for:)).
 - Punch Through, [BLE Write Requests vs. Write Commands](https://punchthrough.com/ble-write-requests-vs-write-commands/) — discusses the relationship between MTU and write-type-specific limits.
+
+## Resolution (verified 2026-06-02)
+
+I325 exposed `getMaximumWriteLength` via Pigeon and the domain `maxWritePayload` API (`bluey_connection.dart`). Verified in HEAD.

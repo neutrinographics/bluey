@@ -87,3 +87,5 @@ Fix sketch (small):
 Pairs with I051 (advertise configurability) and I313 (scan-response slot)
 but isn't subsumed by either — this is purely about the failure-translation
 seam.
+
+**Update (2026-06-02):** Partially addressed — `DATA_TOO_LARGE` is now differentiated as `bluey-advertise-data-too-large` (via the I099 typed-error rewrite). Still open: the other `AdvertisingSetCallback` failure codes (ALREADY_STARTED, TOO_MANY_ADVERTISERS, INTERNAL_ERROR, FEATURE_UNSUPPORTED) still collapse to `bluey-unknown`.

@@ -4,8 +4,9 @@ title: "iOS `services` dict is dead storage"
 category: bug
 severity: low
 platform: ios
-status: open
-last_verified: 2026-04-23
+status: fixed
+fixed_in: 99893fd
+last_verified: 2026-06-02
 ---
 
 ## Symptom
@@ -29,3 +30,7 @@ Leftover from an earlier design that probably used the Bluey-side cache, before 
 Trivial cleanup: delete the `services` dict, the writes, and the clear calls. Zero behavior change. Can roll into any other CentralManagerImpl change.
 
 No parallel `characteristics` / `descriptors` problem — those dicts *are* read in `findCharacteristic` / `findDescriptor`.
+
+## Resolution (verified 2026-06-02)
+
+The dead UUID-keyed `services` lookup dict was removed in the I088 dead-code cleanup; no such field remains in `CentralManagerImpl.swift`. Verified absent in HEAD.

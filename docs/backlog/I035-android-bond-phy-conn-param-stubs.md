@@ -2,7 +2,7 @@
 id: I035
 title: Android Dart-side bonding/PHY/connection-parameter methods return silent success
 category: no-op
-severity: high
+severity: medium
 platform: android
 status: open
 last_verified: 2026-04-26
@@ -51,3 +51,5 @@ External references:
 - Android [`BluetoothGatt.requestConnectionPriority(...)`](https://developer.android.com/reference/android/bluetooth/BluetoothGatt#requestConnectionPriority(int)).
 - [`ACTION_BOND_STATE_CHANGED`](https://developer.android.com/reference/android/bluetooth/BluetoothDevice#ACTION_BOND_STATE_CHANGED).
 - Martijn van Welie, [*Making Android BLE Work — Part 4* on bonding](https://medium.com/@martijn.van.welie/making-android-ble-work-part-4-72a0b85cb442).
+
+**Severity note (2026-06-02):** Downgraded high→medium — Stage A landed (methods now throw `UnimplementedError` and are capability-gated rather than silently succeeding); only Stage B (Pigeon + native impl) remains, and these are rarely-used APIs (bonding is legacy; PHY/conn-params niche).

@@ -2,7 +2,7 @@
 id: I031
 title: PHY API stubbed (hardcoded returns)
 category: no-op
-severity: high
+severity: medium
 platform: android
 status: open
 last_verified: 2026-04-23
@@ -33,3 +33,5 @@ Fix sketch:
 API-level gate: `Build.VERSION.SDK_INT < Build.VERSION_CODES.O` → return / throw a Bluey-typed exception. `minSdkVersion` in Bluey's Gradle config should be compared; if it's ≥26 this is a pure implementation.
 
 iOS does not expose PHY at all — see I200, `wontfix`.
+
+**Severity note (2026-06-02):** Downgraded high→medium — Stage A landed (methods now throw `UnimplementedError` and are capability-gated rather than silently succeeding); only Stage B (Pigeon + native impl) remains, and these are rarely-used APIs (bonding is legacy; PHY/conn-params niche).

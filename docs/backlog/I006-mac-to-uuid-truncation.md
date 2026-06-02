@@ -4,8 +4,9 @@ title: BlueyCentral MAC → UUID truncation
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+fixed_in: 3863358
+last_verified: 2026-06-02
 historical_ref: BUGS-ANALYSIS-#12
 ---
 
@@ -28,3 +29,7 @@ Worth noting the historical BUGS_ANALYSIS described this as silently dropped. A 
 Fix sketch: treat the input semantically. If `platformId` matches the MAC regex, strip colons, parse as 12 hex digits, and zero-pad to the UUID's 128 bits (`00000000-0000-0000-0000-{MAC}`). If it's already a UUID, pass through. Otherwise, hash it (SHA-256, first 16 bytes) for a collision-resistant deterministic mapping.
 
 Platforms also differ: Android supplies `AA:BB:CC:...`, iOS supplies a random resolvable-address-derived UUID. The MAC→UUID path only matters on Android-as-server.
+
+## Resolution (verified 2026-06-02)
+
+I337 replaced the lossy `String→UUID` identity with `DeviceAddress`/`ClientAddress` value objects; the truncating MAC→UUID conversion no longer exists. Verified absent in HEAD.

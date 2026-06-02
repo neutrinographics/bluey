@@ -4,8 +4,9 @@ title: Disconnect state double-emission
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+fixed_in: 8b02ccf
+last_verified: 2026-06-02
 historical_ref: BUGS-ANALYSIS-#3
 ---
 
@@ -31,3 +32,7 @@ Two viable fixes:
 2. Cancel the platform subscription before the manual emission in `disconnect()`. Simple, but the subscription can no longer observe unexpected late-stage events.
 
 Needs a test that asserts exactly one `disconnected` emission per disconnect call.
+
+## Resolution (verified 2026-06-02)
+
+The `connected→linked+ready` state-machine split (I067) added a `if (_state == newState) return;` dedup guard in `_setState` (`bluey_connection.dart`), so a redundant `disconnected` emission is now filtered. Verified in HEAD.

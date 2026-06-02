@@ -2,7 +2,7 @@
 id: I030
 title: Bonding API stubbed (hardcoded returns)
 category: no-op
-severity: high
+severity: medium
 platform: android
 status: open
 last_verified: 2026-04-23
@@ -33,3 +33,5 @@ Fix sketch:
 Permission implications: Android 12+ requires `BLUETOOTH_CONNECT` for bonding ops. Already requested, so no manifest change.
 
 iOS bonding is handled transparently by CoreBluetooth — no corresponding stub to fix. The iOS `ios_connection_manager.dart` correctly returns empty streams (see I200, `wontfix`).
+
+**Severity note (2026-06-02):** Downgraded high→medium — Stage A landed (methods now throw `UnimplementedError` and are capability-gated rather than silently succeeding); only Stage B (Pigeon + native impl) remains, and these are rarely-used APIs (bonding is legacy; PHY/conn-params niche).
