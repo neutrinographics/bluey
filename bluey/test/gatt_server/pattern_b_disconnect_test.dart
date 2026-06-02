@@ -27,7 +27,8 @@ void main() {
       async.flushMicrotasks();
       fake.simulateCentralDisconnection(_mac); // = iOS didUnsubscribe(presence)
       async.flushMicrotasks();
-      expect(gone, equals([const ClientAddress(_mac)]));
+      expect(gone, equals([const ClientAddress(_mac)]),
+          reason: 'centralDisconnection must emit exactly one disconnections event');
       expect(server.isClientConnected(const ClientAddress(_mac)), isFalse);
       server.dispose();
       bluey.dispose();
@@ -35,7 +36,7 @@ void main() {
   });
 
   test(
-      'Codex-P1 resolved: reconnect after disconnect re-establishes cleanly (no loop)',
+      'Pattern-B: reconnect after presence-disconnect re-establishes cleanly (no eviction loop)',
       () async {
     final fake = FakeBlueyPlatform(reportsCentralDisconnects: true);
     BlueyPlatform.instance = fake;
