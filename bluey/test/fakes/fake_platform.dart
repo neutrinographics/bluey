@@ -357,6 +357,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Records every call to [readCharacteristic] in order.
   final List<ReadCharacteristicCall> readCharacteristicCalls = [];
 
+  /// Records every call to [setNotification] in order. Carries both the
+  /// wire-level handle and the fake-resolved characteristic UUID so tests
+  /// can assert on UUID without knowing the per-device handle mapping.
+  final List<SetNotificationCall> setNotificationCalls = [];
+
   /// Records every call to [discoverServices] by deviceId, in order.
   /// Used by tests that need to assert re-discovery happened (e.g. after
   /// a Service Changed event clears the cache).
@@ -616,6 +621,21 @@ base class FakeBlueyPlatform extends BlueyPlatform {
                 canWrite: false,
                 canWriteWithoutResponse: false,
                 canNotify: false,
+                canIndicate: false,
+              ),
+              descriptors: [],
+              handle: 0,
+            ),
+            // Presence char: notify-only. The client subscribes to this on
+            // connect so the iOS server learns of the disconnect via
+            // didUnsubscribe when the link drops.
+            PlatformCharacteristic(
+              uuid: 'b1e70005-0000-1000-8000-00805f9b34fb',
+              properties: PlatformCharacteristicProperties(
+                canRead: false,
+                canWrite: false,
+                canWriteWithoutResponse: false,
+                canNotify: true,
                 canIndicate: false,
               ),
               descriptors: [],
@@ -1296,6 +1316,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
     final state = _stateFor(deviceId);
     final charUuid = state.charUuidByHandle[characteristicHandle];
+    setNotificationCalls.add(
+      SetNotificationCall(
+        deviceId: deviceId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid ?? '',
+        enable: enable,
+      ),
+    );
     if (charUuid != null) {
       if (enable) {
         connection.subscribedCharacteristics.add(charUuid);
@@ -1939,6 +1967,26 @@ class ReadCharacteristicCall {
     required this.deviceId,
     required this.characteristicHandle,
     required this.characteristicUuid,
+  });
+}
+
+/// A recorded call to [FakeBlueyPlatform.setNotification].
+///
+/// Carries both the wire-level [characteristicHandle] and the
+/// fake-resolved [characteristicUuid] (lowercase) so tests can assert on
+/// the subscribed characteristic by UUID without knowing the per-device
+/// handle mapping.
+class SetNotificationCall {
+  final String deviceId;
+  final int characteristicHandle;
+  final String characteristicUuid;
+  final bool enable;
+
+  const SetNotificationCall({
+    required this.deviceId,
+    required this.characteristicHandle,
+    required this.characteristicUuid,
+    required this.enable,
   });
 }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -61,6 +62,14 @@ class LifecycleClient {
   /// iOS-client side, where handle stability across re-discovery is
   /// not guaranteed).
   StreamSubscription<List<RemoteService>>? _servicesChangesSub;
+
+  /// Subscription to the server's presence characteristic. Listening
+  /// auto-enables notifications via the platform's `setNotification`; the
+  /// subscription itself IS the disconnect signal the iOS server watches
+  /// for (it gets a `didUnsubscribe` callback when this link drops). The
+  /// client never voluntarily unsubscribes while running — only `stop()`
+  /// cancels it.
+  StreamSubscription<Uint8List>? _presenceSub;
 
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
@@ -273,6 +282,24 @@ class LifecycleClient {
       },
     );
 
+    // Subscribe to the presence characteristic so the server (iOS) gets a
+    // real disconnect signal via didUnsubscribe when this link drops. The
+    // client never voluntarily unsubscribes while running; stop() cancels it.
+    final presenceChar =
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() == lifecycle.presenceCharUuid,
+            )
+            .firstOrNull;
+    if (presenceChar != null) {
+      _presenceSub = presenceChar.notifications.listen(
+        (_) {}, // the subscription itself IS the signal; no payload expected
+        onError: (_) {},
+      );
+    }
+
     try {
       // Send the first heartbeat immediately so the server (especially
       // iOS, which has no connection callback) learns about this client
@@ -360,6 +387,8 @@ class LifecycleClient {
     _monitor.stop();
     _servicesChangesSub?.cancel();
     _servicesChangesSub = null;
+    _presenceSub?.cancel();
+    _presenceSub = null;
   }
 
   /// Re-acquire the heartbeat-char handle from a freshly-discovered

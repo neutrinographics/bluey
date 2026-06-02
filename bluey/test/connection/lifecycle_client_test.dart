@@ -244,6 +244,38 @@ void main() {
       });
     });
 
+    // 4b. start() subscribes to the presence characteristic so the server
+    // (iOS) gets a real disconnect signal via didUnsubscribe when this link
+    // drops on link loss.
+    test('subscribes to the presence characteristic on start', () {
+      fakeAsync((async) {
+        late LifecycleClient client;
+        late List<RemoteService> services;
+        late FakeBlueyPlatform fakePlatform;
+        _setUpConnectedClient(onServerUnreachable: () {}).then((setup) {
+          client = setup.client;
+          services = setup.services;
+          fakePlatform = setup.fakePlatform;
+        });
+        async.flushMicrotasks();
+
+        client.start(allServices: services);
+        async.flushMicrotasks();
+
+        // Assert the presence characteristic was subscribed
+        // (setNotification enable=true).
+        expect(
+          fakePlatform.setNotificationCalls.any(
+            (c) => c.enable && c.characteristicUuid == lifecycle.presenceCharUuid,
+          ),
+          isTrue,
+          reason: 'presence subscription must be enabled on start',
+        );
+
+        client.stop();
+      });
+    });
+
     // 5. start() reads interval and sets heartbeat to half
     test('start() reads interval and sets heartbeat to half', () {
       fakeAsync((async) {
@@ -2255,7 +2287,22 @@ class _TestRemoteCharacteristic implements RemoteCharacteristic {
       );
 
   @override
-  Stream<Uint8List> get notifications => const Stream.empty();
+  Stream<Uint8List> get notifications {
+    // Mirror BlueyRemoteCharacteristic: listening auto-enables
+    // notifications via the platform's setNotification, and the last
+    // cancellation disables them. The lifecycle client subscribes to the
+    // presence char this way, so the fake must observe the enable call.
+    late final StreamController<Uint8List> controller;
+    controller = StreamController<Uint8List>(
+      onListen: () {
+        _fakePlatform.setNotification(_connectionId, handle.value, true);
+      },
+      onCancel: () {
+        _fakePlatform.setNotification(_connectionId, handle.value, false);
+      },
+    );
+    return controller.stream;
+  }
 
   @override
   RemoteDescriptor descriptor(UUID uuid) =>
