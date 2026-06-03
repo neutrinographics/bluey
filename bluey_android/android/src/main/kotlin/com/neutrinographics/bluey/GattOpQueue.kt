@@ -15,6 +15,13 @@ import android.os.Handler
  * dispatches on). The [ConnectionManager.createGattCallback] pattern
  * marshals [android.bluetooth.BluetoothGattCallback] events via
  * `handler.post { queue.onComplete(...) }` before touching the queue.
+ *
+ * iOS analogs: `PendingWriteQueue` (central WriteNoResponse) and
+ * `PendingNotificationQueue` (peripheral notify) in `bluey_ios`. They are
+ * shaped differently — drain-while-`canSendWriteWithoutResponse`-is-open
+ * rather than serial one-op-in-flight — because CoreBluetooth gives a
+ * batch gate plus a single readiness callback instead of a completion
+ * callback per write.
  */
 internal class GattOpQueue(
     private val gatt: BluetoothGatt,
