@@ -209,6 +209,7 @@ Everything else (the remaining 25+ open entries, mostly low-severity stubs and l
 | [I094](I094-scanner-controller-never-closed.md) | Scanner broadcast controllers never closed (both platforms) | medium |
 | [I095](I095-server-controllers-never-closed.md) | AndroidServer / IosServer broadcast controllers never closed | medium |
 | [I322](I322-duplicate-respond-to-request.md) | Duplicate `respondTo*Request` invocation; second response fails with `RespondNotFoundException` (defensive containment shipped, root cause pending — likely platform-layer broadcast-stream multi-subscriber) | medium |
+| [I344](I344-write-integrity-stress-test.md) | Add a write-integrity stress test (sequenced WriteNoResponse + server-side tally) as a self-verdicting on-device repro/regression harness for I339 / I343. Example-app tooling; deferred until the I343 bisect localizes the root cause | low |
 
 ### Open — DDD / architectural refinement
 
