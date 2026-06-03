@@ -4,7 +4,7 @@
 
 **Goal:** Extend the example app's `mtuProbe` stress test into a chunked, byte-exact, both-write-types transfer-integrity check that reproduces (and guards against a regression of) the I343 silent-truncation bug.
 
-**Architecture:** Add one wire command (`TransferChunk`, opcode `0x07`) carrying a fragment of a larger logical payload. The server reassembles fragments into a per-instance buffer and exposes the result on read. The client chunks a deterministic pattern (`byte[i] = i & 0xff`) sized to the connection's real `maxWritePayload` (minus the chunk header), sends each fragment in the round's write type, reads the reassembled buffer back, and byte-compares it via a pure, unit-tested `evaluateTransfer` verdict function. The round runs once `withoutResponse` (the I343 path) and once `withResponse`. All of this is example-app test tooling — **no bluey-library changes**.
+**Architecture:** Add one minimal wire command — `TransferData` (opcode `0x07`, layout `[0x07][data…]`, 1-byte overhead like every other stress command). The server appends each `TransferData` fragment to a reassembly buffer (BLE preserves write order on a single characteristic) and returns it on read; `ResetCommand` clears it. The client chunks a deterministic pattern (`byte[i] = i & 0xff`), sized so each on-wire write lands exactly at the connection's real `maxWritePayload`, sends each fragment in the round's write type, reads the reassembled buffer back, and byte-compares it via a pure, unit-tested `evaluateTransfer` verdict. The round runs once `withoutResponse` (the I343 path) and once `withResponse`. No `seq` / `totalLen` framing is needed — write ordering plus the byte-exact compare detect any drop or truncation. All of this is example-app test tooling — **no bluey-library changes**.
 
 **Tech Stack:** Dart / Flutter (`bluey/example`), `flutter test`, `mocktail`.
 
@@ -25,20 +25,20 @@ git checkout main && git checkout -b i344-write-integrity-stress-test
 
 ## File Structure
 
-- **Modify** `bluey/example/lib/shared/stress_protocol.dart` — add the `TransferChunk` command (opcode `0x07`, `headerBytes = 7`) + its `case 0x07` in the `decode` dispatcher.
-- **Modify** `bluey/example/test/shared/stress_protocol_test.dart` — encode/decode/equality/too-short tests for `TransferChunk`.
-- **Modify** `bluey/example/lib/features/server/infrastructure/stress_service_handler.dart` — per-instance reassembly buffer, `TransferChunk` switch case, and reassembly clearing in the `ResetCommand` case.
-- **Modify** `bluey/example/test/server/infrastructure/stress_service_handler_test.dart` — reassembly tests (happy path, reset-on-seq-0, gap fault, ResetCommand clears).
+- **Modify** `bluey/example/lib/shared/stress_protocol.dart` — add the `TransferData` command (opcode `0x07`, `headerBytes = 1`) + its `case 0x07` in the `decode` dispatcher.
+- **Modify** `bluey/example/test/shared/stress_protocol_test.dart` — encode/decode/equality tests for `TransferData`.
+- **Modify** `bluey/example/lib/features/server/infrastructure/stress_service_handler.dart` — per-instance reassembly buffer, `TransferData` switch case, read-precedence, and buffer clearing in the `ResetCommand` case.
+- **Modify** `bluey/example/test/server/infrastructure/stress_service_handler_test.dart` — reassembly tests (happy path, ResetCommand clears, responseNeeded).
 - **Create** `bluey/example/lib/features/stress_tests/domain/transfer_verdict.dart` — pure `TransferVerdict` value object + `evaluateTransfer(...)` function.
 - **Create** `bluey/example/test/stress_tests/domain/transfer_verdict_test.dart` — verdict unit tests.
-- **Modify** `bluey/example/lib/features/stress_tests/infrastructure/stress_test_runner.dart` — rewrite the `runMtuProbe` round: query `maxWritePayload`, chunk, send both write types, read back, verify via `evaluateTransfer`; add a private `_sendChunked` helper.
+- **Modify** `bluey/example/lib/features/stress_tests/infrastructure/stress_test_runner.dart` — rewrite the `runMtuProbe` round: reset per pass, query `maxWritePayload`, chunk, send both write types, read back, verify via `evaluateTransfer`; add a private `_sendChunked` helper.
 - **Modify** `bluey/example/lib/features/stress_tests/presentation/widgets/stress_test_help_content.dart` — update the `mtuProbe` help text to describe the byte-exact chunked check.
 
 No config-form or enum changes are needed: `MtuProbeConfig` already exposes `payloadBytes` as a free-form int field (the `_intField` has no upper cap, so values like `600` are already enterable), and the runner method signature `runMtuProbe(MtuProbeConfig, Connection)` is unchanged.
 
 ---
 
-## Task 1: `TransferChunk` command (opcode 0x07)
+## Task 1: `TransferData` command (opcode 0x07)
 
 **Files:**
 - Modify: `bluey/example/lib/shared/stress_protocol.dart`
@@ -49,72 +49,44 @@ No config-form or enum changes are needed: `MtuProbeConfig` already exposes `pay
 Append this group inside `main()` in `bluey/example/test/shared/stress_protocol_test.dart`, immediately before the final closing `}` of `main()` (i.e. after the `ResetCommand` group's closing `});`):
 
 ```dart
-  group('TransferChunk', () {
-    test('headerBytes is 7 (opcode + seq u16 + totalLen u32)', () {
-      expect(TransferChunk.headerBytes, equals(7));
+  group('TransferData', () {
+    test('headerBytes is 1 (just the opcode)', () {
+      expect(TransferData.headerBytes, equals(1));
     });
 
-    test('encode layout is [0x07, seq_lo, seq_hi, len0..len3 LE, ...data]', () {
-      final cmd = TransferChunk(
-        seq: 0x0102,
-        totalLen: 0x03040506,
-        data: Uint8List.fromList([0xAA, 0xBB]),
-      );
+    test('encode prepends opcode 0x07 to the data', () {
+      final cmd = TransferData(Uint8List.fromList([0xAA, 0xBB, 0xCC]));
       expect(
         cmd.encode(),
-        equals(
-          Uint8List.fromList([
-            0x07, // opcode
-            0x02, 0x01, // seq = 0x0102, little-endian
-            0x06, 0x05, 0x04, 0x03, // totalLen = 0x03040506, little-endian
-            0xAA, 0xBB, // data
-          ]),
-        ),
+        equals(Uint8List.fromList([0x07, 0xAA, 0xBB, 0xCC])),
       );
     });
 
-    test('encode supports an empty data fragment', () {
-      final cmd = TransferChunk(seq: 0, totalLen: 0, data: Uint8List(0));
-      expect(cmd.encode(), hasLength(TransferChunk.headerBytes));
-      expect(cmd.encode()[0], equals(0x07));
+    test('encode handles an empty data fragment', () {
+      final cmd = TransferData(Uint8List(0));
+      expect(cmd.encode(), equals(Uint8List.fromList([0x07])));
     });
 
-    test('decode round-trips seq, totalLen, and data', () {
-      final original = TransferChunk(
-        seq: 700,
-        totalLen: 100000,
-        data: Uint8List.fromList([1, 2, 3, 4, 5]),
-      );
+    test('decode round-trips the data bytes', () {
+      final original = TransferData(Uint8List.fromList([1, 2, 3, 4, 5]));
       final decoded = StressCommand.decode(original.encode());
-      expect(decoded, isA<TransferChunk>());
-      final t = decoded as TransferChunk;
-      expect(t.seq, equals(700));
-      expect(t.totalLen, equals(100000));
-      expect(t.data, equals(Uint8List.fromList([1, 2, 3, 4, 5])));
-    });
-
-    test('decode throws when the header is shorter than 6 body bytes', () {
-      // opcode + 3 body bytes = needs at least 6 body bytes for the header.
+      expect(decoded, isA<TransferData>());
       expect(
-        () => StressCommand.decode(Uint8List.fromList([0x07, 0x00, 0x00, 0x00])),
-        throwsA(
-          isA<StressProtocolException>().having((e) => e.opcode, 'opcode', 0x07),
-        ),
+        (decoded as TransferData).data,
+        equals(Uint8List.fromList([1, 2, 3, 4, 5])),
       );
     });
 
-    test('TransferChunk instances with equal fields are equal', () {
+    test('TransferData instances with equal data are equal', () {
       expect(
-        TransferChunk(seq: 1, totalLen: 9, data: Uint8List.fromList([7, 8])),
-        equals(
-          TransferChunk(seq: 1, totalLen: 9, data: Uint8List.fromList([7, 8])),
-        ),
+        TransferData(Uint8List.fromList([7, 8, 9])),
+        equals(TransferData(Uint8List.fromList([7, 8, 9]))),
       );
     });
 
-    test('TransferChunk defensively copies its data', () {
+    test('TransferData defensively copies its data', () {
       final mutable = Uint8List.fromList([1, 2, 3]);
-      final cmd = TransferChunk(seq: 0, totalLen: 3, data: mutable);
+      final cmd = TransferData(mutable);
       mutable[0] = 99;
       expect(cmd.data[0], equals(1));
     });
@@ -124,63 +96,49 @@ Append this group inside `main()` in `bluey/example/test/shared/stress_protocol_
 - [ ] **Step 2: Run, verify it fails**
 
 Run: `cd bluey/example && flutter test test/shared/stress_protocol_test.dart`
-Expected: FAIL — `TransferChunk` is undefined and `decode` has no `0x07` case.
+Expected: FAIL — `TransferData` is undefined and `decode` has no `0x07` case.
 
-- [ ] **Step 3: Add the `TransferChunk` class**
+- [ ] **Step 3: Add the `TransferData` class**
 
 In `bluey/example/lib/shared/stress_protocol.dart`, add this class after the `ResetCommand` class (after its closing `}` near line 217, before the `StressProtocolException` class):
 
 ```dart
-/// TransferChunk: one fragment of a larger logical payload the client is
+/// TransferData: one fragment of a larger logical payload the client is
 /// streaming to the server for byte-exact reassembly. The server appends
-/// [data] in ascending [seq] order; once the reassembled length reaches
-/// [totalLen] the result becomes the value returned by the next read.
-/// Opcode 0x07.
+/// [data] to a reassembly buffer in arrival order (BLE preserves write
+/// order on a single characteristic within a connection), and the buffer
+/// becomes the value returned by the next read. Opcode 0x07.
 ///
-/// Wire layout: `[0x07][seq u16 LE][totalLen u32 LE][data…]`. The 7-byte
-/// header ([headerBytes]) must be subtracted from the connection's max
-/// write payload when sizing each fragment, so the framed write stays
-/// within a single ATT packet.
-class TransferChunk extends StressCommand {
-  /// Framing overhead per chunk: 1 opcode + 2 seq + 4 totalLen = 7 bytes.
-  static const int headerBytes = 7;
-
-  /// Zero-based fragment index. `seq == 0` resets the server's buffer.
-  final int seq;
-
-  /// Total length of the complete logical payload, repeated in every
-  /// fragment so the server knows when reassembly is complete.
-  final int totalLen;
+/// Wire layout: `[0x07][data…]`. The 1-byte opcode ([headerBytes]) is the
+/// only framing overhead; subtract it from the connection's max write
+/// payload when sizing a fragment so each framed write fits in one ATT
+/// packet. No sequence number or total length is carried — write ordering
+/// plus the client's byte-exact compare detect any dropped or truncated
+/// fragment.
+class TransferData extends StressCommand {
+  /// Framing overhead per fragment: just the 1-byte opcode.
+  static const int headerBytes = 1;
 
   /// This fragment's bytes.
   final Uint8List data;
 
-  TransferChunk({
-    required this.seq,
-    required this.totalLen,
-    required Uint8List data,
-  }) : data = Uint8List.fromList(data);
+  TransferData(Uint8List data) : data = Uint8List.fromList(data);
 
   @override
   Uint8List encode() {
     final out = Uint8List(headerBytes + data.length);
     out[0] = 0x07;
-    final header = out.buffer.asByteData();
-    header.setUint16(1, seq, Endian.little);
-    header.setUint32(3, totalLen, Endian.little);
     out.setRange(headerBytes, out.length, data);
     return out;
   }
 
   @override
   bool operator ==(Object other) =>
-      other is TransferChunk &&
-      other.seq == seq &&
-      other.totalLen == totalLen &&
+      other is TransferData &&
       const ListEquality<int>().equals(other.data, data);
 
   @override
-  int get hashCode => Object.hash(seq, totalLen, Object.hashAll(data));
+  int get hashCode => Object.hashAll(data);
 }
 ```
 
@@ -190,18 +148,7 @@ In the same file, in `StressCommand.decode`, add a `case 0x07` immediately befor
 
 ```dart
       case 0x07:
-        if (body.length < 6) {
-          throw StressProtocolException(
-            opcode: opcode,
-            message: 'TransferChunk header too short (${body.length}, need 6)',
-          );
-        }
-        final header = body.buffer.asByteData(body.offsetInBytes, 6);
-        return TransferChunk(
-          seq: header.getUint16(0, Endian.little),
-          totalLen: header.getUint32(2, Endian.little),
-          data: body.sublist(6),
-        );
+        return TransferData(body);
 ```
 
 - [ ] **Step 5: Run, verify it passes**
@@ -214,7 +161,7 @@ Expected: PASS (all groups).
 ```bash
 cd /Users/joel/git/neutrinographics/bluey
 git add bluey/example/lib/shared/stress_protocol.dart bluey/example/test/shared/stress_protocol_test.dart
-git commit -m "feat(example): add TransferChunk stress command for chunked transfers (I344)"
+git commit -m "feat(example): add TransferData stress command for chunked transfers (I344)"
 ```
 
 ---
@@ -230,123 +177,50 @@ git commit -m "feat(example): add TransferChunk stress command for chunked trans
 Append these two groups inside `main()` in `bluey/example/test/server/infrastructure/stress_service_handler_test.dart`, immediately before the final closing `}` of `main()` (after the `Reset` group's closing `});`):
 
 ```dart
-  group('StressServiceHandler — TransferChunk reassembly', () {
-    WriteRequest chunkWrite(StressServiceHandler _, TransferChunk chunk) =>
-        WriteRequest(
-          client: mockClient,
-          characteristicId: UUID(StressProtocol.charUuid),
-          value: chunk.encode(),
-          responseNeeded: true,
-          offset: 0,
-          internalRequestId: 0,
-        );
+  group('StressServiceHandler — TransferData reassembly', () {
+    WriteRequest dataWrite(Uint8List data) => WriteRequest(
+      client: mockClient,
+      characteristicId: UUID(StressProtocol.charUuid),
+      value: TransferData(data).encode(),
+      responseNeeded: true,
+      offset: 0,
+      internalRequestId: 0,
+    );
 
-    test('reassembles ordered fragments into the original payload', () async {
+    test('appends fragments in order and reads back the whole payload', () async {
       final handler = StressServiceHandler();
-      // Logical payload of 10 bytes split into [0..3], [4..6], [7..9].
-      final full = Uint8List.fromList(
-        List<int>.generate(10, (i) => i & 0xff),
-      );
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(seq: 0, totalLen: 10, data: full.sublist(0, 4)),
-        ),
-        mockServer,
-      );
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(seq: 1, totalLen: 10, data: full.sublist(4, 7)),
-        ),
-        mockServer,
-      );
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(seq: 2, totalLen: 10, data: full.sublist(7, 10)),
-        ),
-        mockServer,
-      );
+      final full = Uint8List.fromList(List<int>.generate(10, (i) => i & 0xff));
+
+      await handler.onWrite(dataWrite(full.sublist(0, 4)), mockServer);
+      await handler.onWrite(dataWrite(full.sublist(4, 7)), mockServer);
+      await handler.onWrite(dataWrite(full.sublist(7, 10)), mockServer);
 
       expect(handler.onRead(), equals(full));
     });
 
-    test('seq 0 resets the buffer, discarding a prior partial transfer', () async {
+    test('the reassembly buffer takes precedence over a prior echo', () async {
       final handler = StressServiceHandler();
-      // Start a transfer, then abandon it with a fresh seq-0 fragment.
+      // Prior echo sets _lastEcho.
       await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(
-            seq: 0,
-            totalLen: 10,
-            data: Uint8List.fromList([0xDE, 0xAD]),
-          ),
+        WriteRequest(
+          client: mockClient,
+          characteristicId: UUID(StressProtocol.charUuid),
+          value: EchoCommand(Uint8List.fromList([0xDE, 0xAD])).encode(),
+          responseNeeded: true,
+          offset: 0,
+          internalRequestId: 0,
         ),
         mockServer,
       );
-      // New transfer of 3 bytes [0x00, 0x01, 0x02], single fragment.
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(
-            seq: 0,
-            totalLen: 3,
-            data: Uint8List.fromList([0x00, 0x01, 0x02]),
-          ),
-        ),
-        mockServer,
-      );
+      // A transfer fragment now shadows it.
+      await handler.onWrite(dataWrite(Uint8List.fromList([0x01, 0x02])), mockServer);
 
-      expect(handler.onRead(), equals(Uint8List.fromList([0x00, 0x01, 0x02])));
+      expect(handler.onRead(), equals(Uint8List.fromList([0x01, 0x02])));
     });
 
-    test('a gap (out-of-order seq) yields a fault sentinel on read', () async {
+    test('TransferData honors responseNeeded', () async {
       final handler = StressServiceHandler();
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(
-            seq: 0,
-            totalLen: 6,
-            data: Uint8List.fromList([0x00, 0x01, 0x02]),
-          ),
-        ),
-        mockServer,
-      );
-      // Skip seq 1 — jump straight to seq 2. This is a gap.
-      await handler.onWrite(
-        chunkWrite(
-          handler,
-          TransferChunk(
-            seq: 2,
-            totalLen: 6,
-            data: Uint8List.fromList([0x04, 0x05]),
-          ),
-        ),
-        mockServer,
-      );
-
-      final read = handler.onRead();
-      expect(read, equals(Uint8List.fromList([0xEE])));
-    });
-
-    test('TransferChunk honors responseNeeded', () async {
-      final handler = StressServiceHandler();
-      final ackWrite = WriteRequest(
-        client: mockClient,
-        characteristicId: UUID(StressProtocol.charUuid),
-        value: TransferChunk(
-          seq: 0,
-          totalLen: 1,
-          data: Uint8List.fromList([0x00]),
-        ).encode(),
-        responseNeeded: true,
-        offset: 0,
-        internalRequestId: 0,
-      );
-      await handler.onWrite(ackWrite, mockServer);
+      await handler.onWrite(dataWrite(Uint8List.fromList([0x00])), mockServer);
       verify(
         () =>
             mockServer.respondToWrite(any(), status: GattResponseStatus.success),
@@ -355,7 +229,7 @@ Append these two groups inside `main()` in `bluey/example/test/server/infrastruc
   });
 
   group('StressServiceHandler — Reset clears reassembly', () {
-    test('ResetCommand discards an in-progress transfer', () async {
+    test('ResetCommand discards the transfer buffer', () async {
       final handler = StressServiceHandler();
 
       WriteRequest writeOf(Uint8List value) => WriteRequest(
@@ -367,22 +241,16 @@ Append these two groups inside `main()` in `bluey/example/test/server/infrastruc
         internalRequestId: 0,
       );
 
-      // Partial transfer: 1 of an expected 10 bytes.
+      // Accumulate some transfer data.
       await handler.onWrite(
-        writeOf(
-          TransferChunk(
-            seq: 0,
-            totalLen: 10,
-            data: Uint8List.fromList([0x00]),
-          ).encode(),
-        ),
+        writeOf(TransferData(Uint8List.fromList([0x00, 0x01])).encode()),
         mockServer,
       );
 
       await handler.onWrite(writeOf(const ResetCommand().encode()), mockServer);
 
-      // After reset, _lastEcho is empty so reads return the default
-      // 20-byte pattern, not stale reassembly state.
+      // After reset the buffer is empty, so reads fall back to the default
+      // 20-byte pattern rather than stale transfer state.
       expect(handler.onRead(), hasLength(20));
     });
   });
@@ -391,64 +259,35 @@ Append these two groups inside `main()` in `bluey/example/test/server/infrastruc
 - [ ] **Step 2: Run, verify it fails**
 
 Run: `cd bluey/example && flutter test test/server/infrastructure/stress_service_handler_test.dart`
-Expected: FAIL — the switch has no `TransferChunk` case (and the file won't compile because the sealed switch is non-exhaustive), and the `0xEE` fault sentinel doesn't exist.
+Expected: FAIL — the switch has no `TransferData` case (the file won't compile, because the sealed switch becomes non-exhaustive once `TransferData` exists), and `onRead` has no buffer-precedence path.
 
-- [ ] **Step 3: Add the reassembly fields**
+- [ ] **Step 3: Add the reassembly buffer field**
 
-In `bluey/example/lib/features/server/infrastructure/stress_service_handler.dart`, add the fields and the sentinel after the existing `bool _abortBurst = false;` line (line 19):
+In `bluey/example/lib/features/server/infrastructure/stress_service_handler.dart`, add the field after the existing `bool _abortBurst = false;` line (line 19):
 
 ```dart
-  // Reassembly state for chunked TransferChunk writes. Per-instance and
-  // shared across centrals, like the other stress state.
-  final BytesBuilder _reassembly = BytesBuilder();
-  int _expectedTotalLen = 0;
-  int _nextSeq = 0;
-  bool _reassemblyFault = false;
-
-  /// Returned on read after a reassembly fault (gap / out-of-order /
-  /// overflow). A distinct 1-byte value so any non-trivial expected
-  /// payload diverges from it immediately, failing the client's verdict.
-  static final Uint8List _reassemblyFaultSentinel = Uint8List.fromList(
-    <int>[0xEE],
-  );
+  // Reassembly buffer for chunked TransferData writes. Per-instance and
+  // shared across centrals, like the other stress state. Cleared by
+  // ResetCommand. Takes precedence over _lastEcho on read so a transfer
+  // round reads back exactly what was streamed.
+  final BytesBuilder _transfer = BytesBuilder();
 ```
 
-- [ ] **Step 4: Add the `TransferChunk` switch case**
+- [ ] **Step 4: Add the `TransferData` switch case**
 
 In the `switch (cmd)` inside `onWrite`, add this case immediately before the `case ResetCommand():` line (after the `SetPayloadSizeCommand` case's body):
 
 ```dart
-      case TransferChunk(:final seq, :final totalLen, :final data):
-        if (seq == 0) {
-          _reassembly.clear();
-          _expectedTotalLen = totalLen;
-          _nextSeq = 0;
-          _reassemblyFault = false;
-          _lastEcho = Uint8List(0);
-        }
-        if (_reassemblyFault || seq != _nextSeq) {
-          // A fragment arrived out of order, after a gap, or after a
-          // prior fault — the transfer is unrecoverable.
-          _reassemblyFault = true;
-          _lastEcho = _reassemblyFaultSentinel;
-        } else {
-          _reassembly.add(data);
-          _nextSeq++;
-          if (_reassembly.length > _expectedTotalLen) {
-            _reassemblyFault = true;
-            _lastEcho = _reassemblyFaultSentinel;
-          } else if (_reassembly.length == _expectedTotalLen) {
-            _lastEcho = _reassembly.toBytes();
-          }
-        }
+      case TransferData(:final data):
+        _transfer.add(data);
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
 ```
 
-- [ ] **Step 5: Clear reassembly in the `ResetCommand` case**
+- [ ] **Step 5: Clear the buffer in the `ResetCommand` case**
 
-In the existing `case ResetCommand():`, add the reassembly resets. Change it from:
+In the existing `case ResetCommand():`, add the buffer reset. Change it from:
 
 ```dart
       case ResetCommand():
@@ -469,26 +308,46 @@ to:
         _dropNextWrite = false;
         _payloadSize = 20;
         _abortBurst = true; // interrupts any in-flight burstMe loop
-        _reassembly.clear();
-        _expectedTotalLen = 0;
-        _nextSeq = 0;
-        _reassemblyFault = false;
+        _transfer.clear();
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
 ```
 
-- [ ] **Step 6: Run, verify it passes**
+- [ ] **Step 6: Give the reassembly buffer read precedence**
+
+Change `onRead` from:
+
+```dart
+  Uint8List onRead() {
+    if (_lastEcho.isNotEmpty) return _lastEcho;
+    return _generatePattern(_payloadSize);
+  }
+```
+
+to:
+
+```dart
+  Uint8List onRead() {
+    if (_transfer.length > 0) return _transfer.toBytes();
+    if (_lastEcho.isNotEmpty) return _lastEcho;
+    return _generatePattern(_payloadSize);
+  }
+```
+
+(`BytesBuilder.toBytes()` returns a copy and does not clear the builder, so repeated reads are stable.)
+
+- [ ] **Step 7: Run, verify it passes**
 
 Run: `cd bluey/example && flutter test test/server/infrastructure/stress_service_handler_test.dart`
 Expected: PASS (all groups, including the pre-existing ones).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 cd /Users/joel/git/neutrinographics/bluey
 git add bluey/example/lib/features/server/infrastructure/stress_service_handler.dart bluey/example/test/server/infrastructure/stress_service_handler_test.dart
-git commit -m "feat(example): reassemble TransferChunk fragments server-side (I344)"
+git commit -m "feat(example): reassemble TransferData fragments server-side (I344)"
 ```
 
 ---
@@ -771,24 +630,30 @@ with:
 ```dart
     // Byte-exact chunked transfer, once per write type. withoutResponse
     // first — that is the path that silently truncated in I343. Each pass
-    // sizes its chunks to the connection's real maxWritePayload (minus the
-    // TransferChunk header), streams config.payloadBytes of deterministic
-    // pattern, reads the reassembled buffer back, and byte-compares it.
+    // resets the server buffer, sizes its chunks to the connection's real
+    // maxWritePayload (minus the 1-byte TransferData opcode), streams
+    // config.payloadBytes of deterministic pattern, reads the reassembled
+    // buffer back, and byte-compares it.
     for (final withResponse in [false, true]) {
       final label = withResponse ? 'withResponse' : 'withoutResponse';
       final start = stopwatch.elapsedMicroseconds;
       try {
+        // Fresh server buffer for this pass.
+        await stressChar.write(
+          const ResetCommand().encode(),
+          withResponse: true,
+        );
+
         final limit = await connection.maxWritePayload(
           withResponse: withResponse,
         );
         final chunkSize = limit.value;
-        if (chunkSize <= TransferChunk.headerBytes) {
+        if (chunkSize <= TransferData.headerBytes) {
           throw StateError(
             '$label: maxWritePayload ($chunkSize) too small to frame a chunk',
           );
         }
 
-        // Fresh transfer each pass: seq 0 resets the server buffer.
         final payload = _generatePattern(config.payloadBytes);
         await _sendChunked(
           stressChar,
@@ -829,33 +694,30 @@ In the same class, add this method immediately after `_resolveStressChar` (befor
 
 ```dart
   /// Streams [payload] to the stress characteristic as ordered
-  /// [TransferChunk] fragments. Each on-wire write is sized to fit within
-  /// [chunkSize] including the [TransferChunk.headerBytes] framing, so the
-  /// data carried per fragment is `chunkSize - headerBytes`. Sends each
-  /// fragment using [withResponse].
+  /// [TransferData] fragments. Each on-wire write is sized to fit within
+  /// [chunkSize] including the 1-byte [TransferData.headerBytes] opcode, so
+  /// the data carried per fragment is `chunkSize - headerBytes` and the
+  /// framed write lands exactly at [chunkSize]. Sends each fragment using
+  /// [withResponse].
   Future<void> _sendChunked(
     RemoteCharacteristic stressChar,
     Uint8List payload, {
     required int chunkSize,
     required bool withResponse,
   }) async {
-    final dataPerChunk = chunkSize - TransferChunk.headerBytes;
+    final dataPerChunk = chunkSize - TransferData.headerBytes;
     final totalLen = payload.length;
-    var seq = 0;
     for (var offset = 0; offset < totalLen; offset += dataPerChunk) {
       final end =
           (offset + dataPerChunk < totalLen) ? offset + dataPerChunk : totalLen;
       final fragment = Uint8List.sublistView(payload, offset, end);
       await stressChar.write(
-        TransferChunk(seq: seq, totalLen: totalLen, data: fragment).encode(),
+        TransferData(fragment).encode(),
         withResponse: withResponse,
       );
-      seq++;
     }
   }
 ```
-
-Note: a zero-length `payload` sends no fragments, so the server's buffer is never reset for that pass — but `config.payloadBytes` defaults to 244 and the test is meaningless at 0, so this is acceptable. The `ResetCommand` at the top of `runMtuProbe` already zeroed the server state.
 
 - [ ] **Step 4: Run the runner test suite — confirm no regression**
 
@@ -865,7 +727,7 @@ Expected: PASS. If any test asserted the old 3-cycle / SetPayloadSize behavior o
 - [ ] **Step 5: Analyze**
 
 Run: `cd bluey/example && flutter analyze`
-Expected: no new issues. (`SetPayloadSizeCommand` is still used elsewhere — it remains a valid command; only this call site dropped it. If analyzer flags an unused import, remove only the now-unused symbol, not the whole `stress_protocol.dart` import which `TransferChunk`/`EchoCommand`/`ResetCommand` still need.)
+Expected: no new issues. (`SetPayloadSizeCommand` is still used elsewhere — it remains a valid command; only this call site dropped it. If the analyzer flags an unused import, remove only the now-unused symbol, not the whole `stress_protocol.dart` import which `TransferData`/`EchoCommand`/`ResetCommand` still need.)
 
 - [ ] **Step 6: Commit**
 
@@ -947,20 +809,19 @@ Record the outcome in `docs/backlog/I344-write-integrity-stress-test.md` (and fl
 
 **Spec coverage:**
 - Extend `mtuProbe` (not a new variant) → Task 4. ✅
-- `TransferChunk` opcode 0x07, wire `[0x07][seq u16 LE][totalLen u32 LE][data…]` → Task 1. ✅
-- Server reassembly: seq-0 reset, in-order append, gap/overflow fault → sentinel, completion sets `_lastEcho` → Task 2. ✅
-- `ResetCommand` clears reassembly → Task 2 Step 5. ✅
+- One chunked-transfer command (the spec's `TransferChunk`, here simplified to `TransferData` — `seq`/`totalLen` dropped because write ordering + byte-exact compare make them redundant; see the "design call" discussion) → Task 1. ✅
+- Server reassembly: append in arrival order, read-back, ResetCommand clears → Task 2. ✅
 - Pure `evaluateTransfer({required int expectedLen, required Uint8List readBack}) → TransferVerdict` (ok | divergence detail) → Task 3. ✅
-- Chunk sizing from real `maxWritePayload` (header-adjusted), both write types, read-back, byte-compare → Task 4. ✅
-- Result surfacing via existing `recordSuccess`/`recordFailure` + divergence detail in the failure `typeName`/message → Task 4 (uses `StateError('label: ...describe()')`). ✅
-- Unit tests for verdict + TransferChunk encode/decode + reassembly → Tasks 1–3. ✅
+- Chunk sizing from real `maxWritePayload` (opcode-adjusted so the on-wire write lands exactly at the cap), both write types, read-back, byte-compare → Task 4. ✅
+- Result surfacing via existing `recordSuccess`/`recordFailure` + divergence detail in the failure message → Task 4 (`StateError('label: ...describe()')`). ✅
+- Unit tests for verdict + TransferData encode/decode + reassembly → Tasks 1–3. ✅
 - On-device guard (PASS on main, FAIL un-clamped) → Task 5 Step 5. ✅
 - No bluey-library changes (example-app only) → every task touches only `bluey/example/`. ✅
 
 **Placeholder scan:** every code step shows complete code; every run step states expected output; no TBD/"handle edge cases". ✅
 
 **Type consistency:**
-- `TransferChunk({required int seq, required int totalLen, required Uint8List data})`, `TransferChunk.headerBytes` (int const = 7) — defined Task 1, used Tasks 2/4. ✅
+- `TransferData(Uint8List data)`, `TransferData.headerBytes` (int const = 1), `.data` (Uint8List) — defined Task 1, used Tasks 2/4. ✅
 - `evaluateTransfer({required int expectedLen, required Uint8List readBack}) → TransferVerdict`; `TransferVerdict.ok`/`.describe()`/`.firstDivergenceOffset`/`.expectedByte`/`.gotByte`/`.expectedLen`/`.gotLen` — defined Task 3, used Tasks 3/4. ✅
 - `Connection.maxWritePayload({required bool withResponse}) → Future<WritePayloadLimit>`, `.value` (int) — matches `bluey_connection.dart:731`. ✅
 - `RemoteCharacteristic.write(Uint8List, {required bool withResponse})` / `.read() → Future<Uint8List>` — matches existing runner call sites. ✅

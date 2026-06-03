@@ -33,8 +33,9 @@ Replace the single-write round with a **chunked byte-exact transfer**, run for
    `config.payloadBytes` is the **logical** transfer size and may exceed `chunk`
    (e.g. 600) — that is the point.
 3. Generate a deterministic payload of `payloadBytes` (`byte[i] = i & 0xff`).
-4. **Chunk** it into ⌈payloadBytes / chunk⌉ writes; send each in order as a
-   `TransferChunk` command (below), using the round's write type.
+4. **Chunk** it into writes sized so each on-wire `TransferData` write (data +
+   1-byte opcode) lands exactly at `chunk`; send each in order using the
+   round's write type.
 5. **Read back** the server's reassembled buffer (`stressChar.read()`).
 6. **Byte-compare** read-back vs the regenerated pattern → verdict.
 7. Run steps 2–6 **twice**: once `withResponse: false` (the I343 path), once
@@ -43,15 +44,22 @@ Replace the single-write round with a **chunked byte-exact transfer**, run for
 
 ### Protocol: one new command + server reassembly (`stress_protocol.dart` + `stress_service_handler.dart`)
 
-Add `TransferChunk` (next free opcode `0x07`):
-- Wire: `[0x07][seq u16 LE][totalLen u32 LE][data…]`.
+Add `TransferData` (next free opcode `0x07`):
+- Wire: `[0x07][data…]` — a single 1-byte opcode of framing overhead, like
+  every other stress command.
 - Server (`StressServiceHandler`): maintains a per-instance reassembly buffer.
-  - `seq == 0` resets the buffer and records `totalLen`.
-  - Each chunk appends `data` in `seq` order. Out-of-order / gap / overflow →
-    record a fault (the next read returns a sentinel so the verdict fails).
-  - When the buffer reaches `totalLen`, set `_lastEcho = buffer` (reuse the
-    existing `onRead` path, which already returns `_lastEcho`).
-- `ResetCommand` also clears the reassembly buffer (extend the existing reset).
+  - Each `TransferData` write appends `data` to the buffer in arrival order.
+    BLE preserves write ordering on a single characteristic within a
+    connection (and I339 fixed WriteNoResponse flow control), so no `seq` is
+    needed.
+  - `read` returns the buffer (it takes precedence over `_lastEcho`).
+- `ResetCommand` clears the reassembly buffer at the start of each pass.
+
+No `seq` / `totalLen` framing is carried: write ordering plus the client's
+byte-exact compare detect any dropped or truncated fragment. (The earlier
+draft's per-chunk `seq`+`totalLen` header was redundant with the byte-exact
+verdict — dropped to keep the on-wire write at exactly `maxWritePayload` with
+the minimum 1-byte opcode.)
 
 Chunks are WriteNoResponse-capable: `onWrite` already handles `responseNeeded
 == false`. The control/read-back path (`read`) is reliable, so only the
@@ -94,9 +102,9 @@ shape (e.g. cycles × {withResponse, withoutResponse}).
 
 ## Implementation footprint
 
-- `bluey/example/lib/shared/stress_protocol.dart` — `TransferChunk` command (0x07).
+- `bluey/example/lib/shared/stress_protocol.dart` — `TransferData` command (0x07).
 - `bluey/example/lib/features/server/infrastructure/stress_service_handler.dart` —
-  reassembly buffer + `TransferChunk` case + reset extension.
+  reassembly buffer + `TransferData` case + read-precedence + reset extension.
 - `bluey/example/lib/features/stress_tests/infrastructure/stress_test_runner.dart` —
   rewrite the `mtuProbe` round: chunked transfer, both write types, byte-exact
   verify via `evaluateTransfer`.
