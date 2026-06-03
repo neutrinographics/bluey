@@ -66,8 +66,10 @@ class MtuProbeConfig extends StressTestConfig {
   /// MTU value to request from the platform.
   final int requestedMtu;
 
-  /// Payload bytes per write/read (defaults to negotiated MTU - 3 ATT
-  /// header bytes if 0).
+  /// Total logical payload streamed per pass, as a deterministic pattern.
+  /// Chunked across writes sized to the connection's real max write
+  /// payload, so set this ABOVE the single-write limit (e.g. 600) to force
+  /// multi-chunk fragmentation — the case I343 corrupted.
   final int payloadBytes;
   const MtuProbeConfig({this.requestedMtu = 247, this.payloadBytes = 244});
 }
