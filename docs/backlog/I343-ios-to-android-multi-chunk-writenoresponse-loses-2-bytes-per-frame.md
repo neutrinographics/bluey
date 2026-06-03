@@ -1,6 +1,6 @@
 ---
 id: I343
-title: iOS-central → Android-peripheral multi-chunk `WriteNoResponse` transmissions silently lose exactly 2 bytes per frame at the chunk boundary
+title: Writes above the 512-octet attribute cap are silently truncated (iOS over-reports the WriteNoResponse max as MTU−3), corrupting large iOS→Android frames
 category: bug
 severity: high
 platform: both
