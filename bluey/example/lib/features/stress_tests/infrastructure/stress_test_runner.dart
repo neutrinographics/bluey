@@ -6,6 +6,7 @@ import 'package:bluey/bluey.dart';
 import '../../../shared/stress_protocol.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
+import '../domain/transfer_verdict.dart';
 
 String _typeName(Object e) {
   if (e is BlueyPlatformException) {
@@ -400,31 +401,47 @@ class StressTestRunner {
       }
     }
 
-    // Tell server to return payloadBytes-sized reads.
-    try {
-      await stressChar.write(
-        SetPayloadSizeCommand(sizeBytes: config.payloadBytes).encode(),
-        withResponse: true,
-      );
-    } on Object {
-      // If setPayloadSize fails, the read-length check will fail — but
-      // we still proceed to record the per-cycle failures uniformly.
-    }
-
-    // Three rounds: write payloadBytes, read payloadBytes, verify length.
-    for (var i = 0; i < 3; i++) {
+    // Byte-exact chunked transfer, once per write type. withoutResponse
+    // first — that is the path that silently truncated in I343. Each pass
+    // resets the server buffer, sizes its chunks to the connection's real
+    // maxWritePayload (minus the 1-byte TransferData opcode), streams
+    // config.payloadBytes of deterministic pattern, reads the reassembled
+    // buffer back, and byte-compares it.
+    for (final withResponse in [false, true]) {
+      final label = withResponse ? 'withResponse' : 'withoutResponse';
       final start = stopwatch.elapsedMicroseconds;
       try {
-        final payload = _generatePattern(config.payloadBytes);
+        // Fresh server buffer for this pass.
         await stressChar.write(
-          EchoCommand(payload).encode(),
+          const ResetCommand().encode(),
           withResponse: true,
         );
-        final readBack = await stressChar.read();
-        if (readBack.length != config.payloadBytes) {
+
+        final limit = await connection.maxWritePayload(
+          withResponse: withResponse,
+        );
+        final chunkSize = limit.value;
+        if (chunkSize <= TransferData.headerBytes) {
           throw StateError(
-            'MTU read returned ${readBack.length} bytes, expected ${config.payloadBytes}',
+            '$label: maxWritePayload ($chunkSize) too small to frame a chunk',
           );
+        }
+
+        final payload = _generatePattern(config.payloadBytes);
+        await _sendChunked(
+          stressChar,
+          payload,
+          chunkSize: chunkSize,
+          withResponse: withResponse,
+        );
+
+        final readBack = await stressChar.read();
+        final verdict = evaluateTransfer(
+          expectedLen: config.payloadBytes,
+          readBack: readBack,
+        );
+        if (!verdict.ok) {
+          throw StateError('$label: ${verdict.describe()}');
         }
         result = result.recordSuccess(
           latency: Duration(
@@ -597,6 +614,31 @@ class StressTestRunner {
       orElse: () => throw StateError('Stress service not found on peer'),
     );
     return svc.characteristic(UUID(StressProtocol.charUuid));
+  }
+
+  /// Streams [payload] to the stress characteristic as ordered
+  /// [TransferData] fragments. Each on-wire write is sized to fit within
+  /// [chunkSize] including the 1-byte [TransferData.headerBytes] opcode, so
+  /// the data carried per fragment is `chunkSize - headerBytes` and the
+  /// framed write lands exactly at [chunkSize]. Sends each fragment using
+  /// [withResponse].
+  Future<void> _sendChunked(
+    RemoteCharacteristic stressChar,
+    Uint8List payload, {
+    required int chunkSize,
+    required bool withResponse,
+  }) async {
+    final dataPerChunk = chunkSize - TransferData.headerBytes;
+    final totalLen = payload.length;
+    for (var offset = 0; offset < totalLen; offset += dataPerChunk) {
+      final end =
+          (offset + dataPerChunk < totalLen) ? offset + dataPerChunk : totalLen;
+      final fragment = Uint8List.sublistView(payload, offset, end);
+      await stressChar.write(
+        TransferData(fragment).encode(),
+        withResponse: withResponse,
+      );
+    }
   }
 
   static Uint8List _generatePattern(int size) {

@@ -536,36 +536,59 @@ void main() {
   });
 
   group('StressTestRunner.runMtuProbe', () {
-    test('requests MTU then sends sized writes', () async {
+    test('requests MTU then byte-exact chunked transfer on both write '
+        'types', () async {
+      // Genuinely exercise the chunked round-trip: this test's write/read
+      // hooks reassemble TransferData fragments exactly like the server's
+      // StressServiceHandler, so evaluateTransfer compares the streamed
+      // deterministic pattern against the reassembled buffer for real.
+      //
+      // Scoped to THIS test only — the fake's global default behaviour is
+      // unchanged (other tests rely on it).
       var writes = 0;
+      final reassembly = BytesBuilder();
       stressChar.onWriteHook = (value, {required bool withResponse}) async {
         writes++;
+        try {
+          final command = StressCommand.decode(value);
+          if (command is TransferData) {
+            reassembly.add(command.data);
+          } else if (command is ResetCommand) {
+            reassembly.clear();
+          }
+          // Other commands don't affect the reassembly buffer.
+        } on StressProtocolException {
+          // Ignore undecodable control writes for buffer purposes.
+        }
       };
-      // The test's stressChar.onReadHook default returns empty bytes,
-      // which will cause the length check to throw StateError. Set it to
-      // return payloadBytes of pattern so the write+read cycle succeeds.
-      stressChar.onReadHook = () async {
-        // The runner invokes SetPayloadSizeCommand before reads, but the
-        // fake doesn't actually track payload size — it just returns
-        // whatever onReadHook returns. Return 50 bytes to match config.
-        return Uint8List(50);
-      };
+      // Read back the current reassembled buffer — mirrors the server
+      // returning its reassembly buffer as the read value.
+      stressChar.onReadHook = () async => reassembly.toBytes();
 
+      // payloadBytes (250) comfortably exceeds the fake's maxWritePayload
+      // (MTU 100 → 100 - 3 = 97, so 96 data bytes/fragment), forcing the
+      // transfer to span 3 fragments and exercising _sendChunked's
+      // multi-fragment path.
       final results =
           await runner
               .runMtuProbe(
-                const MtuProbeConfig(requestedMtu: 100, payloadBytes: 50),
+                const MtuProbeConfig(requestedMtu: 100, payloadBytes: 250),
                 conn,
               )
               .toList();
 
       expect(conn.lastRequestedMtu, equals(100));
-      // reset + setPayloadSize + 3 echo writes = at least 5 writes total
-      expect(writes, greaterThanOrEqualTo(1));
+      // Each of the two transfer passes resets the buffer then streams 3
+      // TransferData fragments, so well more than one write per pass.
+      expect(writes, greaterThan(2));
       final last = results.last;
       expect(last.isRunning, isFalse);
-      // 1 MTU request + 3 successful cycles = 4 successes minimum.
-      expect(last.succeeded, greaterThanOrEqualTo(1));
+      // connection.android is non-null in this test, so the MTU request
+      // runs and counts as a success: 1 MTU request + 2 transfer passes
+      // (withoutResponse + withResponse), each reassembling and
+      // byte-matching = 3 successes, 0 failures.
+      expect(last.succeeded, equals(3));
+      expect(last.failed, equals(0));
     });
   });
 }
