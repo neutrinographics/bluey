@@ -160,22 +160,27 @@ extension StressTestHelpX on StressTest {
     ),
     StressTest.mtuProbe => const StressTestHelpContent(
       whatItDoes:
-          'Requests requestedMtu bytes as the ATT MTU, then sends '
-          'writes of payloadBytes each. Confirms that MTU '
-          'negotiation completes and that payloads at or near the '
-          'negotiated MTU transfer without fragmentation '
-          'errors.\n\n'
-          'requestedMtu is the value passed to the platform MTU '
-          'request API — the negotiated result may be lower '
-          'depending on the peripheral. Set payloadBytes to '
-          'requestedMtu − 3 to test the maximum single-packet '
-          'payload (3-byte ATT header overhead).',
+          'Requests requestedMtu as the ATT MTU (Android only — iOS '
+          'auto-negotiates), then streams a payloadBytes-long '
+          'deterministic pattern to the server in chunks sized to the '
+          'connection\'s real max write payload, and reads the '
+          'reassembled bytes back for an exact comparison. Runs the '
+          'whole transfer twice: once write-without-response (the I343 '
+          'path that silently truncated above 512 bytes) and once '
+          'write-with-response.\n\n'
+          'Set payloadBytes ABOVE the single-write limit (e.g. 600) to '
+          'force multi-chunk fragmentation — that is the case I343 '
+          'corrupted. requestedMtu is the value passed to the platform '
+          'MTU request API; the negotiated result may be lower.',
       readingResults:
-          'Any failures indicate either failed MTU negotiation or '
-          'incorrect payload sizing.\n\n'
-          'Unusually high median or p95 latency at large MTU sizes '
-          'can indicate retransmission due to RF congestion rather '
-          'than stack bugs.',
+          'Each write type is one attempt (2 transfer attempts total, '
+          'plus the MTU request on Android). SUCCEEDED means the bytes '
+          'read back matched the pattern exactly, byte-for-byte.\n\n'
+          'A failure reports the first divergence as '
+          '"offset N: expected 0xNN got 0xMM (len A vs B)", labelled '
+          'with the write type. A tail divergence on the '
+          'withoutResponse pass is the I343 truncation signature — it '
+          'should NOT occur with the 512-octet clamp in place.',
       relevantStats: [
         HelpStat.attempted,
         HelpStat.succeeded,
