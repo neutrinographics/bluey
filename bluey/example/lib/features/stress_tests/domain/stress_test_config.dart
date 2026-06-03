@@ -71,7 +71,7 @@ class MtuProbeConfig extends StressTestConfig {
   /// payload, so set this ABOVE the single-write limit (e.g. 600) to force
   /// multi-chunk fragmentation — the case I343 corrupted.
   final int payloadBytes;
-  const MtuProbeConfig({this.requestedMtu = 247, this.payloadBytes = 244});
+  const MtuProbeConfig({this.requestedMtu = 517, this.payloadBytes = 600});
 }
 
 class NotificationThroughputConfig extends StressTestConfig {
