@@ -74,6 +74,23 @@ void main() {
 
       expect(limit.value, equals(20));
     });
+
+    test('clamps an over-512 platform report to 512 (I343)', () async {
+      // iOS reports MTU-3 = 514 for withoutResponse at MTU 517; the consumer
+      // must see the spec-capped 512 or large writes corrupt on Android.
+      fakePlatform.setMaxWriteLengthOverride(
+        TestDeviceIds.device1,
+        withResponse: 514,
+        withoutResponse: 514,
+      );
+      final connection = await bluey.connect(deviceFor(TestDeviceIds.device1));
+
+      final wnr = await connection.maxWritePayload(withResponse: false);
+      final wr = await connection.maxWritePayload(withResponse: true);
+
+      expect(wnr.value, equals(512));
+      expect(wr.value, equals(512));
+    });
   });
 
   // Verifies the cross-platform `maxWritePayload` reflects MTU
