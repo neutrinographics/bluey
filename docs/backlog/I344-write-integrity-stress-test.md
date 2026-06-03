@@ -4,15 +4,36 @@ title: Add a write-integrity stress test (sequenced WriteNoResponse + server-sid
 category: enhancement
 severity: low
 platform: domain
-status: open
-last_verified: 2026-06-02
+status: done
+fixed_in: e5ca4e7
+last_verified: 2026-06-03
 related: [I339, I343, I050]
 ---
 
-> **Deferred — gated on the I343 bisect.** Do **not** build this until the
-> I343 root cause is localized (iOS-central / Pigeon / Android-peripheral /
-> consumer reassembly). The harness must be designed to *observe the actual
-> locus*; building it blind risks a test that can't see the real bug. See
+> **Done (2026-06-03, merge `e5ca4e7`).** Built *after* the I343 root cause was
+> localized (the 512-octet attribute-value cap; iOS over-reports the
+> WriteNoResponse max as MTU−3). Implemented by **extending the existing
+> `mtuProbe` stress test** rather than adding a new `writeIntegrity` variant.
+> On-device dogfood confirmed PASS in both directions (iPhone↔Pixel) at
+> MTU 517 / payload 600.
+>
+> **What shipped (diverges from the sketch below):** a byte-exact transfer
+> integrity check, not a seq-tally. `TransferData` (opcode `0x07`) streams a
+> deterministic pattern as chunked writes sized to `maxWritePayload`;
+> `ReadWindowCommand` (opcode `0x08`) pulls the server's reassembled buffer back
+> in ≤`maxAttributeValueLength` (512) windows — necessary because a single
+> `read()` cannot exceed the 512-octet attribute cap; the pure, unit-tested
+> `evaluateTransfer` byte-compares the stitched read-back against the pattern.
+> Runs both write types (the `withoutResponse` pass is the I343 path). Failures
+> surface as a legible `TransferMismatch[<label>]: offset N: expected … got …`.
+> A *symmetric* failure indicates a param/test issue; the real I343 signature is
+> *asymmetric*. Spec: `docs/superpowers/specs/2026-06-03-write-integrity-stress-test-design.md`;
+> plan: `docs/superpowers/plans/2026-06-03-write-integrity-stress-test.md`.
+>
+> The original deferred sketch is preserved below for history.
+
+> **(Historical) Deferred — gated on the I343 bisect.** Do **not** build this
+> until the I343 root cause is localized. See
 > [I343](I343-ios-to-android-multi-chunk-writenoresponse-loses-2-bytes-per-frame.md).
 
 ## Motivation
