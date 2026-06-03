@@ -184,4 +184,82 @@ void main() {
       expect(const ResetCommand(), equals(const ResetCommand()));
     });
   });
+
+  group('TransferData', () {
+    test('headerBytes is 1 (just the opcode)', () {
+      expect(TransferData.headerBytes, equals(1));
+    });
+
+    test('encode prepends opcode 0x07 to the data', () {
+      final cmd = TransferData(Uint8List.fromList([0xAA, 0xBB, 0xCC]));
+      expect(
+        cmd.encode(),
+        equals(Uint8List.fromList([0x07, 0xAA, 0xBB, 0xCC])),
+      );
+    });
+
+    test('encode handles an empty data fragment', () {
+      final cmd = TransferData(Uint8List(0));
+      expect(cmd.encode(), equals(Uint8List.fromList([0x07])));
+    });
+
+    test('decode round-trips the data bytes', () {
+      final original = TransferData(Uint8List.fromList([1, 2, 3, 4, 5]));
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<TransferData>());
+      expect(
+        (decoded as TransferData).data,
+        equals(Uint8List.fromList([1, 2, 3, 4, 5])),
+      );
+    });
+
+    test('TransferData instances with equal data are equal', () {
+      expect(
+        TransferData(Uint8List.fromList([7, 8, 9])),
+        equals(TransferData(Uint8List.fromList([7, 8, 9]))),
+      );
+    });
+
+    test('TransferData defensively copies its data', () {
+      final mutable = Uint8List.fromList([1, 2, 3]);
+      final cmd = TransferData(mutable);
+      mutable[0] = 99;
+      expect(cmd.data[0], equals(1));
+    });
+  });
+
+  group('ReadWindowCommand', () {
+    test('encode is [0x08, offset u32 LE, len u16 LE]', () {
+      const cmd = ReadWindowCommand(offset: 0x01020304, len: 0x0506);
+      expect(
+        cmd.encode(),
+        equals(Uint8List.fromList([0x08, 0x04, 0x03, 0x02, 0x01, 0x06, 0x05])),
+      );
+    });
+
+    test('decode round-trips offset and len', () {
+      const original = ReadWindowCommand(offset: 600, len: 244);
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<ReadWindowCommand>());
+      final c = decoded as ReadWindowCommand;
+      expect(c.offset, equals(600));
+      expect(c.len, equals(244));
+    });
+
+    test('decode throws when the body is shorter than 6 bytes', () {
+      expect(
+        () => StressCommand.decode(Uint8List.fromList([0x08, 0, 0, 0, 0])),
+        throwsA(
+          isA<StressProtocolException>().having((e) => e.opcode, 'opcode', 0x08),
+        ),
+      );
+    });
+
+    test('ReadWindowCommand instances with equal fields are equal', () {
+      expect(
+        const ReadWindowCommand(offset: 5, len: 9),
+        equals(const ReadWindowCommand(offset: 5, len: 9)),
+      );
+    });
+  });
 }

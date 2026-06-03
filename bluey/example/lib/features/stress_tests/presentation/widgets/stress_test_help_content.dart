@@ -160,22 +160,29 @@ extension StressTestHelpX on StressTest {
     ),
     StressTest.mtuProbe => const StressTestHelpContent(
       whatItDoes:
-          'Requests requestedMtu bytes as the ATT MTU, then sends '
-          'writes of payloadBytes each. Confirms that MTU '
-          'negotiation completes and that payloads at or near the '
-          'negotiated MTU transfer without fragmentation '
-          'errors.\n\n'
-          'requestedMtu is the value passed to the platform MTU '
-          'request API — the negotiated result may be lower '
-          'depending on the peripheral. Set payloadBytes to '
-          'requestedMtu − 3 to test the maximum single-packet '
-          'payload (3-byte ATT header overhead).',
+          'Streams a payloadBytes-long deterministic pattern to the '
+          'server as chunked writes, reads the reassembled bytes back '
+          'in windows, and byte-compares them exactly. Runs the whole '
+          'transfer twice: once write-without-response (the I343 path '
+          'that silently truncated above 512 bytes) and once '
+          'write-with-response.\n\n'
+          'To actually exercise I343 you need a HIGH MTU (~517) so a '
+          'single write chunk reaches the 513–514 boundary — the '
+          'Android client can request it; iOS auto-negotiates and you '
+          'cannot set it. payloadBytes above the single-write limit '
+          '(e.g. 600) forces multi-chunk fragmentation; the read-back '
+          'is pulled in ≤512-byte windows since a single read cannot '
+          'exceed the 512-octet attribute cap.',
       readingResults:
-          'Any failures indicate either failed MTU negotiation or '
-          'incorrect payload sizing.\n\n'
-          'Unusually high median or p95 latency at large MTU sizes '
-          'can indicate retransmission due to RF congestion rather '
-          'than stack bugs.',
+          'Each write type is one attempt (2 transfer attempts total, '
+          'plus the MTU request on Android). SUCCEEDED means the bytes '
+          'read back matched the pattern exactly.\n\n'
+          'A failure shows as "TransferMismatch[withoutResponse]: '
+          'offset N: expected 0xNN got 0xMM (len A vs B)". A '
+          'SYMMETRIC failure (both directions, or at a low MTU) usually '
+          'means a parameter/test issue; the real I343 signature is '
+          'ASYMMETRIC — one direction fails (historically iOS→Android '
+          'write-without-response) while the other passes.',
       relevantStats: [
         HelpStat.attempted,
         HelpStat.succeeded,

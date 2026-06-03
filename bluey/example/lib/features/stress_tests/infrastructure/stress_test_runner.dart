@@ -6,6 +6,7 @@ import 'package:bluey/bluey.dart';
 import '../../../shared/stress_protocol.dart';
 import '../domain/stress_test_config.dart';
 import '../domain/stress_test_result.dart';
+import '../domain/transfer_verdict.dart';
 
 String _typeName(Object e) {
   if (e is BlueyPlatformException) {
@@ -400,37 +401,61 @@ class StressTestRunner {
       }
     }
 
-    // Tell server to return payloadBytes-sized reads.
-    try {
-      await stressChar.write(
-        SetPayloadSizeCommand(sizeBytes: config.payloadBytes).encode(),
-        withResponse: true,
-      );
-    } on Object {
-      // If setPayloadSize fails, the read-length check will fail — but
-      // we still proceed to record the per-cycle failures uniformly.
-    }
-
-    // Three rounds: write payloadBytes, read payloadBytes, verify length.
-    for (var i = 0; i < 3; i++) {
+    // Byte-exact chunked transfer, once per write type. withoutResponse
+    // first — that is the path that silently truncated in I343. Each pass
+    // resets the server buffer, sizes its chunks to the connection's real
+    // maxWritePayload (minus the 1-byte TransferData opcode), streams
+    // config.payloadBytes of deterministic pattern, reads the reassembled
+    // buffer back, and byte-compares it.
+    for (final withResponse in [false, true]) {
+      final label = withResponse ? 'withResponse' : 'withoutResponse';
       final start = stopwatch.elapsedMicroseconds;
       try {
-        final payload = _generatePattern(config.payloadBytes);
+        // Fresh server buffer for this pass.
         await stressChar.write(
-          EchoCommand(payload).encode(),
+          const ResetCommand().encode(),
           withResponse: true,
         );
-        final readBack = await stressChar.read();
-        if (readBack.length != config.payloadBytes) {
+
+        final limit = await connection.maxWritePayload(
+          withResponse: withResponse,
+        );
+        final chunkSize = limit.value;
+        if (chunkSize <= TransferData.headerBytes) {
           throw StateError(
-            'MTU read returned ${readBack.length} bytes, expected ${config.payloadBytes}',
+            '$label: maxWritePayload ($chunkSize) too small to frame a chunk',
           );
         }
-        result = result.recordSuccess(
-          latency: Duration(
-            microseconds: stopwatch.elapsedMicroseconds - start,
-          ),
+
+        final payload = _generatePattern(config.payloadBytes);
+        await _sendChunked(
+          stressChar,
+          payload,
+          chunkSize: chunkSize,
+          withResponse: withResponse,
         );
+
+        final readBack = await _readBackWindowed(
+          stressChar,
+          expectedLen: config.payloadBytes,
+        );
+        final verdict = evaluateTransfer(
+          expectedLen: config.payloadBytes,
+          readBack: readBack,
+        );
+        if (verdict.ok) {
+          result = result.recordSuccess(
+            latency: Duration(
+              microseconds: stopwatch.elapsedMicroseconds - start,
+            ),
+          );
+        } else {
+          // Record the divergence detail directly (not a bare StateError) so
+          // the result panel shows what actually went wrong.
+          result = result.recordFailure(
+            typeName: 'TransferMismatch[$label]: ${verdict.describe()}',
+          );
+        }
       } catch (e) {
         if (e is DisconnectedException) {
           result = result.markConnectionLost();
@@ -597,6 +622,58 @@ class StressTestRunner {
       orElse: () => throw StateError('Stress service not found on peer'),
     );
     return svc.characteristic(UUID(StressProtocol.charUuid));
+  }
+
+  /// Streams [payload] to the stress characteristic as ordered
+  /// [TransferData] fragments. Each on-wire write is sized to fit within
+  /// [chunkSize] including the 1-byte [TransferData.headerBytes] opcode, so
+  /// the data carried per fragment is `chunkSize - headerBytes` and the
+  /// framed write lands exactly at [chunkSize]. Sends each fragment using
+  /// [withResponse].
+  Future<void> _sendChunked(
+    RemoteCharacteristic stressChar,
+    Uint8List payload, {
+    required int chunkSize,
+    required bool withResponse,
+  }) async {
+    final dataPerChunk = chunkSize - TransferData.headerBytes;
+    final totalLen = payload.length;
+    for (var offset = 0; offset < totalLen; offset += dataPerChunk) {
+      final end =
+          (offset + dataPerChunk < totalLen) ? offset + dataPerChunk : totalLen;
+      final fragment = Uint8List.sublistView(payload, offset, end);
+      await stressChar.write(
+        TransferData(fragment).encode(),
+        withResponse: withResponse,
+      );
+    }
+  }
+
+  /// Reads the server's reassembled buffer back in slices via [ReadWindowCommand]
+  /// and stitches them, because a single characteristic read cannot return more
+  /// than the 512-octet attribute cap ([maxAttributeValueLength]) — the same cap
+  /// that necessitates the windowing. Advances by the bytes actually returned
+  /// (never assuming a read delivered the full window), so it is robust to how
+  /// the platform sizes read PDUs. Stops once [expectedLen] bytes are gathered,
+  /// or when a slice comes back empty (the server has no more — itself the
+  /// truncation signal the verdict then reports).
+  Future<Uint8List> _readBackWindowed(
+    RemoteCharacteristic stressChar, {
+    required int expectedLen,
+  }) async {
+    final acc = BytesBuilder();
+    var offset = 0;
+    while (offset < expectedLen) {
+      await stressChar.write(
+        ReadWindowCommand(offset: offset, len: maxAttributeValueLength).encode(),
+        withResponse: true,
+      );
+      final slice = await stressChar.read();
+      if (slice.isEmpty) break;
+      acc.add(slice);
+      offset += slice.length;
+    }
+    return acc.toBytes();
   }
 
   static Uint8List _generatePattern(int size) {
