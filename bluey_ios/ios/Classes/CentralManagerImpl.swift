@@ -914,6 +914,15 @@ class CentralManagerImpl: NSObject {
         // that races the change can't resolve to a stale entry.
         handleStore.clear(for: deviceId)
 
+        // I339 — the deferred WriteNoResponse queue holds `CBCharacteristic`
+        // instances from the now-invalidated attribute table. Fail them here
+        // rather than letting a later `peripheralIsReady` hand a stale
+        // characteristic to CoreBluetooth (silent loss) or hang the
+        // completions if readiness never returns (the queue has no per-write
+        // timeout; on a still-connected link no disconnect would clear it).
+        pendingWriteQueues.removeValue(forKey: deviceId)?
+            .failAll(error: BlueyError.handleInvalidated.toClientPigeonError())
+
         flutterApi.onServicesChanged(deviceId: deviceId) { _ in }
     }
 
