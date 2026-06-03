@@ -435,19 +435,27 @@ class StressTestRunner {
           withResponse: withResponse,
         );
 
-        final readBack = await stressChar.read();
+        final readBack = await _readBackWindowed(
+          stressChar,
+          expectedLen: config.payloadBytes,
+        );
         final verdict = evaluateTransfer(
           expectedLen: config.payloadBytes,
           readBack: readBack,
         );
-        if (!verdict.ok) {
-          throw StateError('$label: ${verdict.describe()}');
+        if (verdict.ok) {
+          result = result.recordSuccess(
+            latency: Duration(
+              microseconds: stopwatch.elapsedMicroseconds - start,
+            ),
+          );
+        } else {
+          // Record the divergence detail directly (not a bare StateError) so
+          // the result panel shows what actually went wrong.
+          result = result.recordFailure(
+            typeName: 'TransferMismatch[$label]: ${verdict.describe()}',
+          );
         }
-        result = result.recordSuccess(
-          latency: Duration(
-            microseconds: stopwatch.elapsedMicroseconds - start,
-          ),
-        );
       } catch (e) {
         if (e is DisconnectedException) {
           result = result.markConnectionLost();
@@ -639,6 +647,33 @@ class StressTestRunner {
         withResponse: withResponse,
       );
     }
+  }
+
+  /// Reads the server's reassembled buffer back in slices via [ReadWindowCommand]
+  /// and stitches them, because a single characteristic read cannot return more
+  /// than the 512-octet attribute cap ([maxAttributeValueLength]) — the same cap
+  /// that necessitates the windowing. Advances by the bytes actually returned
+  /// (never assuming a read delivered the full window), so it is robust to how
+  /// the platform sizes read PDUs. Stops once [expectedLen] bytes are gathered,
+  /// or when a slice comes back empty (the server has no more — itself the
+  /// truncation signal the verdict then reports).
+  Future<Uint8List> _readBackWindowed(
+    RemoteCharacteristic stressChar, {
+    required int expectedLen,
+  }) async {
+    final acc = BytesBuilder();
+    var offset = 0;
+    while (offset < expectedLen) {
+      await stressChar.write(
+        ReadWindowCommand(offset: offset, len: maxAttributeValueLength).encode(),
+        withResponse: true,
+      );
+      final slice = await stressChar.read();
+      if (slice.isEmpty) break;
+      acc.add(slice);
+      offset += slice.length;
+    }
+    return acc.toBytes();
   }
 
   static Uint8List _generatePattern(int size) {

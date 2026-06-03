@@ -547,6 +547,13 @@ void main() {
       // unchanged (other tests rely on it).
       var writes = 0;
       final reassembly = BytesBuilder();
+      // The read cursor set by the most recent ReadWindowCommand. The next
+      // read returns buffer[readOffset : readOffset + min(readLen, pduCap)].
+      var readOffset = 0;
+      var readLen = 0;
+      // Simulate a single read PDU smaller than the payload, so the runner's
+      // tolerant windowed loop genuinely iterates more than once.
+      const pduCap = 99;
       stressChar.onWriteHook = (value, {required bool withResponse}) async {
         writes++;
         try {
@@ -555,15 +562,32 @@ void main() {
             reassembly.add(command.data);
           } else if (command is ResetCommand) {
             reassembly.clear();
+            readOffset = 0;
+            readLen = 0;
+          } else if (command is ReadWindowCommand) {
+            // Set the read cursor; must NOT touch the reassembly buffer.
+            readOffset = command.offset;
+            readLen = command.len;
           }
           // Other commands don't affect the reassembly buffer.
         } on StressProtocolException {
           // Ignore undecodable control writes for buffer purposes.
         }
       };
-      // Read back the current reassembled buffer — mirrors the server
-      // returning its reassembly buffer as the read value.
-      stressChar.onReadHook = () async => reassembly.toBytes();
+      // Read back a slice of the reassembled buffer at the cursor set by the
+      // last ReadWindowCommand, capped to a single PDU (pduCap) and clamped to
+      // the buffer end — mirrors a server that returns buffer[offset:offset+len]
+      // but where the link can only carry pduCap bytes per read.
+      stressChar.onReadHook = () async {
+        final buffer = reassembly.toBytes();
+        if (readOffset >= buffer.length) return Uint8List(0);
+        final window = readLen < pduCap ? readLen : pduCap;
+        final end =
+            (readOffset + window < buffer.length)
+                ? readOffset + window
+                : buffer.length;
+        return Uint8List.sublistView(buffer, readOffset, end);
+      };
 
       // payloadBytes (250) comfortably exceeds the fake's maxWritePayload
       // (MTU 100 → 100 - 3 = 97, so 96 data bytes/fragment), forcing the
