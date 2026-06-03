@@ -84,6 +84,8 @@ sealed class StressCommand {
         );
       case 0x06:
         return const ResetCommand();
+      case 0x07:
+        return TransferData(body);
       default:
         throw StressProtocolException(
           opcode: opcode,
@@ -214,6 +216,44 @@ class ResetCommand extends StressCommand {
 
   @override
   int get hashCode => runtimeType.hashCode;
+}
+
+/// TransferData: one fragment of a larger logical payload the client is
+/// streaming to the server for byte-exact reassembly. The server appends
+/// [data] to a reassembly buffer in arrival order (BLE preserves write
+/// order on a single characteristic within a connection), and the buffer
+/// becomes the value returned by the next read. Opcode 0x07.
+///
+/// Wire layout: `[0x07][data…]`. The 1-byte opcode ([headerBytes]) is the
+/// only framing overhead; subtract it from the connection's max write
+/// payload when sizing a fragment so each framed write fits in one ATT
+/// packet. No sequence number or total length is carried — write ordering
+/// plus the client's byte-exact compare detect any dropped or truncated
+/// fragment.
+class TransferData extends StressCommand {
+  /// Framing overhead per fragment: just the 1-byte opcode.
+  static const int headerBytes = 1;
+
+  /// This fragment's bytes.
+  final Uint8List data;
+
+  TransferData(Uint8List data) : data = Uint8List.fromList(data);
+
+  @override
+  Uint8List encode() {
+    final out = Uint8List(headerBytes + data.length);
+    out[0] = 0x07;
+    out.setRange(headerBytes, out.length, data);
+    return out;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TransferData &&
+      const ListEquality<int>().equals(other.data, data);
+
+  @override
+  int get hashCode => Object.hashAll(data);
 }
 
 /// Thrown when stress command bytes can't be decoded.

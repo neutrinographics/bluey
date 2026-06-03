@@ -184,4 +184,47 @@ void main() {
       expect(const ResetCommand(), equals(const ResetCommand()));
     });
   });
+
+  group('TransferData', () {
+    test('headerBytes is 1 (just the opcode)', () {
+      expect(TransferData.headerBytes, equals(1));
+    });
+
+    test('encode prepends opcode 0x07 to the data', () {
+      final cmd = TransferData(Uint8List.fromList([0xAA, 0xBB, 0xCC]));
+      expect(
+        cmd.encode(),
+        equals(Uint8List.fromList([0x07, 0xAA, 0xBB, 0xCC])),
+      );
+    });
+
+    test('encode handles an empty data fragment', () {
+      final cmd = TransferData(Uint8List(0));
+      expect(cmd.encode(), equals(Uint8List.fromList([0x07])));
+    });
+
+    test('decode round-trips the data bytes', () {
+      final original = TransferData(Uint8List.fromList([1, 2, 3, 4, 5]));
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<TransferData>());
+      expect(
+        (decoded as TransferData).data,
+        equals(Uint8List.fromList([1, 2, 3, 4, 5])),
+      );
+    });
+
+    test('TransferData instances with equal data are equal', () {
+      expect(
+        TransferData(Uint8List.fromList([7, 8, 9])),
+        equals(TransferData(Uint8List.fromList([7, 8, 9]))),
+      );
+    });
+
+    test('TransferData defensively copies its data', () {
+      final mutable = Uint8List.fromList([1, 2, 3]);
+      final cmd = TransferData(mutable);
+      mutable[0] = 99;
+      expect(cmd.data[0], equals(1));
+    });
+  });
 }
