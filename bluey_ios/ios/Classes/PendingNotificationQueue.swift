@@ -33,6 +33,11 @@ import Foundation
 /// Generic on its value types so unit tests can exercise the storage
 /// contract with `NSObject` stand-ins (CB types are not publicly
 /// constructible enough for clean unit tests).
+///
+/// Sibling: `PendingWriteQueue` (I339) applies this same
+/// drain-while-the-gate-is-open shape to central-role WriteNoResponse
+/// writes. Android's `GattOpQueue` is the cross-platform analog, shaped
+/// differently (serial, advance-on-callback) for its per-op-callback API.
 internal final class PendingNotificationQueue<C: AnyObject, Central: AnyObject> {
 
     struct Entry {

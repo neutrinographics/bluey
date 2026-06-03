@@ -64,4 +64,10 @@ class PeripheralDelegate: NSObject, CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
         manager?.didModifyServices(peripheral: peripheral, invalidatedServices: invalidatedServices)
     }
+
+    // MARK: - Write-Without-Response Flow Control
+
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        manager?.peripheralIsReadyToSendWriteWithoutResponse(peripheral: peripheral)
+    }
 }
