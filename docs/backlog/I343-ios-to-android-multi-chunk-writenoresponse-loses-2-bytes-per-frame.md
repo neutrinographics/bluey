@@ -1,13 +1,58 @@
 ---
 id: I343
-title: iOS-central → Android-peripheral multi-chunk `WriteNoResponse` transmissions silently lose exactly 2 bytes per frame at the chunk boundary
+title: Writes above the 512-octet attribute cap are silently truncated (iOS over-reports the WriteNoResponse max as MTU−3), corrupting large iOS→Android frames
 category: bug
 severity: high
 platform: both
-status: open
-last_verified: 2026-06-02
+status: fixed
+fixed_in: c7f1446
+last_verified: 2026-06-03
 related: [I050, I338, I339]
 ---
+
+> ## ✅ Root cause CONFIRMED (2026-06-02 simultaneous-capture bisect) — supersedes the speculative "What IS the cause" section below
+>
+> The loss is **not** at a chunk *boundary* and **not** coalescing. It is a
+> **max-write-payload over-report**: a `WriteNoResponse` write sized at
+> `CBPeripheral.maximumWriteValueLength(for: .withoutResponse)` = **514**
+> (`MTU − 3`, MTU 517) is silently truncated to **512** (`MTU − 5`) on
+> delivery to the Android peripheral. Any write **below** 512 arrives intact.
+>
+> **Evidence** — one simultaneous iOS+Android capture (23:06), comparing the
+> per-write `ios-writeValue` length (bytes handed to CoreBluetooth) against
+> the Android `onCharacteristicWriteRequest` length:
+> - `length=514` ×135 on iOS → `length=512` ×159 on Android. **No `514` ever
+>   reaches Android; no `512` is ever sent by iOS** — a clean 514→512 mapping.
+> - `448`, `449`, `286`, `326`, `366`, `407` … all arrive byte-for-byte intact.
+> - **No whole writes dropped** (Android count ≥ iOS). **Pigeon clean**
+>   (`native onWrite` length == `dart-recv` length, exactly). **Not** gossip
+>   reassembly (it faithfully decodes the 2-short stream it is handed).
+>
+> It looked "multi-chunk-specific" only because the **first chunk of any
+> multi-chunk frame is always the max size (514)** and therefore always loses
+> its last 2 bytes; single-chunk frames (< 512) never hit it. The original
+> reproducer's "stall/keyboard hang" was a **red herring** — a hang *or* a
+> reconnect merely produces the large state-sync frames that exceed 512; the
+> last capture reproduced the failure with **no hang at all**.
+>
+> **Verified fix (empirical):** capping the iOS `getMaximumWriteLength`
+> `.withoutResponse` result by 2 makes gossip chunk at 512 → zero truncation →
+> **zero corruption, chats flow perfectly both directions.** (Verification
+> hack: branch `i343-bisect-instrumentation`, commit `7e97c2e`.)
+>
+> **Fixed (2026-06-03):** clamp `WritePayloadLimit.fromPlatform` to the 512-octet attribute cap (`min(MTU−3, 512)`), commit `c7f1446`; design `docs/superpowers/specs/2026-06-03-write-payload-512-cap-design.md`.
+>
+> **Open question — the *mechanism* (which stack eats the 2 bytes):** both
+> sides negotiated MTU 517 (Android `onMtuChanged=517`; iOS's 514 = 517−3), and
+> bluey's math is spec-correct on both platforms (iOS trusts CoreBluetooth's
+> `maximumWriteValueLength`; Android uses `mtu − 3`, `ConnectionManager.kt:539`).
+> So 514 *should* fit. Web research confirms the 3-byte ATT overhead but found
+> **no documented `MTU − 5` rule for WriteNoResponse**. Candidates not yet
+> separated: (a) CoreBluetooth over-reports the iOS WnR max by 2; (b) the
+> Android peripheral truncates a received WnR at `MTU − 5`; (c) an MTU
+> off-by-2 in negotiation. Settling this needs an air sniffer or an MTU sweep —
+> and determines whether the principled fix is an iOS-side cap, an Android-side
+> receive fix, or a derived margin. Tracked into the fix brainstorm.
 
 ## Symptom
 
