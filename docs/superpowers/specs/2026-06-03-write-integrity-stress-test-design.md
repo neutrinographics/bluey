@@ -36,11 +36,51 @@ Replace the single-write round with a **chunked byte-exact transfer**, run for
 4. **Chunk** it into writes sized so each on-wire `TransferData` write (data +
    1-byte opcode) lands exactly at `chunk`; send each in order using the
    round's write type.
-5. **Read back** the server's reassembled buffer (`stressChar.read()`).
-6. **Byte-compare** read-back vs the regenerated pattern → verdict.
+5. **Read back** the server's reassembled buffer **in windows** (see below):
+   loop `ReadWindowCommand(offset, window)` → `stressChar.read()` → append,
+   until `payloadBytes` bytes are retrieved (or a short slice signals the
+   server has fewer — itself a truncation signal). A single `read()` cannot
+   return more than the 512-octet attribute cap, so a >512 payload **must** be
+   pulled back in slices.
+6. **Byte-compare** the stitched read-back vs the regenerated pattern → verdict.
 7. Run steps 2–6 **twice**: once `withResponse: false` (the I343 path), once
    `withResponse: true` (settles the unverified "with-response is capped at 512"
-   question empirically). Record each as its own labelled outcome.
+   question empirically). Record each as its own labelled outcome — on failure,
+   record `verdict.describe()` so the divergence is visible in the result panel
+   (not a bare `StateError`).
+
+#### Read-back must be chunked too (post-dogfood correction)
+
+The first on-device run (iPhone↔Pixel, `payloadBytes = 600`, both directions)
+failed *symmetrically* with two opaque `StateError`s. Root cause: a single
+characteristic `read()` cannot return more than the **512-octet maximum
+attribute-value length** (the same cap I343 is about), so reading a 600-byte
+reassembled buffer back as one value is impossible — the verdict failed on
+length regardless of write integrity. A symmetric failure (not the asymmetric
+signature of a real I343 truncation) is the tell. The fix: chunk the *reads*
+the way we chunk the writes.
+
+- **`ReadWindowCommand(offset u32, len u16)`** (next free opcode `0x08`): sets
+  the server's read cursor; the next `read()` returns `buffer[offset :
+  offset+len]` (clamped to the buffer end; empty when `offset >= length`).
+- **Window size** = **`maxAttributeValueLength`** (512), the existing I343
+  domain constant (public via `package:bluey/bluey.dart`). This is the *correct*
+  ubiquitous-language term: the same 512-octet attribute-value cap that bounds a
+  single read is what makes the windowing necessary in the first place — one
+  concept, used consistently. **Not** `maxWritePayload` (a write concept doing a
+  read's job — a UL smell), and **not** a new `maxReadPayload` (a fictitious
+  concept — the read/write asymmetry is real: an app must size *writes* but the
+  platform long-reads and reassembles *reads* transparently up to the 512 cap,
+  so there is no consumer-facing read-size limit to name).
+- **The read loop advances by the bytes actually returned**, stopping only on an
+  empty slice (server has no more — the truncation signal) or once
+  `payloadBytes` is gathered. It never assumes a read returned the full window,
+  so it is robust to however the platform sizes read PDUs — no MTU-derived
+  window needed.
+- To actually **trigger I343** you also need a **high MTU (~517)** so a single
+  *write* chunk reaches 513–514; at `requestedMtu = 247` (`maxWritePayload ≈
+  244`) the over-report cannot occur. With chunked reads in place,
+  `payloadBytes = 600` is correct again *when paired with a high MTU*.
 
 ### Protocol: one new command + server reassembly (`stress_protocol.dart` + `stress_service_handler.dart`)
 
@@ -52,8 +92,12 @@ Add `TransferData` (next free opcode `0x07`):
     BLE preserves write ordering on a single characteristic within a
     connection (and I339 fixed WriteNoResponse flow control), so no `seq` is
     needed.
-  - `read` returns the buffer (it takes precedence over `_lastEcho`).
-- `ResetCommand` clears the reassembly buffer at the start of each pass.
+  - `read` returns the buffer window set by the last `ReadWindowCommand`
+    (default: the whole buffer), taking precedence over `_lastEcho`.
+- `ReadWindowCommand(offset, len)` (opcode `0x08`) sets the read window so the
+  client can pull a >512 buffer back in ≤512 slices.
+- `ResetCommand` clears the reassembly buffer **and** resets the read window at
+  the start of each pass.
 
 No `seq` / `totalLen` framing is carried: write ordering plus the client's
 byte-exact compare detect any dropped or truncated fragment. (The earlier
