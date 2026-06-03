@@ -86,6 +86,18 @@ sealed class StressCommand {
         return const ResetCommand();
       case 0x07:
         return TransferData(body);
+      case 0x08:
+        if (body.length < 6) {
+          throw StressProtocolException(
+            opcode: opcode,
+            message: 'ReadWindow payload too short (${body.length}, need 6)',
+          );
+        }
+        final bd = body.buffer.asByteData(body.offsetInBytes, 6);
+        return ReadWindowCommand(
+          offset: bd.getUint32(0, Endian.little),
+          len: bd.getUint16(4, Endian.little),
+        );
       default:
         throw StressProtocolException(
           opcode: opcode,
@@ -254,6 +266,33 @@ class TransferData extends StressCommand {
 
   @override
   int get hashCode => Object.hashAll(data);
+}
+
+/// ReadWindowCommand: sets the server's read cursor so the client can pull a
+/// reassembled buffer larger than the 512-octet attribute cap back in slices.
+/// The next read returns `buffer[offset : offset+len]` (clamped to the buffer
+/// end). Opcode 0x08. Wire: `[0x08][offset u32 LE][len u16 LE]`.
+class ReadWindowCommand extends StressCommand {
+  final int offset;
+  final int len;
+  const ReadWindowCommand({required this.offset, required this.len});
+
+  @override
+  Uint8List encode() {
+    final out = Uint8List(7);
+    out[0] = 0x08;
+    final bd = out.buffer.asByteData();
+    bd.setUint32(1, offset, Endian.little);
+    bd.setUint16(5, len, Endian.little);
+    return out;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReadWindowCommand && other.offset == offset && other.len == len;
+
+  @override
+  int get hashCode => Object.hash(offset, len);
 }
 
 /// Thrown when stress command bytes can't be decoded.

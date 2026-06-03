@@ -227,4 +227,39 @@ void main() {
       expect(cmd.data[0], equals(1));
     });
   });
+
+  group('ReadWindowCommand', () {
+    test('encode is [0x08, offset u32 LE, len u16 LE]', () {
+      const cmd = ReadWindowCommand(offset: 0x01020304, len: 0x0506);
+      expect(
+        cmd.encode(),
+        equals(Uint8List.fromList([0x08, 0x04, 0x03, 0x02, 0x01, 0x06, 0x05])),
+      );
+    });
+
+    test('decode round-trips offset and len', () {
+      const original = ReadWindowCommand(offset: 600, len: 244);
+      final decoded = StressCommand.decode(original.encode());
+      expect(decoded, isA<ReadWindowCommand>());
+      final c = decoded as ReadWindowCommand;
+      expect(c.offset, equals(600));
+      expect(c.len, equals(244));
+    });
+
+    test('decode throws when the body is shorter than 6 bytes', () {
+      expect(
+        () => StressCommand.decode(Uint8List.fromList([0x08, 0, 0, 0, 0])),
+        throwsA(
+          isA<StressProtocolException>().having((e) => e.opcode, 'opcode', 0x08),
+        ),
+      );
+    });
+
+    test('ReadWindowCommand instances with equal fields are equal', () {
+      expect(
+        const ReadWindowCommand(offset: 5, len: 9),
+        equals(const ReadWindowCommand(offset: 5, len: 9)),
+      );
+    });
+  });
 }
