@@ -4,8 +4,9 @@ title: iOS-central → Android-peripheral multi-chunk `WriteNoResponse` transmis
 category: bug
 severity: high
 platform: both
-status: open
-last_verified: 2026-06-02
+status: fixed
+fixed_in: c7f1446
+last_verified: 2026-06-03
 related: [I050, I338, I339]
 ---
 
@@ -38,6 +39,8 @@ related: [I050, I338, I339]
 > `.withoutResponse` result by 2 makes gossip chunk at 512 → zero truncation →
 > **zero corruption, chats flow perfectly both directions.** (Verification
 > hack: branch `i343-bisect-instrumentation`, commit `7e97c2e`.)
+>
+> **Fixed (2026-06-03):** clamp `WritePayloadLimit.fromPlatform` to the 512-octet attribute cap (`min(MTU−3, 512)`), commit `c7f1446`; design `docs/superpowers/specs/2026-06-03-write-payload-512-cap-design.md`.
 >
 > **Open question — the *mechanism* (which stack eats the 2 bytes):** both
 > sides negotiated MTU 517 (Android `onMtuChanged=517`; iOS's 514 = 517−3), and

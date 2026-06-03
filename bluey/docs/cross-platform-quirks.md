@@ -87,3 +87,14 @@ Apps that hold multiple central-role peer connections concurrently should *also*
 **Practical guidance.** On both platforms, treat a `ClientLifecycleTimeoutEvent` as a warning that a peer may be paused, not as confirmation it is gone — wait for a `Server.disconnections` emission before tearing down app state for that client. To widen the pause envelope before the timeout advisory fires, raise `lifecycleInterval` on the server (default 10 s) and `peerSilenceTimeout` on the client (default 30 s) to match your app's background-pause profile.
 
 *(I338 — lifecycle-silence transport reconciliation. Stage 1 fixed the Android advisory path; Pattern B gives iOS a real disconnect signal via presence-characteristic unsubscription, making silence advisory on both platforms.)*
+
+## Single writes are capped at 512 bytes regardless of MTU
+
+The Bluetooth spec caps an attribute value at **512 octets** (Core Spec Vol 3,
+Part F §3.2.9), independent of the negotiated ATT MTU. So even at MTU 517 (where
+`MTU - 3` = 514), the largest single `connection.write(...)` payload that
+reliably arrives is **512**. iOS's CoreBluetooth over-reports the
+write-without-response maximum as `MTU - 3`; spec-conforming peripherals (e.g.
+Android) silently truncate the overflow, and a Write Command gives no error.
+bluey hides this: `connection.maxWritePayload(...)` is already clamped to 512,
+so sizing chunked writes from it is safe on both platforms. (See backlog I343.)
