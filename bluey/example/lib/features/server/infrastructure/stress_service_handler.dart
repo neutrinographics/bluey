@@ -24,6 +24,13 @@ class StressServiceHandler {
   // round reads back exactly what was streamed.
   final BytesBuilder _transfer = BytesBuilder();
 
+  // Read cursor for windowed reads of the reassembly buffer (so a buffer larger
+  // than the 512-octet attribute cap can be pulled back in slices). Defaults to
+  // a full attribute-value-sized window; set by ReadWindowCommand, reset by
+  // ResetCommand.
+  int _readOffset = 0;
+  int _readLen = maxAttributeValueLength;
+
   /// Processes a write to [StressProtocol.charUuid]. Decodes the
   /// command, mutates server state, responds and/or notifies as
   /// appropriate.
@@ -97,12 +104,21 @@ class StressServiceHandler {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
 
+      case ReadWindowCommand(:final offset, :final len):
+        _readOffset = offset;
+        _readLen = len;
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+
       case ResetCommand():
         _lastEcho = Uint8List(0);
         _dropNextWrite = false;
         _payloadSize = 20;
         _abortBurst = true; // interrupts any in-flight burstMe loop
         _transfer.clear();
+        _readOffset = 0;
+        _readLen = maxAttributeValueLength;
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
@@ -113,7 +129,14 @@ class StressServiceHandler {
   /// [_lastEcho] is non-empty, returns it; otherwise returns
   /// [_payloadSize] bytes of deterministic pattern.
   Uint8List onRead() {
-    if (_transfer.length > 0) return _transfer.toBytes();
+    if (_transfer.length > 0) {
+      final bytes = _transfer.toBytes();
+      if (_readOffset >= bytes.length) return Uint8List(0);
+      final end = (_readOffset + _readLen < bytes.length)
+          ? _readOffset + _readLen
+          : bytes.length;
+      return Uint8List.sublistView(bytes, _readOffset, end);
+    }
     if (_lastEcho.isNotEmpty) return _lastEcho;
     return _generatePattern(_payloadSize);
   }

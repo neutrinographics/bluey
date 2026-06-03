@@ -437,4 +437,60 @@ void main() {
       expect(handler.onRead(), hasLength(20));
     });
   });
+
+  group('StressServiceHandler — ReadWindow', () {
+    WriteRequest writeOf(Uint8List value) => WriteRequest(
+      client: mockClient,
+      characteristicId: UUID(StressProtocol.charUuid),
+      value: value,
+      responseNeeded: true,
+      offset: 0,
+      internalRequestId: 0,
+    );
+
+    test('returns the requested slice of a reassembled buffer', () async {
+      final handler = StressServiceHandler();
+      final full = Uint8List.fromList(List<int>.generate(10, (i) => i & 0xff));
+      await handler.onWrite(writeOf(TransferData(full).encode()), mockServer);
+
+      await handler.onWrite(
+        writeOf(const ReadWindowCommand(offset: 3, len: 4).encode()),
+        mockServer,
+      );
+      expect(handler.onRead(), equals(Uint8List.fromList([3, 4, 5, 6])));
+    });
+
+    test('clamps a window past the buffer end and yields empty past it', () async {
+      final handler = StressServiceHandler();
+      final full = Uint8List.fromList(List<int>.generate(10, (i) => i & 0xff));
+      await handler.onWrite(writeOf(TransferData(full).encode()), mockServer);
+
+      await handler.onWrite(
+        writeOf(const ReadWindowCommand(offset: 8, len: 100).encode()),
+        mockServer,
+      );
+      expect(handler.onRead(), equals(Uint8List.fromList([8, 9])));
+
+      await handler.onWrite(
+        writeOf(const ReadWindowCommand(offset: 50, len: 4).encode()),
+        mockServer,
+      );
+      expect(handler.onRead(), isEmpty);
+    });
+
+    test('ResetCommand restores the default full-buffer window', () async {
+      final handler = StressServiceHandler();
+      final full = Uint8List.fromList(List<int>.generate(10, (i) => i & 0xff));
+      await handler.onWrite(writeOf(TransferData(full).encode()), mockServer);
+      await handler.onWrite(
+        writeOf(const ReadWindowCommand(offset: 5, len: 2).encode()),
+        mockServer,
+      );
+      await handler.onWrite(writeOf(const ResetCommand().encode()), mockServer);
+
+      // Window reset; a fresh transfer reads back whole.
+      await handler.onWrite(writeOf(TransferData(full).encode()), mockServer);
+      expect(handler.onRead(), equals(full));
+    });
+  });
 }
