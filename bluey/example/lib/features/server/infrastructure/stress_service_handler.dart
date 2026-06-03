@@ -18,6 +18,12 @@ class StressServiceHandler {
   int _burstId = 0;
   bool _abortBurst = false;
 
+  // Reassembly buffer for chunked TransferData writes. Per-instance and
+  // shared across centrals, like the other stress state. Cleared by
+  // ResetCommand. Takes precedence over _lastEcho on read so a transfer
+  // round reads back exactly what was streamed.
+  final BytesBuilder _transfer = BytesBuilder();
+
   /// Processes a write to [StressProtocol.charUuid]. Decodes the
   /// command, mutates server state, responds and/or notifies as
   /// appropriate.
@@ -85,11 +91,18 @@ class StressServiceHandler {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
 
+      case TransferData(:final data):
+        _transfer.add(data);
+        if (req.responseNeeded) {
+          await server.respondToWrite(req, status: GattResponseStatus.success);
+        }
+
       case ResetCommand():
         _lastEcho = Uint8List(0);
         _dropNextWrite = false;
         _payloadSize = 20;
         _abortBurst = true; // interrupts any in-flight burstMe loop
+        _transfer.clear();
         if (req.responseNeeded) {
           await server.respondToWrite(req, status: GattResponseStatus.success);
         }
@@ -100,6 +113,7 @@ class StressServiceHandler {
   /// [_lastEcho] is non-empty, returns it; otherwise returns
   /// [_payloadSize] bytes of deterministic pattern.
   Uint8List onRead() {
+    if (_transfer.length > 0) return _transfer.toBytes();
     if (_lastEcho.isNotEmpty) return _lastEcho;
     return _generatePattern(_payloadSize);
   }

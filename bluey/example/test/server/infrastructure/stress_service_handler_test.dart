@@ -359,4 +359,82 @@ void main() {
       );
     });
   });
+
+  group('StressServiceHandler — TransferData reassembly', () {
+    WriteRequest dataWrite(Uint8List data) => WriteRequest(
+      client: mockClient,
+      characteristicId: UUID(StressProtocol.charUuid),
+      value: TransferData(data).encode(),
+      responseNeeded: true,
+      offset: 0,
+      internalRequestId: 0,
+    );
+
+    test('appends fragments in order and reads back the whole payload', () async {
+      final handler = StressServiceHandler();
+      final full = Uint8List.fromList(List<int>.generate(10, (i) => i & 0xff));
+
+      await handler.onWrite(dataWrite(full.sublist(0, 4)), mockServer);
+      await handler.onWrite(dataWrite(full.sublist(4, 7)), mockServer);
+      await handler.onWrite(dataWrite(full.sublist(7, 10)), mockServer);
+
+      expect(handler.onRead(), equals(full));
+    });
+
+    test('the reassembly buffer takes precedence over a prior echo', () async {
+      final handler = StressServiceHandler();
+      // Prior echo sets _lastEcho.
+      await handler.onWrite(
+        WriteRequest(
+          client: mockClient,
+          characteristicId: UUID(StressProtocol.charUuid),
+          value: EchoCommand(Uint8List.fromList([0xDE, 0xAD])).encode(),
+          responseNeeded: true,
+          offset: 0,
+          internalRequestId: 0,
+        ),
+        mockServer,
+      );
+      // A transfer fragment now shadows it.
+      await handler.onWrite(dataWrite(Uint8List.fromList([0x01, 0x02])), mockServer);
+
+      expect(handler.onRead(), equals(Uint8List.fromList([0x01, 0x02])));
+    });
+
+    test('TransferData honors responseNeeded', () async {
+      final handler = StressServiceHandler();
+      await handler.onWrite(dataWrite(Uint8List.fromList([0x00])), mockServer);
+      verify(
+        () =>
+            mockServer.respondToWrite(any(), status: GattResponseStatus.success),
+      ).called(1);
+    });
+  });
+
+  group('StressServiceHandler — Reset clears reassembly', () {
+    test('ResetCommand discards the transfer buffer', () async {
+      final handler = StressServiceHandler();
+
+      WriteRequest writeOf(Uint8List value) => WriteRequest(
+        client: mockClient,
+        characteristicId: UUID(StressProtocol.charUuid),
+        value: value,
+        responseNeeded: true,
+        offset: 0,
+        internalRequestId: 0,
+      );
+
+      // Accumulate some transfer data.
+      await handler.onWrite(
+        writeOf(TransferData(Uint8List.fromList([0x00, 0x01])).encode()),
+        mockServer,
+      );
+
+      await handler.onWrite(writeOf(const ResetCommand().encode()), mockServer);
+
+      // After reset the buffer is empty, so reads fall back to the default
+      // 20-byte pattern rather than stale transfer state.
+      expect(handler.onRead(), hasLength(20));
+    });
+  });
 }
