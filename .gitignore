@@ -33,7 +33,11 @@ migrate_working_dir/
 build/
 
 # AI related files
-.claude/
+# Local Claude Code state — keep shared skills tracked, ignore local config/worktrees
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
 .superpowers/
 
 # Worktrees
