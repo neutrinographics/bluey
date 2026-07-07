@@ -171,7 +171,8 @@ When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `te
 
 - `bluey_android/pigeons/messages.dart` - Pigeon API definition for Android (generates `Messages.g.kt` + `messages.g.dart`)
 - `bluey_ios/pigeons/messages.dart` - Pigeon API definition for iOS (generates `Messages.g.swift` + `messages.g.dart`)
-- `docs/backlog/README.md` - living index of known bugs, no-op stubs, and unimplemented features; start here for outstanding work
+- `docs/roadmap.md` - the development roadmap: source of truth for what to work on next (priority, status, ordering, grouped by bounded context). Start here for outstanding work.
+- `docs/backlog/` - one file per known bug, no-op stub, and unimplemented feature (the detailed technical record behind each roadmap item); `docs/backlog/README.md` documents the entry schema and ID-allocation conventions
 - `docs/old/` - historical references (`BUGS_ANALYSIS.md`, `ANDROID_IMPLEMENTATION_COMPARISON.md`, `IOS_IMPLEMENTATION_COMPARISON.md`, all dated January 2026 and superseded by `docs/backlog/`)
 - `bluey/docs/cross-platform-quirks.md` - consumer-facing behavioral differences between Android and iOS that bluey cannot hide (e.g. iOS `CBPeer` shared-link trap on bidirectional discovery). Read before designing apps that scan and advertise simultaneously.
 - `bluey_android/ANDROID_BLE_NOTES.md` - Android BLE gotchas for platform-package maintainers (threading, lifecycle, force-kill behavior)

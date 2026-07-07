@@ -4,8 +4,9 @@ title: iOS `writeValue(...type: .withoutResponse)` is fire-and-forget — no `ca
 category: bug
 severity: high
 platform: ios
-status: open
-last_verified: 2026-06-02
+status: fixed
+last_verified: 2026-07-06
+fixed_in: d8277b7
 related: [I050, I338]
 ---
 

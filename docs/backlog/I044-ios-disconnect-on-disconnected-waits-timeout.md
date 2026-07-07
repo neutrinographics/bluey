@@ -4,8 +4,9 @@ title: iOS disconnect of an already-disconnected peripheral waits for timeout
 category: bug
 severity: low
 platform: ios
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-07-06
+fixed_in: 683a1eb
 ---
 
 ## Symptom

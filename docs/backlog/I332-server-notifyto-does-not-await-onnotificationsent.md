@@ -4,8 +4,9 @@ title: `Server.notifyTo` returns before `onNotificationSent`; rapid notification
 category: bug
 severity: high
 platform: android
-status: open
-last_verified: 2026-05-06
+status: fixed
+last_verified: 2026-07-06
+fixed_in: aa588f1  # subsumed by I012 (per-central onNotificationSent FIFO)
 related: [I331]
 ---
 

@@ -4,8 +4,9 @@ title: "`_handleServiceChange` swallows all exceptions silently"
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-04-23
+status: fixed
+last_verified: 2026-07-06
+fixed_in: "HEAD (verified 2026-07-06; no dedicated commit — now warns + propagates onto servicesChanges)"
 ---
 
 ## Symptom

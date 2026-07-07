@@ -4,8 +4,9 @@ title: `BlueyClient.mtu` is hardcoded to 23 when constructed from the lifecycle 
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-05-06
+status: fixed
+last_verified: 2026-07-06
+fixed_in: "HEAD (verified 2026-07-06; no dedicated commit — handshake path now reuses the tracked client's MTU)"
 related: [I325, I326]
 ---
 
