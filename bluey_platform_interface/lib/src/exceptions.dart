@@ -243,6 +243,84 @@ class PlatformBluetoothUnavailableException implements Exception {
   int get hashCode => message.hashCode;
 }
 
+/// Classification of a connect-phase failure, as reported by the platform.
+///
+/// Wire-level vocabulary: each value corresponds to a class of native
+/// connect outcome (a timeout the native layer enforced, a CoreBluetooth
+/// "peripheral not found", a GATT status delivered while the connect was
+/// pending, ...). The domain layer maps these onto its own
+/// `ConnectionFailureReason` at the translation boundary.
+enum PlatformConnectFailureReason {
+  /// The connection attempt did not complete within the configured
+  /// (or platform-default) timeout.
+  timeout,
+
+  /// The platform has no record of the requested device (e.g. iOS
+  /// `BlueyError.notFound` when the peripheral was never retrieved).
+  deviceNotFound,
+
+  /// The device was found but refused or dropped the connection attempt.
+  notConnectable,
+
+  /// Pairing/bonding was required and failed during connection setup.
+  pairingFailed,
+
+  /// The platform's concurrent-connection budget is exhausted.
+  connectionLimitReached,
+
+  /// The platform reported a failure that fits no more specific class.
+  /// [PlatformConnectFailedException.status] carries the raw code when
+  /// one was delivered (e.g. Android GATT status 133).
+  unknown,
+}
+
+/// A connection attempt failed before a link was established.
+///
+/// Distinct from the `GattOperation*` family: those describe operations on
+/// an established connection, while this describes the connect phase
+/// itself. Carries the platform's [reason] classification plus the raw
+/// GATT [status] when the failure was delivered as a status callback
+/// (e.g. Android's infamous 133), so no fidelity is lost across the seam.
+///
+/// Internal platform-interface signal. Not part of the `BlueyException`
+/// sealed hierarchy in the `bluey` package; the domain layer translates
+/// this into a user-facing `ConnectionException` at the public API
+/// boundary.
+class PlatformConnectFailedException implements Exception {
+  /// Classification of the failure.
+  final PlatformConnectFailureReason reason;
+
+  /// Raw native GATT status code, when the failure was delivered as a
+  /// status callback during the pending connect. `null` when the failure
+  /// class has no status (timeout, device not found).
+  final int? status;
+
+  /// Human-readable message from the platform layer, if available.
+  final String? message;
+
+  const PlatformConnectFailedException(
+    this.reason, {
+    this.status,
+    this.message,
+  });
+
+  @override
+  String toString() =>
+      'PlatformConnectFailedException: connect failed (${reason.name})'
+      '${status != null ? ' status $status' : ''}'
+      '${message != null ? ' - $message' : ''}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlatformConnectFailedException &&
+      other.reason == reason &&
+      other.status == status &&
+      other.message == message;
+
+  @override
+  int get hashCode => Object.hash(reason, status, message);
+}
+
 /// Raised when a server-side `respondToReadRequest` or
 /// `respondToWriteRequest` call references a `requestId` the platform
 /// plugin no longer has on file.

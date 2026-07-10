@@ -89,6 +89,21 @@ class IosConnectionManager {
   // === Connection ===
 
   /// Connects to a device and creates per-device streams.
+  ///
+  /// Failures are re-expressed as [PlatformConnectFailedException]: this
+  /// call site knows positionally that no link was ever established, so
+  /// the wire signals the native layer reuses for connect outcomes get
+  /// their connect-phase meaning here —
+  ///
+  ///   * `gatt-timeout` (OpSlot connect timeout) → `timeout`
+  ///   * `gatt-disconnected` (`BlueyError.notFound`/`.notConnected`
+  ///     before a link existed) → `deviceNotFound`
+  ///   * `gatt-status-failed` (`didFailToConnect` with a mapped CBError)
+  ///     → `unknown` carrying the status
+  ///   * `bluey-unknown` (`didFailToConnect` with an unmapped error)
+  ///     → `unknown` carrying the message
+  ///
+  /// Adapter-unavailable errors keep their own typed form.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
 
@@ -97,7 +112,30 @@ class IosConnectionManager {
     _notificationControllers[deviceId] =
         StreamController<PlatformNotification>.broadcast();
 
-    return await _hostApi.connect(deviceId, dto);
+    try {
+      return await _translateGattPlatformError(
+        'connect',
+        () => _hostApi.connect(deviceId, dto),
+      );
+    } on GattOperationTimeoutException {
+      throw const PlatformConnectFailedException(
+        PlatformConnectFailureReason.timeout,
+      );
+    } on GattOperationDisconnectedException {
+      throw const PlatformConnectFailedException(
+        PlatformConnectFailureReason.deviceNotFound,
+      );
+    } on GattOperationStatusFailedException catch (e) {
+      throw PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+        status: e.status,
+      );
+    } on GattOperationUnknownPlatformException catch (e) {
+      throw PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+        message: e.message,
+      );
+    }
   }
 
   /// Disconnects from a device and cleans up per-device streams.

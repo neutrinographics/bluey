@@ -525,6 +525,77 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _pendingReadError = error;
   }
 
+  // === Connect-phase failure seams (audit R1 / NT-1) ===
+  //
+  // Unlike the write/read seams above, these are keyed per device: a
+  // multi-peer test can fail one candidate's connect while others
+  // succeed (PeerDiscovery probe-skip behaviour depends on exactly
+  // that).
+
+  final Map<String, PlatformConnectFailedException> _pendingConnectFailures =
+      {};
+
+  /// Arranges for the next [connect] call to [deviceId] to throw a
+  /// [PlatformConnectFailedException] with [reason] (and optional raw
+  /// [status] / [message]), then clears automatically — a retry
+  /// connects normally. Per-device and one-shot, mirroring how a real
+  /// platform reports a single failed attempt.
+  void simulateConnectFailure(
+    String deviceId,
+    PlatformConnectFailureReason reason, {
+    int? status,
+    String? message,
+  }) {
+    _pendingConnectFailures[deviceId] = PlatformConnectFailedException(
+      reason,
+      status: status,
+      message: message,
+    );
+  }
+
+  /// When non-null, the next call to [connect] parks on this gate
+  /// instead of completing immediately. Consumed (set to null) as soon
+  /// as the connect call fires, so a subsequent connect falls through
+  /// to normal handling. Mirrors the `_heldWrite` two-slot pattern.
+  Completer<void>? _heldConnect;
+
+  /// Once a held connect has been consumed by [connect], the gate is
+  /// parked here so [resolveHeldConnect]/[failHeldConnect] can find it.
+  Completer<void>? _heldConnectInFlight;
+
+  /// Arranges for the next [connect] call to be held. While held, the
+  /// timeout carried in the connect config is enforced with a [Timer]
+  /// (so `fakeAsync.elapse` drives it): crossing it fails the connect
+  /// with `PlatformConnectFailedException(timeout)`, matching the
+  /// native connect-timeout contract. Call [resolveHeldConnect] to let
+  /// the connect complete normally or [failHeldConnect] to fail it.
+  void holdNextConnect() {
+    _heldConnect = Completer<void>();
+  }
+
+  /// Releases the currently-held connect so it completes its normal
+  /// path (peripheral lookup, state wiring, `connected` emission).
+  void resolveHeldConnect() {
+    final held = _heldConnectInFlight ?? _heldConnect;
+    if (held == null) {
+      throw StateError('No held connect to resolve');
+    }
+    _heldConnect = null;
+    _heldConnectInFlight = null;
+    held.complete();
+  }
+
+  /// Fails the currently-held connect with [error].
+  void failHeldConnect(Object error) {
+    final held = _heldConnectInFlight ?? _heldConnect;
+    if (held == null) {
+      throw StateError('No held connect to fail');
+    }
+    _heldConnect = null;
+    _heldConnectInFlight = null;
+    held.completeError(error);
+  }
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
@@ -957,6 +1028,40 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     lastConnectConfig = config;
+
+    final injectedFailure = _pendingConnectFailures.remove(deviceId);
+    if (injectedFailure != null) {
+      throw injectedFailure;
+    }
+
+    final held = _heldConnect;
+    if (held != null) {
+      _heldConnect = null;
+      _heldConnectInFlight = held;
+      // Enforce the caller's connect timeout while held — the only
+      // window in which the fake's connect is ever in flight. Uses a
+      // Timer so fakeAsync.elapse drives it deterministically.
+      Timer? timeoutTimer;
+      final timeoutMs = config.timeoutMs;
+      if (timeoutMs != null) {
+        timeoutTimer = Timer(Duration(milliseconds: timeoutMs), () {
+          if (!held.isCompleted) {
+            _heldConnectInFlight = null;
+            held.completeError(
+              const PlatformConnectFailedException(
+                PlatformConnectFailureReason.timeout,
+              ),
+            );
+          }
+        });
+      }
+      try {
+        await held.future;
+      } finally {
+        timeoutTimer?.cancel();
+      }
+    }
+
     final peripheral = _peripherals[deviceId];
     if (peripheral == null) {
       throw Exception('Device not found: $deviceId');

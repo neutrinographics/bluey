@@ -88,6 +88,14 @@ class AndroidConnectionManager {
   ///
   /// Creates per-device stream controllers for connection state
   /// and notifications.
+  ///
+  /// Failures are re-expressed as [PlatformConnectFailedException]:
+  /// the native layer reports a connect timeout as `gatt-timeout` and a
+  /// mid-connect GATT status (e.g. 133) as `gatt-status-failed`, but
+  /// *this* call site knows positionally that no link was ever
+  /// established — the failure belongs to the connect phase, not to an
+  /// operation on a connection. Permission and adapter-unavailable
+  /// errors keep their own typed forms.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
 
@@ -97,7 +105,21 @@ class AndroidConnectionManager {
     _notificationControllers[deviceId] =
         StreamController<PlatformNotification>.broadcast();
 
-    return await _hostApi.connect(deviceId, dto);
+    try {
+      return await _translateGattPlatformError(
+        'connect',
+        () => _hostApi.connect(deviceId, dto),
+      );
+    } on GattOperationTimeoutException {
+      throw const PlatformConnectFailedException(
+        PlatformConnectFailureReason.timeout,
+      );
+    } on GattOperationStatusFailedException catch (e) {
+      throw PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+        status: e.status,
+      );
+    }
   }
 
   /// Disconnects from a device and cleans up per-device streams.

@@ -48,6 +48,121 @@ void main() {
         expect(captured.mtu, equals(512));
       });
 
+      test('translates gatt-timeout into '
+          'PlatformConnectFailedException(timeout)', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(
+            code: 'gatt-timeout',
+            message: 'Operation timed out',
+          ),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            const PlatformConnectConfig(timeoutMs: 5000, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>().having(
+              (e) => e.reason,
+              'reason',
+              PlatformConnectFailureReason.timeout,
+            ),
+          ),
+        );
+      });
+
+      test('translates gatt-disconnected (BlueyError.notFound/.notConnected '
+          'pre-link) into PlatformConnectFailedException(deviceNotFound)',
+          () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(
+            code: 'gatt-disconnected',
+            message: 'Resource not found',
+          ),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            const PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>().having(
+              (e) => e.reason,
+              'reason',
+              PlatformConnectFailureReason.deviceNotFound,
+            ),
+          ),
+        );
+      });
+
+      test('translates gatt-status-failed (didFailToConnect with a mapped '
+          'CBError) into PlatformConnectFailedException(unknown) preserving '
+          'the status', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(code: 'gatt-status-failed', details: 14),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            const PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>()
+                .having(
+                  (e) => e.reason,
+                  'reason',
+                  PlatformConnectFailureReason.unknown,
+                )
+                .having((e) => e.status, 'status', 14),
+          ),
+        );
+      });
+
+      test('translates bluey-unknown (didFailToConnect with an unmapped '
+          'error) into PlatformConnectFailedException(unknown) preserving '
+          'the message', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(
+            code: 'bluey-unknown',
+            message: 'CBError Domain code 10',
+          ),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            const PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>()
+                .having(
+                  (e) => e.reason,
+                  'reason',
+                  PlatformConnectFailureReason.unknown,
+                )
+                .having((e) => e.message, 'message', 'CBError Domain code 10'),
+          ),
+        );
+      });
+
+      test('still translates bluetooth-unavailable into '
+          'PlatformBluetoothUnavailableException', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(code: 'bluetooth-unavailable'),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            const PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(isA<PlatformBluetoothUnavailableException>()),
+        );
+      });
+
       test('creates per-device connection state stream', () async {
         when(
           () => mockHostApi.connect(any(), any()),

@@ -3,6 +3,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter/services.dart' show PlatformException;
 
 import '../connection/lifecycle_client.dart';
+import '../discovery/device_address.dart';
 import '../lifecycle.dart' show lifecycleEvictionAttStatus;
 import 'exceptions.dart';
 
@@ -59,6 +60,25 @@ BlueyException translatePlatformException(
       error.message ?? 'unknown platform error (${error.code})',
       code: error.code,
       cause: error,
+    );
+  }
+  if (error is platform.PlatformConnectFailedException) {
+    return ConnectionException(
+      DeviceAddress(address ?? ''),
+      switch (error.reason) {
+        platform.PlatformConnectFailureReason.timeout =>
+          ConnectionFailureReason.timeout,
+        platform.PlatformConnectFailureReason.deviceNotFound =>
+          ConnectionFailureReason.deviceNotFound,
+        platform.PlatformConnectFailureReason.notConnectable =>
+          ConnectionFailureReason.deviceNotConnectable,
+        platform.PlatformConnectFailureReason.pairingFailed =>
+          ConnectionFailureReason.pairingFailed,
+        platform.PlatformConnectFailureReason.connectionLimitReached =>
+          ConnectionFailureReason.connectionLimitReached,
+        platform.PlatformConnectFailureReason.unknown =>
+          ConnectionFailureReason.unknown,
+      },
     );
   }
   if (error is platform.PlatformPermissionDeniedException) {

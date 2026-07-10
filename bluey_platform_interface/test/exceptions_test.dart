@@ -171,4 +171,123 @@ void main() {
       expect(e, isA<Exception>());
     });
   });
+
+  group('PlatformConnectFailedException', () {
+    test('exposes reason, status, and message via public fields', () {
+      const e = PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+        status: 133,
+        message: 'connection failed',
+      );
+
+      expect(e.reason, equals(PlatformConnectFailureReason.unknown));
+      expect(e.status, equals(133));
+      expect(e.message, equals('connection failed'));
+    });
+
+    test('status and message are optional', () {
+      const e = PlatformConnectFailedException(
+        PlatformConnectFailureReason.timeout,
+      );
+      expect(e.status, isNull);
+      expect(e.message, isNull);
+    });
+
+    test('toString mentions the reason for log readability', () {
+      const e = PlatformConnectFailedException(
+        PlatformConnectFailureReason.timeout,
+      );
+      expect(e.toString(), contains('timeout'));
+    });
+
+    test('toString mentions the status when present', () {
+      const e = PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+        status: 133,
+      );
+      expect(e.toString(), contains('133'));
+    });
+
+    test('two instances with the same fields are equal', () {
+      const a = PlatformConnectFailedException(
+        PlatformConnectFailureReason.deviceNotFound,
+        status: 2,
+        message: 'gone',
+      );
+      const b = PlatformConnectFailedException(
+        PlatformConnectFailureReason.deviceNotFound,
+        status: 2,
+        message: 'gone',
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('differs by reason, status, and message', () {
+      const base = PlatformConnectFailedException(
+        PlatformConnectFailureReason.timeout,
+        status: 8,
+        message: 'm',
+      );
+      expect(
+        base,
+        isNot(
+          equals(
+            const PlatformConnectFailedException(
+              PlatformConnectFailureReason.unknown,
+              status: 8,
+              message: 'm',
+            ),
+          ),
+        ),
+      );
+      expect(
+        base,
+        isNot(
+          equals(
+            const PlatformConnectFailedException(
+              PlatformConnectFailureReason.timeout,
+              status: 133,
+              message: 'm',
+            ),
+          ),
+        ),
+      );
+      expect(
+        base,
+        isNot(
+          equals(
+            const PlatformConnectFailedException(
+              PlatformConnectFailureReason.timeout,
+              status: 8,
+              message: 'other',
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('is catchable as Exception', () {
+      const e = PlatformConnectFailedException(
+        PlatformConnectFailureReason.unknown,
+      );
+      expect(e, isA<Exception>());
+    });
+  });
+
+  group('PlatformConnectFailureReason', () {
+    test('covers the connect-phase failure classes', () {
+      expect(
+        PlatformConnectFailureReason.values,
+        containsAll(const [
+          PlatformConnectFailureReason.timeout,
+          PlatformConnectFailureReason.deviceNotFound,
+          PlatformConnectFailureReason.notConnectable,
+          PlatformConnectFailureReason.pairingFailed,
+          PlatformConnectFailureReason.connectionLimitReached,
+          PlatformConnectFailureReason.unknown,
+        ]),
+      );
+    });
+  });
 }
