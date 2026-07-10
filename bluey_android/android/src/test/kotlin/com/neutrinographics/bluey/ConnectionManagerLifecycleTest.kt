@@ -655,4 +655,86 @@ class ConnectionManagerLifecycleTest {
             removedCallbacks.any { it === fallback!!.first },
         )
     }
+
+    // === Connect-phase failures (audit R1 / NT-1) ===
+    //
+    // Pin the two connect outcomes that were previously scheduled but never
+    // driven: the connect-timeout runnable actually firing, and a
+    // mid-connect GATT status failure (the classic 133).
+
+    @Test
+    fun `connect timeout runnable fires - pending connect fails with gatt-timeout and gatt is closed`() {
+        var connectResult: Result<String>? = null
+        connectionManager.connect(
+            deviceAddress, ConnectConfigDto(timeoutMs = 10_000L),
+        ) { connectResult = it }
+
+        val timeoutEntry = capturedPostDelayed.firstOrNull { it.second == 10_000L }
+        assertNotNull(
+            "connect(timeoutMs) must schedule a connect-timeout runnable",
+            timeoutEntry,
+        )
+        assertNull("connect must still be pending before the timeout", connectResult)
+
+        // Simulate the timer expiring while the connect is still pending.
+        timeoutEntry!!.first.run()
+
+        assertNotNull("timeout must complete the pending connect", connectResult)
+        assertTrue(connectResult!!.isFailure)
+        // At this layer the timeout is the typed BlueyAndroidError;
+        // BlueyPlugin.connect maps it to FlutterError("gatt-timeout") via
+        // toClientFlutterError() (pinned by ErrorsTest).
+        val err = connectResult!!.exceptionOrNull()
+        assertTrue(
+            "expected BlueyAndroidError.ConnectionTimeout, " +
+                "got ${err?.javaClass?.simpleName}: $err",
+            err is BlueyAndroidError.ConnectionTimeout,
+        )
+        verify { mockGatt.disconnect() }
+        verify { mockGatt.close() }
+    }
+
+    @Test
+    fun `late STATE_CONNECTED after the connect timeout fired does not resurrect the connect`() {
+        var results = mutableListOf<Result<String>>()
+        connectionManager.connect(
+            deviceAddress, ConnectConfigDto(timeoutMs = 10_000L),
+        ) { results.add(it) }
+
+        capturedPostDelayed.first { it.second == 10_000L }.first.run()
+        assertEquals(1, results.size)
+
+        // The radio answers after we gave up: must not fire the callback again.
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED,
+        )
+        assertEquals(
+            "a late STATE_CONNECTED must not complete an already-timed-out connect",
+            1, results.size,
+        )
+    }
+
+    @Test
+    fun `mid-connect status 133 - pending connect fails with gatt-status-failed carrying the status`() {
+        var connectResult: Result<String>? = null
+        connectionManager.connect(
+            deviceAddress, ConnectConfigDto(timeoutMs = null),
+        ) { connectResult = it }
+        assertNull(connectResult)
+
+        // The stack reports the infamous GATT_ERROR 133 during connection
+        // setup: status != SUCCESS with STATE_DISCONNECTED.
+        capturedGattCallback!!.onConnectionStateChange(
+            mockGatt, 133, BluetoothProfile.STATE_DISCONNECTED,
+        )
+
+        assertNotNull("status 133 must complete the pending connect", connectResult)
+        assertTrue(connectResult!!.isFailure)
+        val err = connectResult!!.exceptionOrNull()
+        assertTrue(
+            "expected FlutterError(gatt-status-failed, details=133), " +
+                "got ${err?.javaClass?.simpleName}: $err",
+            err is FlutterError && err.code == "gatt-status-failed" && err.details == 133,
+        )
+    }
 }

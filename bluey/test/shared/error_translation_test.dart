@@ -186,6 +186,87 @@ void main() {
     });
   });
 
+  group('connect-phase failure translation', () {
+    ConnectionException translateConnect(
+      platform.PlatformConnectFailureReason reason, {
+      int? status,
+    }) {
+      final result = translatePlatformException(
+        platform.PlatformConnectFailedException(reason, status: status),
+        operation: 'connect',
+        address: testAddress,
+      );
+      expect(result, isA<ConnectionException>());
+      return result as ConnectionException;
+    }
+
+    test('PlatformConnectFailedException → ConnectionException '
+        'carrying the device address', () {
+      final cx = translateConnect(platform.PlatformConnectFailureReason.unknown);
+      expect(cx.deviceAddress, DeviceAddress(testAddress));
+    });
+
+    test('reason timeout maps to ConnectionFailureReason.timeout', () {
+      final cx = translateConnect(platform.PlatformConnectFailureReason.timeout);
+      expect(cx.reason, ConnectionFailureReason.timeout);
+    });
+
+    test('reason deviceNotFound maps to ConnectionFailureReason.deviceNotFound',
+        () {
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.deviceNotFound,
+      );
+      expect(cx.reason, ConnectionFailureReason.deviceNotFound);
+    });
+
+    test('reason notConnectable maps to '
+        'ConnectionFailureReason.deviceNotConnectable', () {
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.notConnectable,
+      );
+      expect(cx.reason, ConnectionFailureReason.deviceNotConnectable);
+    });
+
+    test('reason pairingFailed maps to ConnectionFailureReason.pairingFailed',
+        () {
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.pairingFailed,
+      );
+      expect(cx.reason, ConnectionFailureReason.pairingFailed);
+    });
+
+    test('reason connectionLimitReached maps to '
+        'ConnectionFailureReason.connectionLimitReached', () {
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.connectionLimitReached,
+      );
+      expect(cx.reason, ConnectionFailureReason.connectionLimitReached);
+    });
+
+    test('reason unknown maps to ConnectionFailureReason.unknown '
+        '(status 133 stays a connect failure, not a GATT-op failure)', () {
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.unknown,
+        status: 133,
+      );
+      expect(cx.reason, ConnectionFailureReason.unknown);
+    });
+
+    test('a null address still translates (empty-address diagnostic)', () {
+      final result = translatePlatformException(
+        const platform.PlatformConnectFailedException(
+          platform.PlatformConnectFailureReason.timeout,
+        ),
+        operation: 'connect',
+      );
+      expect(result, isA<ConnectionException>());
+      expect(
+        (result as ConnectionException).deviceAddress,
+        const DeviceAddress(''),
+      );
+    });
+  });
+
   group('eviction-status translation', () {
     test('reserved eviction status becomes DisconnectedException(evictedByServer)', () {
       final translated = translatePlatformException(

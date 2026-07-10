@@ -47,6 +47,94 @@ void main() {
         expect(captured.mtu, equals(512));
       });
 
+      test('translates gatt-timeout into '
+          'PlatformConnectFailedException(timeout)', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(code: 'gatt-timeout', message: 'Connect timeout'),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            PlatformConnectConfig(timeoutMs: 5000, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>().having(
+              (e) => e.reason,
+              'reason',
+              PlatformConnectFailureReason.timeout,
+            ),
+          ),
+        );
+      });
+
+      test('translates gatt-status-failed into '
+          'PlatformConnectFailedException(unknown) preserving the status',
+          () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(
+            code: 'gatt-status-failed',
+            message: 'Connection failed with status 133',
+            details: 133,
+          ),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformConnectFailedException>()
+                .having(
+                  (e) => e.reason,
+                  'reason',
+                  PlatformConnectFailureReason.unknown,
+                )
+                .having((e) => e.status, 'status', 133),
+          ),
+        );
+      });
+
+      test('still translates bluey-permission-denied into '
+          'PlatformPermissionDeniedException', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(
+            code: 'bluey-permission-denied',
+            details: 'BLUETOOTH_CONNECT',
+          ),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(
+            isA<PlatformPermissionDeniedException>().having(
+              (e) => e.permission,
+              'permission',
+              'BLUETOOTH_CONNECT',
+            ),
+          ),
+        );
+      });
+
+      test('still translates bluetooth-unavailable into '
+          'PlatformBluetoothUnavailableException', () async {
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(code: 'bluetooth-unavailable'),
+        );
+
+        await expectLater(
+          connectionManager.connect(
+            'device-1',
+            PlatformConnectConfig(timeoutMs: null, mtu: null),
+          ),
+          throwsA(isA<PlatformBluetoothUnavailableException>()),
+        );
+      });
+
       test('creates per-device stream controllers', () async {
         when(
           () => mockHostApi.connect(any(), any()),
