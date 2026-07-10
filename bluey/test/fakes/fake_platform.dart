@@ -525,31 +525,94 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _pendingReadError = error;
   }
 
-  // === Connect-phase failure seams (audit R1 / NT-1) ===
+  // === Fault-rule queue (audit R2 / NT-5) ===
   //
-  // Unlike the write/read seams above, these are keyed per device: a
-  // multi-peer test can fail one candidate's connect while others
-  // succeed (PeerDiscovery probe-skip behaviour depends on exactly
-  // that).
+  // The general fault-injection mechanism: scripted, ordered rules with
+  // per-device / per-characteristic targeting and bounded repetition.
+  // The single-purpose seams in this file (`simulateWrite*`,
+  // `simulateConnectFailure`, ...) remain as sugar for the common
+  // one-liner cases; anything they can express, a rule can too.
 
-  final Map<String, PlatformConnectFailedException> _pendingConnectFailures =
-      {};
+  final List<_FaultRule> _faultRules = [];
+
+  /// Enqueues a fault rule: the next [times] calls to [op] that match
+  /// [deviceId] / [characteristicUuid] (null = match any) throw [error],
+  /// then the rule retires. Pass `times: null` for a rule that persists
+  /// until [clearFaults].
+  ///
+  /// Rules are consulted in FIFO order; the first match fires. Enqueue a
+  /// timeout rule then a status rule to script "first attempt times out,
+  /// second is rejected, third succeeds" — the flaky-link shape no
+  /// boolean seam can express.
+  void enqueueFault(
+    FakeOp op,
+    Object error, {
+    String? deviceId,
+    String? characteristicUuid,
+    int? times = 1,
+  }) {
+    assert(times == null || times > 0, 'times must be null or positive');
+    _faultRules.add(
+      _FaultRule(
+        op: op,
+        deviceId: deviceId,
+        characteristicUuid: characteristicUuid?.toLowerCase(),
+        error: error,
+        remaining: times,
+      ),
+    );
+  }
+
+  /// Removes every pending fault rule.
+  void clearFaults() {
+    _faultRules.clear();
+  }
+
+  /// Fires the first matching rule for [op], if any: decrements its
+  /// budget, retires it at zero, and throws its error.
+  void _applyFaultRules(
+    FakeOp op, {
+    String? deviceId,
+    String? characteristicUuid,
+  }) {
+    for (final rule in _faultRules) {
+      if (rule.op != op) continue;
+      if (rule.deviceId != null && rule.deviceId != deviceId) continue;
+      if (rule.characteristicUuid != null &&
+          rule.characteristicUuid != characteristicUuid?.toLowerCase()) {
+        continue;
+      }
+      final remaining = rule.remaining;
+      if (remaining != null) {
+        rule.remaining = remaining - 1;
+        if (rule.remaining == 0) {
+          _faultRules.remove(rule);
+        }
+      }
+      // ignore: only_throw_errors
+      throw rule.error;
+    }
+  }
+
+  // === Connect-phase failure seams (audit R1 / NT-1) ===
 
   /// Arranges for the next [connect] call to [deviceId] to throw a
   /// [PlatformConnectFailedException] with [reason] (and optional raw
   /// [status] / [message]), then clears automatically — a retry
   /// connects normally. Per-device and one-shot, mirroring how a real
   /// platform reports a single failed attempt.
+  ///
+  /// Sugar over [enqueueFault]; repeated calls stack as ordered rules.
   void simulateConnectFailure(
     String deviceId,
     PlatformConnectFailureReason reason, {
     int? status,
     String? message,
   }) {
-    _pendingConnectFailures[deviceId] = PlatformConnectFailedException(
-      reason,
-      status: status,
-      message: message,
+    enqueueFault(
+      FakeOp.connect,
+      PlatformConnectFailedException(reason, status: status, message: message),
+      deviceId: deviceId,
     );
   }
 
@@ -1029,10 +1092,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     lastConnectConfig = config;
 
-    final injectedFailure = _pendingConnectFailures.remove(deviceId);
-    if (injectedFailure != null) {
-      throw injectedFailure;
-    }
+    _applyFaultRules(FakeOp.connect, deviceId: deviceId);
 
     final held = _heldConnect;
     if (held != null) {
@@ -1110,6 +1170,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<List<PlatformService>> discoverServices(String deviceId) async {
     discoverServicesCalls.add(deviceId);
+    _applyFaultRules(FakeOp.discoverServices, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
@@ -1273,6 +1334,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       return held.future;
     }
 
+    _applyFaultRules(
+      FakeOp.readCharacteristic,
+      deviceId: deviceId,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle],
+    );
+
     final code = simulateReadPlatformErrorCode;
     if (code != null) {
       simulateReadPlatformErrorCode = null;
@@ -1385,6 +1453,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       ),
     );
 
+    _applyFaultRules(
+      FakeOp.writeCharacteristic,
+      deviceId: deviceId,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle],
+    );
+
     if (simulateWriteTimeout) {
       throw const GattOperationTimeoutException('writeCharacteristic');
     }
@@ -1420,6 +1495,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     bool enable,
   ) async {
+    _applyFaultRules(
+      FakeOp.setNotification,
+      deviceId: deviceId,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle],
+    );
     if (simulateSetNotificationDisconnected) {
       throw const GattOperationDisconnectedException('setNotification');
     }
@@ -1474,6 +1555,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     int descriptorHandle,
   ) async {
+    _applyFaultRules(
+      FakeOp.readDescriptor,
+      deviceId: deviceId,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle],
+    );
     final value =
         _deviceStates[deviceId]?.descriptorValuesByHandle[descriptorHandle];
     if (value != null) return value;
@@ -1487,6 +1574,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int descriptorHandle,
     Uint8List value,
   ) async {
+    _applyFaultRules(
+      FakeOp.writeDescriptor,
+      deviceId: deviceId,
+      characteristicUuid:
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle],
+    );
     _stateFor(
       deviceId,
     ).descriptorValuesByHandle[descriptorHandle] = Uint8List.fromList(value);
@@ -1494,6 +1587,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async {
+    _applyFaultRules(FakeOp.requestMtu, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
@@ -1542,6 +1636,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<int> readRssi(String deviceId) async {
+    _applyFaultRules(FakeOp.readRssi, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
@@ -1954,6 +2049,37 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       await controller.close();
     }
   }
+}
+
+/// Operations that [FakeBlueyPlatform.enqueueFault] can target.
+enum FakeOp {
+  connect,
+  discoverServices,
+  readCharacteristic,
+  writeCharacteristic,
+  setNotification,
+  readDescriptor,
+  writeDescriptor,
+  requestMtu,
+  readRssi,
+}
+
+/// A scripted fault: fires [error] for matching calls to [op] until its
+/// budget runs out ([remaining] `null` = unlimited).
+class _FaultRule {
+  final FakeOp op;
+  final String? deviceId;
+  final String? characteristicUuid; // lowercase
+  final Object error;
+  int? remaining;
+
+  _FaultRule({
+    required this.op,
+    required this.deviceId,
+    required this.characteristicUuid,
+    required this.error,
+    required this.remaining,
+  });
 }
 
 // === Internal Helper Classes ===

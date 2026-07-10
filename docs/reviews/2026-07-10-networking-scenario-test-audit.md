@@ -159,6 +159,10 @@ Added after the initial report, sourced from the project's own quirk record (`bl
 
 **Revised order:** R1 → R2 → R3 → R4 → R10 → R11 → R5 → R6–R9 → R12 (I346–I348 last, per owner's sequencing; I346 depends on R4's loopback).
 
+### Progress
+
+- **R1 — done** (2026-07-10, merge `b06f304`): `PlatformConnectFailedException` + reason enum in the platform interface; ACL maps it to `ConnectionException` (first `ConnectionFailureReason` construction — half of DA-21); both adapters translate connect-phase codes positionally; fake gains `simulateConnectFailure` (per-device, one-shot), `holdNextConnect`/`resolveHeldConnect`/`failHeldConnect`, and held-connect timeout enforcement under `fakeAsync`; Kotlin pins the fired connect-timeout runnable (typed `ConnectionTimeout`, late `STATE_CONNECTED` no-op) and mid-connect status 133.
+
 ## Coverage
 
 - `bluey/test/fakes/fake_platform.dart` — read in full by the orchestrator (2,017 lines) *and* by agent 1.
