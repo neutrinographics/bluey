@@ -611,6 +611,32 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
   }
 
+  // === Dual-role virtual link (audit R4 / NT-6) ===
+  //
+  // Set by [FakeBleLink]. `_outboundLink` is non-null on the fake whose
+  // Bluey instance acts as the GATT *client* over the link;
+  // `_inboundLink` on the fake whose Bluey instance acts as the *server*.
+
+  FakeBleLink? _outboundLink;
+  FakeBleLink? _inboundLink;
+
+  /// Delivers a server-side notify/indicate to the linked central's
+  /// client-side notification stream, if [centralId] is the linked one.
+  void _deliverLinkedNotification(
+    String centralId,
+    String charUuid,
+    Uint8List value,
+  ) {
+    final link = _inboundLink;
+    if (link != null && link.centralId == centralId) {
+      link.central.simulateNotification(
+        deviceId: link.deviceId,
+        characteristicUuid: charUuid,
+        value: value,
+      );
+    }
+  }
+
   // === Connect-phase failure seams (audit R1 / NT-1) ===
 
   /// Arranges for the next [connect] call to [deviceId] to throw a
@@ -872,6 +898,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   void simulateCentralDisconnection(String centralId) {
     _connectedCentrals.remove(centralId);
     _centralDisconnectionController.add(centralId);
+    final link = _inboundLink;
+    if (link != null && link.centralId == centralId) {
+      link.central.simulateDisconnection(link.deviceId);
+    }
   }
 
   /// Models an iOS link loss where `didUnsubscribe` did NOT fire (the flaky
@@ -1166,6 +1196,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
     stateController.add(PlatformConnectionState.connected);
 
+    final link = _outboundLink;
+    if (link != null && link.deviceId == deviceId) {
+      // The far end is a real Bluey server riding the linked fake:
+      // surface this connect as an inbound central there.
+      link.peripheral.simulateCentralConnection(
+        centralId: link.centralId,
+        mtu: config.mtu ?? link.mtu,
+      );
+    }
+
     return deviceId;
   }
 
@@ -1178,6 +1218,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       await connection.notificationController.close();
       _connectionStateControllers.remove(deviceId);
       _notificationControllers.remove(deviceId);
+      final link = _outboundLink;
+      if (link != null && link.deviceId == deviceId) {
+        link.peripheral.simulateCentralDisconnection(link.centralId);
+      }
     }
     _clearHandles(deviceId);
   }
@@ -1399,6 +1443,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
+    final link = _outboundLink;
+    if (link != null && link.deviceId == deviceId) {
+      final uuid =
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '';
+      return link.peripheral.simulateReadRequest(
+        centralId: link.centralId,
+        characteristicUuid: uuid,
+      );
+    }
+
     var state = _deviceStates[deviceId];
     if (state != null) {
       final value = state.charValuesByHandle[characteristicHandle];
@@ -1516,6 +1570,18 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Not connected to device: $deviceId');
     }
 
+    final link = _outboundLink;
+    if (link != null && link.deviceId == deviceId) {
+      final uuid =
+          _deviceStates[deviceId]?.charUuidByHandle[characteristicHandle] ?? '';
+      return link.peripheral.simulateWriteRequest(
+        centralId: link.centralId,
+        characteristicUuid: uuid,
+        value: value,
+        responseNeeded: withResponse,
+      );
+    }
+
     // Handle is the primary key.
     _stateFor(
       deviceId,
@@ -1561,6 +1627,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         connection.subscribedCharacteristics.add(charUuid);
       } else {
         connection.subscribedCharacteristics.remove(charUuid);
+      }
+      final link = _outboundLink;
+      if (link != null && link.deviceId == deviceId) {
+        final central = link.peripheral._connectedCentrals[link.centralId];
+        if (enable) {
+          central?.subscribedCharacteristics.add(charUuid);
+        } else {
+          central?.subscribedCharacteristics.remove(charUuid);
+        }
       }
     }
 
@@ -1945,7 +2020,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
-        // In a real implementation, this would send over BLE.
+        _deliverLinkedNotification(central.id, charUuid, value);
       }
     }
   }
@@ -1960,7 +2035,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (central == null) {
       throw Exception('Central not connected: $centralId');
     }
-    // For testing purposes, we track this was called
+    final charUuid = _localHandleByCharUuid.entries
+        .firstWhere(
+          (e) => e.value == characteristicHandle,
+          orElse: () => const MapEntry('', 0),
+        )
+        .key;
+    if (charUuid.isNotEmpty &&
+        central.subscribedCharacteristics.contains(charUuid)) {
+      _deliverLinkedNotification(centralId, charUuid, value);
+    }
   }
 
   @override
@@ -1978,7 +2062,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
-        // In a real implementation, this would wait for acknowledgment.
+        _deliverLinkedNotification(central.id, charUuid, value);
       }
     }
   }
@@ -1993,8 +2077,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (central == null) {
       throw Exception('Central not connected: $centralId');
     }
-    // For testing purposes, we track this was called
-    // In a real implementation, this would wait for acknowledgment
+    final charUuid = _localHandleByCharUuid.entries
+        .firstWhere(
+          (e) => e.value == characteristicHandle,
+          orElse: () => const MapEntry('', 0),
+        )
+        .key;
+    if (charUuid.isNotEmpty &&
+        central.subscribedCharacteristics.contains(charUuid)) {
+      _deliverLinkedNotification(centralId, charUuid, value);
+    }
   }
 
   @override
@@ -2101,6 +2193,90 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     for (final controller in _notificationControllers.values) {
       await controller.close();
     }
+  }
+}
+
+/// A virtual BLE link between two [FakeBlueyPlatform]s, so two real
+/// Bluey endpoints — one GATT server, one client — exchange traffic
+/// end-to-end (audit R4 / NT-6):
+///
+///  * a client `connect` to [deviceId] surfaces as an inbound central
+///    [centralId] on the peripheral side (which must be advertising);
+///  * client writes/reads become real `writeRequests`/`readRequests`
+///    on the server, whose responses complete the client's futures;
+///  * client subscriptions mirror onto the server's per-central
+///    subscription set, and server notify/indicate delivers onto the
+///    client's notification stream;
+///  * disconnects propagate in both directions.
+///
+/// Usage: create both fakes, bind a Bluey instance to each (set
+/// `BlueyPlatform.instance` before each `Bluey.create()`), construct
+/// the link, host services + start advertising on the server side,
+/// then call [announce] so the client side can discover the server.
+class FakeBleLink {
+  /// The fake behind the Bluey instance acting as GATT client.
+  final FakeBlueyPlatform central;
+
+  /// The fake behind the Bluey instance acting as GATT server.
+  final FakeBlueyPlatform peripheral;
+
+  /// The peripheral's identity in the central's world (scan/connect id).
+  final String deviceId;
+
+  /// The central's identity in the peripheral's world.
+  final String centralId;
+
+  /// MTU announced for the inbound central when the client connects
+  /// without requesting one.
+  final int mtu;
+
+  FakeBleLink({
+    required this.central,
+    required this.peripheral,
+    required this.deviceId,
+    required this.centralId,
+    this.mtu = 23,
+  }) {
+    central._outboundLink = this;
+    peripheral._inboundLink = this;
+  }
+
+  /// Snapshots the peripheral side's hosted services and registers them
+  /// as a discoverable simulated peripheral on the central side. Call
+  /// after the server has added its services (re-call after changes).
+  void announce({String? name, int rssi = -50}) {
+    final config = peripheral._advertiseConfig;
+    central.simulatePeripheral(
+      id: deviceId,
+      name: name ?? config?.name,
+      rssi: rssi,
+      serviceUuids: [
+        ...?config?.serviceUuids,
+        ...?config?.scanResponseServiceUuids,
+      ],
+      services: peripheral._localServices.map(_asRemoteService).toList(),
+    );
+  }
+
+  static PlatformService _asRemoteService(PlatformLocalService service) {
+    return PlatformService(
+      uuid: service.uuid,
+      isPrimary: service.isPrimary,
+      characteristics: [
+        for (final c in service.characteristics)
+          PlatformCharacteristic(
+            uuid: c.uuid,
+            properties: c.properties,
+            descriptors: [
+              for (final d in c.descriptors)
+                PlatformDescriptor(uuid: d.uuid, handle: 0),
+            ],
+            handle: 0,
+          ),
+      ],
+      includedServices:
+          service.includedServices.map(_asRemoteService).toList(),
+    );
   }
 }
 
