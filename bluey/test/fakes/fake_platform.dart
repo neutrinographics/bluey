@@ -525,6 +525,23 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _pendingReadError = error;
   }
 
+  // === Operation latency (audit R3 / NT-2) ===
+
+  /// When non-null, every platform operation waits this long (virtual
+  /// time — `Future.delayed` is Timer-backed, so `fakeAsync.elapse`
+  /// drives it) before processing. This is what creates genuine
+  /// interleaving windows: with the default `null` the fake resolves
+  /// ops in microtasks and domain-level operations can never overlap.
+  ///
+  /// Latency is applied before fault rules and legacy failure flags —
+  /// a failure arrives after the simulated round trip, as it would on
+  /// a real link. Held operations (`holdNext*`) are consumed first;
+  /// they model indefinite in-flight ops and need no extra delay.
+  ///
+  /// Tests that set this should run under `fakeAsync`; in real-time
+  /// tests it would sleep the wall clock.
+  Duration? operationLatency;
+
   // === Fault-rule queue (audit R2 / NT-5) ===
   //
   // The general fault-injection mechanism: scripted, ordered rules with
@@ -1092,6 +1109,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
     lastConnectConfig = config;
 
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(FakeOp.connect, deviceId: deviceId);
 
     final held = _heldConnect;
@@ -1170,6 +1191,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<List<PlatformService>> discoverServices(String deviceId) async {
     discoverServicesCalls.add(deviceId);
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(FakeOp.discoverServices, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
@@ -1334,6 +1359,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       return held.future;
     }
 
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(
       FakeOp.readCharacteristic,
       deviceId: deviceId,
@@ -1453,6 +1482,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       ),
     );
 
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(
       FakeOp.writeCharacteristic,
       deviceId: deviceId,
@@ -1495,6 +1528,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     bool enable,
   ) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(
       FakeOp.setNotification,
       deviceId: deviceId,
@@ -1555,6 +1592,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int characteristicHandle,
     int descriptorHandle,
   ) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(
       FakeOp.readDescriptor,
       deviceId: deviceId,
@@ -1574,6 +1615,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     int descriptorHandle,
     Uint8List value,
   ) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(
       FakeOp.writeDescriptor,
       deviceId: deviceId,
@@ -1587,6 +1632,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<int> requestMtu(String deviceId, int mtu) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(FakeOp.requestMtu, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {
@@ -1636,6 +1685,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<int> readRssi(String deviceId) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(FakeOp.readRssi, deviceId: deviceId);
     final connection = _connections[deviceId];
     if (connection == null) {

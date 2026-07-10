@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
@@ -190,344 +191,278 @@ void main() {
     });
 
     group('Parallel Read/Write Operations', () {
-      test('reads from multiple characteristics in parallel', () async {
-        fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:01',
-          name: 'Test Device',
-          services: [
-            const platform.PlatformService(
-              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-              isPrimary: true,
-              characteristics: [
-                platform.PlatformCharacteristic(
-                  uuid: '00002a37-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: true,
-                    canWrite: false,
-                    canWriteWithoutResponse: false,
-                    canNotify: false,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-                platform.PlatformCharacteristic(
-                  uuid: '00002a38-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: true,
-                    canWrite: false,
-                    canWriteWithoutResponse: false,
-                    canNotify: false,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-              ],
-              includedServices: [],
-            ),
-          ],
-          characteristicValues: {
-            '00002a37-0000-1000-8000-00805f9b34fb': Uint8List.fromList([0x01]),
-            '00002a38-0000-1000-8000-00805f9b34fb': Uint8List.fromList([0x02]),
-          },
-        );
+      // Rewritten through the public Connection API (audit R3 / NT-2,
+      // DA-39): the originals called the fake's readCharacteristicByUuid
+      // directly, so they exercised the fake's map access rather than the
+      // library. With operationLatency the parallelism is now genuine —
+      // both operations are provably in flight at the same time.
 
-        final bluey = await Bluey.create();
-        final device = await scanFirstDevice(bluey);
-        await bluey.connect(device);
+      Connection bootConnected(FakeAsync async, Bluey Function() getBluey) {
+        late Connection connection;
+        getBluey()
+            .connect(Device(address: const DeviceAddress(TestDeviceIds.device1)))
+            .then((c) => connection = c);
+        async.flushMicrotasks();
+        return connection;
+      }
 
-        // Read both characteristics in parallel
-        final results = await Future.wait([
-          fakePlatform.readCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-          ),
-          fakePlatform.readCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a38-0000-1000-8000-00805f9b34fb',
-          ),
-        ]);
+      test('reads from two characteristics genuinely overlap in flight', () {
+        fakeAsync((async) {
+          fakePlatform.simulatePeripheral(
+            id: TestDeviceIds.device1,
+            name: 'Test Device',
+            services: [
+              TestServiceBuilder(TestUuids.heartRateService)
+                  .withReadable(TestUuids.heartRateMeasurement)
+                  .withReadable(TestUuids.bodySensorLocation)
+                  .build(),
+            ],
+            characteristicValues: {
+              TestUuids.heartRateMeasurement: Uint8List.fromList([0x01]),
+              TestUuids.bodySensorLocation: Uint8List.fromList([0x02]),
+            },
+          );
 
-        expect(results[0], equals(Uint8List.fromList([0x01])));
-        expect(results[1], equals(Uint8List.fromList([0x02])));
+          late Bluey bluey;
+          Bluey.create().then((b) => bluey = b);
+          async.flushMicrotasks();
+          final connection = bootConnected(async, () => bluey);
+          late List<RemoteCharacteristic> chars;
+          connection
+              .services()
+              .then((s) => chars = s.first.characteristics());
+          async.flushMicrotasks();
 
-        await bluey.dispose();
+          fakePlatform.operationLatency = const Duration(milliseconds: 50);
+
+          Uint8List? value1;
+          Uint8List? value2;
+          chars[0].read().then((v) => value1 = v);
+          chars[1].read().then((v) => value2 = v);
+          async.flushMicrotasks();
+
+          expect(
+            fakePlatform.readCharacteristicCalls,
+            hasLength(2),
+            reason: 'both reads reached the platform before either completed',
+          );
+          expect(value1, isNull);
+          expect(value2, isNull);
+
+          async.elapse(const Duration(milliseconds: 51));
+          expect(value1, equals([0x01]));
+          expect(value2, equals([0x02]));
+
+          bluey.dispose();
+          async.flushMicrotasks();
+        });
       });
 
-      test('writes to multiple characteristics in parallel', () async {
-        fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:01',
-          name: 'Test Device',
-          services: [
-            const platform.PlatformService(
-              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-              isPrimary: true,
-              characteristics: [
-                platform.PlatformCharacteristic(
-                  uuid: '00002a37-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: true,
-                    canWrite: true,
-                    canWriteWithoutResponse: false,
-                    canNotify: false,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-                platform.PlatformCharacteristic(
-                  uuid: '00002a38-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: true,
-                    canWrite: true,
-                    canWriteWithoutResponse: false,
-                    canNotify: false,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-              ],
-              includedServices: [],
-            ),
-          ],
-        );
+      test('writes to two characteristics genuinely overlap in flight', () {
+        fakeAsync((async) {
+          fakePlatform.simulatePeripheral(
+            id: TestDeviceIds.device1,
+            name: 'Test Device',
+            services: [
+              TestServiceBuilder(TestUuids.heartRateService)
+                  .withReadWrite(TestUuids.heartRateMeasurement)
+                  .withReadWrite(TestUuids.bodySensorLocation)
+                  .build(),
+            ],
+          );
 
-        final bluey = await Bluey.create();
-        final device = await scanFirstDevice(bluey);
-        await bluey.connect(device);
+          late Bluey bluey;
+          Bluey.create().then((b) => bluey = b);
+          async.flushMicrotasks();
+          final connection = bootConnected(async, () => bluey);
+          late List<RemoteCharacteristic> chars;
+          connection
+              .services()
+              .then((s) => chars = s.first.characteristics());
+          async.flushMicrotasks();
 
-        // Write to both characteristics in parallel
-        await Future.wait([
-          fakePlatform.writeCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0xAA]),
-            true,
-          ),
-          fakePlatform.writeCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a38-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0xBB]),
-            true,
-          ),
-        ]);
+          fakePlatform.operationLatency = const Duration(milliseconds: 50);
 
-        // Verify both writes succeeded
-        final value1 = await fakePlatform.readCharacteristicByUuid(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-        );
-        final value2 = await fakePlatform.readCharacteristicByUuid(
-          'AA:BB:CC:DD:EE:01',
-          '00002a38-0000-1000-8000-00805f9b34fb',
-        );
+          var write1Done = false;
+          var write2Done = false;
+          chars[0]
+              .write(Uint8List.fromList([0xAA]))
+              .then((_) => write1Done = true);
+          chars[1]
+              .write(Uint8List.fromList([0xBB]))
+              .then((_) => write2Done = true);
+          async.flushMicrotasks();
 
-        expect(value1, equals(Uint8List.fromList([0xAA])));
-        expect(value2, equals(Uint8List.fromList([0xBB])));
+          expect(fakePlatform.writeCharacteristicCalls, hasLength(2));
+          expect(write1Done, isFalse);
+          expect(write2Done, isFalse);
 
-        await bluey.dispose();
+          async.elapse(const Duration(milliseconds: 51));
+          expect(write1Done, isTrue);
+          expect(write2Done, isTrue);
+
+          // Read back through the API (instantly — latency off again).
+          fakePlatform.operationLatency = null;
+          Uint8List? value1;
+          Uint8List? value2;
+          chars[0].read().then((v) => value1 = v);
+          chars[1].read().then((v) => value2 = v);
+          async.flushMicrotasks();
+          expect(value1, equals([0xAA]));
+          expect(value2, equals([0xBB]));
+
+          bluey.dispose();
+          async.flushMicrotasks();
+        });
       });
 
-      test('interleaves reads and writes', () async {
-        fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:01',
-          name: 'Test Device',
-          services: [
-            const platform.PlatformService(
-              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-              isPrimary: true,
-              characteristics: [
-                platform.PlatformCharacteristic(
-                  uuid: '00002a37-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: true,
-                    canWrite: true,
-                    canWriteWithoutResponse: false,
-                    canNotify: false,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-              ],
-              includedServices: [],
-            ),
-          ],
-          characteristicValues: {
-            '00002a37-0000-1000-8000-00805f9b34fb': Uint8List.fromList([0x00]),
-          },
-        );
+      test('interleaved reads and writes on one characteristic all complete; '
+          'last write wins', () {
+        fakeAsync((async) {
+          fakePlatform.simulatePeripheral(
+            id: TestDeviceIds.device1,
+            name: 'Test Device',
+            services: [
+              TestServiceBuilder(TestUuids.heartRateService)
+                  .withReadWrite(TestUuids.heartRateMeasurement)
+                  .build(),
+            ],
+            characteristicValues: {
+              TestUuids.heartRateMeasurement: Uint8List.fromList([0x00]),
+            },
+          );
 
-        final bluey = await Bluey.create();
-        final device = await scanFirstDevice(bluey);
-        await bluey.connect(device);
+          late Bluey bluey;
+          Bluey.create().then((b) => bluey = b);
+          async.flushMicrotasks();
+          final connection = bootConnected(async, () => bluey);
+          late RemoteCharacteristic characteristic;
+          connection
+              .services()
+              .then((s) => characteristic = s.first.characteristics().first);
+          async.flushMicrotasks();
 
-        // Interleave multiple read/write operations
-        await Future.wait([
-          fakePlatform.readCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-          ),
-          fakePlatform.writeCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0x01]),
-            true,
-          ),
-          fakePlatform.readCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-          ),
-          fakePlatform.writeCharacteristicByUuid(
-            'AA:BB:CC:DD:EE:01',
-            '00002a37-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0x02]),
-            true,
-          ),
-        ]);
+          fakePlatform.operationLatency = const Duration(milliseconds: 50);
 
-        // Final value should be the last write
-        final finalValue = await fakePlatform.readCharacteristicByUuid(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-        );
-        expect(finalValue, equals(Uint8List.fromList([0x02])));
+          var completed = 0;
+          characteristic.read().then((_) => completed++);
+          characteristic
+              .write(Uint8List.fromList([0x01]))
+              .then((_) => completed++);
+          characteristic.read().then((_) => completed++);
+          characteristic
+              .write(Uint8List.fromList([0x02]))
+              .then((_) => completed++);
+          async.flushMicrotasks();
 
-        await bluey.dispose();
+          expect(completed, 0, reason: 'all four ops are in flight at once');
+          async.elapse(const Duration(milliseconds: 51));
+          expect(completed, 4);
+
+          fakePlatform.operationLatency = null;
+          Uint8List? finalValue;
+          characteristic.read().then((v) => finalValue = v);
+          async.flushMicrotasks();
+          expect(finalValue, equals([0x02]));
+
+          bluey.dispose();
+          async.flushMicrotasks();
+        });
       });
     });
 
     group('Concurrent Notifications', () {
+      // Rewritten through characteristic.notifications (audit R3 / NT-2):
+      // the originals subscribed at the fake level (setNotificationByUuid +
+      // platform notificationStream), bypassing the domain layer entirely.
+
       test('receives notifications from multiple characteristics', () async {
         fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:01',
+          id: TestDeviceIds.device1,
           name: 'Test Device',
           services: [
-            const platform.PlatformService(
-              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-              isPrimary: true,
-              characteristics: [
-                platform.PlatformCharacteristic(
-                  uuid: '00002a37-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: false,
-                    canWrite: false,
-                    canWriteWithoutResponse: false,
-                    canNotify: true,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-                platform.PlatformCharacteristic(
-                  uuid: '00002a38-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: false,
-                    canWrite: false,
-                    canWriteWithoutResponse: false,
-                    canNotify: true,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-              ],
-              includedServices: [],
-            ),
+            TestServiceBuilder(TestUuids.heartRateService)
+                .withNotifiable(TestUuids.heartRateMeasurement)
+                .withNotifiable(TestUuids.bodySensorLocation)
+                .build(),
           ],
         );
 
         final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
-        await bluey.connect(device);
+        final connection = await bluey.connect(device);
+        final service = (await connection.services()).first;
+        final char1 = service
+            .characteristics(uuid: UUID(TestUuids.heartRateMeasurement))
+            .first;
+        final char2 = service
+            .characteristics(uuid: UUID(TestUuids.bodySensorLocation))
+            .first;
 
-        // Subscribe to notifications
-        await fakePlatform.setNotificationByUuid(
-          'AA:BB:CC:DD:EE:01',
-          '00002a37-0000-1000-8000-00805f9b34fb',
-          true,
-        );
-        await fakePlatform.setNotificationByUuid(
-          'AA:BB:CC:DD:EE:01',
-          '00002a38-0000-1000-8000-00805f9b34fb',
-          true,
-        );
+        final received1 = <Uint8List>[];
+        final received2 = <Uint8List>[];
+        final sub1 = char1.notifications.listen(received1.add);
+        final sub2 = char2.notifications.listen(received2.add);
+        await Future.delayed(Duration.zero);
 
-        final notifications = <platform.PlatformNotification>[];
-        final subscription = fakePlatform
-            .notificationStream('AA:BB:CC:DD:EE:01')
-            .listen(notifications.add);
-
-        // Simulate notifications from both characteristics
         fakePlatform.simulateNotification(
-          deviceId: 'AA:BB:CC:DD:EE:01',
-          characteristicUuid: '00002a37-0000-1000-8000-00805f9b34fb',
+          deviceId: TestDeviceIds.device1,
+          characteristicUuid: TestUuids.heartRateMeasurement,
           value: Uint8List.fromList([0x01]),
         );
         fakePlatform.simulateNotification(
-          deviceId: 'AA:BB:CC:DD:EE:01',
-          characteristicUuid: '00002a38-0000-1000-8000-00805f9b34fb',
+          deviceId: TestDeviceIds.device1,
+          characteristicUuid: TestUuids.bodySensorLocation,
           value: Uint8List.fromList([0x02]),
         );
-
         await Future.delayed(Duration.zero);
 
-        expect(notifications, hasLength(2));
+        expect(received1, hasLength(1));
+        expect(received1.single, equals([0x01]));
+        expect(received2, hasLength(1));
+        expect(received2.single, equals([0x02]));
 
-        await subscription.cancel();
+        await sub1.cancel();
+        await sub2.cancel();
         await bluey.dispose();
       });
 
-      test('high-frequency notifications are all received', () async {
+      test('high-frequency notifications are all received in order', () async {
         fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:01',
+          id: TestDeviceIds.device1,
           name: 'Test Device',
           services: [
-            const platform.PlatformService(
-              uuid: '0000180d-0000-1000-8000-00805f9b34fb',
-              isPrimary: true,
-              characteristics: [
-                platform.PlatformCharacteristic(
-                  uuid: '00002a37-0000-1000-8000-00805f9b34fb',
-                  properties: platform.PlatformCharacteristicProperties(
-                    canRead: false,
-                    canWrite: false,
-                    canWriteWithoutResponse: false,
-                    canNotify: true,
-                    canIndicate: false,
-                  ),
-                  descriptors: [],
-                  handle: 0,
-                ),
-              ],
-              includedServices: [],
-            ),
+            TestServiceBuilder(TestUuids.heartRateService)
+                .withNotifiable(TestUuids.heartRateMeasurement)
+                .build(),
           ],
         );
 
         final bluey = await Bluey.create();
         final device = await scanFirstDevice(bluey);
-        await bluey.connect(device);
+        final connection = await bluey.connect(device);
+        final characteristic =
+            (await connection.services()).first.characteristics().first;
 
-        final notifications = <platform.PlatformNotification>[];
-        final subscription = fakePlatform
-            .notificationStream('AA:BB:CC:DD:EE:01')
-            .listen(notifications.add);
+        final received = <Uint8List>[];
+        final subscription = characteristic.notifications.listen(received.add);
+        await Future.delayed(Duration.zero);
 
-        // Simulate 100 rapid notifications
         for (var i = 0; i < 100; i++) {
           fakePlatform.simulateNotification(
-            deviceId: 'AA:BB:CC:DD:EE:01',
-            characteristicUuid: '00002a37-0000-1000-8000-00805f9b34fb',
+            deviceId: TestDeviceIds.device1,
+            characteristicUuid: TestUuids.heartRateMeasurement,
             value: Uint8List.fromList([i]),
           );
         }
-
         await Future.delayed(Duration.zero);
 
-        expect(notifications, hasLength(100));
+        expect(received, hasLength(100));
+        expect(
+          received.asMap().entries.every((e) => e.value.single == e.key),
+          isTrue,
+          reason: 'notifications arrive in emission order',
+        );
 
         await subscription.cancel();
         await bluey.dispose();
