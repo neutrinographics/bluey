@@ -129,6 +129,9 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☐ **Low** — [Express advertise intent, not platform mechanism](backlog/I320-domain-server-names-platform-mechanism.md) · `BlueyServer` names the platform "scan response" slot directly instead of the intent.
 - ☐ **Low** — [Reconcile the two fake requestMtu caps](backlog/I329-fake-mock-requestmtu-inconsistency.md) · Test fixtures disagree on whether to cap MTU at 512.
 - ☐ **Low** — [Shape the fake's disconnected error like the real one](backlog/I330-fake-platform-getmaximumwritelength-exception-shape.md) · `FakeBlueyPlatform` throws a raw `Exception` instead of a `gatt-disconnected`-shaped one.
+- ☐ **Low** — [Model the iOS shared-link trap in the fake platform](backlog/I346-fake-platform-shared-link-trap-model.md) · The fake's two roles can't share one physical link, so the documented bidirectional-discovery trap is untestable. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
+- ☐ **Low** — [Make the role-reversal ATT blackhole injectable in the fake](backlog/I347-fake-platform-role-reversal-att-blackhole.md) · No seam for "server silently receives nothing while the link looks healthy" (I208's condition), so death-watch convergence is untested. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
+- ☐ **Low** — [Accept inherited centrals before advertising in the fake](backlog/I348-fake-platform-inherited-central-before-advertising.md) · `simulateCentralConnection` throws pre-advertising, but real platforms deliver cached/inherited connections then. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 
 ## Shipped
 
