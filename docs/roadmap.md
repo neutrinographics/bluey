@@ -107,6 +107,7 @@ Local-as-peripheral: advertising, request/response handling, and outbound notifi
 The Bluey lifecycle protocol, stable peer identity, and peer discovery.
 
 - ☐ **Medium** — [Fix the LifecycleServer activity/timer race](backlog/I072-lifecycle-server-record-activity-race.md) · `recordActivity` does a check-then-act on the heartbeat timer map (single-threaded, defensive).
+- ☐ **Medium** — [Stop peer connect waiting out the full scan window](backlog/I349-peer-connect-waits-full-scan-window.md) · `connectTo`/`discover` collect-then-probe, so every peer connect costs the whole scanTimeout even on an instant match.
 - ☐ **Low** — [Extract a shared peer-builder helper](backlog/I304-peer-builder-helper-extraction.md) · Two sites duplicate `PeerConnection` / `LifecycleClient` construction.
 - ☐ **Low** — [Remove the dormant silence-eviction machinery](backlog/I340-remove-dormant-silence-eviction-machinery.md) · Deferred cleanup of the reserved ATT-status eviction path — hold until Pattern B soaks in production.
 - ☐ **Low** — [Retry failed presence subscriptions](backlog/I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) · A failed presence-characteristic subscription leaves an iOS-server peer's disconnect undetectable.
