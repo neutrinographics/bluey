@@ -702,11 +702,68 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     held.completeError(error);
   }
 
+  /// When true, [setBluetoothState] to a non-`on` state also models the
+  /// *transport* consequences of losing the adapter (audit R6 / NT-4):
+  /// live outgoing connections drop with a `disconnected` state event,
+  /// connected centrals are disconnected, scanning and advertising stop,
+  /// and held in-flight operations are drained with
+  /// [GattOperationDisconnectedException] (connects with
+  /// [PlatformConnectFailedException]). Defaults to false — the
+  /// historical event-only behavior existing tests rely on.
+  bool cascadeAdapterTeardown = false;
+
   /// Sets the Bluetooth state and notifies listeners.
   void setBluetoothState(BluetoothState state) {
     _state = state;
     if (!suppressInitialStateEmission) {
       _stateController.add(state);
+    }
+    if (cascadeAdapterTeardown && state != BluetoothState.on) {
+      _teardownTransport();
+    }
+  }
+
+  /// Models the transport dying with the adapter. See
+  /// [cascadeAdapterTeardown].
+  void _teardownTransport() {
+    for (final deviceId in _connections.keys.toList()) {
+      simulateDisconnection(deviceId);
+    }
+    for (final centralId in _connectedCentrals.keys.toList()) {
+      simulateCentralDisconnection(centralId);
+    }
+    _isScanningPlatform = false;
+    _isAdvertising = false;
+    _advertiseConfig = null;
+
+    // Drain held in-flight ops the way a real platform queue drains on
+    // adapter loss.
+    final heldWrite = _heldWriteInFlight ?? _heldWrite;
+    if (heldWrite != null && !heldWrite.isCompleted) {
+      _heldWrite = null;
+      _heldWriteInFlight = null;
+      heldWrite.completeError(
+        const GattOperationDisconnectedException('writeCharacteristic'),
+      );
+    }
+    final heldRead = _heldReadInFlight ?? _heldRead;
+    if (heldRead != null && !heldRead.isCompleted) {
+      _heldRead = null;
+      _heldReadInFlight = null;
+      heldRead.completeError(
+        const GattOperationDisconnectedException('readCharacteristic'),
+      );
+    }
+    final heldConnect = _heldConnectInFlight ?? _heldConnect;
+    if (heldConnect != null && !heldConnect.isCompleted) {
+      _heldConnect = null;
+      _heldConnectInFlight = null;
+      heldConnect.completeError(
+        const PlatformConnectFailedException(
+          PlatformConnectFailureReason.unknown,
+          message: 'adapter powered off during connect',
+        ),
+      );
     }
   }
 
