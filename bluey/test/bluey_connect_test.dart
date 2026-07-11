@@ -72,7 +72,7 @@ void main() {
         device.address.value,
         platform.PlatformConnectionState.connected,
       );
-      await Future.delayed(Duration(milliseconds: 10));
+      await pumpEventQueue();
 
       // No regression: post-ready, a duplicate platform-CONNECTED does
       // NOT walk the connection back to `linked`.
@@ -104,7 +104,7 @@ void main() {
         platform.PlatformConnectionState.disconnecting,
       );
 
-      await Future.delayed(Duration(milliseconds: 10));
+      await pumpEventQueue();
       await subscription.cancel();
 
       expect(states, contains(ConnectionState.disconnecting));

@@ -39,10 +39,10 @@ void main() {
         final sub = scanner.stateChanges.listen(observed.add);
 
         final scanSub = scanner.scan().listen((_) {});
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await pumpEventQueue();
 
         await scanSub.cancel();
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await pumpEventQueue();
 
         expect(
           observed,
@@ -64,12 +64,12 @@ void main() {
       expect(scanner.isScanning, isFalse);
 
       final scanSub = scanner.scan().listen((_) {});
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       expect(scanner.isScanning, isTrue);
       expect(scanner.state, equals(ScanState.scanning));
 
       await scanSub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       expect(scanner.isScanning, isFalse);
     });
 
@@ -95,9 +95,9 @@ void main() {
       bluey.events.listen(events.add);
 
       final scanSub = scanner.scan().listen((_) {});
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await pumpEventQueue();
       await scanSub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await pumpEventQueue();
 
       expect(events.whereType<ScanStartingEvent>().length, equals(1));
       expect(events.whereType<ScanStartedEvent>().length, equals(1));
@@ -115,7 +115,7 @@ void main() {
       () async {
         final scanner = bluey.scanner();
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         // Scanner is now invalidated. Subscribe AFTER.
         final received = <ScanState>[];
@@ -158,7 +158,7 @@ void main() {
       // events should hit the stream beyond the single replay value.
       await scanner.stop();
       await scanner.stop();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       // Only the replay should be present.
       expect(observed, equals([ScanState.stopped]));
@@ -182,9 +182,9 @@ void main() {
 
       final scanSub =
           scanner.scan(services: filter, timeout: timeout).listen((_) {});
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await pumpEventQueue();
       await scanSub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await pumpEventQueue();
 
       final starting = events.whereType<ScanStartingEvent>().single;
       expect(starting.serviceFilter, equals(filter));

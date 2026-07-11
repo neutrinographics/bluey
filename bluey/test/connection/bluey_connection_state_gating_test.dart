@@ -238,7 +238,7 @@ void main() {
       final ctx = await establishWithChar();
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await expectLater(
         ctx.connection.maxWritePayload(withResponse: false),
@@ -250,7 +250,7 @@ void main() {
       final ctx = await establishWithChar();
 
       fakePlatform.setState(platform.BluetoothState.unauthorized);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await expectLater(ctx.char.read(), throwsA(isA<StaleHandleException>()));
     });
@@ -259,9 +259,9 @@ void main() {
       final ctx = await establishWithChar();
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       fakePlatform.setState(platform.BluetoothState.on);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await expectLater(
         ctx.connection.services(),
@@ -275,7 +275,7 @@ void main() {
         final ctx = await establishWithChar();
 
         fakePlatform.setState(platform.BluetoothState.unauthorized);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         try {
           await ctx.connection.maxWritePayload(withResponse: false);
@@ -294,7 +294,7 @@ void main() {
       ctx.connection.stateChanges.listen((_) {}, onDone: stateClosed.complete);
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(stateClosed.isCompleted, isTrue);
     });

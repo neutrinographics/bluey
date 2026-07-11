@@ -303,7 +303,7 @@ void main() {
           responseNeeded: true,
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       await eventSub.cancel();
 
       final paused =

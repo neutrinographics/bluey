@@ -201,7 +201,7 @@ void main() {
       final peerConn = await peer.connect();
 
       // Wait for the initial heartbeat write triggered during connect.
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pumpEventQueue();
 
       final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
         (w) =>

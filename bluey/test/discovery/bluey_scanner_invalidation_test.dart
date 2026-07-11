@@ -29,7 +29,7 @@ void main() {
       final scanner = bluey.scanner();
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
     });
@@ -41,7 +41,7 @@ void main() {
       scanner.scan().listen((_) {}, onDone: scanClosed.complete);
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
 
       expect(scanClosed.isCompleted, isTrue);
     });
@@ -50,9 +50,9 @@ void main() {
       final scanner = bluey.scanner();
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       fakePlatform.setState(platform.BluetoothState.on);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
     });
@@ -63,7 +63,7 @@ void main() {
         final scanner = bluey.scanner();
 
         fakePlatform.setState(platform.BluetoothState.unauthorized);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         try {
           scanner.scan();
@@ -82,7 +82,7 @@ void main() {
       final scanner = bluey.scanner();
 
       fakePlatform.simulateStateError(StateError('platform glitch'));
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
     });

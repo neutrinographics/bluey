@@ -11,7 +11,7 @@ import '../fakes/test_helpers.dart';
 /// updates its cached `_currentState`. The synchronous factory
 /// pre-check reads that cache.
 Future<void> flushState() async {
-  await Future<void>.delayed(const Duration(milliseconds: 5));
+  await pumpEventQueue();
 }
 
 void main() {
