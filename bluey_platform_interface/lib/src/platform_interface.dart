@@ -613,10 +613,19 @@ class PlatformNotification {
   final String characteristicUuid;
   final Uint8List value;
 
+  /// The platform-assigned handle of the characteristic instance this
+  /// notification came from, when the platform can attribute it
+  /// (Android: `getInstanceId()`; iOS: the client-minted handle from
+  /// the per-device store). Null on legacy paths — the domain then
+  /// falls back to UUID demux, which cannot distinguish duplicate-UUID
+  /// instances (DA-02).
+  final int? characteristicHandle;
+
   const PlatformNotification({
     required this.deviceId,
     required this.characteristicUuid,
     required this.value,
+    this.characteristicHandle,
   });
 }
 

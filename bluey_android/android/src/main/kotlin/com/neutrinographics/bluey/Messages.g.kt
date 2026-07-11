@@ -706,7 +706,13 @@ data class ServiceDto (
 data class NotificationEventDto (
   val deviceId: String,
   val characteristicUuid: String,
-  val value: ByteArray
+  val value: ByteArray,
+  /**
+   * Platform-assigned handle of the characteristic instance this
+   * notification came from; null when the platform cannot attribute
+   * it (the domain falls back to UUID demux — DA-02).
+   */
+  val characteristicHandle: Long? = null
 )
  {
   companion object {
@@ -714,7 +720,8 @@ data class NotificationEventDto (
       val deviceId = pigeonVar_list[0] as String
       val characteristicUuid = pigeonVar_list[1] as String
       val value = pigeonVar_list[2] as ByteArray
-      return NotificationEventDto(deviceId, characteristicUuid, value)
+      val characteristicHandle = pigeonVar_list[3] as Long?
+      return NotificationEventDto(deviceId, characteristicUuid, value, characteristicHandle)
     }
   }
   fun toList(): List<Any?> {
@@ -722,6 +729,7 @@ data class NotificationEventDto (
       deviceId,
       characteristicUuid,
       value,
+      characteristicHandle,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -732,7 +740,7 @@ data class NotificationEventDto (
       return true
     }
     val other = other as NotificationEventDto
-    return MessagesPigeonUtils.deepEquals(this.deviceId, other.deviceId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.value, other.value)
+    return MessagesPigeonUtils.deepEquals(this.deviceId, other.deviceId) && MessagesPigeonUtils.deepEquals(this.characteristicUuid, other.characteristicUuid) && MessagesPigeonUtils.deepEquals(this.value, other.value) && MessagesPigeonUtils.deepEquals(this.characteristicHandle, other.characteristicHandle)
   }
 
   override fun hashCode(): Int {
@@ -740,6 +748,7 @@ data class NotificationEventDto (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.deviceId)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristicUuid)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.value)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristicHandle)
     return result
   }
 }

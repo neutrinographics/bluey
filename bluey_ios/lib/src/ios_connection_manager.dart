@@ -186,6 +186,7 @@ class IosConnectionManager {
           deviceId: event.deviceId,
           characteristicUuid: expandUuid(event.characteristicUuid),
           value: event.value,
+          characteristicHandle: event.characteristicHandle,
         ),
       );
     }

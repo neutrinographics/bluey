@@ -629,10 +629,20 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   ) {
     final link = _inboundLink;
     if (link != null && link.centralId == centralId) {
+      // Resolve the CLIENT-side handle for this characteristic (the
+      // server-side handle is a different numbering space). First
+      // instance wins — the link fixture does not model duplicate-UUID
+      // trees.
+      final clientHandle = link
+          .central
+          ._deviceStates[link.deviceId]
+          ?.charHandlesByUuid[charUuid.toLowerCase()]
+          ?.firstOrNull;
       link.central.simulateNotification(
         deviceId: link.deviceId,
         characteristicUuid: charUuid,
         value: value,
+        characteristicHandle: clientHandle,
       );
     }
   }
@@ -1154,10 +1164,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   /// Simulates a notification from a connected peripheral.
+  ///
+  /// Pass [characteristicHandle] to model a platform that attributes
+  /// the notification to a specific characteristic instance (DA-02
+  /// handle demux); omit it for the legacy UUID-only path.
   void simulateNotification({
     required String deviceId,
     required String characteristicUuid,
     required Uint8List value,
+    int? characteristicHandle,
   }) {
     final controller = _notificationControllers[deviceId];
     controller?.add(
@@ -1165,6 +1180,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         deviceId: deviceId,
         characteristicUuid: characteristicUuid,
         value: value,
+        characteristicHandle: characteristicHandle,
       ),
     );
   }

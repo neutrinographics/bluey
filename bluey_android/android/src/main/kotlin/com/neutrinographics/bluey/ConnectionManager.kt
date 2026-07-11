@@ -832,7 +832,10 @@ class ConnectionManager(
                 val event = NotificationEventDto(
                     deviceId = deviceId,
                     characteristicUuid = characteristic.uuid.toString(),
-                    value = value
+                    value = value,
+                    // DA-02 — attribute the notification to the exact
+                    // characteristic instance for handle-based demux.
+                    characteristicHandle = characteristic.instanceId.toLong()
                 )
                 // Must dispatch to main thread for Flutter platform channel
                 handler.post {
@@ -849,7 +852,8 @@ class ConnectionManager(
                 val event = NotificationEventDto(
                     deviceId = deviceId,
                     characteristicUuid = characteristic.uuid.toString(),
-                    value = characteristic.value ?: ByteArray(0)
+                    value = characteristic.value ?: ByteArray(0),
+                    characteristicHandle = characteristic.instanceId.toLong()
                 )
                 // Must dispatch to main thread for Flutter platform channel
                 handler.post {

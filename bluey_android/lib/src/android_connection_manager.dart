@@ -371,6 +371,7 @@ class AndroidConnectionManager {
           deviceId: event.deviceId,
           characteristicUuid: event.characteristicUuid,
           value: event.value,
+          characteristicHandle: event.characteristicHandle,
         ),
       );
     }

@@ -152,6 +152,37 @@ void main() {
       });
     });
 
+    group('onNotification', () {
+      test('forwards the characteristic handle to PlatformNotification '
+          '(DA-02 handle demux)', () async {
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenAnswer((_) async => 'conn-123');
+        await connectionManager.connect(
+          'device-1',
+          PlatformConnectConfig(timeoutMs: null, mtu: null),
+        );
+
+        final received = <PlatformNotification>[];
+        final sub = connectionManager
+            .notificationStream('device-1')
+            .listen(received.add);
+
+        connectionManager.onNotification(
+          NotificationEventDto(
+            deviceId: 'device-1',
+            characteristicUuid: '2a37',
+            value: Uint8List.fromList([1]),
+            characteristicHandle: 7,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received.single.characteristicHandle, 7);
+        await sub.cancel();
+      });
+    });
+
     group('disconnect', () {
       test(
         'calls hostApi.disconnect and cleans up per-device streams',
