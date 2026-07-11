@@ -768,6 +768,13 @@ class Bluey {
         servicesChanges: rawConnection.servicesChanges,
         events: _eventBus,
         deviceAddress: rawConnection.deviceAddress,
+        // Only verify against a genuinely-read identity; when the read
+        // failed and the id below is fabricated, there is nothing real
+        // to compare against.
+        expectedServerId: serverId,
+        onIdentityMismatch: (_) {
+          rawConnection.disconnect().catchError((_) {});
+        },
       );
       lifecycleClient.start(allServices: services);
 
