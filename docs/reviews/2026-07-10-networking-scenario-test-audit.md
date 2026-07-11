@@ -161,7 +161,20 @@ Added after the initial report, sourced from the project's own quirk record (`bl
 
 ### Progress
 
-- **R1 — done** (2026-07-10, merge `b06f304`): `PlatformConnectFailedException` + reason enum in the platform interface; ACL maps it to `ConnectionException` (first `ConnectionFailureReason` construction — half of DA-21); both adapters translate connect-phase codes positionally; fake gains `simulateConnectFailure` (per-device, one-shot), `holdNextConnect`/`resolveHeldConnect`/`failHeldConnect`, and held-connect timeout enforcement under `fakeAsync`; Kotlin pins the fired connect-timeout runnable (typed `ConnectionTimeout`, late `STATE_CONNECTED` no-op) and mid-connect status 133.
+**All recommendations R1–R12 landed on main, 2026-07-10.** Gates at completion: bluey 1,082 · platform_interface 73 · bluey_android 80 · bluey_ios 97 (all + analyze clean) · Kotlin suite green (119 incl. 3 new) · XCTest 83 green on iPhone SE (3rd gen) sim.
+
+- **R1 — done** (merge `b06f304`): `PlatformConnectFailedException` + reason enum; ACL maps to `ConnectionException` (first `ConnectionFailureReason` construction — half of DA-21); both adapters translate connect-phase codes positionally; fake `simulateConnectFailure` / held-connect / timeout enforcement; Kotlin pins connect-timeout firing and mid-connect status 133.
+- **R2 — done**: `enqueueFault({op, deviceId?, characteristicUuid?, times})` fault-rule queue (FIFO, targeted, fail-N-then-succeed, `times:null` persistent, `clearFaults`); `simulateConnectFailure` now sugar over it; legacy write booleans retained as independent sugar.
+- **R3 — done**: `operationLatency` (Timer-based, `fakeAsync`-driven) creates genuine interleaving windows; concurrent-operations and notification integration groups rewritten through the public API (closes the NT-2 half of DA-39).
+- **R4 — done**: `FakeBleLink` — cross-wired fake pair; two real Bluey endpoints exchange connects/writes/reads/subscriptions/notifications/disconnects end-to-end; `connectAsPeer` proven over the link against the real `LifecycleServer`.
+- **R10 — done**: A.1 address rotation, A.2 identity-change pins (mismatch signal still an open design gap), A.3 silence-boundary race, A.4 hostile lifecycle inputs over a real link, A.5 DA-02 cross-delivery pinned. Surfaced **I349** (peer connect waits out the full scan window — filed, Peer/Medium).
+- **R11 — done**: force-kill profile driving the real death watch to `PeerDeclaredUnreachableEvent` + teardown in virtual time; connect flapping/limit; I343 512-cap regression.
+- **R5 — done (server role)**: `PeripheralManagerImplCore<Manager: PeripheralManaging>` with `CentralLike`/`ATTRequestLike` seams; 7 delegate-sequence tests (Pattern B presence-unsubscribe, I040 gate-shut/reopen/partial-drain, I047 batch shape, respond-through-manager, poweredOff rejection). Central role filed as **I350** (Platform/Medium).
+- **R6 — done**: `cascadeAdapterTeardown` — adapter-off drops links, centrals, radio, and drains held ops (opt-in; default preserves historical behavior).
+- **R7 — done**: `simulateMtuNegotiationCap` (negotiate-down) and `simulateScanFailure` (one-shot; fake side of open I013).
+- **R8 — done**: 112 wall-clock sleeps eliminated (event pumps → `pumpEventQueue`, the scanner-timeout test → `fakeAsync`); zero non-zero `Future.delayed` remain in `bluey/test` (executes DA-37).
+- **R9 — done**: `setWriteWithoutResponseBudget`/`drainPendingWrites` WWR backpressure; transport loss fails parked writes (I315 shape).
+- **R12 — done**: **I346** `FakeBleLink.shareOnePhysicalLink` (trap + dedup-guard both regression-tested), **I347** `simulateServerRequestBlackhole` (E2E death-watch convergence proof), **I348** inherited centrals pre-advertising (guard dropped; obsolete guard test updated). Roadmap items flipped to done.
 
 ## Coverage
 
