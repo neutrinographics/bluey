@@ -637,6 +637,49 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
   }
 
+  // === Write-without-response backpressure (audit R9 / NT-10) ===
+
+  final Map<String, int> _wwrBudgets = {};
+  final Map<String, List<Completer<void>>> _parkedWrites = {};
+
+  /// Models a saturated native write-without-response queue for
+  /// [deviceId]: the next [budget] WWR writes complete immediately;
+  /// writes beyond that park (their futures stay pending, like iOS
+  /// gating on `canSendWriteWithoutResponse` — I339) until
+  /// [drainPendingWrites] releases them or the link drops (which fails
+  /// them with [GattOperationDisconnectedException]).
+  void setWriteWithoutResponseBudget(String deviceId, int budget) {
+    _wwrBudgets[deviceId] = budget;
+  }
+
+  /// Number of parked (in-flight, un-acked) WWR writes for [deviceId].
+  int pendingWriteCount(String deviceId) =>
+      _parkedWrites[deviceId]?.length ?? 0;
+
+  /// Completes up to [count] parked WWR writes for [deviceId] in FIFO
+  /// order (all of them when [count] is null) — the fake's equivalent
+  /// of the native ready-to-send drain.
+  void drainPendingWrites(String deviceId, {int? count}) {
+    final parked = _parkedWrites[deviceId];
+    if (parked == null) return;
+    final n = count == null ? parked.length : count.clamp(0, parked.length);
+    for (var i = 0; i < n; i++) {
+      parked.removeAt(0).complete();
+    }
+  }
+
+  /// Fails every parked WWR write for [deviceId] — called on transport
+  /// loss so saturated writers see the link drop (I315 shape).
+  void _failParkedWrites(String deviceId) {
+    final parked = _parkedWrites.remove(deviceId);
+    if (parked == null) return;
+    for (final completer in parked) {
+      completer.completeError(
+        const GattOperationDisconnectedException('writeCharacteristic'),
+      );
+    }
+  }
+
   // === MTU negotiation + scan failure seams (audit R7 / NT-7, NT-8) ===
 
   final Map<String, int> _mtuNegotiationCaps = {};
@@ -1065,6 +1108,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       _connections.remove(deviceId);
       connection.stateController.add(PlatformConnectionState.disconnected);
     }
+    _failParkedWrites(deviceId);
     _clearHandles(deviceId);
   }
 
@@ -1315,6 +1359,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         link.peripheral.simulateCentralDisconnection(link.centralId);
       }
     }
+    _failParkedWrites(deviceId);
     _clearHandles(deviceId);
   }
 
@@ -1672,6 +1717,25 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         value: value,
         responseNeeded: withResponse,
       );
+    }
+
+    // Backpressure: a WWR write beyond the saturation budget parks
+    // until drained (or failed by a link drop). With-response writes
+    // are acked per-op by the peer and bypass the TX-queue model.
+    if (!withResponse) {
+      final budget = _wwrBudgets[deviceId];
+      if (budget != null) {
+        if (budget > 0) {
+          _wwrBudgets[deviceId] = budget - 1;
+        } else {
+          final completer = Completer<void>();
+          _parkedWrites.putIfAbsent(deviceId, () => []).add(completer);
+          _stateFor(
+            deviceId,
+          ).charValuesByHandle[characteristicHandle] = Uint8List.fromList(value);
+          return completer.future;
+        }
+      }
     }
 
     // Handle is the primary key.
