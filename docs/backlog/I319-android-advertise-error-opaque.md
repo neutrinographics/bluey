@@ -89,3 +89,12 @@ but isn't subsumed by either — this is purely about the failure-translation
 seam.
 
 **Update (2026-06-02):** Partially addressed — `DATA_TOO_LARGE` is now differentiated as `bluey-advertise-data-too-large` (via the I099 typed-error rewrite). Still open: the other `AdvertisingSetCallback` failure codes (ALREADY_STARTED, TOO_MANY_ADVERTISERS, INTERNAL_ERROR, FEATURE_UNSUPPORTED) still collapse to `bluey-unknown`.
+
+## Test-harness note (2026-07-10, absorbs audit NT-12)
+
+The fix should land with typed `AdvertisingFailureReason` coverage end
+to end: only `dataTooBig` is wired through the translation layer, and
+the fake's `advertisingShouldFail` seam throws a single generic
+`StateError` — extend it to inject typed advertising failures so each
+reason's domain surface is pinned.
+

@@ -62,3 +62,15 @@ PeerConnection _buildPeer({
 Lives somewhere in `bluey/lib/src/peer/` (e.g. `peer_builder.dart`) as a top-level package-internal function. Both call sites in `bluey.dart` and `bluey_peer.dart` shrink to one call.
 
 Cost-benefit: ~20 lines saved across two files; a clear single source of truth for the LifecycleClient lifecycle. Worth doing during Phase E cleanup or the next refactor that touches either file. Not blocking.
+
+## Scope update (2026-07-10, absorbs audit DA-25)
+
+The 2026-07-07 audit found the duplication is worse than two sites:
+the connect-discover-read-identity-heartbeat-wrap sequence lives in
+`Bluey._tryBuildPeerConnection` (~85 lines of domain logic inside the
+facade), `peer_discovery.dart`, and `bluey_peer.dart`. The fix shape is
+a `PeerConnectionFactory` in `src/peer/` that all three delegate to —
+the facade should only wire and delegate. Doing this first would give
+[I356](I356-peer-upgrade-failure-semantics.md) a single home for its
+failure-semantics fixes.
+

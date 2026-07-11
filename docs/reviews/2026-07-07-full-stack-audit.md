@@ -70,6 +70,18 @@ The two April 2026 external reviews were verified against HEAD. A prior report's
 
 ## Findings
 
+> **Tracking note (2026-07-10):** every open finding below now has a roadmap
+> item — DA-01→I353, DA-03/04→I354, DA-05→I355, DA-06/07→I356, DA-08/09→I357,
+> DA-10→I358, DA-11→I359, DA-12→I360, DA-13→I361, DA-14..17→I362, DA-18→I363,
+> DA-19→I063 (pre-existing), DA-20/21→I364 (ConnectionException half fixed
+> 2026-07-10), DA-22/36→I365, DA-23→I366, DA-24→I367, DA-25→I304 (updated),
+> DA-26→I368, DA-27→I369, DA-28→I370, DA-29/30→I371, DA-31→I372, DA-32→I373,
+> DA-33→I374, DA-34→I004/I326, DA-35→I043/I048/I084, DA-37 **fixed**,
+> DA-38/39→I375, DA-40..42→I376, MINOR ledger→I377. **DA-02 fixed**
+> (2026-07-10, handle-attributed notifications). `docs/roadmap.md` is the
+> source of truth for status/priority from here; this report stays as the
+> evidence record.
+
 Grouped by severity, then by theme. IDs are `DA-##` (Deep Audit, audit #1). Each carries rubric tag(s) and the originating territory. `[latent]` = real but requires a specific device topology or error condition.
 
 ### CRITICAL

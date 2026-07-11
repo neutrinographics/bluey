@@ -32,6 +32,11 @@ Count: **0 Critical, 3 Major, 7 Moderate, 4 Minor, 2 Observations.** No finding 
 
 ## Findings
 
+> **Tracking note (2026-07-10):** all findings and recommendations from this
+> report are resolved or on the roadmap: R1–R12 landed (see Progress below);
+> NT-11→I035 (note), NT-12→I319 (note), NT-13/14→I375; I349/I350/I351/I352
+> track the follow-ups. `docs/roadmap.md` is the source of truth from here.
+
 ### MAJOR
 
 **NT-1 — Connect-phase failures cannot be simulated anywhere in the stack.**
