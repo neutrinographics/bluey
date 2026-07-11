@@ -637,6 +637,28 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
   }
 
+  // === MTU negotiation + scan failure seams (audit R7 / NT-7, NT-8) ===
+
+  final Map<String, int> _mtuNegotiationCaps = {};
+
+  /// Models a peer/platform that negotiates MTU *down*: [requestMtu]
+  /// for [deviceId] grants at most [cap] regardless of what the caller
+  /// asks for. Persistent for the fake's lifetime (a peer's cap doesn't
+  /// change between requests).
+  void simulateMtuNegotiationCap(String deviceId, int cap) {
+    _mtuNegotiationCaps[deviceId] = cap;
+  }
+
+  Object? _pendingScanFailure;
+
+  /// Arranges for the next [scan] call to emit [error] on its stream
+  /// (instead of results) and close — the shape of a native scan
+  /// failure (e.g. Android SCAN_FAILED_*; the fake side of I013). Then
+  /// clears automatically: a retry scans normally.
+  void simulateScanFailure(Object error) {
+    _pendingScanFailure = error;
+  }
+
   // === Connect-phase failure seams (audit R1 / NT-1) ===
 
   /// Arranges for the next [connect] call to [deviceId] to throw a
@@ -1167,6 +1189,19 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _isScanningPlatform = true;
     // Create a new controller for each scan to avoid "closed stream" issues
     final scanController = StreamController<PlatformDevice>.broadcast();
+
+    final scanFailure = _pendingScanFailure;
+    if (scanFailure != null) {
+      _pendingScanFailure = null;
+      Future(() {
+        if (!scanController.isClosed) {
+          scanController.addError(scanFailure);
+          scanController.close();
+        }
+        _isScanningPlatform = false;
+      });
+      return scanController.stream;
+    }
 
     // Emit all simulated peripherals that match the filter
     Future(() {
@@ -1773,8 +1808,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (connection == null) {
       throw Exception('Not connected to device: $deviceId');
     }
-    connection.mtu = mtu;
-    return mtu;
+    final cap = _mtuNegotiationCaps[deviceId];
+    final negotiated = cap == null ? mtu : (mtu < cap ? mtu : cap);
+    connection.mtu = negotiated;
+    return negotiated;
   }
 
   /// Per-device override for the value returned from
