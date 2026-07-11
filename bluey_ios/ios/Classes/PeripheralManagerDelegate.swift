@@ -6,34 +6,34 @@ class PeripheralManagerDelegate: NSObject, CBPeripheralManagerDelegate {
     weak var manager: PeripheralManagerImpl?
 
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-        manager?.didUpdateState(peripheral: peripheral)
+        manager?.didUpdateState()
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        manager?.didAddService(peripheral: peripheral, service: service, error: error)
+        manager?.didAddService(service: service, error: error)
     }
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
-        manager?.didStartAdvertising(peripheral: peripheral, error: error)
+        manager?.didStartAdvertising(error: error)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
-        manager?.didSubscribe(peripheral: peripheral, central: central, characteristic: characteristic)
+        manager?.didSubscribe(central: central, characteristic: characteristic)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
-        manager?.didUnsubscribe(peripheral: peripheral, central: central, characteristic: characteristic)
+        manager?.didUnsubscribe(central: central, characteristic: characteristic)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
-        manager?.didReceiveRead(peripheral: peripheral, request: request)
+        manager?.didReceiveRead(request: request)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
-        manager?.didReceiveWrite(peripheral: peripheral, requests: requests)
+        manager?.didReceiveWrite(requests: requests)
     }
 
     func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
-        manager?.isReadyToUpdateSubscribers(peripheral: peripheral)
+        manager?.isReadyToUpdateSubscribers()
     }
 }

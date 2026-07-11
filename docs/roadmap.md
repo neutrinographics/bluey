@@ -118,6 +118,7 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 
 - ☐ **Medium** — [Enable iOS state restoration](backlog/I048-ios-no-state-restoration.md) · Managers start without a restore identifier, so a background relaunch loses state.
 - ☐ **Medium** — [Move bluey-ios off the main thread](backlog/I345-decouple-bluey-ios-from-main-thread.md) · CoreBluetooth delegates, Pigeon handlers, and timers all run on the iOS main thread.
+- ☐ **Medium** — [Give the iOS central role a delegate seam](backlog/I350-ios-central-manager-delegate-seam.md) · `CentralManagerImpl` is welded to CB types; its delegate wiring (disconnect drain, write gate, power-off) is only testable on hardware. Server role got its seam in audit R5.
 - ☐ **Low** — [Coordinate GATT-server teardown on engine detach](backlog/I015-gatt-server-close-order-on-engine-detach.md) · Redundant cleanup entry points with no teardown state machine.
 
 ## Code health
