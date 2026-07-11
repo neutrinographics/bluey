@@ -976,7 +976,7 @@ void main() {
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(centrals, hasLength(1));
@@ -998,7 +998,7 @@ void main() {
           const platform.PlatformCentral(id: 'central-2', mtu: 256),
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(server.connectedClients, hasLength(2));
       });
@@ -1011,12 +1011,12 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(server.connectedClients, hasLength(1));
 
         mockPlatform.emitCentralDisconnected('central-1');
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(server.connectedClients, isEmpty);
       });
@@ -1044,7 +1044,7 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 512),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           expect(
             server.isClientConnected(const ClientAddress('central-1')),
@@ -1060,7 +1060,7 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 512),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           // No heartbeat written, so the central has not been promoted
           // to a PeerClient — but it is still connected and the guard
@@ -1078,9 +1078,9 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 512),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
           mockPlatform.emitCentralDisconnected('central-1');
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           expect(
             server.isClientConnected(const ClientAddress('central-1')),
@@ -1095,7 +1095,7 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 512),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           expect(
             server.isClientConnected(const ClientAddress('central-2')),
@@ -1123,7 +1123,7 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 247),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           // Connection alone doesn't identify as peer.
           expect(peers, isEmpty);
@@ -1139,7 +1139,7 @@ void main() {
               characteristicHandle: 0,
             ),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           expect(
             peers,
@@ -1164,7 +1164,7 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'central-1', mtu: 247),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           for (var i = 0; i < 5; i++) {
             mockPlatform.emitWriteRequest(
@@ -1178,7 +1178,7 @@ void main() {
                 characteristicHandle: 0,
               ),
             );
-            await Future<void>.delayed(const Duration(milliseconds: 10));
+            await pumpEventQueue();
           }
 
           expect(
@@ -1201,7 +1201,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'raw-central', mtu: 247),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await pumpEventQueue();
 
         expect(
           peers,
@@ -1221,7 +1221,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 247),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         mockPlatform.emitWriteRequest(
           platform.PlatformWriteRequest(
             requestId: 1,
@@ -1233,17 +1233,17 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         expect(peers, hasLength(1));
 
         mockPlatform.emitCentralDisconnected('central-1');
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         // Reconnect + heartbeat — fresh identification expected.
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 247),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         mockPlatform.emitWriteRequest(
           platform.PlatformWriteRequest(
             requestId: 2,
@@ -1255,7 +1255,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(
           peers,
@@ -1279,7 +1279,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 247),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         mockPlatform.emitWriteRequest(
           platform.PlatformWriteRequest(
             requestId: 1,
@@ -1291,7 +1291,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(a, hasLength(1));
         expect(b, hasLength(1));
@@ -1339,7 +1339,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         final central = server.connectedClients.first;
         final charUuid = UUID.short(0x2A19);
@@ -1400,7 +1400,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         final central = server.connectedClients.first;
         final charUuid = UUID.short(0x2A19);
@@ -1438,7 +1438,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         final requests = <ReadRequest>[];
         final subscription = server.readRequests.listen(requests.add);
@@ -1453,7 +1453,7 @@ void main() {
           ),
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(requests, hasLength(1));
@@ -1470,7 +1470,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late ReadRequest capturedRequest;
         server.readRequests.listen((r) => capturedRequest = r);
@@ -1484,7 +1484,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         final responseData = Uint8List.fromList([100]);
         await server.respondToRead(
@@ -1515,7 +1515,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         final requests = <WriteRequest>[];
         final subscription = server.writeRequests.listen(requests.add);
@@ -1533,7 +1533,7 @@ void main() {
           ),
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(requests, hasLength(1));
@@ -1552,7 +1552,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late WriteRequest capturedRequest;
         server.writeRequests.listen((r) => capturedRequest = r);
@@ -1568,7 +1568,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         await server.respondToWrite(
           capturedRequest,
@@ -2072,7 +2072,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late ReadRequest capturedRequest;
         server.readRequests.listen((r) => capturedRequest = r);
@@ -2090,7 +2090,7 @@ void main() {
               characteristicHandle: 0,
             ),
           );
-          await Future.delayed(Duration(milliseconds: 10));
+          await pumpEventQueue();
 
           await server.respondToRead(
             capturedRequest,
@@ -2120,7 +2120,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late ReadRequest captured;
         server.readRequests.listen((r) => captured = r);
@@ -2133,7 +2133,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         return captured;
       }
 
@@ -2143,7 +2143,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late WriteRequest captured;
         server.writeRequests.listen((r) => captured = r);
@@ -2158,7 +2158,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         return captured;
       }
 
@@ -2290,7 +2290,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         return server.connectedClients.first;
       }
 
@@ -2399,7 +2399,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late ReadRequest captured;
         server.readRequests.listen((r) => captured = r);
@@ -2412,7 +2412,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         mockPlatform.throwOnRespondToReadRequest = PlatformException(
           code: 'bluey-unknown',
@@ -2442,7 +2442,7 @@ void main() {
         mockPlatform.emitCentralConnected(
           const platform.PlatformCentral(id: 'central-1', mtu: 512),
         );
-        await Future.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         late WriteRequest captured;
         server.writeRequests.listen((r) => captured = r);
@@ -2457,7 +2457,7 @@ void main() {
             characteristicHandle: 0,
           ),
         );
-        await Future.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         mockPlatform.throwOnRespondToWriteRequest = PlatformException(
           code: 'bluey-unknown',
@@ -2482,7 +2482,7 @@ void main() {
         final server = bluey.server()!;
 
         mockPlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         expect(
           () => server.addService(
@@ -2496,7 +2496,7 @@ void main() {
         final server = bluey.server()!;
 
         mockPlatform.setState(platform.BluetoothState.unauthorized);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         expect(
           () => server.startAdvertising(),
@@ -2509,7 +2509,7 @@ void main() {
 
         // Already on at setUp; explicitly re-emit to verify no spurious invalidation.
         mockPlatform.setState(platform.BluetoothState.on);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         await expectLater(
           server.addService(
@@ -2523,9 +2523,9 @@ void main() {
         final server = bluey.server()!;
 
         mockPlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
         mockPlatform.setState(platform.BluetoothState.on);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         expect(
           () => server.startAdvertising(),
@@ -2539,7 +2539,7 @@ void main() {
           final server = bluey.server()!;
 
           mockPlatform.setState(platform.BluetoothState.unauthorized);
-          await Future<void>.delayed(const Duration(milliseconds: 5));
+          await pumpEventQueue();
 
           try {
             await server.startAdvertising();
@@ -2558,7 +2558,7 @@ void main() {
         server.connections.listen((_) {}, onDone: connectionsClosed.complete);
 
         mockPlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         expect(connectionsClosed.isCompleted, isTrue);
       });
@@ -2572,11 +2572,11 @@ void main() {
           mockPlatform.emitCentralConnected(
             const platform.PlatformCentral(id: 'racing-central', mtu: 23),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 5));
+          await pumpEventQueue();
 
           // Adapter goes off — server invalidates.
           mockPlatform.setState(platform.BluetoothState.off);
-          await Future<void>.delayed(const Duration(milliseconds: 5));
+          await pumpEventQueue();
 
           // Platform now delivers a flurry of post-off events that would
           // normally land in the now-closed controllers. None of these
@@ -2588,7 +2588,7 @@ void main() {
             mockPlatform.emitCentralDisconnected('racing-central');
           }, returnsNormally);
 
-          await Future<void>.delayed(const Duration(milliseconds: 5));
+          await pumpEventQueue();
 
           // The server is still invalidated and any public call still throws.
           expect(

@@ -191,7 +191,7 @@ void main() {
         connection.emitState(ConnectionState.disconnecting);
         connection.emitState(ConnectionState.disconnected);
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(states, contains(ConnectionState.disconnecting));
@@ -281,7 +281,7 @@ void main() {
 
         await connection.disconnect();
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(states, contains(ConnectionState.disconnecting));
         expect(states, contains(ConnectionState.disconnected));

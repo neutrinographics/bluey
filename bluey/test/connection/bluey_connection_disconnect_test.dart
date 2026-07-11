@@ -40,7 +40,7 @@ void main() {
 
       // Let any initial heartbeat traffic settle so the next held write
       // is unambiguously the disconnect-command write.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await pumpEventQueue();
 
       // Hold the next write — that will be the courtesy 0x00 emitted
       // during disconnect.

@@ -154,9 +154,9 @@ void main() {
 
       // Allow the platform setNotification call to resolve so the
       // .then(...) emission can fire.
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       await notifSub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       await sub.cancel();
       await connection.disconnect();
 
@@ -177,7 +177,7 @@ void main() {
       final char =
           (await connection.services()).single.characteristics().single;
       final notifSub = char.notifications.listen((_) {});
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       // Inject an inbound notification on the platform.
       fakePlatform.simulateNotification(
@@ -185,10 +185,10 @@ void main() {
         characteristicUuid: charUuidStr,
         value: Uint8List.fromList([0xAA, 0xBB, 0xCC]),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await notifSub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       await sub.cancel();
       await connection.disconnect();
 

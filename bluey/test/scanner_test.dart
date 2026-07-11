@@ -1,6 +1,7 @@
 import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_platform.dart';
@@ -48,7 +49,7 @@ void main() {
       final results = <ScanResult>[];
       final subscription = scanner.scan().listen(results.add);
 
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -129,7 +130,7 @@ void main() {
           .scan(services: [Services.heartRate])
           .listen(results.add);
 
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -137,32 +138,35 @@ void main() {
       expect(results.first.device.name, equals('Heart Rate Monitor'));
     });
 
-    test('scan with timeout closes stream and stops scanning', () async {
-      fakePlatform.simulatePeripheral(
-        id: 'AA:BB:CC:DD:EE:FF',
-        name: 'Test Device',
-      );
+    test('scan with timeout closes stream and stops scanning', () {
+      fakeAsync((async) {
+        fakePlatform.simulatePeripheral(
+          id: 'AA:BB:CC:DD:EE:FF',
+          name: 'Test Device',
+        );
 
-      final scanner = bluey.scanner();
+        final scanner = bluey.scanner();
 
-      final results = <ScanResult>[];
-      var streamDone = false;
+        final results = <ScanResult>[];
+        var streamDone = false;
 
-      scanner
-          .scan(timeout: Duration(milliseconds: 100))
-          .listen(results.add, onDone: () => streamDone = true);
+        scanner
+            .scan(timeout: Duration(milliseconds: 100))
+            .listen(results.add, onDone: () => streamDone = true);
 
-      // Results arrive before timeout
-      await Future.delayed(Duration(milliseconds: 50));
-      expect(results, hasLength(1));
-      expect(scanner.isScanning, isTrue);
+        // Results arrive before timeout (virtual time).
+        async.elapse(Duration(milliseconds: 50));
+        expect(results, hasLength(1));
+        expect(scanner.isScanning, isTrue);
 
-      // After timeout, stream should close and scanning should stop
-      await Future.delayed(Duration(milliseconds: 150));
-      expect(streamDone, isTrue);
-      expect(scanner.isScanning, isFalse);
+        // After timeout, stream should close and scanning should stop.
+        async.elapse(Duration(milliseconds: 150));
+        expect(streamDone, isTrue);
+        expect(scanner.isScanning, isFalse);
 
-      scanner.dispose();
+        scanner.dispose();
+        async.flushMicrotasks();
+      });
     });
 
     test('dispose cleans up', () {
@@ -205,7 +209,7 @@ void main() {
       final results = <ScanResult>[];
       final subscription = scanner.scan().listen(results.add);
 
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -231,7 +235,7 @@ void main() {
       final results = <ScanResult>[];
       final subscription = scanner.scan().listen(results.add);
 
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -253,7 +257,7 @@ void main() {
       final scanner = bluey.scanner();
 
       final subscription = scanner.scan().listen((_) {});
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -278,7 +282,7 @@ void main() {
       final scanner = bluey.scanner();
 
       final subscription = scanner.scan().listen((_) {});
-      await Future.delayed(Duration(milliseconds: 50));
+      await pumpEventQueue();
       await subscription.cancel();
       scanner.dispose();
 
@@ -301,7 +305,7 @@ void main() {
       // resolves. The broadcast event bus delivers asynchronously, so
       // give pending microtasks a chance to drain before cancelling
       // the listener.
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       scanner.dispose();
 
       await eventSub.cancel();

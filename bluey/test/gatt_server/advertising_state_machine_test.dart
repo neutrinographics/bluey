@@ -39,9 +39,9 @@ void main() {
         final sub = server.advertisingStateChanges.listen(observed.add);
 
         await server.startAdvertising();
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
         await server.stopAdvertising();
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(
           observed,
@@ -93,9 +93,9 @@ void main() {
       bluey.events.listen(events.add);
 
       await server.startAdvertising();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       await server.stopAdvertising();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(events.whereType<AdvertisingStartingEvent>().length, equals(1));
       expect(events.whereType<AdvertisingStartedEvent>().length, equals(1));
@@ -113,7 +113,7 @@ void main() {
       () async {
         final server = bluey.server()!;
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         final received = <AdvertisingState>[];
         final completer = Completer<void>();
@@ -153,7 +153,7 @@ void main() {
       // events beyond the single replay value.
       await server.stopAdvertising();
       await server.stopAdvertising();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(observed, equals([AdvertisingState.idle]));
 
@@ -174,7 +174,7 @@ void main() {
         server.startAdvertising(name: 'Boom'),
         throwsA(isA<StateError>()),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(server.advertisingState, equals(AdvertisingState.idle));
       expect(events.whereType<AdvertisingStartingEvent>().length, equals(1));
@@ -194,7 +194,7 @@ void main() {
 
       final services = [UUID.short(0x180F)];
       await server.startAdvertising(name: 'My Device', services: services);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       final started = events.whereType<AdvertisingStartedEvent>().single;
       expect(started.name, equals('My Device'));

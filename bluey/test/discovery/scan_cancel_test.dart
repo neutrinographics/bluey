@@ -29,11 +29,11 @@ void main() {
       final sub = scanner.scan().listen((_) {});
 
       // Wait for scan to actually start at the platform layer.
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
       expect(fakePlatform.isScanning, isTrue);
 
       await sub.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(fakePlatform.isScanning, isFalse);
     });

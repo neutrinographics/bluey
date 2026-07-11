@@ -770,7 +770,7 @@ void main() {
           Uint8List.fromList([0x00, 70]),
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(values, hasLength(2));

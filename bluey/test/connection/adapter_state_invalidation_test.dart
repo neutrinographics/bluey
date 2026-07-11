@@ -40,7 +40,7 @@ void main() {
 
       // Adapter cycles off.
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       // Old server is dead.
       expect(
@@ -50,7 +50,7 @@ void main() {
 
       // Adapter comes back on.
       fakePlatform.setState(platform.BluetoothState.on);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       // Old server stays dead.
       expect(
@@ -74,7 +74,7 @@ void main() {
       );
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await expectLater(
         firstConnection.services(),
@@ -82,7 +82,7 @@ void main() {
       );
 
       fakePlatform.setState(platform.BluetoothState.on);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       await expectLater(
         firstConnection.services(),
@@ -99,12 +99,12 @@ void main() {
       final firstScanner = bluey.scanner();
 
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(() => firstScanner.scan(), throwsA(isA<StaleHandleException>()));
 
       fakePlatform.setState(platform.BluetoothState.on);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(() => firstScanner.scan(), throwsA(isA<StaleHandleException>()));
 
@@ -122,7 +122,7 @@ void main() {
       expect(connection.state, isNot(equals(ConnectionState.invalidated)));
 
       fakePlatform.simulateStateError(StateError('platform glitch'));
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(connection.state, equals(ConnectionState.invalidated));
     });
@@ -138,7 +138,7 @@ void main() {
       );
 
       fakePlatform.simulateStateError(StateError('platform glitch'));
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(server.advertisingState, equals(AdvertisingState.invalidated));
     });

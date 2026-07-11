@@ -370,7 +370,7 @@ void main() {
         mockPlatform.emitState(platform.BluetoothState.off);
         mockPlatform.emitState(platform.BluetoothState.on);
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
 
         expect(states, contains(BluetoothState.off));
         expect(states, contains(BluetoothState.on));
@@ -417,7 +417,7 @@ void main() {
           platform.PlatformConnectionState.connected,
         );
 
-        await Future.delayed(Duration(milliseconds: 10));
+        await pumpEventQueue();
         await subscription.cancel();
 
         expect(states, contains(ConnectionState.connecting));

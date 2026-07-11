@@ -215,7 +215,7 @@ void main() {
     test('connection.state returns invalidated after adapter invalidation', () async {
       final connection = await establish();
       fakePlatform.setState(platform.BluetoothState.off);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await pumpEventQueue();
 
       expect(connection.state, equals(ConnectionState.invalidated));
     });
@@ -225,7 +225,7 @@ void main() {
       () async {
         final connection = await establish();
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         // Connection is now invalidated. Subscribe AFTER.
         final received = <ConnectionState>[];
@@ -312,7 +312,7 @@ void main() {
       () async {
         final connection = await establish();
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         Object? errorReceived;
         final completer = Completer<void>();
@@ -333,7 +333,7 @@ void main() {
         final connection = await establish();
         final android = connection.android!;
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         Object? errorReceived;
         final completer = Completer<void>();
@@ -354,7 +354,7 @@ void main() {
         final connection = await establish();
         final android = connection.android!;
         fakePlatform.setState(platform.BluetoothState.off);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
 
         Object? errorReceived;
         final completer = Completer<void>();
