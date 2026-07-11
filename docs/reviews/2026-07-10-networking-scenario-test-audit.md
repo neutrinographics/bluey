@@ -176,6 +176,11 @@ Added after the initial report, sourced from the project's own quirk record (`bl
 - **R9 — done**: `setWriteWithoutResponseBudget`/`drainPendingWrites` WWR backpressure; transport loss fails parked writes (I315 shape).
 - **R12 — done**: **I346** `FakeBleLink.shareOnePhysicalLink` (trap + dedup-guard both regression-tested), **I347** `simulateServerRequestBlackhole` (E2E death-watch convergence proof), **I348** inherited centrals pre-advertising (guard dropped; obsolete guard test updated). Roadmap items flipped to done.
 
+**Follow-up fixes (2026-07-10, post-program):**
+- **I349 — fixed**: probe-as-you-scan in `PeerDiscovery` — connect completes on the first identity match instead of waiting out the scan window (failure bound unchanged). Includes a fakeAsync gotcha fix: broadcast-subscription cancels are deliberately unawaited (awaiting the root-zone null-future escapes the fake clock).
+- **A.2 — resolved (mismatch = disconnect)**: `LifecycleClient` re-verifies the peer's ServerId on Service Changed; a different identity constructs `PeerIdentityMismatchException` (previously dead), surfaces it as an `ErrorEvent`, and tears the session down. Failed verification reads are transient. Closes the remaining DA-21 never-constructed exception for the peer context.
+- **DA-02 — fixed (full stack)**: `PlatformNotification.characteristicHandle` end to end — Android `getInstanceId()`, iOS `CentralHandleStore` lookup, Pigeon regen, adapters, domain handle-first demux with UUID fallback. The pinned A.5 hazard test flipped: handle-carrying notifications reach only the matching instance; the handle-less fallback cross-delivery remains pinned as the legacy shape.
+
 ## Coverage
 
 - `bluey/test/fakes/fake_platform.dart` — read in full by the orchestrator (2,017 lines) *and* by agent 1.
