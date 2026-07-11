@@ -2,22 +2,22 @@ import Foundation
 import CoreBluetooth
 import Flutter
 
+// Pattern B — the dedicated Bluey lifecycle presence characteristic.
+// A central unsubscribing from THIS characteristic is treated as a
+// real client disconnect (see `didUnsubscribe`). Must match the Dart
+// constant exactly. (File-scope because generic types cannot hold
+// static stored properties.)
+private let presenceCharUuid = "b1e70005-0000-1000-8000-00805f9b34fb"
+
 /// Implementation of the Peripheral (server) role BLE operations.
-class PeripheralManagerImpl: NSObject {
-    // Pattern B — the dedicated Bluey lifecycle presence characteristic.
-    // A central unsubscribing from THIS characteristic is treated as a
-    // real client disconnect (see `didUnsubscribe`). Must match the Dart
-    // constant exactly.
-    private static let presenceCharUuid = "b1e70005-0000-1000-8000-00805f9b34fb"
+///
+/// Generic over [PeripheralManaging] (audit R5): production binds
+/// `CBPeripheralManager` via the `PeripheralManagerImpl` subclass below;
+/// tests bind an instantiable fake and drive full delegate sequences.
+class PeripheralManagerImplCore<Manager: PeripheralManaging>: NSObject {
 
-    private let flutterApi: BlueyFlutterApi
-    private let peripheralManager: CBPeripheralManager
-
-    private lazy var peripheralManagerDelegate: PeripheralManagerDelegate = {
-        let delegate = PeripheralManagerDelegate()
-        delegate.manager = self
-        return delegate
-    }()
+    private let flutterApi: BlueyFlutterApiProtocol
+    let peripheralManager: Manager
 
     // Added services
     private var services: [String: CBMutableService] = [:] // [serviceUuid: service]
@@ -39,17 +39,17 @@ class PeripheralManagerImpl: NSObject {
     // `updateValue` returning `false` (TX queue full). Drained by
     // `peripheralManagerIsReady(toUpdateSubscribers:)`.
     private let pendingNotifications =
-        PendingNotificationQueue<CBMutableCharacteristic, CBCentral>()
+        PendingNotificationQueue<CBMutableCharacteristic, Manager.Central>()
 
     // Subscribed centrals per characteristic
     private var subscribedCentrals: [String: Set<String>] = [:] // [charUuid: Set<centralId>]
 
     // Connected centrals
-    private var centrals: [String: CBCentral] = [:] // [centralId: central]
+    private var centrals: [String: Manager.Central] = [:] // [centralId: central]
 
     // Pending ATT requests
-    private var pendingReadRequests: [Int: CBATTRequest] = [:]
-    private var pendingWriteRequests: [Int: [CBATTRequest]] = [:]
+    private var pendingReadRequests: [Int: Manager.Request] = [:]
+    private var pendingWriteRequests: [Int: [Manager.Request]] = [:]
     private var nextRequestId: Int = 0
 
     // Completion handlers
@@ -58,11 +58,10 @@ class PeripheralManagerImpl: NSObject {
     private var addServicePopulated: [String: LocalServiceDto] = [:]
     private var startAdvertisingCompletion: ((Result<Void, Error>) -> Void)?
 
-    init(messenger: FlutterBinaryMessenger) {
-        flutterApi = BlueyFlutterApi(binaryMessenger: messenger)
-        peripheralManager = CBPeripheralManager(delegate: nil, queue: nil)
+    init(flutterApi: BlueyFlutterApiProtocol, manager: Manager) {
+        self.flutterApi = flutterApi
+        self.peripheralManager = manager
         super.init()
-        peripheralManager.delegate = peripheralManagerDelegate
     }
 
     // MARK: - Readiness gate (I333)
@@ -254,7 +253,7 @@ class PeripheralManagerImpl: NSObject {
         }
 
         // I040 — queue is full. Defer until isReadyToUpdateSubscribers fires.
-        let entry = PendingNotificationQueue<CBMutableCharacteristic, CBCentral>.Entry(
+        let entry = PendingNotificationQueue<CBMutableCharacteristic, Manager.Central>.Entry(
             characteristic: characteristic,
             data: value.data,
             central: nil,
@@ -305,7 +304,7 @@ class PeripheralManagerImpl: NSObject {
         }
 
         // I040 — queue is full. Defer until isReadyToUpdateSubscribers fires.
-        let entry = PendingNotificationQueue<CBMutableCharacteristic, CBCentral>.Entry(
+        let entry = PendingNotificationQueue<CBMutableCharacteristic, Manager.Central>.Entry(
             characteristic: characteristic,
             data: value.data,
             central: central,
@@ -422,7 +421,7 @@ class PeripheralManagerImpl: NSObject {
     /// Tracks a central and notifies Flutter if this is the first time we see it.
     /// iOS does not provide a connection state callback, so we infer connections
     /// from subscribe, read, and write events.
-    private func trackCentralIfNeeded(_ central: CBCentral) {
+    private func trackCentralIfNeeded(_ central: Manager.Central) {
         let centralId = central.identifier.uuidString.lowercased()
         let isNew = centrals[centralId] == nil
         centrals[centralId] = central
@@ -431,7 +430,8 @@ class PeripheralManagerImpl: NSObject {
             BlueyLog.shared.log(.info, "bluey.ios.peripheral", "central connected (inferred)",
                                 data: ["centralId": centralId,
                                        "mtu": central.maximumUpdateValueLength])
-            let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
+            let centralDto = CentralDto(
+                id: centralId, mtu: Int64(central.maximumUpdateValueLength))
             flutterApi.onCentralConnected(central: centralDto) { _ in }
         }
     }
@@ -447,22 +447,23 @@ class PeripheralManagerImpl: NSObject {
     func reannounceTrackedCentrals() {
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "resetServerSessions",
                             data: ["centralCount": centrals.count])
-        for (_, central) in centrals {
-            let centralDto = central.toCentralDto(mtu: central.maximumUpdateValueLength)
+        for (centralId, central) in centrals {
+            let centralDto = CentralDto(
+                id: centralId, mtu: Int64(central.maximumUpdateValueLength))
             flutterApi.onCentralConnected(central: centralDto) { _ in }
         }
     }
 
     // MARK: - CBPeripheralManagerDelegate callbacks
 
-    func didUpdateState(peripheral: CBPeripheralManager) {
-        let stateDto = peripheral.state.toDto()
+    func didUpdateState() {
+        let stateDto = peripheralManager.state.toDto()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "peripheralManagerDidUpdateState",
                             data: ["state": String(describing: stateDto)])
         flutterApi.onStateChanged(state: stateDto) { _ in }
     }
 
-    func didAddService(peripheral: CBPeripheralManager, service: CBService, error: Error?) {
+    func didAddService(service: CBService, error: Error?) {
         let serviceUuid = service.uuid.uuidString.lowercased()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didAddService",
                             data: ["serviceUuid": serviceUuid,
@@ -491,7 +492,7 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
-    func didStartAdvertising(peripheral: CBPeripheralManager, error: Error?) {
+    func didStartAdvertising(error: Error?) {
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "peripheralManagerDidStartAdvertising",
                             data: ["hasError": error != nil])
         guard let completion = startAdvertisingCompletion else {
@@ -513,7 +514,7 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
-    func didSubscribe(peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
+    func didSubscribe(central: Manager.Central, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didSubscribeTo",
@@ -528,7 +529,7 @@ class PeripheralManagerImpl: NSObject {
         flutterApi.onCharacteristicSubscribed(centralId: centralId, characteristicUuid: charUuid) { _ in }
     }
 
-    func didUnsubscribe(peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
+    func didUnsubscribe(central: Manager.Central, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString.lowercased()
         let charUuid = characteristic.uuid.uuidString.lowercased()
         BlueyLog.shared.log(.info, "bluey.ios.peripheral", "didUnsubscribeFrom",
@@ -547,13 +548,13 @@ class PeripheralManagerImpl: NSObject {
         // native peripheral-side disconnect callback). Only the presence char
         // triggers this; a data-characteristic unsubscribe stays a no-op (a client
         // may toggle data notifications while staying connected).
-        if charUuid == PeripheralManagerImpl.presenceCharUuid {
+        if charUuid == presenceCharUuid {
             centrals.removeValue(forKey: centralId)
             flutterApi.onCentralDisconnected(centralId: centralId) { _ in }
         }
     }
 
-    func didReceiveRead(peripheral: CBPeripheralManager, request: CBATTRequest) {
+    func didReceiveRead(request: Manager.Request) {
         let centralId = request.central.identifier.uuidString.lowercased()
         let charUuid = request.characteristic.uuid.uuidString.lowercased()
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "didReceiveRead",
@@ -583,7 +584,7 @@ class PeripheralManagerImpl: NSObject {
         flutterApi.onReadRequest(request: requestDto) { _ in }
     }
 
-    func didReceiveWrite(peripheral: CBPeripheralManager, requests: [CBATTRequest]) {
+    func didReceiveWrite(requests: [Manager.Request]) {
         guard let firstRequest = requests.first else { return }
 
         let centralId = firstRequest.central.identifier.uuidString.lowercased()
@@ -619,7 +620,7 @@ class PeripheralManagerImpl: NSObject {
         }
     }
 
-    func isReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
+    func isReadyToUpdateSubscribers() {
         let depthBefore = pendingNotifications.count
         BlueyLog.shared.log(.debug, "bluey.ios.peripheral", "peripheralManagerIsReady toUpdateSubscribers",
                             data: ["queueDepthBefore": depthBefore])
@@ -630,13 +631,13 @@ class PeripheralManagerImpl: NSObject {
         // ready callback.
         pendingNotifications.drain { entry in
             if let central = entry.central {
-                return peripheral.updateValue(
+                return peripheralManager.updateValue(
                     entry.data,
                     for: entry.characteristic,
                     onSubscribedCentrals: [central]
                 )
             } else {
-                return peripheral.updateValue(
+                return peripheralManager.updateValue(
                     entry.data,
                     for: entry.characteristic,
                     onSubscribedCentrals: nil
@@ -649,5 +650,22 @@ class PeripheralManagerImpl: NSObject {
                                 data: ["queueDepthBefore": depthBefore,
                                        "queueDepthAfter": pendingNotifications.count])
         }
+    }
+}
+
+/// Production binding: `PeripheralManagerImplCore` over the real
+/// `CBPeripheralManager`, wired to the Pigeon Flutter API and the
+/// CoreBluetooth delegate wrapper.
+final class PeripheralManagerImpl: PeripheralManagerImplCore<CBPeripheralManager> {
+    private let peripheralManagerDelegate = PeripheralManagerDelegate()
+
+    init(messenger: FlutterBinaryMessenger) {
+        let manager = CBPeripheralManager(delegate: nil, queue: nil)
+        super.init(
+            flutterApi: BlueyFlutterApi(binaryMessenger: messenger),
+            manager: manager
+        )
+        peripheralManagerDelegate.manager = self
+        manager.delegate = peripheralManagerDelegate
     }
 }
