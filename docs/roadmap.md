@@ -21,11 +21,13 @@ Priority: `High` · `Medium` · `Low` · `Launch` (gated to before a public
 release). Priorities below are derived from each item's recorded severity and
 are the maintainer's to adjust.
 
-> **Health check (2026-07-06):** every open item is Medium or Low severity —
-> **no high-severity bugs are open.** The last two highs, iOS write-without-
-> response flow control (I339) and the Android `notifyTo` completion race
-> (I332), both shipped. Remaining work is polish, feature-completeness, and
-> architectural refinement.
+> **Health check (2026-07-10):** the 2026-07-07 full-stack audit (DA-##) and
+> the 2026-07-10 networking-test audit (NT-##) are now fully absorbed into
+> this roadmap — every open finding has a backlog item (I353–I377 for the
+> newly absorbed set); the audit reports remain the detailed evidence record.
+> One **High** is open (I353 — a documentation-honesty fix, not a runtime
+> bug); everything else is Medium or Low. The last two high-severity runtime
+> bugs (I339, I332) shipped before 2026-07-06.
 
 ## Guardrails (design invariants)
 
@@ -49,6 +51,7 @@ Scanning and inbound advertisement data.
 - ☐ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded.
 - ☐ **Medium** — [Expose scan options (mode, filters, duplicates)](backlog/I052-scan-options-not-exposed.md) · Scan mode/dedup are hardcoded; no RSSI, manufacturer, name, or allow-duplicates controls.
 - ☐ **Medium** — [Close scanner streams on dispose](backlog/I094-scanner-controller-never-closed.md) · Platform scanner broadcast controllers are never closed (leak across instances).
+- ☐ **Medium** — [Fill or remove never-populated advertisement fields](backlog/I366-advertisement-surface-honesty.md) · `isConnectable` hardcoded true, `serviceData` always empty, `txPowerLevel` always null, `ScanMode` dead (audit DA-23).
 - ☐ **Low** — [Return all manufacturer-data entries](backlog/I014-manufacturer-data-only-first-entry.md) · Android returns only the first company-ID entry in an advertisement.
 - ☐ **Low** — [Support overlapping scans](backlog/I336-scanner-overlapping-scan-not-supported.md) · A second `scan()` clobbers the first; concurrent scanners aren't multiplexed.
 
@@ -66,10 +69,14 @@ Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and r
 - ☐ **Medium** — [Reconnect to known iOS peripherals](backlog/I043-ios-no-retrieve-peripherals.md) · No `retrievePeripherals` / `retrieveConnectedPeripherals`, so iOS can't fast-reconnect to a known device.
 - ☐ **Medium** — [Stop misrouting late Android GATT callbacks](backlog/I063-android-late-callback-misroute-after-timeout.md) · A callback that arrives after an app-level timeout can be delivered to the next operation.
 - ☐ **Medium** — [Give stale-bond errors an actionable path](backlog/I321-ios-bond-mismatch-opaque-error.md) · iOS surfaces `CBError` 14 (pairing removed) as an opaque exception with no recovery guidance.
+- ☐ **Medium** — [Translate errors on domain streams + write-respond](backlog/I357-stream-errors-bypass-acl.md) · Raw `PlatformException`s leak onto `stateChanges`/`notifications` etc.; a client-gone race throws `StateError` into request streams (audit DA-08/09).
+- ☐ **Medium** — [Reject connect() during an in-flight disconnect](backlog/I363-android-connect-during-disconnect.md) · A connect in the disconnect window returns success, then STATE_DISCONNECTED tears it down (audit DA-18).
+- ☐ **Medium** — [Close per-device adapter controllers on failed/spontaneous disconnects](backlog/I369-adapter-controller-leaks.md) · Both adapters leak controllers on failed connects and remote drops (audit DA-27).
 - ☐ **Low** — [Prevent the initial connection-state guess race](backlog/I007-connection-state-init-race.md) · A connection reports a state before the platform stream confirms it.
 - ☐ **Low** — [Auto-update Android MTU on peer renegotiation](backlog/I326-android-mtu-onmtuchanged-listener.md) · `connection.android.mtu` isn't refreshed on a spontaneous MTU change.
 - ☐ **Low** — [Wrap RSSI in a value object](backlog/I327-rssi-value-object.md) · `Connection.rssi` is a raw `int` with no validation or semantics.
 - ☐ **Low** — [Guard against duplicate Android STATE_CONNECTED](backlog/I328-android-state-connected-double-init.md) · A repeat connected callback wipes in-flight queues and resets MTU to 23.
+- ☐ **Low** — [Apply the BLE-spec ×2 supervision-timeout floor](backlog/I361-connection-parameters-spec-floor.md) · `ConnectionParameters` admits sub-spec triples the controller will reject (audit DA-13; gated on I032 shipping).
 
 ## GATT Client
 
@@ -78,6 +85,8 @@ Local-as-client reads, writes, notifications, and service discovery.
 - ☐ **Medium** — [Separate iOS read responses from notifications](backlog/I041-ios-read-notification-race.md) · `didUpdateValue` conflates a read reply with an unsolicited notification.
 - ☐ **Medium** — [Implement prepared / long writes](backlog/I050-prepared-write-flow-unimplemented.md) · The chunked long-write (prepared-write) flow is unimplemented on both roles.
 - ☐ **Medium** — [Fix the service-cache re-discovery race](backlog/I075-cached-services-race-with-invalidation.md) · `services()` and Service-Changed re-discovery race on the cached service list.
+- ☐ **Medium** — [Key iOS client discovery + op routing by handle](backlog/I354-ios-client-uuid-keyed-routing.md) · Duplicate-UUID attributes can yield incomplete discovery or misrouted op completions on iOS (audit DA-03/04; sequence after I350).
+- ☐ **Medium** — [Correlate iOS op-slot pending drops](backlog/I359-ios-pendingdrops-poison.md) · A genuinely lost callback poisons the drop counter and consumes the next op's completion (audit DA-11).
 - ☐ **Low** — [Prevent the first-listen subscription race](backlog/I008-notification-subscription-race.md) · Enabling notifications races the CCCD write on the first stream listen.
 
 ## GATT Server
@@ -96,6 +105,10 @@ Local-as-peripheral: advertising, request/response handling, and outbound notifi
 - ☐ **Medium** — [Close server streams on dispose](backlog/I095-server-controllers-never-closed.md) · Server broadcast controllers are never closed.
 - ☐ **Medium** — [Honor the advertised name on Android](backlog/I318-android-advertise-name-ignored.md) · `config.name` is treated as a boolean and dropped; the system adapter name is broadcast instead.
 - ☐ **Medium** — [Fix the duplicate respondTo* root cause](backlog/I322-duplicate-respond-to-request.md) · A response can fire twice (`RespondNotFound`); only crash-containment has shipped, not the root-cause fix.
+- ☐ **Medium** — [Address server notify by service + characteristic](backlog/I355-server-notify-uuid-collapse.md) · Notify resolves by UUID first-match; a char hosted under two services can't be addressed (audit DA-05).
+- ☐ **Medium** — [Queue concurrent iOS addService/startAdvertising completions](backlog/I360-ios-server-completion-clobbering.md) · A duplicate call clobbers the first caller's completion, orphaning its Future (audit DA-12).
+- ☐ **Medium** — [Thread-confine the Android server + gate notifies on onNotificationSent](backlog/I362-android-server-threading-and-notify.md) · Binder-thread map mutations, unserialized notify fan-out, main-thread sleep (audit DA-14..17).
+- ☐ **Medium** — [Prune the server handle table on removeService](backlog/I370-remove-service-handle-prune.md) · Stale handles after removeService fail later notifies (audit DA-28; Dart side of I086).
 - ☐ **Low** — [Surface server-side PHY events](backlog/I025-gatt-server-phy-events-logging-only.md) · PHY update/read events are logging-only; there's no Dart API.
 - ☐ **Low** — [Detect non-Bluey iOS client disconnect on Android server](backlog/I306-android-server-no-disconnect-on-ios-client-cancel.md) · Detection relies on the native supervision timeout; no mitigation.
 - ☐ **Low** — [Purge stale iOS pending notifications on disconnect](backlog/I315-ios-pending-notification-stale-entries-on-disconnect.md) · The queue keeps entries for centrals that left mid-burst.
@@ -108,9 +121,12 @@ The Bluey lifecycle protocol, stable peer identity, and peer discovery.
 
 - ☐ **Medium** — [Fix the LifecycleServer activity/timer race](backlog/I072-lifecycle-server-record-activity-race.md) · `recordActivity` does a check-then-act on the heartbeat timer map (single-threaded, defensive).
 - ☑ **Medium** — [Stop peer connect waiting out the full scan window](backlog/I349-peer-connect-waits-full-scan-window.md) · `connectTo`/`discover` collect-then-probe, so every peer connect costs the whole scanTimeout even on an instant match.
+- ☐ **Medium** — [Honest peer-upgrade failure semantics](backlog/I356-peer-upgrade-failure-semantics.md) · Transient failures become "not a peer"; unreadable identity fabricates a random ServerId (audit DA-06/07).
+- ☐ **Medium** — [Clamp malformed lifecycle intervals](backlog/I358-lifecycle-interval-clamp.md) · A zero/negative served interval busy-loops the heartbeat in release builds (audit DA-10).
 - ☐ **Low** — [Extract a shared peer-builder helper](backlog/I304-peer-builder-helper-extraction.md) · Two sites duplicate `PeerConnection` / `LifecycleClient` construction.
 - ☐ **Low** — [Remove the dormant silence-eviction machinery](backlog/I340-remove-dormant-silence-eviction-machinery.md) · Deferred cleanup of the reserved ATT-status eviction path — hold until Pattern B soaks in production.
 - ☐ **Low** — [Retry failed presence subscriptions](backlog/I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) · A failed presence-characteristic subscription leaves an iOS-server peer's disconnect undetectable.
+- ☐ **Low** — [Consider an internal iOS same-peer connect guard](backlog/I374-ios-same-peer-connect-guard.md) · Make the shared-link-safe path the default instead of a documented pattern (audit DA-33; design decision).
 
 ## Platform
 
@@ -125,7 +141,12 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 
 Architecture / DDD refinement and test-fixture consistency — no user-visible behavior change.
 
+- ☐ **High** — [Correct docs advertising unshipped features](backlog/I353-docs-overstate-shipped-features.md) · README claims bond/PHY/conn-params ship; no platform has them (audit DA-01 — the sole MAJOR).
 - ☐ **Medium** — [Set up continuous integration](backlog/I351-continuous-integration.md) · No CI exists; all six test gates (4 Dart, Gradle, XCTest) run only by hand.
+- ☐ **Medium** — [Remove or wire the inert plumbing](backlog/I364-remove-inert-plumbing.md) · User-op accounting never engages; `GattException`/`GattStatus` are dead types consumers can catch in vain (audit DA-20/21r).
+- ☐ **Medium** — [Emit missing events + test the event bus](backlog/I365-events-emission-and-coverage.md) · `bluey.events` shows connects but never disconnects; 13 emitted types untested; two channels double-emit (audit DA-22/36).
+- ☐ **Medium** — [Make dispose terminal for Scanner/Server](backlog/I368-dispose-terminal-flag.md) · Post-dispose scan()/addService partially restarts over closed controllers (audit DA-26).
+- ☐ **Medium** — [Consolidate test doubles onto the fake](backlog/I375-test-double-consolidation.md) · Four diverged hand-rolled mocks, remaining SUT bypasses, legacy boolean seams, fixture duplication (audit DA-38/39, NT-13/14).
 - ☐ **Low** — [Stop the domain catching Flutter's PlatformException](backlog/I308-domain-catches-flutter-platform-exception.md) · The domain catch ladder depends on a Flutter framework type.
 - ☐ **Low** — [Route the domain through abstract repositories](backlog/I309-domain-imports-platform-interface-types-directly.md) · The domain imports platform-interface types directly instead of via a port.
 - ☐ **Low** — [Make iOS connection extensions per-connection](backlog/I312-ios-extensions-singleton-asymmetry.md) · iOS uses a const singleton where Android is per-connection.
@@ -136,6 +157,12 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☑ **Low** — [Make the role-reversal ATT blackhole injectable in the fake](backlog/I347-fake-platform-role-reversal-att-blackhole.md) · No seam for "server silently receives nothing while the link looks healthy" (I208's condition), so death-watch convergence is untested. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 - ☑ **Low** — [Accept inherited centrals before advertising in the fake](backlog/I348-fake-platform-inherited-central-before-advertising.md) · `simulateCentralConnection` throws pre-advertising, but real platforms deliver cached/inherited connections then. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 - ☐ **Low** — [Extend FakeBleLink model coverage](backlog/I352-fake-ble-link-model-limits.md) · Descriptors not routed over the link, duplicate-UUID trees unsupported, no indication acks, MTU fixed at setup.
+- ☐ **Low** — [Hoist the quadruplicated BluetoothState mapper](backlog/I367-hoist-bluetoothstate-mapper.md) · The same 5-case switch lives in four files (audit DA-24).
+- ☐ **Low** — [Defensive-copy byte buffers + unify DTO equality](backlog/I371-vo-dto-integrity.md) · Mutable `Uint8List` escapes value objects; 12 of 17 DTOs lack value equality (audit DA-29/30).
+- ☐ **Low** — [Decompose the five god-objects incrementally](backlog/I372-god-object-decomposition.md) · ~1000-line classes on every layer concentrate change-risk (audit DA-31).
+- ☐ **Low** — [Move protocol concepts out of the platform enum](backlog/I373-boundary-concept-leaks.md) · `lifecycleEviction` in the BLE-generic enum; exception classification outside the ACL (audit DA-32).
+- ☐ **Low** — [Fix the example app where it teaches the wrong patterns](backlog/I376-example-app-reference-quality.md) · Missing shared-link guard, inert tolerance setting, stringly-typed disconnect flow (audit DA-40..42).
+- ☐ **Low** — [Work through the 2026-07-07 MINOR ledger](backlog/I377-audit-minor-ledger.md) · ~30 small API/robustness/DRY fixes, tracked as one sweep against the audit doc.
 
 ## Shipped
 

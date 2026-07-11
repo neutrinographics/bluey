@@ -53,3 +53,12 @@ External references:
 - Martijn van Welie, [*Making Android BLE Work — Part 4* on bonding](https://medium.com/@martijn.van.welie/making-android-ble-work-part-4-72a0b85cb442).
 
 **Severity note (2026-06-02):** Downgraded high→medium — Stage A landed (methods now throw `UnimplementedError` and are capability-gated rather than silently succeeding); only Stage B (Pigeon + native impl) remains, and these are rarely-used APIs (bonding is legacy; PHY/conn-params niche).
+
+## Test-harness note (2026-07-10, absorbs audit NT-11)
+
+When Stage B lands, the fake platform needs bonding *failure* seams to
+land with it: today `bond()` on a `canBond=true` fake is an
+unconditional no-op success — no bond-rejected / auth-failed /
+bond-removed-by-peer outcomes are simulatable, so the domain's failure
+handling would ship untested.
+
