@@ -236,6 +236,29 @@ final class MockBlueyPlatform extends BlueyPlatform
 }
 
 void main() {
+  group('PlatformNotification', () {
+    test('carries the attribute handle when the platform provides one '
+        '(DA-02: handle-based demux)', () {
+      final n = PlatformNotification(
+        deviceId: 'd',
+        characteristicUuid: 'u',
+        value: Uint8List(0),
+        characteristicHandle: 42,
+      );
+      expect(n.characteristicHandle, 42);
+    });
+
+    test('the handle is optional (legacy platforms send none)', () {
+      final n = PlatformNotification(
+        deviceId: 'd',
+        characteristicUuid: 'u',
+        value: Uint8List(0),
+      );
+      expect(n.characteristicHandle, isNull);
+    });
+  });
+
+
   group('BlueyPlatform', () {
     test('instance can be set and retrieved', () {
       final mock = MockBlueyPlatform();

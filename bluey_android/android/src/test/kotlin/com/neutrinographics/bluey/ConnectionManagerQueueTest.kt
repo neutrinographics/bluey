@@ -153,6 +153,7 @@ class ConnectionManagerQueueTest {
     ): BluetoothGattCharacteristic {
         val char = mockk<BluetoothGattCharacteristic>(relaxed = true)
         every { char.uuid } returns charUuid
+        every { char.instanceId } returns 7
         val service = mockk<BluetoothGattService>(relaxed = true)
         every { service.uuid } returns testServiceUuid
         every { service.getCharacteristic(charUuid) } returns char
@@ -344,7 +345,11 @@ class ConnectionManagerQueueTest {
                 match { event ->
                     event.deviceId == deviceAddress &&
                         event.characteristicUuid.equals(testCharUuid.toString(), ignoreCase = true) &&
-                        event.value.contentEquals(notifValue)
+                        event.value.contentEquals(notifValue) &&
+                        // DA-02 — the notification is attributed to the
+                        // exact characteristic instance (instanceId
+                        // stubbed to 7 in mockCharacteristic).
+                        event.characteristicHandle == 7L
                 },
                 any(),
             )

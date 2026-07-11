@@ -1324,11 +1324,18 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     // Subscribe to platform notifications
     _notificationSubscription = _platform
         .notificationStream(_connectionId)
-        .where(
-          (n) =>
-              n.characteristicUuid.toLowerCase() ==
-              uuid.toString().toLowerCase(),
-        )
+        .where((n) {
+          // DA-02 — demux by handle when the platform attributes the
+          // notification to a characteristic instance; duplicate-UUID
+          // trees cannot be told apart by UUID alone. Handle-less
+          // (legacy) notifications fall back to UUID matching.
+          final notificationHandle = n.characteristicHandle;
+          if (notificationHandle != null) {
+            return notificationHandle == handle.value;
+          }
+          return n.characteristicUuid.toLowerCase() ==
+              uuid.toString().toLowerCase();
+        })
         .listen(
           (notification) {
             // Inbound notifications are demonstrable peer activity but

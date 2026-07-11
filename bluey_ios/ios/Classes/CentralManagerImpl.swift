@@ -813,10 +813,16 @@ class CentralManagerImpl: NSObject {
         // Otherwise it's a notification
         if error == nil {
             let value = characteristic.value ?? Data()
+            // DA-02 — attribute the notification to the exact
+            // characteristic instance for handle-based demux.
+            let handle = handleStore.handleForCharacteristic(
+                characteristic, deviceId: deviceId
+            )
             let notification = NotificationEventDto(
                 deviceId: deviceId,
                 characteristicUuid: charUuid,
-                value: FlutterStandardTypedData(bytes: value)
+                value: FlutterStandardTypedData(bytes: value),
+                characteristicHandle: handle.map { Int64($0) }
             )
             flutterApi.onNotification(event: notification) { _ in }
         }

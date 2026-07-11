@@ -136,10 +136,16 @@ class NotificationEventDto {
   final String characteristicUuid;
   final Uint8List value;
 
+  /// Platform-assigned handle of the characteristic instance this
+  /// notification came from; null when the platform cannot attribute
+  /// it (the domain falls back to UUID demux — DA-02).
+  final int? characteristicHandle;
+
   NotificationEventDto({
     required this.deviceId,
     required this.characteristicUuid,
     required this.value,
+    this.characteristicHandle,
   });
 }
 

@@ -604,6 +604,10 @@ struct NotificationEventDto: Hashable {
   var deviceId: String
   var characteristicUuid: String
   var value: FlutterStandardTypedData
+  /// Platform-assigned handle of the characteristic instance this
+  /// notification came from; null when the platform cannot attribute
+  /// it (the domain falls back to UUID demux — DA-02).
+  var characteristicHandle: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -611,11 +615,13 @@ struct NotificationEventDto: Hashable {
     let deviceId = pigeonVar_list[0] as! String
     let characteristicUuid = pigeonVar_list[1] as! String
     let value = pigeonVar_list[2] as! FlutterStandardTypedData
+    let characteristicHandle: Int64? = nilOrValue(pigeonVar_list[3])
 
     return NotificationEventDto(
       deviceId: deviceId,
       characteristicUuid: characteristicUuid,
-      value: value
+      value: value,
+      characteristicHandle: characteristicHandle
     )
   }
   func toList() -> [Any?] {
@@ -623,13 +629,14 @@ struct NotificationEventDto: Hashable {
       deviceId,
       characteristicUuid,
       value,
+      characteristicHandle,
     ]
   }
   static func == (lhs: NotificationEventDto, rhs: NotificationEventDto) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return deepEqualsMessages(lhs.deviceId, rhs.deviceId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.value, rhs.value)
+    return deepEqualsMessages(lhs.deviceId, rhs.deviceId) && deepEqualsMessages(lhs.characteristicUuid, rhs.characteristicUuid) && deepEqualsMessages(lhs.value, rhs.value) && deepEqualsMessages(lhs.characteristicHandle, rhs.characteristicHandle)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -637,6 +644,7 @@ struct NotificationEventDto: Hashable {
     deepHashMessages(value: deviceId, hasher: &hasher)
     deepHashMessages(value: characteristicUuid, hasher: &hasher)
     deepHashMessages(value: value, hasher: &hasher)
+    deepHashMessages(value: characteristicHandle, hasher: &hasher)
   }
 }
 

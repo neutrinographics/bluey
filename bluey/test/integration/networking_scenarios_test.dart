@@ -296,19 +296,18 @@ void main() {
   });
 
   group('A.5 — duplicate-UUID notification demux (DA-02)', () {
-    test('a notification for a duplicated UUID cross-delivers to every '
-        'instance (pins the current hazard)', () async {
-      // DA-02: PlatformNotification carries no handle, so the domain
-      // demuxes by UUID string. Two characteristic instances sharing a
-      // UUID cannot be told apart on the notification path — both
-      // streams receive every notification for that UUID. This test
-      // pins the hazard so any future fix (handle-carrying
-      // notifications) must consciously flip these assertions.
-      final fakePlatform = FakeBlueyPlatform();
-      platform.BlueyPlatform.instance = fakePlatform;
-      final bluey = await Bluey.create();
+    late FakeBlueyPlatform fakePlatform;
+    late Bluey bluey;
+    late RemoteCharacteristic instanceA;
+    late RemoteCharacteristic instanceB;
 
-      const dupUuid = TestUuids.heartRateMeasurement;
+    const dupUuid = TestUuids.heartRateMeasurement;
+
+    setUp(() async {
+      fakePlatform = FakeBlueyPlatform();
+      platform.BlueyPlatform.instance = fakePlatform;
+      bluey = await Bluey.create();
+
       fakePlatform.simulatePeripheral(
         id: TestDeviceIds.device1,
         name: 'Dup Device',
@@ -326,36 +325,68 @@ void main() {
         Device(address: const DeviceAddress(TestDeviceIds.device1)),
       );
       final services = await connection.services();
-      final instanceA = services[0].characteristics().single;
-      final instanceB = services[1].characteristics().single;
-      expect(instanceA.handle, isNot(equals(instanceB.handle)),
-          reason: 'distinct instances under distinct services');
+      instanceA = services[0].characteristics().single;
+      instanceB = services[1].characteristics().single;
+      expect(instanceA.handle, isNot(equals(instanceB.handle)));
+    });
 
+    tearDown(() async {
+      await bluey.dispose();
+      await fakePlatform.dispose();
+    });
+
+    test('a handle-carrying notification is delivered ONLY to the matching '
+        'instance (DA-02 fixed)', () async {
       final receivedA = <Uint8List>[];
       final receivedB = <Uint8List>[];
       final subA = instanceA.notifications.listen(receivedA.add);
       final subB = instanceB.notifications.listen(receivedB.add);
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
+
+      fakePlatform.simulateNotification(
+        deviceId: TestDeviceIds.device1,
+        characteristicUuid: dupUuid,
+        value: Uint8List.fromList([0x55]),
+        characteristicHandle: instanceA.handle.value,
+      );
+      await pumpEventQueue();
+
+      expect(receivedA, hasLength(1));
+      expect(
+        receivedB,
+        isEmpty,
+        reason: 'handle demux routes to exactly one instance',
+      );
+
+      await subA.cancel();
+      await subB.cancel();
+    });
+
+    test('a legacy handle-less notification falls back to UUID demux and '
+        'still cross-delivers (pinned fallback)', () async {
+      final receivedA = <Uint8List>[];
+      final receivedB = <Uint8List>[];
+      final subA = instanceA.notifications.listen(receivedA.add);
+      final subB = instanceB.notifications.listen(receivedB.add);
+      await pumpEventQueue();
 
       fakePlatform.simulateNotification(
         deviceId: TestDeviceIds.device1,
         characteristicUuid: dupUuid,
         value: Uint8List.fromList([0x55]),
       );
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
 
       expect(receivedA, hasLength(1));
       expect(
         receivedB,
         hasLength(1),
-        reason: 'DA-02 cross-delivery: instance B receives a notification '
-            'that may have been meant only for instance A',
+        reason: 'without a handle, UUID demux cannot tell instances apart '
+            '— the legacy hazard survives only on handle-less paths',
       );
 
       await subA.cancel();
       await subB.cancel();
-      await bluey.dispose();
-      await fakePlatform.dispose();
     });
   });
 }
