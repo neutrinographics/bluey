@@ -4,8 +4,9 @@ title: Make the Android role-reversal ATT blackhole injectable in the fake platf
 category: enhancement
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-07-10
+fixed_in: r12-fake-modeling merge
 related: [I208]
 ---
 
