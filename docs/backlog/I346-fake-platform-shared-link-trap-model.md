@@ -4,8 +4,9 @@ title: Model the iOS shared-link trap in the fake platform so bidirectional-disc
 category: enhancement
 severity: low
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-07-10
+fixed_in: r12-fake-modeling merge
 related: [I337, I338]
 ---
 

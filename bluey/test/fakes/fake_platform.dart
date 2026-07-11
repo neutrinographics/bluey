@@ -637,6 +637,37 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
   }
 
+  // === Server-side request blackhole (audit R12 / I347) ===
+
+  final Set<String> _blackholedCentrals = {};
+
+  /// While enabled for [centralId], inbound server-bound requests from
+  /// that central vanish at the simulated stack: no read/write request
+  /// reaches the server role, no response ever returns, and the
+  /// sender's future fails with [GattOperationTimeoutException] after
+  /// the per-op timeout (10 s, Timer-based — drive with fakeAsync).
+  /// This is the fingerprint of the Android role-reversal ATT
+  /// blackhole recorded in I208 / cross-platform-quirks.md.
+  void simulateServerRequestBlackhole(String centralId, {bool enabled = true}) {
+    if (enabled) {
+      _blackholedCentrals.add(centralId);
+    } else {
+      _blackholedCentrals.remove(centralId);
+    }
+  }
+
+  /// Parks a blackholed request: hangs until the sender-side per-op
+  /// timeout fires.
+  Future<T> _blackholeRequest<T>(String operation) {
+    final completer = Completer<T>();
+    Timer(const Duration(seconds: 10), () {
+      if (!completer.isCompleted) {
+        completer.completeError(GattOperationTimeoutException(operation));
+      }
+    });
+    return completer.future;
+  }
+
   // === Write-without-response backpressure (audit R9 / NT-10) ===
 
   final Map<String, int> _wwrBudgets = {};
@@ -958,10 +989,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   /// Simulates a central connecting to our server.
+  ///
+  /// Deliberately does NOT require advertising to be active (I348):
+  /// real platforms deliver centrals regardless — most notably iOS's
+  /// cached connection "reconnecting" the moment a new GATT server
+  /// opens, before advertising starts. The natives report all
+  /// connections to Dart immediately, and so does the fake.
   void simulateCentralConnection({required String centralId, int mtu = 23}) {
-    if (!_isAdvertising) {
-      throw StateError('Cannot connect central when not advertising');
-    }
     _connectedCentrals[centralId] = _ConnectedCentral(
       id: centralId,
       mtu: mtu,
@@ -1023,6 +1057,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     final link = _inboundLink;
     if (link != null && link.centralId == centralId) {
       link.central.simulateDisconnection(link.deviceId);
+      link._teardownSharedSibling();
     }
   }
 
@@ -1043,6 +1078,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }) {
     if (!_connectedCentrals.containsKey(centralId)) {
       throw StateError('Central $centralId is not connected');
+    }
+    if (_blackholedCentrals.contains(centralId)) {
+      return _blackholeRequest<Uint8List>('readCharacteristic');
     }
 
     final requestId = _nextRequestId++;
@@ -1074,6 +1112,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }) {
     if (!_connectedCentrals.containsKey(centralId)) {
       throw StateError('Central $centralId is not connected');
+    }
+    if (_blackholedCentrals.contains(centralId)) {
+      return _blackholeRequest<void>('writeCharacteristic');
     }
 
     final requestId = _nextRequestId++;
@@ -1357,6 +1398,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       final link = _outboundLink;
       if (link != null && link.deviceId == deviceId) {
         link.peripheral.simulateCentralDisconnection(link.centralId);
+        link._teardownSharedSibling();
       }
     }
     _failParkedWrites(deviceId);
@@ -2397,6 +2439,34 @@ class FakeBleLink {
   }) {
     central._outboundLink = this;
     peripheral._inboundLink = this;
+  }
+
+  /// The opposite-direction link riding the same physical connection,
+  /// when [shareOnePhysicalLink] has bound this pair. iOS multiplexes
+  /// one LL connection per peer pair across GAP roles; tearing either
+  /// logical link down kills both (cross-platform-quirks.md §1, I346).
+  FakeBleLink? _sharedWith;
+  bool _tearingShared = false;
+
+  /// Binds [a] and [b] — two opposite-direction links between the same
+  /// pair of fakes — into the iOS one-physical-link topology:
+  /// disconnecting either tears both down. Leave unbound for the
+  /// Android topology (independent links).
+  static void shareOnePhysicalLink(FakeBleLink a, FakeBleLink b) {
+    a._sharedWith = b;
+    b._sharedWith = a;
+  }
+
+  /// Tears the shared sibling link down after this link's own teardown.
+  void _teardownSharedSibling() {
+    final sibling = _sharedWith;
+    if (sibling == null || _tearingShared || sibling._tearingShared) return;
+    _tearingShared = true;
+    sibling._tearingShared = true;
+    sibling.central.simulateDisconnection(sibling.deviceId);
+    sibling.peripheral.simulateCentralDisconnection(sibling.centralId);
+    _tearingShared = false;
+    sibling._tearingShared = false;
   }
 
   /// Snapshots the peripheral side's hosted services and registers them
