@@ -4,7 +4,6 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_platform.dart';
-import 'test_helpers.dart';
 
 /// I346 — the iOS shared-physical-link trap, modeled.
 ///

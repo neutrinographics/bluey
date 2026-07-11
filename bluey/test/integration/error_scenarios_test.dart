@@ -211,14 +211,15 @@ void main() {
 
     group('Server Errors', () {
       test(
-        'throws when simulating central connection without advertising',
+        'accepts a central connection without advertising (inherited '
+        'connection, I348)',
         () async {
-          // Server is not advertising, so central cannot connect
-          expect(
-            () =>
-                fakePlatform.simulateCentralConnection(centralId: 'central-1'),
-            throwsA(isA<StateError>()),
-          );
+          // Real platforms deliver centrals regardless of advertising
+          // state — iOS's cached connection reconnects the moment a new
+          // GATT server opens, before advertising starts. The fake used
+          // to forbid this; it now mirrors the platforms.
+          fakePlatform.simulateCentralConnection(centralId: 'central-1');
+          expect(fakePlatform.connectedCentralIds, contains('central-1'));
         },
       );
 
