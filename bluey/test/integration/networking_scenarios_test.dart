@@ -116,11 +116,13 @@ void main() {
     });
 
     test('connectAsPeer adopts whatever identity the address serves now '
-        '(pins current behavior — no mismatch signal exists yet)', () async {
-      // Documents the A.2 design gap: PeerIdentityMismatchException is
-      // defined but nothing constructs it. An address-based connect
-      // reads the identity fresh and hands it to the caller; comparing
-      // against a remembered identity is the caller's job today.
+        '(an address-based connect has no expectation to mismatch against)',
+        () async {
+      // At connect time there is no remembered identity, so the fresh
+      // read is authoritative. Mid-session identity CHANGES are a
+      // different story: the lifecycle client re-verifies on Service
+      // Changed and tears down with PeerIdentityMismatchException (see
+      // peer_identity_mismatch_test.dart).
       final fakePlatform = FakeBlueyPlatform();
       platform.BlueyPlatform.instance = fakePlatform;
       final bluey = await Bluey.create(

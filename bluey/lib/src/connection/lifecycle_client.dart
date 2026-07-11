@@ -13,6 +13,7 @@ import '../log/bluey_logger.dart';
 import '../log/log_level.dart';
 import '../discovery/device_address.dart';
 import '../peer/server_id.dart';
+import '../shared/exceptions.dart';
 import 'peer_silence_monitor.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -71,6 +72,20 @@ class LifecycleClient {
   /// cancels it.
   StreamSubscription<Uint8List>? _presenceSub;
 
+  /// The remote peer's identity as read at session establishment, when
+  /// it was genuinely read (null when unknown — no verification then).
+  /// A Service Changed re-verification finding a *different* identity
+  /// means the session's peer is gone: the client stops and
+  /// [onIdentityMismatch] fires (A.2 — mismatch is a disconnect).
+  final ServerId? _expectedServerId;
+
+  /// Invoked (after [stop]) when re-verification finds a different
+  /// ServerId than [_expectedServerId]. Wired by the peer builder to
+  /// tear the connection down.
+  final void Function(ServerId actual)? onIdentityMismatch;
+
+  bool _identityCheckInFlight = false;
+
   LifecycleClient({
     required platform.BlueyPlatform platformApi,
     required String connectionId,
@@ -81,13 +96,16 @@ class LifecycleClient {
     Stream<List<RemoteService>>? servicesChanges,
     EventPublisher? events,
     DeviceAddress? deviceAddress,
+    ServerId? expectedServerId,
+    this.onIdentityMismatch,
   }) : _platform = platformApi,
        _connectionId = connectionId,
        _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
        _events = events,
-       _deviceAddress = deviceAddress {
+       _deviceAddress = deviceAddress,
+       _expectedServerId = expectedServerId {
     if (servicesChanges != null) {
       _servicesChangesSub = servicesChanges.listen(
         _refreshFromServices,
@@ -422,6 +440,85 @@ class LifecycleClient {
   /// same conceptual char (iOS-client side does this; Android-client
   /// side happens to keep `getInstanceId()` stable, so the handle is
   /// usually the same — but the contract should hold both sides).
+  /// Re-reads the peer's ServerId after a Service Changed and compares
+  /// it with the identity this session was established against.
+  ///
+  /// A different identity is conclusive: the session's peer is gone —
+  /// stop the client, surface [PeerIdentityMismatchException] on the
+  /// event bus, and invoke [onIdentityMismatch] (which tears the
+  /// connection down). A failed read or an absent characteristic is
+  /// *not* evidence of a different peer — treated as transient, the
+  /// session survives.
+  Future<void> _verifyPeerIdentity(RemoteService controlService) async {
+    final expected = _expectedServerId;
+    if (expected == null || _identityCheckInFlight || !_isRunning) return;
+    final serverIdChar =
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() ==
+                  lifecycle.serverIdCharUuid,
+            )
+            .firstOrNull;
+    if (serverIdChar == null) {
+      _logger.log(
+        BlueyLogLevel.debug,
+        'bluey.connection.lifecycle',
+        'identity re-verification skipped: serverId char absent',
+        data: {'connectionId': _connectionId},
+      );
+      return;
+    }
+    _identityCheckInFlight = true;
+    try {
+      final bytes = await serverIdChar.read();
+      final actual = lifecycle.lifecycleCodec.decodeAdvertisedIdentity(bytes);
+      if (!_isRunning) return;
+      if (actual == expected) {
+        _logger.log(
+          BlueyLogLevel.debug,
+          'bluey.connection.lifecycle',
+          'peer identity re-verified',
+          data: {'connectionId': _connectionId},
+        );
+        return;
+      }
+      _logger.log(
+        BlueyLogLevel.error,
+        'bluey.connection.lifecycle',
+        'peer identity mismatch — tearing session down',
+        data: {
+          'connectionId': _connectionId,
+          'expected': expected.toString(),
+          'actual': actual.toString(),
+        },
+        errorCode: 'peer-identity-mismatch',
+      );
+      _events?.emit(
+        ErrorEvent(
+          message: 'Peer identity changed mid-session',
+          error: PeerIdentityMismatchException(expected, actual),
+          source: 'LifecycleClient',
+        ),
+      );
+      stop();
+      onIdentityMismatch?.call(actual);
+    } catch (e) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.connection.lifecycle',
+        'identity re-verification read failed — treating as transient',
+        data: {
+          'connectionId': _connectionId,
+          'exception': e.runtimeType.toString(),
+        },
+      );
+    } finally {
+      _identityCheckInFlight = false;
+    }
+  }
+
   void _refreshFromServices(List<RemoteService> allServices) {
     if (!_isRunning) {
       _logger.log(
@@ -445,6 +542,11 @@ class LifecycleClient {
       );
       return;
     }
+    // A rebuilt GATT database may belong to a different peer entirely
+    // (server app restarted while the ACL stayed up) — re-verify the
+    // identity this session was established against. Fire-and-forget;
+    // errors are contained inside.
+    unawaited(_verifyPeerIdentity(controlService));
     final heartbeatChar =
         controlService
             .characteristics()

@@ -124,6 +124,10 @@ class _BlueyPeer implements BlueyPeer {
         servicesChanges: blueyConnection.servicesChanges,
         events: _events,
         deviceAddress: blueyConnection.deviceAddress,
+        expectedServerId: serverId,
+        onIdentityMismatch: (_) {
+          blueyConnection.disconnect().catchError((_) {});
+        },
       );
       lifecycleClient.start(allServices: allServices);
 
