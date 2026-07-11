@@ -385,8 +385,13 @@ void main() {
         final data = Uint8List.fromList([0x00, 75]); // HR = 75 bpm
         await server.notify(charUuid, data: data);
 
-        // Assert: No exception thrown, notification sent
-        expect(true, isTrue);
+        // Assert: the broadcast notify reached the platform, addressed
+        // to the right characteristic with the right payload.
+        final sent = fakePlatform.serverNotifyCalls.single;
+        expect(sent.centralId, isNull, reason: 'broadcast, not targeted');
+        expect(sent.characteristicUuid, equals(charUuid.toString()));
+        expect(sent.value, equals(data));
+        expect(sent.isIndication, isFalse);
 
         await server.dispose();
         await bluey.dispose();
@@ -422,8 +427,12 @@ void main() {
         final data = Uint8List.fromList([0x00, 80]);
         await server.notifyTo(targetClient, charUuid, data: data);
 
-        // Assert: No exception thrown
-        expect(true, isTrue);
+        // Assert: the targeted notify reached the platform addressed
+        // to exactly that central.
+        final sent = fakePlatform.serverNotifyCalls.single;
+        expect(sent.centralId, equals(targetClient.address.value));
+        expect(sent.characteristicUuid, equals(charUuid.toString()));
+        expect(sent.value, equals(data));
 
         await server.dispose();
         await bluey.dispose();

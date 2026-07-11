@@ -125,6 +125,7 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 
 Architecture / DDD refinement and test-fixture consistency — no user-visible behavior change.
 
+- ☐ **Medium** — [Set up continuous integration](backlog/I351-continuous-integration.md) · No CI exists; all six test gates (4 Dart, Gradle, XCTest) run only by hand.
 - ☐ **Low** — [Stop the domain catching Flutter's PlatformException](backlog/I308-domain-catches-flutter-platform-exception.md) · The domain catch ladder depends on a Flutter framework type.
 - ☐ **Low** — [Route the domain through abstract repositories](backlog/I309-domain-imports-platform-interface-types-directly.md) · The domain imports platform-interface types directly instead of via a port.
 - ☐ **Low** — [Make iOS connection extensions per-connection](backlog/I312-ios-extensions-singleton-asymmetry.md) · iOS uses a const singleton where Android is per-connection.
@@ -134,6 +135,7 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☑ **Low** — [Model the iOS shared-link trap in the fake platform](backlog/I346-fake-platform-shared-link-trap-model.md) · The fake's two roles can't share one physical link, so the documented bidirectional-discovery trap is untestable. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 - ☑ **Low** — [Make the role-reversal ATT blackhole injectable in the fake](backlog/I347-fake-platform-role-reversal-att-blackhole.md) · No seam for "server silently receives nothing while the link looks healthy" (I208's condition), so death-watch convergence is untested. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 - ☑ **Low** — [Accept inherited centrals before advertising in the fake](backlog/I348-fake-platform-inherited-central-before-advertising.md) · `simulateCentralConnection` throws pre-advertising, but real platforms deliver cached/inherited connections then. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
+- ☐ **Low** — [Extend FakeBleLink model coverage](backlog/I352-fake-ble-link-model-limits.md) · Descriptors not routed over the link, duplicate-UUID trees unsupported, no indication acks, MTU fixed at setup.
 
 ## Shipped
 

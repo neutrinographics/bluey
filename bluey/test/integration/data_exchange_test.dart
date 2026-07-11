@@ -255,8 +255,11 @@ void main() {
         final dataToWrite = Uint8List.fromList([0x01, 0x02]);
         await characteristic.write(dataToWrite, withResponse: false);
 
-        // Assert: Write completed without error
-        expect(true, isTrue);
+        // Assert: the write reached the platform as a
+        // write-WITHOUT-response with the exact payload.
+        final sent = fakePlatform.writeCharacteristicCalls.single;
+        expect(sent.withResponse, isFalse);
+        expect(sent.value, equals(dataToWrite));
 
         await connection.disconnect();
         await bluey.dispose();
