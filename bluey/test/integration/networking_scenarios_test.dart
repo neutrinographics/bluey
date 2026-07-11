@@ -19,8 +19,9 @@ void main() {
   group('A.1 — peer identity survives address rotation', () {
     test('the same ServerId reconnects after re-advertising at a new address',
         () {
-      // Virtual time: peer.connect() waits out the whole scan window
-      // (see I349) — 2× the default 5 s scanTimeout would real-sleep.
+      // Virtual time so the scan/probe machinery is deterministic.
+      // (Post-I349, connect completes as soon as the peer is found —
+      // the generous elapses below are upper bounds, not waits.)
       fakeAsync((async) {
         final fakePlatform = FakeBlueyPlatform();
         platform.BlueyPlatform.instance = fakePlatform;
