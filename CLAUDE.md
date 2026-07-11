@@ -165,7 +165,7 @@ Tests live in each package's `test/` directory. The `bluey` package has the most
 - **Fakes**: `bluey/test/fakes/fake_platform.dart` - in-memory `BlueyPlatform` implementation that simulates both central and peripheral roles
 - **Test helpers**: `bluey/test/fakes/test_helpers.dart` - common UUIDs (`TestUuids`), device IDs (`TestDeviceIds`), property builders (`TestProperties`)
 
-When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `test_helpers.dart`.
+When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `test_helpers.dart`. Read `docs/testing-conventions.md` first — it records the simulate-time rule, the fakeAsync broadcast-cancel trap, and the fake's scenario-simulation surface (fault rules, latency, `FakeBleLink`).
 
 ## Key Files
 

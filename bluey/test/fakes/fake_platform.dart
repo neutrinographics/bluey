@@ -362,6 +362,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// can assert on UUID without knowing the per-device handle mapping.
   final List<SetNotificationCall> setNotificationCalls = [];
 
+  /// Records every server-role notify/indicate send in order —
+  /// broadcast and targeted, with the handle-resolved characteristic
+  /// UUID. Lets tests assert outbound server traffic without wiring a
+  /// full [FakeBleLink].
+  final List<ServerNotifyCall> serverNotifyCalls = [];
+
   /// Records every call to [discoverServices] by deviceId, in order.
   /// Used by tests that need to assert re-discovery happened (e.g. after
   /// a Service Changed event clears the cache).
@@ -2233,6 +2239,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
               orElse: () => const MapEntry('', 0),
             )
             .key;
+    serverNotifyCalls.add(
+      ServerNotifyCall(
+        centralId: null,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid,
+        value: Uint8List.fromList(value),
+        isIndication: false,
+      ),
+    );
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
@@ -2257,6 +2272,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
           orElse: () => const MapEntry('', 0),
         )
         .key;
+    serverNotifyCalls.add(
+      ServerNotifyCall(
+        centralId: centralId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid,
+        value: Uint8List.fromList(value),
+        isIndication: false,
+      ),
+    );
     if (charUuid.isNotEmpty &&
         central.subscribedCharacteristics.contains(charUuid)) {
       _deliverLinkedNotification(centralId, charUuid, value);
@@ -2275,6 +2299,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
               orElse: () => const MapEntry('', 0),
             )
             .key;
+    serverNotifyCalls.add(
+      ServerNotifyCall(
+        centralId: null,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid,
+        value: Uint8List.fromList(value),
+        isIndication: true,
+      ),
+    );
     if (charUuid.isEmpty) return;
     for (final central in _connectedCentrals.values) {
       if (central.subscribedCharacteristics.contains(charUuid)) {
@@ -2299,6 +2332,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
           orElse: () => const MapEntry('', 0),
         )
         .key;
+    serverNotifyCalls.add(
+      ServerNotifyCall(
+        centralId: centralId,
+        characteristicHandle: characteristicHandle,
+        characteristicUuid: charUuid,
+        value: Uint8List.fromList(value),
+        isIndication: true,
+      ),
+    );
     if (charUuid.isNotEmpty &&
         central.subscribedCharacteristics.contains(charUuid)) {
       _deliverLinkedNotification(centralId, charUuid, value);
@@ -2700,6 +2742,26 @@ class SetNotificationCall {
     required this.characteristicHandle,
     required this.characteristicUuid,
     required this.enable,
+  });
+}
+
+/// A recorded server-role notify/indicate send.
+///
+/// [centralId] is null for broadcast sends (`notifyCharacteristic` /
+/// `indicateCharacteristic`) and set for the targeted `*To` variants.
+class ServerNotifyCall {
+  final String? centralId;
+  final int characteristicHandle;
+  final String characteristicUuid;
+  final Uint8List value;
+  final bool isIndication;
+
+  const ServerNotifyCall({
+    required this.centralId,
+    required this.characteristicHandle,
+    required this.characteristicUuid,
+    required this.value,
+    required this.isIndication,
   });
 }
 
