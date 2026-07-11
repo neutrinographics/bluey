@@ -4,8 +4,9 @@ title: Stop peer connect from waiting out the full scan window after a match
 category: bug
 severity: medium
 platform: domain
-status: open
+status: fixed
 last_verified: 2026-07-10
+fixed_in: i349-probe-as-you-scan merge
 related: [I055, I056]
 ---
 
@@ -43,3 +44,15 @@ can keep collecting for the full window but should overlap probes with
 the ongoing scan. Watch for double-probe of duplicate advertisements
 (dedup by address) and for the iOS shared-link dedup guidance in
 `bluey/docs/cross-platform-quirks.md`.
+
+## Done (2026-07-10)
+
+Probe-as-you-scan shipped: `connectTo` probes candidates as the scan
+emits them (deduped by address, probes serialized) and completes on the
+first identity match with the scan cancelled; the scan timeout bounds
+only the failure path. `discover` overlaps probes with the scan window.
+Pinned by `bluey/test/peer/peer_discovery_probe_as_you_scan_test.dart`
+(instant-match latency, wrong-candidate rejection, unchanged failure
+bound). Implementation note: subscription cancels are deliberately not
+awaited — a broadcast cancel returns the root-zone null-future, and
+awaiting it escapes fakeAsync onto the real event loop.

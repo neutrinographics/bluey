@@ -64,9 +64,17 @@ class PeerDiscovery {
       'discoverPeers scan started',
       data: {'timeoutMs': timeout.inMilliseconds},
     );
-    final candidates = await _collectCandidates(timeout);
     final ids = <ServerId>{};
-    for (final address in candidates) {
+    final probed = <String>{};
+    // I349 — probe-as-you-scan: candidates are probed while the scan
+    // window is still open, so results are ready at window close
+    // instead of window-close-plus-N-sequential-probes. Probes stay
+    // serialized (one throw-away connection at a time): overlapping
+    // connect attempts are where mobile BLE stacks get flaky.
+    var probeChain = Future<void>.value();
+    final windowClosed = Completer<void>();
+
+    Future<void> probe(String address) async {
       _logger.log(
         BlueyLogLevel.debug,
         'bluey.peer.discovery',
@@ -92,11 +100,42 @@ class PeerDiscovery {
         // Skip candidates that fail to connect or read.
       }
     }
+
+    final scanConfig = platform.PlatformScanConfig(
+      serviceUuids: [lifecycle.controlServiceUuid],
+      timeoutMs: timeout.inMilliseconds,
+    );
+    final sub = _platform.scan(scanConfig).listen(
+      (device) {
+        if (!probed.add(device.id)) return;
+        probeChain = probeChain.then((_) => probe(device.id));
+      },
+      onError: (Object e) {
+        if (!windowClosed.isCompleted) windowClosed.completeError(e);
+      },
+      onDone: () {
+        if (!windowClosed.isCompleted) windowClosed.complete();
+      },
+    );
+    final deadline = Timer(timeout, () {
+      if (!windowClosed.isCompleted) windowClosed.complete();
+    });
+
+    try {
+      await windowClosed.future;
+      // Let any probe already in flight finish before reporting.
+      await probeChain;
+    } finally {
+      deadline.cancel();
+      // Not awaited — see the matching note in [connectTo].
+      unawaited(sub.cancel());
+      await _platform.stopScan();
+    }
     _logger.log(
       BlueyLogLevel.info,
       'bluey.peer.discovery',
       'discoverPeers stopped',
-      data: {'candidates': candidates.length, 'matched': ids.length},
+      data: {'candidates': probed.length, 'matched': ids.length},
     );
     return ids.toList();
   }
@@ -113,22 +152,34 @@ class PeerDiscovery {
     required Duration scanTimeout,
     Duration probeTimeout = defaultProbeTimeout,
   }) async {
-    final candidates = await _collectCandidates(scanTimeout);
-    for (final address in candidates) {
+    // I349 — probe-as-you-scan: each candidate is probed as the scan
+    // emits it, and the first identity match completes the connect
+    // immediately (scan cancelled). [scanTimeout] bounds only the
+    // failure path; it is no longer a floor on connect latency.
+    final completer = Completer<Connection>();
+    final probed = <String>{};
+    var probeChain = Future<void>.value();
+
+    Future<void> probe(String address) async {
+      if (completer.isCompleted) return;
       try {
         final id = await _readServerIdRaw(address, probeTimeout);
-        if (id == expected) {
+        if (!completer.isCompleted && id == expected) {
           // The probe left the device connected. Build a full
           // BlueyConnection for the caller.
-          return BlueyConnection(
-            platformInstance: _platform,
-            connectionId: address,
-            deviceAddress: DeviceAddress(address),
-            logger: _logger,
-            events: _events,
+          completer.complete(
+            BlueyConnection(
+              platformInstance: _platform,
+              connectionId: address,
+              deviceAddress: DeviceAddress(address),
+              logger: _logger,
+              events: _events,
+            ),
           );
+          return;
         }
-        // Not a match — disconnect.
+        // Not a match (or a match raced a completed future) — the
+        // probe connection is not needed.
         await _platform.disconnect(address);
       } catch (_) {
         // Skip candidates that fail to connect or read.
@@ -137,28 +188,43 @@ class PeerDiscovery {
         } catch (_) {}
       }
     }
-    throw PeerNotFoundException(expected, scanTimeout);
-  }
 
-  /// Scans for peripherals advertising the Bluey lifecycle control
-  /// service UUID and collects their addresses. Filtering at the OS
-  /// level is the only way to keep probe time O(matches) rather than
-  /// O(nearby BLE devices). Servers must opt in via
-  /// `Server.startAdvertising(peerDiscoverable: true)` for their
-  /// advertisements to surface here.
-  Future<Set<String>> _collectCandidates(Duration timeout) async {
-    final addresses = <String>{};
     final scanConfig = platform.PlatformScanConfig(
       serviceUuids: [lifecycle.controlServiceUuid],
-      timeoutMs: timeout.inMilliseconds,
+      timeoutMs: scanTimeout.inMilliseconds,
     );
-    await for (final result in _platform
-        .scan(scanConfig)
-        .timeout(timeout, onTimeout: (sink) => sink.close())) {
-      addresses.add(result.id);
+    final sub = _platform.scan(scanConfig).listen(
+      (device) {
+        if (!probed.add(device.id)) return;
+        probeChain = probeChain.then((_) => probe(device.id));
+      },
+      onError: (Object e) {
+        if (!completer.isCompleted) completer.completeError(e);
+      },
+    );
+    final deadline = Timer(scanTimeout, () {
+      // A probe that started inside the window may still be in flight;
+      // let it settle before declaring failure.
+      probeChain.whenComplete(() {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            PeerNotFoundException(expected, scanTimeout),
+          );
+        }
+      });
+    });
+
+    try {
+      return await completer.future;
+    } finally {
+      deadline.cancel();
+      // Deliberately not awaited: a broadcast-subscription cancel with
+      // no onCancel returns the root-zone null-future, and awaiting it
+      // escapes fakeAsync (parking the caller on the real event loop).
+      // stopScan is the authoritative radio-stop.
+      unawaited(sub.cancel());
+      await _platform.stopScan();
     }
-    await _platform.stopScan();
-    return addresses;
   }
 
   /// Connects to a peripheral via the raw platform API, discovers
