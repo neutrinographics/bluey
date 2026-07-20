@@ -35,7 +35,8 @@ Count: **0 Critical, 3 Major, 7 Moderate, 4 Minor, 2 Observations.** No finding 
 > **Tracking note (2026-07-10):** all findings and recommendations from this
 > report are resolved or on the roadmap: R1–R12 landed (see Progress below);
 > NT-11→I035 (note), NT-12→I319 (note), NT-13/14→I375; I349/I350/I351/I352
-> track the follow-ups. `docs/roadmap.md` is the source of truth from here.
+> track the follow-ups, plus I379 (R6's unlanded native half, filed
+> 2026-07-19). `docs/roadmap.md` is the source of truth from here.
 
 ### MAJOR
 
@@ -175,7 +176,7 @@ Added after the initial report, sourced from the project's own quirk record (`bl
 - **R10 — done**: A.1 address rotation, A.2 identity-change pins (mismatch signal still an open design gap), A.3 silence-boundary race, A.4 hostile lifecycle inputs over a real link, A.5 DA-02 cross-delivery pinned. Surfaced **I349** (peer connect waits out the full scan window — filed, Peer/Medium).
 - **R11 — done**: force-kill profile driving the real death watch to `PeerDeclaredUnreachableEvent` + teardown in virtual time; connect flapping/limit; I343 512-cap regression.
 - **R5 — done (server role)**: `PeripheralManagerImplCore<Manager: PeripheralManaging>` with `CentralLike`/`ATTRequestLike` seams; 7 delegate-sequence tests (Pattern B presence-unsubscribe, I040 gate-shut/reopen/partial-drain, I047 batch shape, respond-through-manager, poweredOff rejection). Central role filed as **I350** (Platform/Medium).
-- **R6 — done**: `cascadeAdapterTeardown` — adapter-off drops links, centrals, radio, and drains held ops (opt-in; default preserves historical behavior).
+- **R6 — done (fake half)**: `cascadeAdapterTeardown` — adapter-off drops links, centrals, radio, and drains held ops (opt-in; default preserves historical behavior). The native-adapter-transition-test half did not land; filed as I379 (2026-07-19).
 - **R7 — done**: `simulateMtuNegotiationCap` (negotiate-down) and `simulateScanFailure` (one-shot; fake side of open I013).
 - **R8 — done**: 112 wall-clock sleeps eliminated (event pumps → `pumpEventQueue`, the scanner-timeout test → `fakeAsync`); zero non-zero `Future.delayed` remain in `bluey/test` (executes DA-37).
 - **R9 — done**: `setWriteWithoutResponseBudget`/`drainPendingWrites` WWR backpressure; transport loss fails parked writes (I315 shape).

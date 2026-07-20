@@ -76,7 +76,8 @@ The two April 2026 external reviews were verified against HEAD. A prior report's
 > DA-19→I063 (pre-existing), DA-20/21→I364 (ConnectionException half fixed
 > 2026-07-10), DA-22/36→I365, DA-23→I366, DA-24→I367, DA-25→I304 (updated),
 > DA-26→I368, DA-27→I369, DA-28→I370, DA-29/30→I371, DA-31→I372, DA-32→I373,
-> DA-33→I374, DA-34→I004/I326, DA-35→I043/I048/I084, DA-37 **fixed**,
+> DA-33→I374, DA-34→I004/I326, DA-35→I043/I048/I084 + I378 (reconnection
+> policy, filed 2026-07-19), DA-37 **fixed**,
 > DA-38/39→I375, DA-40..42→I376, MINOR ledger→I377. **DA-02 fixed**
 > (2026-07-10, handle-attributed notifications). `docs/roadmap.md` is the
 > source of truth for status/priority from here; this report stays as the

@@ -72,6 +72,7 @@ Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and r
 - ☐ **Medium** — [Translate errors on domain streams + write-respond](backlog/I357-stream-errors-bypass-acl.md) · Raw `PlatformException`s leak onto `stateChanges`/`notifications` etc.; a client-gone race throws `StateError` into request streams (audit DA-08/09).
 - ☐ **Medium** — [Reject connect() during an in-flight disconnect](backlog/I363-android-connect-during-disconnect.md) · A connect in the disconnect window returns success, then STATE_DISCONNECTED tears it down (audit DA-18).
 - ☐ **Medium** — [Close per-device adapter controllers on failed/spontaneous disconnects](backlog/I369-adapter-controller-leaks.md) · Both adapters leak controllers on failed connects and remote drops (audit DA-27).
+- ☐ **Medium** — [Add a client reconnection policy](backlog/I378-client-reconnection-policy.md) · A dropped link is terminal; no auto-reconnect/backoff or client-side re-subscription, so consumers hand-roll scan-connect-resubscribe loops (audit DA-35).
 - ☐ **Low** — [Prevent the initial connection-state guess race](backlog/I007-connection-state-init-race.md) · A connection reports a state before the platform stream confirms it.
 - ☐ **Low** — [Auto-update Android MTU on peer renegotiation](backlog/I326-android-mtu-onmtuchanged-listener.md) · `connection.android.mtu` isn't refreshed on a spontaneous MTU change.
 - ☐ **Low** — [Wrap RSSI in a value object](backlog/I327-rssi-value-object.md) · `Connection.rssi` is a raw `int` with no validation or semantics.
@@ -136,6 +137,7 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 - ☐ **Medium** — [Move bluey-ios off the main thread](backlog/I345-decouple-bluey-ios-from-main-thread.md) · CoreBluetooth delegates, Pigeon handlers, and timers all run on the iOS main thread.
 - ☐ **Medium** — [Give the iOS central role a delegate seam](backlog/I350-ios-central-manager-delegate-seam.md) · `CentralManagerImpl` is welded to CB types; its delegate wiring (disconnect drain, write gate, power-off) is only testable on hardware. Server role got its seam in audit R5.
 - ☐ **Low** — [Coordinate GATT-server teardown on engine detach](backlog/I015-gatt-server-close-order-on-engine-detach.md) · Redundant cleanup entry points with no teardown state machine.
+- ☐ **Low** — [Drive the Android adapter-state receiver in a native test](backlog/I379-android-adapter-state-receiver-test.md) · `BlueyPlugin`'s ACTION_STATE_CHANGED receiver has no Kotlin test firing STATE_OFF through it (test-audit NT-4/R6, unlanded native half).
 
 ## Code health
 

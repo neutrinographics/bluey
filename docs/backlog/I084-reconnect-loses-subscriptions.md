@@ -6,6 +6,7 @@ severity: medium
 platform: both
 status: open
 last_verified: 2026-04-23
+related: [I378]
 ---
 
 ## Symptom

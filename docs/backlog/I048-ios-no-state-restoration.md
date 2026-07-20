@@ -6,6 +6,7 @@ severity: medium
 platform: ios
 status: open
 last_verified: 2026-04-26
+related: [I378]
 ---
 
 ## Symptom
