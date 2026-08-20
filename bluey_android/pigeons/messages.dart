@@ -15,6 +15,21 @@ enum BluetoothStateDto { unknown, unsupported, unauthorized, off, on }
 /// Connection state (DTO for platform channel).
 enum ConnectionStateDto { disconnected, connecting, connected, disconnecting }
 
+/// Scan mode for Android.
+///
+/// Controls the scan duty cycle and power consumption.
+enum ScanModeDto {
+  /// Lowest power consumption; sparse scan duty cycle (~0.5s scan /
+  /// ~4.5s idle). Best when scanning is only a safety net.
+  lowPower,
+
+  /// Balanced power consumption (~2s scan / ~3s idle).
+  balanced,
+
+  /// Continuous scanning. Fastest discovery, highest power consumption.
+  lowLatency,
+}
+
 /// Scan configuration (DTO for platform channel).
 class ScanConfigDto {
   /// Service UUIDs to filter by.
@@ -23,7 +38,12 @@ class ScanConfigDto {
   /// Timeout in milliseconds (null for no timeout).
   final int? timeoutMs;
 
-  ScanConfigDto({required this.serviceUuids, this.timeoutMs});
+  /// The scan mode.
+  ///
+  /// Defaults to [ScanModeDto.lowLatency] if not specified.
+  final ScanModeDto? mode;
+
+  ScanConfigDto({required this.serviceUuids, this.timeoutMs, this.mode});
 }
 
 /// Connect configuration (DTO for platform channel).

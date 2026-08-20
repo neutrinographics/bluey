@@ -65,9 +65,18 @@ class PlatformScanConfig {
   /// Timeout in milliseconds (null for no timeout).
   final int? timeoutMs;
 
+  /// The scan mode (Android only).
+  ///
+  /// Controls the scan duty cycle and power consumption.
+  /// Ignored on platforms other than Android.
+  ///
+  /// Defaults to [PlatformScanMode.lowLatency] if not specified.
+  final PlatformScanMode? scanMode;
+
   const PlatformScanConfig({
     required this.serviceUuids,
     required this.timeoutMs,
+    this.scanMode,
   });
 
   @override
@@ -75,11 +84,33 @@ class PlatformScanConfig {
     if (identical(this, other)) return true;
     return other is PlatformScanConfig &&
         _listEquals(other.serviceUuids, serviceUuids) &&
-        other.timeoutMs == timeoutMs;
+        other.timeoutMs == timeoutMs &&
+        other.scanMode == scanMode;
   }
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(serviceUuids), timeoutMs);
+  int get hashCode =>
+      Object.hash(Object.hashAll(serviceUuids), timeoutMs, scanMode);
+}
+
+/// Scan mode (Android only).
+///
+/// Controls the scan duty cycle and power consumption.
+/// This setting only affects Android - other platforms manage scan duty
+/// automatically.
+enum PlatformScanMode {
+  /// Lowest power consumption; the radio listens on a sparse duty cycle
+  /// (~0.5s scan / ~4.5s idle). Best once a mesh is fully connected and
+  /// scanning is only a safety net.
+  lowPower,
+
+  /// Balanced power consumption (~2s scan / ~3s idle).
+  /// Good default for opportunistic discovery.
+  balanced,
+
+  /// Continuous scanning. Fastest discovery, highest power consumption —
+  /// on phones commonly measured at ~10-15% battery per hour.
+  lowLatency,
 }
 
 /// Configuration for connecting.

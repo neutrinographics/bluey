@@ -41,6 +41,39 @@ void main() {
         expect(captured.timeoutMs, equals(5000));
       });
 
+      test('maps the scan mode into the DTO', () {
+        when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
+
+        final config = PlatformScanConfig(
+          serviceUuids: [],
+          timeoutMs: null,
+          scanMode: PlatformScanMode.lowPower,
+        );
+
+        scanner.scan(config);
+
+        final captured =
+            verify(() => mockHostApi.startScan(captureAny())).captured.single
+                as ScanConfigDto;
+
+        expect(captured.mode, equals(ScanModeDto.lowPower));
+      });
+
+      test('a null scan mode crosses as null — the native default '
+          '(lowLatency) applies', () {
+        when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
+
+        final config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
+
+        scanner.scan(config);
+
+        final captured =
+            verify(() => mockHostApi.startScan(captureAny())).captured.single
+                as ScanConfigDto;
+
+        expect(captured.mode, isNull);
+      });
+
       test('returns the scan stream', () {
         when(() => mockHostApi.startScan(any())).thenAnswer((_) async {});
 

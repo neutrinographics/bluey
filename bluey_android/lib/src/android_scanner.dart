@@ -19,12 +19,25 @@ class AndroidScanner {
     final dto = ScanConfigDto(
       serviceUuids: config.serviceUuids,
       timeoutMs: config.timeoutMs,
+      mode: _mapScanModeToDto(config.scanMode),
     );
 
     // Start scan (async, doesn't block)
     _hostApi.startScan(dto);
 
     return _scanController.stream;
+  }
+
+  ScanModeDto? _mapScanModeToDto(PlatformScanMode? mode) {
+    if (mode == null) return null;
+    switch (mode) {
+      case PlatformScanMode.lowPower:
+        return ScanModeDto.lowPower;
+      case PlatformScanMode.balanced:
+        return ScanModeDto.balanced;
+      case PlatformScanMode.lowLatency:
+        return ScanModeDto.lowLatency;
+    }
   }
 
   /// Stops the current BLE scan.

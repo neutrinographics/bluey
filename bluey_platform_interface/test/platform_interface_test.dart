@@ -316,6 +316,33 @@ void main() {
       expect(config.serviceUuids, isEmpty);
       expect(config.timeoutMs, isNull);
     });
+
+    test('carries the scan mode (Android duty-cycle control)', () {
+      const config = PlatformScanConfig(
+        serviceUuids: [],
+        timeoutMs: null,
+        scanMode: PlatformScanMode.balanced,
+      );
+
+      expect(config.scanMode, PlatformScanMode.balanced);
+    });
+
+    test('scan mode defaults to null — the platform default applies', () {
+      const config = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
+
+      expect(config.scanMode, isNull);
+    });
+
+    test('equality includes the scan mode', () {
+      const a = PlatformScanConfig(
+        serviceUuids: [],
+        timeoutMs: null,
+        scanMode: PlatformScanMode.lowPower,
+      );
+      const b = PlatformScanConfig(serviceUuids: [], timeoutMs: null);
+
+      expect(a, isNot(equals(b)));
+    });
   });
 
   group('PlatformConnectConfig', () {

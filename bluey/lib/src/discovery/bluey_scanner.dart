@@ -14,6 +14,7 @@ import '../shared/uuid.dart';
 import 'advertisement.dart';
 import 'device.dart';
 import 'device_address.dart';
+import 'scan.dart';
 import 'scan_result.dart';
 import 'scan_state.dart';
 import 'scanner.dart';
@@ -218,11 +219,21 @@ class BlueyScanner implements Scanner {
   }
 
   @override
-  Stream<ScanResult> scan({List<UUID>? services, Duration? timeout}) {
+  Stream<ScanResult> scan({
+    List<UUID>? services,
+    Duration? timeout,
+    ScanMode? mode,
+  }) {
     _ensureValid();
     final config = platform.PlatformScanConfig(
       serviceUuids: services?.map((u) => u.toString()).toList() ?? [],
       timeoutMs: timeout?.inMilliseconds,
+      scanMode: switch (mode) {
+        null => null,
+        ScanMode.lowPower => platform.PlatformScanMode.lowPower,
+        ScanMode.balanced => platform.PlatformScanMode.balanced,
+        ScanMode.lowLatency => platform.PlatformScanMode.lowLatency,
+      },
     );
 
     // Stash the scan args so `_setState` can ride them through to the

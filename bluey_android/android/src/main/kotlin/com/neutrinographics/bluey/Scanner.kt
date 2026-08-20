@@ -66,8 +66,14 @@ class Scanner(
         val filters = buildScanFilters(config)
 
         // Build scan settings
+        val scanMode = when (config.mode) {
+            ScanModeDto.LOW_POWER -> ScanSettings.SCAN_MODE_LOW_POWER
+            ScanModeDto.BALANCED -> ScanSettings.SCAN_MODE_BALANCED
+            ScanModeDto.LOW_LATENCY -> ScanSettings.SCAN_MODE_LOW_LATENCY
+            null -> ScanSettings.SCAN_MODE_LOW_LATENCY // Default: historical behavior
+        }
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(scanMode)
             .build()
 
         // Create callback

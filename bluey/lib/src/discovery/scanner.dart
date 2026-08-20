@@ -1,4 +1,5 @@
 import '../shared/uuid.dart';
+import 'scan.dart';
 import 'scan_result.dart';
 import 'scan_state.dart';
 
@@ -52,7 +53,12 @@ abstract class Scanner {
   ///
   /// [services] - Optional list of service UUIDs to filter by.
   /// [timeout] - Optional timeout duration.
-  Stream<ScanResult> scan({List<UUID>? services, Duration? timeout});
+  /// [mode] - Optional scan duty cycle (Android only; see [ScanMode]).
+  Stream<ScanResult> scan({
+    List<UUID>? services,
+    Duration? timeout,
+    ScanMode? mode,
+  });
 
   /// Stop the current scan.
   ///
