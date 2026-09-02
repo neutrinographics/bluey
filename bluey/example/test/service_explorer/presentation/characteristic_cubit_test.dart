@@ -350,7 +350,7 @@ void main() {
     test('StaleHandleException during read flips state to invalidated', () async {
       when(() => mockReadCharacteristic(any())).thenThrow(
         StaleHandleException(
-          triggeringState: BluetoothState.off,
+          cause: const AdapterTransitionInvalidation(BluetoothState.off),
           instanceType: InvalidatedInstance.connection,
         ),
       );
@@ -373,7 +373,7 @@ void main() {
         ),
       ).thenThrow(
         StaleHandleException(
-          triggeringState: BluetoothState.off,
+          cause: const AdapterTransitionInvalidation(BluetoothState.off),
           instanceType: InvalidatedInstance.connection,
         ),
       );
@@ -391,7 +391,7 @@ void main() {
       when(() => mockSubscribeToCharacteristic(any())).thenAnswer(
         (_) => Stream.error(
           StaleHandleException(
-            triggeringState: BluetoothState.off,
+            cause: const AdapterTransitionInvalidation(BluetoothState.off),
             instanceType: InvalidatedInstance.connection,
           ),
         ),
@@ -412,7 +412,7 @@ void main() {
       // Seed invalidated state via a real StaleHandleException throw.
       when(() => mockReadCharacteristic(any())).thenThrow(
         StaleHandleException(
-          triggeringState: BluetoothState.off,
+          cause: const AdapterTransitionInvalidation(BluetoothState.off),
           instanceType: InvalidatedInstance.connection,
         ),
       );
@@ -434,7 +434,7 @@ void main() {
       final cubit = createCubit();
       when(() => mockReadCharacteristic(any())).thenThrow(
         StaleHandleException(
-          triggeringState: BluetoothState.off,
+          cause: const AdapterTransitionInvalidation(BluetoothState.off),
           instanceType: InvalidatedInstance.connection,
         ),
       );
@@ -464,7 +464,7 @@ void main() {
       final cubit = createCubit();
       when(() => mockReadCharacteristic(any())).thenThrow(
         StaleHandleException(
-          triggeringState: BluetoothState.off,
+          cause: const AdapterTransitionInvalidation(BluetoothState.off),
           instanceType: InvalidatedInstance.connection,
         ),
       );

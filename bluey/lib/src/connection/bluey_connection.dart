@@ -167,10 +167,9 @@ class BlueyConnection implements Connection {
 
   // I333: adapter-state invalidation. The connection subscribes to
   // platform.stateStream at construction; any non-`on` emission flips
-  // [_invalidated] to true and tears down owned streams + caches.
+  // [_invalidation] and tears down owned streams + caches.
   // Subsequent public calls throw [StaleHandleException].
-  bool _invalidated = false;
-  BluetoothState? _invalidationState;
+  InvalidationCause? _invalidation;
   StreamSubscription<platform.BluetoothState>? _adapterStateSubscription;
 
   // Cached services after discovery
@@ -329,9 +328,8 @@ class BlueyConnection implements Connection {
   /// services cache. Subsequent public calls throw
   /// [StaleHandleException].
   void _invalidate(BluetoothState triggeringState) {
-    if (_invalidated) return;
-    _invalidated = true;
-    _invalidationState = triggeringState;
+    if (_invalidation != null) return;
+    _invalidation = AdapterTransitionInvalidation(triggeringState);
 
     // Cancel every owned platform subscription so post-invalidation
     // emissions can't call .add(...) on a closed controller. Android's
@@ -357,7 +355,7 @@ class BlueyConnection implements Connection {
         if (!aborter.isCompleted) {
           aborter.completeError(
             StaleHandleException(
-              triggeringState: triggeringState,
+              cause: AdapterTransitionInvalidation(triggeringState),
               instanceType: InvalidatedInstance.connection,
             ),
           );
@@ -380,7 +378,7 @@ class BlueyConnection implements Connection {
     // mirrors what the corresponding sync getters throw (Convention 6 —
     // see I333).
     final stale = StaleHandleException(
-      triggeringState: triggeringState,
+      cause: AdapterTransitionInvalidation(triggeringState),
       instanceType: InvalidatedInstance.connection,
     );
 
@@ -413,9 +411,9 @@ class BlueyConnection implements Connection {
   /// Throws [StaleHandleException] if this connection has been
   /// invalidated by a prior adapter-state transition.
   void _ensureValid() {
-    if (_invalidated) {
+    if (_invalidation != null) {
       throw StaleHandleException(
-        triggeringState: _invalidationState!,
+        cause: _invalidation!,
         instanceType: InvalidatedInstance.connection,
       );
     }
@@ -559,7 +557,7 @@ class BlueyConnection implements Connection {
       // closed, so we close the per-subscriber controller directly
       // without trying to bridge.
       controller.add(_state);
-      if (_invalidated) {
+      if (_invalidation != null) {
         controller.close();
         return;
       }
@@ -581,9 +579,9 @@ class BlueyConnection implements Connection {
           // invalidation see addError(StaleHandleException) + close so
           // their `onError` mirrors what the corresponding sync getter
           // would throw (Convention 6).
-          if (_invalidated) {
+          if (_invalidation != null) {
             controller.addError(StaleHandleException(
-              triggeringState: _invalidationState!,
+              cause: _invalidation!,
               instanceType: InvalidatedInstance.connection,
             ));
             controller.close();
@@ -790,7 +788,7 @@ class BlueyConnection implements Connection {
     // I333: an invalidated connection is effectively dead from the
     // user's perspective — the adapter is off / unauthorised. Treat
     // disconnect() as a graceful no-op rather than throwing.
-    if (_invalidated) return;
+    if (_invalidation != null) return;
     // Idempotent: if already disconnected or disconnecting, do nothing
     if (_state == ConnectionState.disconnected ||
         _state == ConnectionState.disconnecting) {
@@ -832,9 +830,9 @@ class BlueyConnection implements Connection {
       // invalidation see addError(StaleHandleException) + close so
       // their `onError` mirrors what the corresponding sync getter
       // would throw (Convention 6).
-      if (_invalidated) {
+      if (_invalidation != null) {
         controller.addError(StaleHandleException(
-          triggeringState: _invalidationState!,
+          cause: _invalidation!,
           instanceType: InvalidatedInstance.connection,
         ));
         controller.close();
@@ -882,9 +880,9 @@ class BlueyConnection implements Connection {
       // invalidation see addError(StaleHandleException) + close so
       // their `onError` mirrors what the corresponding sync getter
       // would throw (Convention 6).
-      if (_invalidated) {
+      if (_invalidation != null) {
         controller.addError(StaleHandleException(
-          triggeringState: _invalidationState!,
+          cause: _invalidation!,
           instanceType: InvalidatedInstance.connection,
         ));
         controller.close();

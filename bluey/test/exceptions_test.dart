@@ -306,27 +306,34 @@ void main() {
   group('StaleHandleException', () {
     test('extends BlueyException', () {
       final exception = StaleHandleException(
-        triggeringState: BluetoothState.off,
         instanceType: InvalidatedInstance.server,
+        cause: const AdapterTransitionInvalidation(BluetoothState.off),
       );
 
       expect(exception, isA<BlueyException>());
     });
 
-    test('carries triggeringState and instanceType', () {
+    test('carries cause, triggeringState and instanceType for an adapter '
+        'transition', () {
       final exception = StaleHandleException(
-        triggeringState: BluetoothState.unauthorized,
         instanceType: InvalidatedInstance.connection,
+        cause: const AdapterTransitionInvalidation(BluetoothState.unauthorized),
       );
 
+      expect(
+        exception.cause,
+        equals(
+          const AdapterTransitionInvalidation(BluetoothState.unauthorized),
+        ),
+      );
       expect(exception.triggeringState, equals(BluetoothState.unauthorized));
       expect(exception.instanceType, equals(InvalidatedInstance.connection));
     });
 
     test('message identifies the instance type and triggering state', () {
       final exception = StaleHandleException(
-        triggeringState: BluetoothState.off,
         instanceType: InvalidatedInstance.server,
+        cause: const AdapterTransitionInvalidation(BluetoothState.off),
       );
 
       expect(exception.message, contains('Server'));
@@ -335,11 +342,51 @@ void main() {
 
     test('action guides the caller to construct fresh', () {
       final exception = StaleHandleException(
-        triggeringState: BluetoothState.off,
         instanceType: InvalidatedInstance.connection,
+        cause: const AdapterTransitionInvalidation(BluetoothState.off),
       );
 
       expect(exception.action, contains('fresh'));
+    });
+
+    test('a disposed instance has no triggering adapter state', () {
+      final exception = StaleHandleException(
+        instanceType: InvalidatedInstance.scanner,
+        cause: const DisposalInvalidation(),
+      );
+
+      expect(exception.cause, equals(const DisposalInvalidation()));
+      expect(exception.triggeringState, isNull);
+    });
+
+    test('message for a disposed instance names the instance and dispose', () {
+      final exception = StaleHandleException(
+        instanceType: InvalidatedInstance.scanner,
+        cause: const DisposalInvalidation(),
+      );
+
+      expect(exception.message, contains('Scanner'));
+      expect(exception.message, contains('disposed'));
+      expect(exception.action, contains('fresh'));
+    });
+
+    test('InvalidationCause values compare by value', () {
+      expect(
+        const AdapterTransitionInvalidation(BluetoothState.off),
+        equals(const AdapterTransitionInvalidation(BluetoothState.off)),
+      );
+      expect(
+        const AdapterTransitionInvalidation(BluetoothState.off),
+        isNot(
+          equals(
+            const AdapterTransitionInvalidation(BluetoothState.unauthorized),
+          ),
+        ),
+      );
+      expect(
+        const DisposalInvalidation(),
+        equals(const DisposalInvalidation()),
+      );
     });
   });
 }

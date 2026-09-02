@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **Dispose is terminal for `Scanner` and `Server` (I368).** Calling
+  `scan()`, `addService()`, `startAdvertising()` etc. on a disposed instance
+  now throws `StaleHandleException` instead of partially restarting over
+  closed streams. The exception gained a `cause` (`InvalidationCause`:
+  `AdapterTransitionInvalidation(state)` or `DisposalInvalidation()`), so
+  one type covers every way an instance becomes terminal. **API change:**
+  `StaleHandleException.triggeringState` is now nullable (`null` for a
+  disposed instance) and the constructor takes `cause:` instead of
+  `triggeringState:`. Existing `on StaleHandleException` handlers that
+  rebuild the instance are already correct for the dispose case.
+- **Malformed lifecycle intervals are clamped (I358).** A served interval
+  that is zero, negative, or too small to halve no longer drives the client
+  heartbeat to a zero cadence; the new `LifecycleInterval` value object owns
+  that rule and decodes malformed wire values to the protocol default.
+
 ## 0.5.0
 
 **Lifecycle-silence ⇄ transport reconciliation (I338):**

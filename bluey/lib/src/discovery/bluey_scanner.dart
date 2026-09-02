@@ -41,14 +41,9 @@ class BlueyScanner implements Scanner {
 
   // I333: adapter-state invalidation. The scanner subscribes to
   // platform.stateStream at construction; any non-`on` emission flips
-  // [_invalidated] to true and tears down the active scan stream(s).
+  // [_invalidation] and tears down the active scan stream(s).
   // Subsequent [scan] calls throw [StaleHandleException].
-  bool _invalidated = false;
-
-  /// A disposed scanner must refuse new work: its controllers are closed,
-  /// so a late [scan] would otherwise restart over dead streams (I368).
-  bool _disposed = false;
-  BluetoothState? _invalidationState;
+  InvalidationCause? _invalidation;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;
 
   /// Active scan controllers — typically zero or one but the API doesn't
@@ -108,9 +103,8 @@ class BlueyScanner implements Scanner {
   /// platform scan subscription, closes every active scan controller,
   /// and fails subsequent [scan] calls with [StaleHandleException].
   void _invalidate(BluetoothState triggeringState) {
-    if (_invalidated) return;
-    _invalidated = true;
-    _invalidationState = triggeringState;
+    if (_invalidation != null) return;
+    _invalidation = AdapterTransitionInvalidation(triggeringState);
 
     _stateSubscription?.cancel();
     _stateSubscription = null;
@@ -140,18 +134,12 @@ class BlueyScanner implements Scanner {
     }
   }
 
-  /// Throws [StaleHandleException] if this scanner has been invalidated
-  /// by a prior adapter-state transition.
+  /// Throws [StaleHandleException] if this scanner is terminal — invalidated
+  /// by an adapter-state transition or disposed by its owner.
   void _ensureValid() {
-    if (_disposed) {
-      throw StateError(
-        'Scanner has been disposed; construct a fresh one via '
-        'Bluey.scanner() rather than reusing this instance.',
-      );
-    }
-    if (_invalidated) {
+    if (_invalidation != null) {
       throw StaleHandleException(
-        triggeringState: _invalidationState!,
+        cause: _invalidation!,
         instanceType: InvalidatedInstance.scanner,
       );
     }
@@ -168,7 +156,7 @@ class BlueyScanner implements Scanner {
       // followed by `onDone`. Matches the explicit pattern used in
       // `BlueyConnection.stateChanges` so all Type A streams in bluey
       // share the same late-subscriber shape.
-      if (_invalidated) {
+      if (_invalidation != null) {
         controller.add(ScanState.invalidated);
         controller.close();
         return;
@@ -359,7 +347,7 @@ class BlueyScanner implements Scanner {
 
   @override
   void dispose() {
-    _disposed = true;
+    _invalidation ??= const DisposalInvalidation();
     _timeoutTimer?.cancel();
     _platformSubscription?.cancel();
     _platformSubscription = null;

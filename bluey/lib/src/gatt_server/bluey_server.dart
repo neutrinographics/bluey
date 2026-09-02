@@ -110,14 +110,9 @@ class BlueyServer implements Server {
 
   // I333: adapter-state invalidation. The server subscribes to
   // platform.stateStream at construction; any non-`on` emission flips
-  // [_invalidated] to true and tears down owned streams + caches.
+  // [_invalidation] and tears down owned streams + caches.
   // Subsequent public calls throw [StaleHandleException].
-  bool _invalidated = false;
-
-  /// A disposed server must refuse new work: its controllers are closed,
-  /// so a late call would otherwise restart over dead streams (I368).
-  bool _disposed = false;
-  BluetoothState? _invalidationState;
+  InvalidationCause? _invalidation;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;
 
   BlueyServer(
@@ -313,9 +308,8 @@ class BlueyServer implements Server {
   /// no-op. Cancels the state subscription, closes owned streams, and
   /// fails subsequent calls with [StaleHandleException].
   void _invalidate(BluetoothState triggeringState) {
-    if (_invalidated) return;
-    _invalidated = true;
-    _invalidationState = triggeringState;
+    if (_invalidation != null) return;
+    _invalidation = AdapterTransitionInvalidation(triggeringState);
     _stateSubscription?.cancel();
     _stateSubscription = null;
 
@@ -365,24 +359,18 @@ class BlueyServer implements Server {
   /// logging stay consistent; that path is guarded, so it has to run before
   /// this server is marked disposed.
   Future<void> _stopAdvertisingIfActive() async {
-    if (!_invalidated &&
+    if (_invalidation == null &&
         _advertisingState == AdvertisingState.advertising) {
       await stopAdvertising();
     }
   }
 
-  /// Throws [StaleHandleException] if this server has been invalidated
-  /// by a prior adapter-state transition.
+  /// Throws [StaleHandleException] if this server is terminal — invalidated
+  /// by an adapter-state transition or disposed by its owner.
   void _ensureValid() {
-    if (_disposed) {
-      throw StateError(
-        'Server has been disposed; construct a fresh one via '
-        'Bluey.server() rather than reusing this instance.',
-      );
-    }
-    if (_invalidated) {
+    if (_invalidation != null) {
       throw StaleHandleException(
-        triggeringState: _invalidationState!,
+        cause: _invalidation!,
         instanceType: InvalidatedInstance.server,
       );
     }
@@ -403,7 +391,7 @@ class BlueyServer implements Server {
       // value followed by `onDone`. Matches the explicit pattern used
       // in `BlueyConnection.stateChanges` so all Type A streams in
       // bluey share the same late-subscriber shape.
-      if (_invalidated) {
+      if (_invalidation != null) {
         controller.add(AdvertisingState.invalidated);
         controller.close();
         return;
@@ -908,7 +896,7 @@ class BlueyServer implements Server {
   @override
   Future<void> dispose() async {
     await _stopAdvertisingIfActive();
-    _disposed = true;
+    _invalidation ??= const DisposalInvalidation();
 
     _lifecycle.dispose();
 
