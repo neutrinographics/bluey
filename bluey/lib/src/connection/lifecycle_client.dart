@@ -363,8 +363,8 @@ class LifecycleClient {
             .readCharacteristic(_connectionId, intervalChar.handle.value)
             .then((bytes) {
               if (!_isRunning) return;
-              final serverInterval = lifecycle.decodeInterval(bytes);
-              _beginHeartbeat(_heartbeatCadenceFor(serverInterval));
+              final serverInterval = lifecycle.LifecycleInterval.decode(bytes);
+              _beginHeartbeat(serverInterval.heartbeatCadence);
             })
             .catchError((_) {
               if (!_isRunning) return;
@@ -454,8 +454,7 @@ class LifecycleClient {
             .characteristics()
             .where(
               (c) =>
-                  c.uuid.toString().toLowerCase() ==
-                  lifecycle.serverIdCharUuid,
+                  c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
             )
             .firstOrNull;
     if (serverIdChar == null) {
@@ -588,19 +587,8 @@ class LifecycleClient {
     );
   }
 
-  /// The cadence to probe a server that asked to hear from us every
-  /// [serverInterval]: half of it, so a heartbeat always lands inside the
-  /// server's silence window. A served interval too small to halve would
-  /// otherwise busy-loop the scheduler (I358), so it falls back to the
-  /// default cadence.
-  Duration _heartbeatCadenceFor(Duration serverInterval) {
-    final halved = Duration(milliseconds: serverInterval.inMilliseconds ~/ 2);
-    return halved > Duration.zero ? halved : _defaultHeartbeatInterval;
-  }
-
-  Duration get _defaultHeartbeatInterval => Duration(
-    milliseconds: lifecycle.defaultLifecycleInterval.inMilliseconds ~/ 2,
-  );
+  Duration get _defaultHeartbeatInterval =>
+      lifecycle.LifecycleInterval.standard.heartbeatCadence;
 
   void _beginHeartbeat(Duration interval) {
     _logger.log(
@@ -685,7 +673,10 @@ class LifecycleClient {
     );
     if (_deviceAddress != null) {
       _events?.emit(
-        HeartbeatSentEvent(deviceAddress: _deviceAddress, source: 'LifecycleClient'),
+        HeartbeatSentEvent(
+          deviceAddress: _deviceAddress,
+          source: 'LifecycleClient',
+        ),
       );
     }
     _monitor.markProbeInFlight();

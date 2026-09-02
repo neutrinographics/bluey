@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:meta/meta.dart';
 
 import 'peer/server_id.dart';
 
@@ -227,22 +228,60 @@ class LifecycleCodec {
 /// this rather than constructing your own.
 const lifecycleCodec = LifecycleCodec();
 
-/// Decodes a 4-byte little-endian interval value (in milliseconds) from the
-/// interval characteristic.
+/// How often a Bluey server expects to hear from a connected client — the
+/// value it serves through the interval characteristic.
 ///
-/// Malformed input decodes to [defaultLifecycleInterval] because a
-/// non-positive interval would drive the client's heartbeat scheduler to a
-/// zero cadence (I358).
-Duration decodeInterval(Uint8List bytes) {
-  if (bytes.length < 4) {
-    return defaultLifecycleInterval;
+/// Exists so the interval's one invariant (it must be positive) and the
+/// client-side rule derived from it ([heartbeatCadence]) live in one place.
+/// A non-positive interval would otherwise drive the client's heartbeat
+/// scheduler to a zero cadence (I358).
+@immutable
+class LifecycleInterval {
+  final Duration value;
+  const LifecycleInterval._(this.value);
+
+  factory LifecycleInterval(Duration value) {
+    if (value <= Duration.zero) {
+      throw ArgumentError.value(value, 'value', 'must be positive');
+    }
+    return LifecycleInterval._(value);
   }
-  final byteData = ByteData.sublistView(bytes);
-  final ms = byteData.getInt32(0, Endian.little);
-  if (ms <= 0) {
-    return defaultLifecycleInterval;
+
+  /// The interval assumed when a server serves none, or serves one the
+  /// protocol cannot honor.
+  static const LifecycleInterval standard = LifecycleInterval._(
+    defaultLifecycleInterval,
+  );
+
+  /// Decodes the 4-byte little-endian millisecond wire value. Malformed
+  /// input (too short, zero, or negative) decodes to [standard] because a
+  /// client with no cadence at all would be worse than one probing at the
+  /// protocol default.
+  factory LifecycleInterval.decode(Uint8List bytes) {
+    if (bytes.length < 4) return standard;
+    final ms = ByteData.sublistView(bytes).getInt32(0, Endian.little);
+    if (ms <= 0) return standard;
+    return LifecycleInterval._(Duration(milliseconds: ms));
   }
-  return Duration(milliseconds: ms);
+
+  /// How often a client should probe a server that serves this interval:
+  /// half of it, so a heartbeat always lands inside the server's silence
+  /// window. Never zero — an interval too small to halve yields the
+  /// [standard] cadence instead of a busy-loop.
+  Duration get heartbeatCadence {
+    final halved = Duration(milliseconds: value.inMilliseconds ~/ 2);
+    return halved > Duration.zero ? halved : standard.heartbeatCadence;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is LifecycleInterval && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => 'LifecycleInterval($value)';
 }
 
 /// Builds the platform-level control service definition.

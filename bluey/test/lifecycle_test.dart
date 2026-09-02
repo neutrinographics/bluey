@@ -249,34 +249,37 @@ void main() {
       await bluey.dispose();
     });
 
-    test('non-Bluey client that never heartbeats is not disconnected', () async {
-      final bluey = await Bluey.create();
-      fakeAsync((async) {
-        final server =
-            bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
+    test(
+      'non-Bluey client that never heartbeats is not disconnected',
+      () async {
+        final bluey = await Bluey.create();
+        fakeAsync((async) {
+          final server =
+              bluey.server(lifecycleInterval: const Duration(seconds: 5))!;
 
-        server.startAdvertising();
-        async.elapse(Duration.zero);
+          server.startAdvertising();
+          async.elapse(Duration.zero);
 
-        final disconnections = <ClientAddress>[];
-        server.disconnections.listen(disconnections.add);
+          final disconnections = <ClientAddress>[];
+          server.disconnections.listen(disconnections.add);
 
-        // A non-Bluey central connects but never writes to the heartbeat
-        // characteristic — it doesn't know about the lifecycle protocol.
-        fakePlatform.simulateCentralConnection(centralId: _clientId1);
-        async.elapse(Duration.zero);
+          // A non-Bluey central connects but never writes to the heartbeat
+          // characteristic — it doesn't know about the lifecycle protocol.
+          fakePlatform.simulateCentralConnection(centralId: _clientId1);
+          async.elapse(Duration.zero);
 
-        // Wait well past the lifecycle interval.
-        async.elapse(const Duration(seconds: 30));
+          // Wait well past the lifecycle interval.
+          async.elapse(const Duration(seconds: 30));
 
-        // Client must still be connected — it was never timed out.
-        expect(disconnections, isEmpty);
-        expect(server.connectedClients, hasLength(1));
+          // Client must still be connected — it was never timed out.
+          expect(disconnections, isEmpty);
+          expect(server.connectedClients, hasLength(1));
 
-        server.dispose();
-        bluey.dispose();
-      });
-    });
+          server.dispose();
+          bluey.dispose();
+        });
+      },
+    );
 
     test('filters interval reads from public readRequests', () async {
       final bluey = await Bluey.create();
@@ -402,13 +405,16 @@ void main() {
       },
     );
 
-    test('auto-generates a ServerId when constructed without identity', () async {
-      final bluey = await Bluey.create();
-      final server = bluey.server()!;
-      expect(server.serverId, isNotNull);
-      server.dispose();
-      await bluey.dispose();
-    });
+    test(
+      'auto-generates a ServerId when constructed without identity',
+      () async {
+        final bluey = await Bluey.create();
+        final server = bluey.server()!;
+        expect(server.serverId, isNotNull);
+        server.dispose();
+        await bluey.dispose();
+      },
+    );
 
     test('respects an app-supplied identity', () async {
       final id = ServerId('11111111-2222-3333-4444-555555555555');
@@ -493,34 +499,68 @@ void main() {
       );
     });
 
-    // 22. decodeInterval with short input returns default
-    test('decodeInterval with short input returns default', () {
-      final shortInput = Uint8List.fromList([0x01, 0x02]);
-      final result = decodeInterval(shortInput);
-      expect(result, equals(defaultLifecycleInterval));
+    // 22. LifecycleInterval — the served interval as a value object. The
+    // positivity invariant lives here because a non-positive interval would
+    // drive the client's heartbeat scheduler to a zero cadence (I358).
+    test('LifecycleInterval rejects a non-positive duration', () {
+      expect(() => LifecycleInterval(Duration.zero), throwsArgumentError);
+      expect(
+        () => LifecycleInterval(const Duration(milliseconds: -1)),
+        throwsArgumentError,
+      );
     });
 
-    // 22b. I358: a zero interval would busy-loop the heartbeat scheduler.
-    test('decodeInterval with zero interval returns default', () {
-      final result = decodeInterval(encodeInterval(Duration.zero));
-      expect(result, equals(defaultLifecycleInterval));
+    test('LifecycleInterval.decode with short input yields the standard', () {
+      final decoded = LifecycleInterval.decode(Uint8List.fromList([1, 2]));
+      expect(decoded, equals(LifecycleInterval.standard));
     });
 
-    // 22c. I358: a negative interval would busy-loop it the same way.
-    test('decodeInterval with negative interval returns default', () {
-      final result = decodeInterval(
+    test('LifecycleInterval.decode with zero yields the standard', () {
+      final decoded = LifecycleInterval.decode(encodeInterval(Duration.zero));
+      expect(decoded, equals(LifecycleInterval.standard));
+    });
+
+    test('LifecycleInterval.decode with negative yields the standard', () {
+      final decoded = LifecycleInterval.decode(
         encodeInterval(const Duration(milliseconds: -1)),
       );
-      expect(result, equals(defaultLifecycleInterval));
+      expect(decoded, equals(LifecycleInterval.standard));
     });
 
-    // 23. encodeInterval/decodeInterval round-trip
-    test('encodeInterval/decodeInterval round-trip', () {
+    test('encodeInterval/LifecycleInterval.decode round-trip', () {
       const original = Duration(seconds: 42);
       final encoded = encodeInterval(original);
       expect(encoded, hasLength(4));
-      final decoded = decodeInterval(encoded);
-      expect(decoded, equals(original));
+      expect(
+        LifecycleInterval.decode(encoded),
+        equals(LifecycleInterval(original)),
+      );
+    });
+
+    test('LifecycleInterval equality is by value', () {
+      expect(
+        LifecycleInterval(const Duration(seconds: 7)),
+        equals(LifecycleInterval(const Duration(seconds: 7))),
+      );
+      expect(
+        LifecycleInterval(const Duration(seconds: 7)),
+        isNot(equals(LifecycleInterval(const Duration(seconds: 8)))),
+      );
+    });
+
+    test('heartbeatCadence is half the interval', () {
+      final interval = LifecycleInterval(const Duration(seconds: 20));
+      expect(interval.heartbeatCadence, equals(const Duration(seconds: 10)));
+    });
+
+    test('heartbeatCadence never reaches zero — a 1ms interval falls back '
+        'to the standard cadence', () {
+      final interval = LifecycleInterval(const Duration(milliseconds: 1));
+      expect(
+        interval.heartbeatCadence,
+        equals(LifecycleInterval.standard.heartbeatCadence),
+      );
+      expect(interval.heartbeatCadence, greaterThan(Duration.zero));
     });
   });
 
@@ -539,8 +579,9 @@ void main() {
   group('presence characteristic', () {
     test('control service includes a notify-only presence characteristic', () {
       final svc = buildControlService();
-      final presence = svc.characteristics
-          .firstWhere((c) => c.uuid.toLowerCase() == presenceCharUuid);
+      final presence = svc.characteristics.firstWhere(
+        (c) => c.uuid.toLowerCase() == presenceCharUuid,
+      );
       expect(presence.properties.canNotify, isTrue);
       expect(presence.properties.canWrite, isFalse);
       expect(presence.properties.canRead, isFalse);
