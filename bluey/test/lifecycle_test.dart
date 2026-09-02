@@ -500,6 +500,21 @@ void main() {
       expect(result, equals(defaultLifecycleInterval));
     });
 
+    // 22b. I358: a zero interval is malformed — never hand the heartbeat
+    // scheduler a zero cadence (busy-loop in release builds).
+    test('decodeInterval with zero interval returns default', () {
+      final result = decodeInterval(encodeInterval(Duration.zero));
+      expect(result, equals(defaultLifecycleInterval));
+    });
+
+    // 22c. I358: a negative interval is malformed for the same reason.
+    test('decodeInterval with negative interval returns default', () {
+      final result = decodeInterval(
+        encodeInterval(const Duration(milliseconds: -1)),
+      );
+      expect(result, equals(defaultLifecycleInterval));
+    });
+
     // 23. encodeInterval/decodeInterval round-trip
     test('encodeInterval/decodeInterval round-trip', () {
       const original = Duration(seconds: 42);

@@ -364,9 +364,14 @@ class LifecycleClient {
             .then((bytes) {
               if (!_isRunning) return;
               final serverInterval = lifecycle.decodeInterval(bytes);
-              final heartbeatInterval = Duration(
+              final halved = Duration(
                 milliseconds: serverInterval.inMilliseconds ~/ 2,
               );
+              // I358: decodeInterval rejects non-positive values, but a
+              // 1ms interval still halves to zero. Never hand the
+              // scheduler a non-positive cadence.
+              final heartbeatInterval =
+                  halved > Duration.zero ? halved : _defaultHeartbeatInterval;
               _beginHeartbeat(heartbeatInterval);
             })
             .catchError((_) {
