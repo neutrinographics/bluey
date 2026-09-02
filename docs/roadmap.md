@@ -29,10 +29,11 @@ are the maintainer's to adjust.
 > handle-attributed notifications, A.2 identity-mismatch = disconnect, both
 > 2026-07-10). Since then: I346–I349 shipped (moved to the table below) and
 > `ScanMode` was wired end-to-end (`f29ec98`, 2026-08-20), which closes the
-> scan-mode half of I052 and the dead-enum half of I366. One **High** is open
-> (I353 — a documentation-honesty fix, not a runtime bug); everything else is
-> Medium or Low. The last two high-severity runtime bugs (I339, I332) shipped
-> before 2026-07-06.
+> scan-mode half of I052 and the dead-enum half of I366. On 2026-09-02 the
+> sole **High** (I353, documentation honesty) shipped alongside two latent
+> hazards (I358, I368); **no High is open** — everything is Medium or Low.
+> The last two high-severity runtime bugs (I339, I332) shipped before
+> 2026-07-06.
 
 ## Guardrails (design invariants)
 
@@ -127,7 +128,6 @@ The Bluey lifecycle protocol, stable peer identity, and peer discovery.
 
 - ☐ **Medium** — [Fix the LifecycleServer activity/timer race](backlog/I072-lifecycle-server-record-activity-race.md) · `recordActivity` does a check-then-act on the heartbeat timer map (single-threaded, defensive).
 - ☐ **Medium** — [Honest peer-upgrade failure semantics](backlog/I356-peer-upgrade-failure-semantics.md) · Transient failures become "not a peer"; unreadable identity fabricates a random ServerId (audit DA-06/07).
-- ☐ **Medium** — [Clamp malformed lifecycle intervals](backlog/I358-lifecycle-interval-clamp.md) · A zero/negative served interval busy-loops the heartbeat in release builds (audit DA-10).
 - ☐ **Low** — [Extract a shared peer-builder helper](backlog/I304-peer-builder-helper-extraction.md) · Two sites duplicate `PeerConnection` / `LifecycleClient` construction.
 - ☐ **Low** — [Remove the dormant silence-eviction machinery](backlog/I340-remove-dormant-silence-eviction-machinery.md) · Deferred cleanup of the reserved ATT-status eviction path — hold until Pattern B soaks in production.
 - ☐ **Low** — [Retry failed presence subscriptions](backlog/I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) · A failed presence-characteristic subscription leaves an iOS-server peer's disconnect undetectable.
@@ -147,11 +147,9 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 
 Architecture / DDD refinement and test-fixture consistency — no user-visible behavior change.
 
-- ☐ **High** — [Correct docs advertising unshipped features](backlog/I353-docs-overstate-shipped-features.md) · README claims bond/PHY/conn-params ship; no platform has them (audit DA-01 — the sole MAJOR).
 - ☐ **Medium** — [Set up continuous integration](backlog/I351-continuous-integration.md) · No CI exists; all six test gates (4 Dart, Gradle, XCTest) run only by hand.
 - ☐ **Medium** — [Remove or wire the inert plumbing](backlog/I364-remove-inert-plumbing.md) · User-op accounting never engages; `GattException`/`GattStatus` are dead types consumers can catch in vain (audit DA-20/21r).
 - ☐ **Medium** — [Emit missing events + test the event bus](backlog/I365-events-emission-and-coverage.md) · `bluey.events` shows connects but never disconnects; 13 emitted types untested; two channels double-emit (audit DA-22/36).
-- ☐ **Medium** — [Make dispose terminal for Scanner/Server](backlog/I368-dispose-terminal-flag.md) · Post-dispose scan()/addService partially restarts over closed controllers (audit DA-26).
 - ☐ **Medium** — [Consolidate test doubles onto the fake](backlog/I375-test-double-consolidation.md) · Four diverged hand-rolled mocks, remaining SUT bypasses, legacy boolean seams, fixture duplication (audit DA-38/39, NT-13/14).
 - ☐ **Low** — [Stop the domain catching Flutter's PlatformException](backlog/I308-domain-catches-flutter-platform-exception.md) · The domain catch ladder depends on a Flutter framework type.
 - ☐ **Low** — [Route the domain through abstract repositories](backlog/I309-domain-imports-platform-interface-types-directly.md) · The domain imports platform-interface types directly instead of via a port.
@@ -262,6 +260,9 @@ carries the detail and the shipping commit. Sorted by ID.
 | [I347](backlog/I347-fake-platform-role-reversal-att-blackhole.md) | Make the role-reversal ATT blackhole injectable in the fake | `148c935` (audit R12) |
 | [I348](backlog/I348-fake-platform-inherited-central-before-advertising.md) | Accept inherited centrals before advertising in the fake | `148c935` (audit R12) |
 | [I349](backlog/I349-peer-connect-waits-full-scan-window.md) | Peer connect waited out the full scan window; now probe-as-you-scan | `7816490` |
+| [I353](backlog/I353-docs-overstate-shipped-features.md) | Docs advertised bonding / PHY / connection parameters as shipped (audit DA-01) | `e5e86da` |
+| [I358](backlog/I358-lifecycle-interval-clamp.md) | Malformed (non-positive) lifecycle interval busy-looped the heartbeat in release builds (audit DA-10) | `ed89d09` |
+| [I368](backlog/I368-dispose-terminal-flag.md) | Scanner/Server dispose was not terminal; post-dispose calls restarted over closed controllers (audit DA-26) | `5a85cf3` |
 
 ## Limitations (wontfix)
 

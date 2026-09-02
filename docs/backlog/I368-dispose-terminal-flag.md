@@ -4,8 +4,9 @@ title: Make dispose terminal: reject post-dispose use of Scanner and Server
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-07-10
+status: fixed
+last_verified: 2026-09-02
+fixed_in: 5a85cf3
 related: [I094, I095]
 ---
 

@@ -4,8 +4,9 @@ title: Clamp malformed lifecycle intervals to a safe floor
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-07-10
+status: fixed
+last_verified: 2026-09-02
+fixed_in: ed89d09
 ---
 
 ## Symptom

@@ -4,8 +4,9 @@ title: Correct product docs that advertise unshipped features as complete
 category: bug
 severity: high
 platform: both
-status: open
-last_verified: 2026-07-10
+status: fixed
+last_verified: 2026-09-02
+fixed_in: e5e86da
 related: [I035]
 ---
 
