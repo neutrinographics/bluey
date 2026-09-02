@@ -113,6 +113,10 @@ class BlueyServer implements Server {
   // [_invalidated] to true and tears down owned streams + caches.
   // Subsequent public calls throw [StaleHandleException].
   bool _invalidated = false;
+
+  /// Set by [dispose]. Terminal: a disposed server rejects further calls
+  /// instead of partially restarting over closed controllers (I368).
+  bool _disposed = false;
   BluetoothState? _invalidationState;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;
 
@@ -360,6 +364,12 @@ class BlueyServer implements Server {
   /// Throws [StaleHandleException] if this server has been invalidated
   /// by a prior adapter-state transition.
   void _ensureValid() {
+    if (_disposed) {
+      throw StateError(
+        'Server has been disposed; construct a fresh one via '
+        'Bluey.server() rather than reusing this instance.',
+      );
+    }
     if (_invalidated) {
       throw StaleHandleException(
         triggeringState: _invalidationState!,
@@ -891,6 +901,9 @@ class BlueyServer implements Server {
         _advertisingState == AdvertisingState.advertising) {
       await stopAdvertising();
     }
+    // Flip the terminal flag after the internal stopAdvertising above,
+    // which goes through _ensureValid and must not be rejected.
+    _disposed = true;
 
     _lifecycle.dispose();
 

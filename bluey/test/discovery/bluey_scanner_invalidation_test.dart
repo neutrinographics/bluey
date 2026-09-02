@@ -24,6 +24,30 @@ void main() {
     await fakePlatform.dispose();
   });
 
+  group('I368 — dispose is terminal', () {
+    test('scan() after dispose throws StateError', () async {
+      final scanner = bluey.scanner();
+
+      scanner.dispose();
+
+      expect(() => scanner.scan(), throwsStateError);
+    });
+
+    test('scan() after dispose does not start a platform scan', () async {
+      final scanner = bluey.scanner();
+      scanner.dispose();
+
+      try {
+        scanner.scan();
+      } on StateError {
+        // expected
+      }
+      await pumpEventQueue();
+
+      expect(fakePlatform.isScanning, isFalse);
+    });
+  });
+
   group('Scanner adapter-state invalidation', () {
     test('subsequent scan() throws StaleHandleException after off', () async {
       final scanner = bluey.scanner();

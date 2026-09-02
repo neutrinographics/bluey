@@ -2477,6 +2477,29 @@ void main() {
       });
     });
 
+    group('I368 — dispose is terminal', () {
+      test('addService after dispose throws StateError', () async {
+        final server = bluey.server()!;
+
+        await server.dispose();
+
+        expect(
+          () => server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          throwsStateError,
+        );
+      });
+
+      test('startAdvertising after dispose throws StateError', () async {
+        final server = bluey.server()!;
+
+        await server.dispose();
+
+        expect(() => server.startAdvertising(), throwsStateError);
+      });
+    });
+
     group('I333 — adapter-state invalidation', () {
       test('invalidates on stateStream emitting off', () async {
         final server = bluey.server()!;
