@@ -45,9 +45,8 @@ class BlueyScanner implements Scanner {
   // Subsequent [scan] calls throw [StaleHandleException].
   bool _invalidated = false;
 
-  /// Set by [dispose]. Terminal: a disposed scanner rejects further
-  /// [scan] calls instead of partially restarting over closed
-  /// controllers (I368).
+  /// A disposed scanner must refuse new work: its controllers are closed,
+  /// so a late [scan] would otherwise restart over dead streams (I368).
   bool _disposed = false;
   BluetoothState? _invalidationState;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;

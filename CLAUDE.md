@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
 - **Coverage targets**: 90% minimum for domain layer, 80% overall.
+- **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
 
 ## Project Overview
 

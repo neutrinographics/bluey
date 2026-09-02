@@ -516,14 +516,11 @@ void main() {
       },
     );
 
-    // 5c/5d. I358: a hostile/buggy server serving a non-positive interval
-    // (or one so small that halving it yields zero) must never reach the
-    // heartbeat scheduler as a zero cadence. In debug builds the monitor's
-    // assert trips and the read-failure fallback rescues it; in release
-    // builds the assert is stripped and the heartbeat busy-loops. The
-    // observable that distinguishes "guarded" from "rescued by the assert"
-    // is the interval log: exactly one "heartbeat interval set", at the
-    // default cadence (10s / 2 = 5s), and never one at <= 0ms.
+    // 5c. I358: a served interval that is (or halves to) zero would
+    // busy-loop the heartbeat in release builds. These assert on the
+    // interval log rather than heartbeat timing because in debug builds the
+    // monitor's assert plus the read-failure fallback already rescue the
+    // timing, which would hide the missing guard.
     for (final (label, served) in [
       ('zero', Duration.zero),
       ('negative', const Duration(milliseconds: -1)),

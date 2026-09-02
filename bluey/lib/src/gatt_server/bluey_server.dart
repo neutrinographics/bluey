@@ -114,8 +114,8 @@ class BlueyServer implements Server {
   // Subsequent public calls throw [StaleHandleException].
   bool _invalidated = false;
 
-  /// Set by [dispose]. Terminal: a disposed server rejects further calls
-  /// instead of partially restarting over closed controllers (I368).
+  /// A disposed server must refuse new work: its controllers are closed,
+  /// so a late call would otherwise restart over dead streams (I368).
   bool _disposed = false;
   BluetoothState? _invalidationState;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;
@@ -358,6 +358,16 @@ class BlueyServer implements Server {
     _setAdvertisingState(AdvertisingState.invalidated);
     if (!_advertisingStateController.isClosed) {
       _advertisingStateController.close();
+    }
+  }
+
+  /// Advertising must end through the public path so its state machine and
+  /// logging stay consistent; that path is guarded, so it has to run before
+  /// this server is marked disposed.
+  Future<void> _stopAdvertisingIfActive() async {
+    if (!_invalidated &&
+        _advertisingState == AdvertisingState.advertising) {
+      await stopAdvertising();
     }
   }
 
@@ -897,12 +907,7 @@ class BlueyServer implements Server {
 
   @override
   Future<void> dispose() async {
-    if (!_invalidated &&
-        _advertisingState == AdvertisingState.advertising) {
-      await stopAdvertising();
-    }
-    // Flip the terminal flag after the internal stopAdvertising above,
-    // which goes through _ensureValid and must not be rejected.
+    await _stopAdvertisingIfActive();
     _disposed = true;
 
     _lifecycle.dispose();

@@ -364,15 +364,7 @@ class LifecycleClient {
             .then((bytes) {
               if (!_isRunning) return;
               final serverInterval = lifecycle.decodeInterval(bytes);
-              final halved = Duration(
-                milliseconds: serverInterval.inMilliseconds ~/ 2,
-              );
-              // I358: decodeInterval rejects non-positive values, but a
-              // 1ms interval still halves to zero. Never hand the
-              // scheduler a non-positive cadence.
-              final heartbeatInterval =
-                  halved > Duration.zero ? halved : _defaultHeartbeatInterval;
-              _beginHeartbeat(heartbeatInterval);
+              _beginHeartbeat(_heartbeatCadenceFor(serverInterval));
             })
             .catchError((_) {
               if (!_isRunning) return;
@@ -594,6 +586,16 @@ class LifecycleClient {
         'newHandle': heartbeatChar.handle.value,
       },
     );
+  }
+
+  /// The cadence to probe a server that asked to hear from us every
+  /// [serverInterval]: half of it, so a heartbeat always lands inside the
+  /// server's silence window. A served interval too small to halve would
+  /// otherwise busy-loop the scheduler (I358), so it falls back to the
+  /// default cadence.
+  Duration _heartbeatCadenceFor(Duration serverInterval) {
+    final halved = Duration(milliseconds: serverInterval.inMilliseconds ~/ 2);
+    return halved > Duration.zero ? halved : _defaultHeartbeatInterval;
   }
 
   Duration get _defaultHeartbeatInterval => Duration(

@@ -37,11 +37,7 @@ void main() {
       final scanner = bluey.scanner();
       scanner.dispose();
 
-      try {
-        scanner.scan();
-      } on StateError {
-        // expected
-      }
+      expect(() => scanner.scan(), throwsStateError);
       await pumpEventQueue();
 
       expect(fakePlatform.isScanning, isFalse);

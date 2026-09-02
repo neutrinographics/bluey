@@ -230,9 +230,9 @@ const lifecycleCodec = LifecycleCodec();
 /// Decodes a 4-byte little-endian interval value (in milliseconds) from the
 /// interval characteristic.
 ///
-/// Malformed input — too short, zero, or negative — decodes to
-/// [defaultLifecycleInterval]. A non-positive interval would otherwise
-/// drive the client's heartbeat scheduler to a zero cadence (I358).
+/// Malformed input decodes to [defaultLifecycleInterval] because a
+/// non-positive interval would drive the client's heartbeat scheduler to a
+/// zero cadence (I358).
 Duration decodeInterval(Uint8List bytes) {
   if (bytes.length < 4) {
     return defaultLifecycleInterval;
