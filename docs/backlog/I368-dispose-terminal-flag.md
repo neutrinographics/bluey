@@ -6,7 +6,7 @@ severity: medium
 platform: domain
 status: fixed
 last_verified: 2026-09-02
-fixed_in: 5a85cf3
+fixed_in: 5a85cf3, 56df832
 related: [I094, I095]
 ---
 
@@ -28,3 +28,11 @@ Set a terminal disposed flag; reject in `_ensureValid`. Same lifecycle
 family as the never-closed controllers
 ([I094](I094-scanner-controller-never-closed.md),
 [I095](I095-server-controllers-never-closed.md)) — consider one pass.
+
+## Resolution
+
+Shipped as a `StaleHandleException` carrying an `InvalidationCause`
+(`AdapterTransitionInvalidation` or `DisposalInvalidation`) rather than a
+separate disposed flag: dispose and adapter invalidation are two causes of
+the same terminal state, so they share one exception, one field, and one
+guard in Scanner, Server, and Connection.

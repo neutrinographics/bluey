@@ -262,7 +262,7 @@ carries the detail and the shipping commit. Sorted by ID.
 | [I349](backlog/I349-peer-connect-waits-full-scan-window.md) | Peer connect waited out the full scan window; now probe-as-you-scan | `7816490` |
 | [I353](backlog/I353-docs-overstate-shipped-features.md) | Docs advertised bonding / PHY / connection parameters as shipped (audit DA-01) | `e5e86da` |
 | [I358](backlog/I358-lifecycle-interval-clamp.md) | Malformed (non-positive) lifecycle interval busy-looped the heartbeat in release builds (audit DA-10) | `ed89d09` |
-| [I368](backlog/I368-dispose-terminal-flag.md) | Scanner/Server dispose was not terminal; post-dispose calls restarted over closed controllers (audit DA-26) | `5a85cf3` |
+| [I368](backlog/I368-dispose-terminal-flag.md) | Scanner/Server dispose was not terminal; post-dispose calls restarted over closed controllers (audit DA-26) | `5a85cf3`, `56df832` |
 
 ## Limitations (wontfix)
 
