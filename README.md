@@ -5,8 +5,8 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 ## 🎯 Project Status
 
 **Phase 1: Core Foundation** ✅ COMPLETE  
-**Phase 2: Android Platform** ✅ COMPLETE  
-**Phase 3: iOS Platform** 🚧 PLANNED  
+**Phase 2: Android Platform** ✅ COMPLETE (bonding / PHY / connection parameters still planned — see below)  
+**Phase 3: iOS Platform** ✅ COMPLETE  
 
 ### Current Capabilities
 
@@ -20,9 +20,18 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 - ✅ Peripheral role (advertising)
 - ✅ Server request/response handling
 - ✅ Notifications and indications
-- ✅ Bonding/pairing support
-- ✅ PHY (Physical Layer) configuration
-- ✅ Connection parameter control
+- ✅ Peer identity and lifecycle protocol (`ServerId`, `connectAsPeer`)
+- ✅ Structured logging (domain + native)
+- 🚧 Bonding/pairing — **planned**, not yet shipped on any platform
+- 🚧 PHY (Physical Layer) configuration — **planned**, not yet shipped on any platform
+- 🚧 Connection parameter control — **planned**, not yet shipped on any platform
+
+> **Honesty note:** the `connection.android` API surface for bonding, PHY, and
+> connection parameters exists so the platform asymmetry is visible at compile
+> time, but every one of those members currently throws `UnimplementedError`
+> on Android and is `null` on iOS. Native wiring is tracked as
+> [I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md). Do not select
+> Bluey for those capabilities yet.
 
 ## 📦 Packages
 
@@ -134,10 +143,10 @@ Dart suites (counts drift as the suite grows; treat as indicative):
 
 | Package | Dart tests | Native suite |
 |---------|-----------|--------------|
-| bluey | ~1000 | — |
-| bluey_platform_interface | ~65 | — |
-| bluey_android | ~76 | Kotlin/JVM (`./gradlew test`) |
-| bluey_ios | ~92 | XCTest (`RunnerTests`) |
+| bluey | ~1100 | — |
+| bluey_platform_interface | ~80 | — |
+| bluey_android | ~85 | Kotlin/JVM (`./gradlew test`) |
+| bluey_ios | ~100 | XCTest (`RunnerTests`) |
 
 Domain-layer coverage target is 90%, overall 80% (`flutter test --coverage`).
 
@@ -318,7 +327,13 @@ await server.notify(
 await server.dispose();
 ```
 
-### Bonding/Pairing (Android-only)
+### Bonding/Pairing (Android-only — planned, not yet implemented)
+
+> ⚠️ **Not yet shipped.** The API below is the intended shape. Today every
+> member of `connection.android` for bonding, PHY, and connection parameters
+> throws `UnimplementedError`; the native + Pigeon wiring is tracked as
+> [I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md). The examples
+> in this section and the two that follow will not work until it lands.
 
 Bonding, PHY, and connection parameters are Android-only — iOS does not expose
 central-side APIs for these (per Apple's CoreBluetooth design). Access them
@@ -346,7 +361,7 @@ for (final device in bondedDevices) {
 }
 ```
 
-### PHY (Physical Layer) Configuration (Android-only)
+### PHY (Physical Layer) Configuration (Android-only — planned, not yet implemented)
 
 ```dart
 // Check current PHY (null on iOS)
@@ -365,7 +380,7 @@ await connection.android?.requestPhy(txPhy: Phy.le2m, rxPhy: Phy.le2m);
 await connection.android?.requestPhy(txPhy: Phy.leCoded, rxPhy: Phy.leCoded);
 ```
 
-### Connection Parameters (Android-only)
+### Connection Parameters (Android-only — planned, not yet implemented)
 
 ```dart
 // Check current connection parameters (null on iOS)
@@ -529,12 +544,15 @@ flutter run
 
 ## 🔜 Roadmap
 
-### Phase 3: iOS Platform (Next)
-- [ ] Set up Pigeon for iOS
-- [ ] Implement BlueyIOS platform class
-- [ ] Implement Swift plugin with CoreBluetooth
-- [ ] iOS scanner and connection manager
-- [ ] Integration tests
+The live roadmap is [`docs/roadmap.md`](docs/roadmap.md); the phases below
+are the historical milestone view.
+
+### Phase 3: iOS Platform ✅ COMPLETE
+- [x] Set up Pigeon for iOS
+- [x] Implement BlueyIOS platform class
+- [x] Implement Swift plugin with CoreBluetooth
+- [x] iOS scanner and connection manager
+- [x] Integration tests
 
 ### Phase 4: GATT Operations ✅ COMPLETE
 - [x] Service discovery
@@ -543,15 +561,17 @@ flutter run
 - [x] Descriptor operations
 - [x] MTU negotiation
 
-### Phase 5: Advanced Features ✅ COMPLETE
+### Phase 5: Advanced Features 🚧 IN PROGRESS
 - [x] Peripheral role (advertising)
-- [x] Bonding/pairing
-- [x] PHY (Physical Layer) configuration
-- [x] Connection parameter control
 - [x] Server request/response handling
+- [x] Peer identity + lifecycle protocol
+- [x] Structured logging
+- [ ] Bonding/pairing ([I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md))
+- [ ] PHY (Physical Layer) configuration ([I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md))
+- [ ] Connection parameter control ([I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md))
 - [ ] Background operation support
 - [ ] Connection pooling
-- [ ] Reconnection strategies
+- [ ] Reconnection strategies ([I378](docs/backlog/I378-client-reconnection-policy.md))
 
 ### Phase 6: Desktop Platforms
 - [ ] macOS support

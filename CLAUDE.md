@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (543 tests)
+bluey/                         Main library - domain models, public API, tests (1092 tests)
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
@@ -139,7 +139,7 @@ The domain layer uses bounded-context-aligned vocabulary; the platform-interface
 | **Peer** (`BlueyPeer`) | Peer | A `Device` (or, server-side, a `Client`) that speaks the Bluey lifecycle protocol. Promotion to peer happens only after control-service discovery; raw connections are protocol-free. |
 | **PeerConnection** | Peer | A `Connection` wrapped with a stable `ServerId` and the lifecycle-protocol disconnect path. Composition over inheritance — `peer.connection` exposes the raw GATT surface. |
 | **ServerId** | Peer | The stable identity advertised through the lifecycle control service. Survives MAC randomization on Android and CBPeripheral identifier rotation on iOS. |
-| **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `disconnectCentral`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
+| **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `centralConnections`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
 | **AttributeHandle** | Connection / GATT Client | Opaque platform-assigned identifier for a service / characteristic / descriptor. Valid only within one connection; invalidated on disconnect or Service Changed. |
 
 #### Quick reference (use / avoid)
