@@ -16,6 +16,10 @@
   that is zero, negative, or too small to halve no longer drives the client
   heartbeat to a zero cadence; the new `LifecycleInterval` value object owns
   that rule and decodes malformed wire values to the protocol default.
+  **Behavior change:** `Bluey.server(lifecycleInterval:)` now throws
+  `ArgumentError` for an interval shorter than `LifecycleInterval.minimum`
+  (2 ms) instead of accepting a configuration that times out every client
+  before its first heartbeat.
 
 ## 0.5.0
 

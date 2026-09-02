@@ -524,7 +524,7 @@ void main() {
     for (final (label, served) in [
       ('zero', Duration.zero),
       ('negative', const Duration(milliseconds: -1)),
-      ('1ms (halves to zero)', const Duration(milliseconds: 1)),
+      ('sub-minimum (1ms)', const Duration(milliseconds: 1)),
     ]) {
       test('start() clamps a $label served interval to the default '
           'heartbeat cadence without tripping the fallback', () {

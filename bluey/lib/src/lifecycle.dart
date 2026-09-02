@@ -231,18 +231,26 @@ const lifecycleCodec = LifecycleCodec();
 /// How often a Bluey server expects to hear from a connected client — the
 /// value it serves through the interval characteristic.
 ///
-/// Exists so the interval's one invariant (it must be positive) and the
-/// client-side rule derived from it ([heartbeatCadence]) live in one place.
-/// A non-positive interval would otherwise drive the client's heartbeat
-/// scheduler to a zero cadence (I358).
+/// Exists so the interval's one invariant and the client-side rule derived
+/// from it ([heartbeatCadence]) live in one place. The invariant is that the
+/// interval is at least [minimum]: shorter, and the client's probing cadence
+/// could not fit inside the server's silence window without collapsing to
+/// zero (I358).
 @immutable
 class LifecycleInterval {
   final Duration value;
   const LifecycleInterval._(this.value);
 
+  /// The shortest interval whose [heartbeatCadence] is still positive.
+  static const Duration minimum = Duration(milliseconds: 2);
+
   factory LifecycleInterval(Duration value) {
-    if (value <= Duration.zero) {
-      throw ArgumentError.value(value, 'value', 'must be positive');
+    if (value < minimum) {
+      throw ArgumentError.value(
+        value,
+        'value',
+        'must be at least $minimum so a heartbeat cadence fits inside it',
+      );
     }
     return LifecycleInterval._(value);
   }
@@ -254,24 +262,22 @@ class LifecycleInterval {
   );
 
   /// Decodes the 4-byte little-endian millisecond wire value. Malformed
-  /// input (too short, zero, or negative) decodes to [standard] because a
+  /// input (too short, or below [minimum]) decodes to [standard] because a
   /// client with no cadence at all would be worse than one probing at the
   /// protocol default.
   factory LifecycleInterval.decode(Uint8List bytes) {
     if (bytes.length < 4) return standard;
     final ms = ByteData.sublistView(bytes).getInt32(0, Endian.little);
-    if (ms <= 0) return standard;
+    if (ms < minimum.inMilliseconds) return standard;
     return LifecycleInterval._(Duration(milliseconds: ms));
   }
 
   /// How often a client should probe a server that serves this interval:
   /// half of it, so a heartbeat always lands inside the server's silence
-  /// window. Never zero — an interval too small to halve yields the
-  /// [standard] cadence instead of a busy-loop.
-  Duration get heartbeatCadence {
-    final halved = Duration(milliseconds: value.inMilliseconds ~/ 2);
-    return halved > Duration.zero ? halved : standard.heartbeatCadence;
-  }
+  /// window. Positive by construction, because [value] is at least
+  /// [minimum].
+  Duration get heartbeatCadence =>
+      Duration(milliseconds: value.inMilliseconds ~/ 2);
 
   @override
   bool operator ==(Object other) =>

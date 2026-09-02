@@ -125,7 +125,7 @@ class BlueyServer implements Server {
        _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
-      interval: lifecycleInterval,
+      interval: _validatedLifecycleInterval(lifecycleInterval),
       serverId: _serverId,
       onClientGone: _handleLifecycleSilence,
       onExplicitDisconnect: _handleClientDisconnected,
@@ -355,13 +355,20 @@ class BlueyServer implements Server {
     }
   }
 
-  /// Advertising must end through the public path so its state machine and
-  /// logging stay consistent; that path is guarded, so it has to run before
-  /// this server is marked disposed.
+  /// A server that serves an interval the protocol cannot honor would time
+  /// out every client before its first probe; failing at construction is
+  /// kinder than a server that silently sheds peers. `null` disables the
+  /// lifecycle protocol and is passed through.
+  static Duration? _validatedLifecycleInterval(Duration? interval) =>
+      interval == null ? null : lifecycle.LifecycleInterval(interval).value;
+
+  /// Dispose stops advertising after the server is already terminal, so it
+  /// cannot go through the guarded public path. Skipped after an adapter
+  /// transition: the platform advertiser is gone with the adapter.
   Future<void> _stopAdvertisingIfActive() async {
-    if (_invalidation == null &&
+    if (_invalidation is! AdapterTransitionInvalidation &&
         _advertisingState == AdvertisingState.advertising) {
-      await stopAdvertising();
+      await _stopAdvertisingUnguarded();
     }
   }
 
@@ -391,7 +398,7 @@ class BlueyServer implements Server {
       // value followed by `onDone`. Matches the explicit pattern used
       // in `BlueyConnection.stateChanges` so all Type A streams in
       // bluey share the same late-subscriber shape.
-      if (_invalidation != null) {
+      if (_invalidation is AdapterTransitionInvalidation) {
         controller.add(AdvertisingState.invalidated);
         controller.close();
         return;
@@ -666,7 +673,11 @@ class BlueyServer implements Server {
   Future<void> stopAdvertising() async {
     _ensureValid();
     _logger.log(BlueyLogLevel.info, 'bluey.server', 'stopAdvertising invoked');
-    // Idempotent: nothing to do unless we are currently advertising.
+    await _stopAdvertisingUnguarded();
+  }
+
+  /// Idempotent: nothing to do unless we are currently advertising.
+  Future<void> _stopAdvertisingUnguarded() async {
     if (_advertisingState != AdvertisingState.advertising) return;
     _setAdvertisingState(AdvertisingState.stopping);
     await _platform.stopAdvertising();
@@ -895,8 +906,8 @@ class BlueyServer implements Server {
 
   @override
   Future<void> dispose() async {
-    await _stopAdvertisingIfActive();
     _invalidation ??= const DisposalInvalidation();
+    await _stopAdvertisingIfActive();
 
     _lifecycle.dispose();
 

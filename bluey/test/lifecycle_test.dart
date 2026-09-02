@@ -553,14 +553,27 @@ void main() {
       expect(interval.heartbeatCadence, equals(const Duration(seconds: 10)));
     });
 
-    test('heartbeatCadence never reaches zero — a 1ms interval falls back '
-        'to the standard cadence', () {
-      final interval = LifecycleInterval(const Duration(milliseconds: 1));
+    test('LifecycleInterval rejects an interval too short to halve', () {
       expect(
-        interval.heartbeatCadence,
-        equals(LifecycleInterval.standard.heartbeatCadence),
+        () => LifecycleInterval(const Duration(milliseconds: 1)),
+        throwsArgumentError,
       );
+      expect(LifecycleInterval(LifecycleInterval.minimum), isNotNull);
+    });
+
+    test('LifecycleInterval.decode with a sub-minimum value yields the '
+        'standard', () {
+      final decoded = LifecycleInterval.decode(
+        encodeInterval(const Duration(milliseconds: 1)),
+      );
+      expect(decoded, equals(LifecycleInterval.standard));
+    });
+
+    test('heartbeatCadence of the minimum interval is positive and within '
+        'the interval', () {
+      final interval = LifecycleInterval(LifecycleInterval.minimum);
       expect(interval.heartbeatCadence, greaterThan(Duration.zero));
+      expect(interval.heartbeatCadence, lessThan(interval.value));
     });
   });
 

@@ -25,6 +25,16 @@ void main() {
   });
 
   group('I368 — dispose is terminal', () {
+    test('a late stateChanges subscriber after dispose sees the current '
+        'state, not invalidated', () async {
+      final scanner = bluey.scanner();
+
+      scanner.dispose();
+
+      expect(await scanner.stateChanges.toList(), equals([ScanState.stopped]));
+      expect(scanner.state, equals(ScanState.stopped));
+    });
+
     test('scan() after dispose throws StaleHandleException caused by '
         'disposal', () async {
       final scanner = bluey.scanner();

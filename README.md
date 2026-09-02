@@ -28,8 +28,11 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 
 > **Honesty note:** the `connection.android` API surface for bonding, PHY, and
 > connection parameters exists so the platform asymmetry is visible at compile
-> time, but every one of those members currently throws `UnimplementedError`
-> on Android and is `null` on iOS. Native wiring is tracked as
+> time, but the features are **unsupported on every platform today**:
+> `bluey.capabilities.canBond`, `canRequestPhy`, and
+> `canRequestConnectionParameters` are `false`, every one of those members
+> throws `UnsupportedOperationException` on Android, and the accessor is `null`
+> on iOS. Native wiring is tracked as
 > [I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md). Do not select
 > Bluey for those capabilities yet.
 
@@ -329,9 +332,12 @@ await server.dispose();
 
 ### Bonding/Pairing (Android-only — planned, not yet implemented)
 
-> ⚠️ **Not yet shipped.** The API below is the intended shape. Today every
-> member of `connection.android` for bonding, PHY, and connection parameters
-> throws `UnimplementedError`; the native + Pigeon wiring is tracked as
+> ⚠️ **Not yet shipped.** The API below is the intended shape. Today the
+> capability flags are `false` and every member of `connection.android` for
+> bonding, PHY, and connection parameters throws
+> `UnsupportedOperationException`; check `bluey.capabilities.canBond` /
+> `canRequestPhy` / `canRequestConnectionParameters` before calling. The
+> native + Pigeon wiring is tracked as
 > [I035](docs/backlog/I035-android-bond-phy-conn-param-stubs.md). The examples
 > in this section and the two that follow will not work until it lands.
 

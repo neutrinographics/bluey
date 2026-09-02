@@ -156,7 +156,7 @@ class BlueyScanner implements Scanner {
       // followed by `onDone`. Matches the explicit pattern used in
       // `BlueyConnection.stateChanges` so all Type A streams in bluey
       // share the same late-subscriber shape.
-      if (_invalidation != null) {
+      if (_invalidation is AdapterTransitionInvalidation) {
         controller.add(ScanState.invalidated);
         controller.close();
         return;

@@ -2477,6 +2477,42 @@ void main() {
     });
 
     group('I368 — dispose is terminal', () {
+      test('a call issued before dispose() first yields is rejected',
+          () async {
+        final server = bluey.server()!;
+
+        final disposing = server.dispose();
+
+        expect(
+          () => server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          throwsA(isA<StaleHandleException>()),
+        );
+        await disposing;
+      });
+
+      test('a late advertisingStateChanges subscriber after dispose sees the '
+          'current state, not invalidated', () async {
+        final server = bluey.server()!;
+
+        await server.dispose();
+
+        expect(
+          await server.advertisingStateChanges.toList(),
+          equals([AdvertisingState.idle]),
+        );
+        expect(server.advertisingState, equals(AdvertisingState.idle));
+      });
+
+      test('a lifecycle interval too short to halve is rejected at the '
+          'server boundary', () {
+        expect(
+          () => bluey.server(lifecycleInterval: const Duration(milliseconds: 1)),
+          throwsArgumentError,
+        );
+      });
+
       test('addService after dispose throws StaleHandleException caused by '
           'disposal', () async {
         final server = bluey.server()!;
