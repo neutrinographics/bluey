@@ -5,7 +5,7 @@ category: bug
 severity: medium
 platform: both
 status: open
-last_verified: 2026-07-10
+last_verified: 2026-09-02
 related: [I014, I052]
 ---
 
@@ -13,8 +13,9 @@ related: [I014, I052]
 
 Scan results promise data that is never real: `isConnectable` is
 hardcoded `true`, `serviceData` is always empty, `txPowerLevel` always
-null (the platform DTO carries neither), and the `ScanMode` enum has
-zero references (audit DA-23).
+null (the platform DTO carries neither) (audit DA-23). The audit also
+flagged `ScanMode` as a dead enum; that half was wired end-to-end in
+`f29ec98` (2026-08-20) and is no longer part of this item.
 
 ## Location
 
@@ -25,7 +26,7 @@ advertisement parsing on both platforms.
 ## Notes
 
 Thread the fields through `PlatformDevice` and native parsing — or
-remove them until supported. Wire or delete `ScanMode`. Adjacent to
+remove them until supported. Adjacent to
 [I014](I014-manufacturer-data-only-first-entry.md) and
 [I052](I052-scan-options-not-exposed.md); consider doing the
 advertisement-data plumbing as one pass.

@@ -5,7 +5,7 @@ category: bug
 severity: medium
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-09-02
 historical_ref: BUGS-ANALYSIS-#15
 ---
 

@@ -5,7 +5,7 @@ category: no-op
 severity: medium
 platform: android
 status: open
-last_verified: 2026-04-26
+last_verified: 2026-09-02
 stage_a_fixed_in: cb1b24f
 related: [I030, I031, I032, I033, I034, I065, I066]
 ---

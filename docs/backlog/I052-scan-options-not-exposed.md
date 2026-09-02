@@ -5,14 +5,14 @@ category: unimplemented
 severity: medium
 platform: both
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-09-02
 ---
 
 ## Symptom
 
 `Bluey.scan(...)` exposes service-UUID filtering and a timeout. It doesn't expose:
 
-- **Scan mode** (Android): `SCAN_MODE_LOW_POWER` / `BALANCED` / `LOW_LATENCY`. Currently hardcoded.
+- ~~**Scan mode** (Android)~~ — **shipped** in `f29ec98` (2026-08-20): `Scanner.scan({mode})` → `PlatformScanConfig.scanMode` → `ScanSettings`; null keeps the historical `LOW_LATENCY` default, iOS ignores it.
 - **Allow-duplicates / report mode** (Android `REPORT_DELAY` + `SCAN_RESULT_TYPE_FULL|ABBREVIATED`; iOS `CBCentralManagerScanOptionAllowDuplicatesKey`): by default iOS deduplicates the same peripheral unless this key is set; apps that want RSSI updates need dup-allow.
 - **RSSI threshold filter** (Android 8+ via `ScanFilter.Builder().setRssiRange(...)`): pre-filter at OS level.
 - **Manufacturer-data filter** (Android `ScanFilter.Builder().setManufacturerData(...)`): filter by company ID and pattern.
@@ -22,7 +22,7 @@ last_verified: 2026-04-23
 
 ## Location
 
-`bluey_android/.../Scanner.kt` — hardcoded scan settings and filters built from service UUIDs only.
+`bluey_android/.../Scanner.kt` — scan mode is now mapped from the config; filters are still built from service UUIDs only and the remaining settings are hardcoded.
 
 `bluey_ios/.../CentralManagerImpl.swift` — `scanForPeripherals(withServices: options:)` call with `options = nil`.
 

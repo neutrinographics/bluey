@@ -4,7 +4,7 @@ title: `Client.id` is not the same identifier `Server.disconnections` emits, bre
 category: bug
 severity: high
 platform: both
-status: resolved
+status: fixed
 last_verified: 2026-05-29
 related: []
 ---

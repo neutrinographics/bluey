@@ -4,7 +4,7 @@ title: Add a write-integrity stress test (sequenced WriteNoResponse + server-sid
 category: enhancement
 severity: low
 platform: domain
-status: done
+status: fixed
 fixed_in: e5ca4e7
 last_verified: 2026-06-03
 related: [I339, I343, I050]
