@@ -113,6 +113,13 @@ class BlueyServer implements Server {
   // [_invalidation] and tears down owned streams + caches.
   // Subsequent public calls throw [StaleHandleException].
   InvalidationCause? _invalidation;
+
+  /// Whether owned subscriptions and controllers have been released.
+  /// Kept apart from [_invalidation] because a cause can be recorded
+  /// (dispose in flight) while the resources are still live, and an
+  /// adapter transition in that window must still be allowed to release
+  /// them.
+  bool _resourcesReleased = false;
   StreamSubscription<platform.BluetoothState>? _stateSubscription;
 
   BlueyServer(
@@ -308,8 +315,8 @@ class BlueyServer implements Server {
   /// no-op. Cancels the state subscription, closes owned streams, and
   /// fails subsequent calls with [StaleHandleException].
   void _invalidate(BluetoothState triggeringState) {
-    if (_invalidation != null) return;
-    _invalidation = AdapterTransitionInvalidation(triggeringState);
+    if (_resourcesReleased) return;
+    _invalidation ??= AdapterTransitionInvalidation(triggeringState);
     _stateSubscription?.cancel();
     _stateSubscription = null;
 
@@ -353,6 +360,7 @@ class BlueyServer implements Server {
     if (!_advertisingStateController.isClosed) {
       _advertisingStateController.close();
     }
+    _resourcesReleased = true;
   }
 
   /// The public constructor takes a plain `Duration` so consumers need not
@@ -366,11 +374,29 @@ class BlueyServer implements Server {
 
   /// Dispose stops advertising after the server is already terminal, so it
   /// cannot go through the guarded public path. Skipped after an adapter
-  /// transition: the platform advertiser is gone with the adapter.
+  /// transition: the platform advertiser is gone with the adapter. A
+  /// platform failure here must not abort dispose — releasing our own
+  /// resources matters more than the advertiser's last word.
   Future<void> _stopAdvertisingIfActive() async {
-    if (_invalidation is! AdapterTransitionInvalidation &&
-        _advertisingState == AdvertisingState.advertising) {
-      await _stopAdvertisingUnguarded();
+    if (_invalidation is AdapterTransitionInvalidation ||
+        _advertisingState != AdvertisingState.advertising) {
+      return;
+    }
+    await _disposeStep('stopAdvertising', _stopAdvertisingUnguarded);
+  }
+
+  /// Runs one platform call of the dispose sequence, logging instead of
+  /// propagating a failure so the remaining steps still release resources.
+  Future<void> _disposeStep(String step, Future<void> Function() call) async {
+    try {
+      await call();
+    } catch (error) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.server',
+        'dispose step failed; continuing teardown',
+        data: {'step': step, 'error': error.toString()},
+      );
     }
   }
 
@@ -915,7 +941,7 @@ class BlueyServer implements Server {
 
     // Close the GATT server and disconnect all clients
     // This is important on Android to prevent zombie BLE connections
-    await _platform.closeServer();
+    await _disposeStep('closeServer', _platform.closeServer);
 
     await _stateSubscription?.cancel();
     _stateSubscription = null;
@@ -935,6 +961,7 @@ class BlueyServer implements Server {
     }
 
     _connectedClients.clear();
+    _resourcesReleased = true;
   }
 
   /// Tracks a peer client identified through a lifecycle write.

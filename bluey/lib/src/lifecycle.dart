@@ -244,9 +244,12 @@ class LifecycleInterval {
   /// The shortest interval whose [heartbeatCadence] spans at least one BLE
   /// connection event at the spec-minimum connection interval (7.5 ms, see
   /// `ConnectionInterval.specMinimum`) — the fastest a heartbeat write can
-  /// possibly reach the server. Stated as a literal rather than derived so
-  /// the lifecycle protocol does not depend on the Connection context; the
-  /// relationship is pinned by a test.
+  /// possibly reach the server. This is the physical floor a value object
+  /// can verify, not operating guidance: the negotiated connection interval
+  /// is a runtime property of each link, so a usable interval must be chosen
+  /// well above this (see `Bluey.server`). Stated as a literal rather than
+  /// derived so the lifecycle protocol does not depend on the Connection
+  /// context; the relationship is pinned by a test.
   static const Duration minimum = Duration(milliseconds: 15);
 
   factory LifecycleInterval(Duration value) {
