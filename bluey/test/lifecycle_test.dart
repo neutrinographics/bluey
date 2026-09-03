@@ -553,9 +553,22 @@ void main() {
       expect(interval.heartbeatCadence, equals(const Duration(seconds: 10)));
     });
 
-    test('LifecycleInterval rejects an interval too short to halve', () {
+    test('LifecycleInterval.minimum lets one heartbeat cadence span one BLE '
+        'connection event at the spec minimum interval', () {
+      expect(
+        LifecycleInterval.minimum,
+        equals(ConnectionInterval.specMinimum * 2),
+      );
+    });
+
+    test('LifecycleInterval rejects an interval the transport cannot '
+        'deliver a heartbeat within', () {
       expect(
         () => LifecycleInterval(const Duration(milliseconds: 1)),
+        throwsArgumentError,
+      );
+      expect(
+        () => LifecycleInterval(const Duration(milliseconds: 14)),
         throwsArgumentError,
       );
       expect(LifecycleInterval(LifecycleInterval.minimum), isNotNull);

@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (1115 tests)
+bluey/                         Main library - domain models, public API, tests (1117 tests)
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)

@@ -43,7 +43,7 @@ A clean, elegant Bluetooth Low Energy library for Flutter following Domain-Drive
 - **`bluey/`** - Main library with domain models and public API
 - **`bluey_platform_interface/`** - Platform abstraction layer
 - **`bluey_android/`** - Android platform implementation (Kotlin)
-- **`bluey_ios/`** - iOS platform implementation (Swift) - planned
+- **`bluey_ios/`** - iOS platform implementation (Swift)
 
 ### Example
 

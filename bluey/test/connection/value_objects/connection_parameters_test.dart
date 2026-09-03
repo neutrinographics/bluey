@@ -2,6 +2,17 @@ import 'package:bluey/bluey.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('ConnectionInterval spec bounds', () {
+    test('specMinimum is the BLE-spec floor of 7.5 ms', () {
+      expect(
+        ConnectionInterval.specMinimum,
+        equals(const Duration(microseconds: 7500)),
+      );
+      expect(ConnectionInterval(7.5), isNotNull);
+      expect(() => ConnectionInterval(7.4), throwsArgumentError);
+    });
+  });
+
   group('ConnectionParameters', () {
     test('constructs with valid interval/latency/timeout', () {
       final params = ConnectionParameters(

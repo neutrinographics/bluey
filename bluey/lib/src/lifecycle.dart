@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:meta/meta.dart';
 
+import 'connection/value_objects/connection_interval.dart';
 import 'peer/server_id.dart';
 
 /// Internal lifecycle management for Bluey peer-to-peer connections.
@@ -233,16 +234,18 @@ const lifecycleCodec = LifecycleCodec();
 ///
 /// Exists so the interval's one invariant and the client-side rule derived
 /// from it ([heartbeatCadence]) live in one place. The invariant is that the
-/// interval is at least [minimum]: shorter, and the client's probing cadence
-/// could not fit inside the server's silence window without collapsing to
-/// zero (I358).
+/// interval is at least [minimum]: shorter, and the server's silence timer
+/// would fire before the transport could physically carry a heartbeat
+/// across the link (I358).
 @immutable
 class LifecycleInterval {
   final Duration value;
   const LifecycleInterval._(this.value);
 
-  /// The shortest interval whose [heartbeatCadence] is still positive.
-  static const Duration minimum = Duration(milliseconds: 2);
+  /// The shortest interval whose [heartbeatCadence] spans at least one BLE
+  /// connection event at the spec-minimum connection interval — the fastest
+  /// a heartbeat write can possibly reach the server.
+  static final Duration minimum = ConnectionInterval.specMinimum * 2;
 
   factory LifecycleInterval(Duration value) {
     if (value < minimum) {

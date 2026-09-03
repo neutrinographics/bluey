@@ -18,8 +18,9 @@
   that rule and decodes malformed wire values to the protocol default.
   **Behavior change:** `Bluey.server(lifecycleInterval:)` now throws
   `ArgumentError` for an interval shorter than `LifecycleInterval.minimum`
-  (2 ms) instead of accepting a configuration that times out every client
-  before its first heartbeat.
+  (15 ms — twice the BLE-spec minimum connection interval, exposed as
+  `ConnectionInterval.specMinimum`) instead of accepting a configuration
+  that times out every client before a heartbeat can cross the link.
 
 ## 0.5.0
 
