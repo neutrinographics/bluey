@@ -5,18 +5,25 @@ category: no-op
 severity: medium
 platform: android
 status: open
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 ## Symptom
 
-`Connection.requestPhy()` returns success without requesting a PHY change. `Connection.phyChanges` is `Stream.empty()`. `Connection.getPhy()` always returns `(tx: le1m, rx: le1m)`.
+`connection.android?.txPhy`, `rxPhy`, `phyChanges`, and `requestPhy(...)`
+throw `UnsupportedOperationException` on Android; `Capabilities.android.canRequestPhy`
+is `false`. The exception comes from the domain capability gate (action: "Check bluey.capabilities before calling"); the Android adapter's underlying stubs throw `UnimplementedError` (I035 Stage A) but are unreachable from the public API. This is honest — nothing silently succeeds any more — but the feature does not exist on any platform.
 
-Domain API advertises this at `bluey/lib/src/connection/connection.dart:267` — callers assume it works.
+(Historical, pre-2026-04-26: `requestPhy` resolved without sending anything,
+`phyChanges` was empty, and the PHY read back as `(le1m, le1m)`.)
 
 ## Location
 
-`bluey_android/lib/src/android_connection_manager.dart:241-259` — three stubs with `// TODO: Implement when Android Pigeon API supports PHY`.
+Capability gate: `bluey/lib/src/connection/bluey_connection.dart`
+(`_AndroidConnectionExtensionsImpl._requireCapability`). Flag:
+`bluey_platform_interface/lib/src/capabilities.dart`. Adapter stubs:
+`bluey_android/lib/src/android_connection_manager.dart` (`getPhy`, `phyStream`,
+`requestPhy` throw `UnimplementedError`).
 
 ## Root cause
 

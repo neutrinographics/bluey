@@ -60,6 +60,7 @@ export 'src/peer/peer.dart' show BlueyPeer;
 export 'src/peer/peer_client.dart' show PeerClient;
 export 'src/peer/peer_connection.dart' show PeerConnection;
 export 'src/peer/server_id.dart' show ServerId;
+export 'src/lifecycle.dart' show LifecycleInterval;
 
 // Domain events
 export 'src/events.dart';

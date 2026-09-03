@@ -14,7 +14,7 @@
   rebuild the instance are already correct for the dispose case.
 - **Malformed lifecycle intervals are clamped (I358).** A served interval
   that is zero, negative, or too small to halve no longer drives the client
-  heartbeat to a zero cadence; the new `LifecycleInterval` value object owns
+  heartbeat to a zero cadence; the new public `LifecycleInterval` value object owns
   that rule and decodes malformed wire values to the protocol default.
   **Behavior change:** `Bluey.server(lifecycleInterval:)` now throws
   `ArgumentError` for an interval shorter than `LifecycleInterval.minimum`

@@ -5,27 +5,39 @@ category: no-op
 severity: medium
 platform: android
 status: open
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 stage_a_fixed_in: cb1b24f
 related: [I030, I031, I032, I033, I034, I065, I066]
 ---
 
 ## Symptom
 
-`connection.bond()` on Android completes successfully with no error, but does not initiate a bond. `connection.bondState` returns `BondState.none` permanently. `connection.bondStateChanges` is an empty stream that never emits. `connection.requestPhy(...)` resolves successfully but does not send the HCI command. `connection.connectionParameters` returns hardcoded default values regardless of the actual link state.
+Bonding, PHY, and connection parameters do not exist on Android (or any
+platform). Since Stage A (2026-04-26) the failure is honest and layered:
+`Capabilities.android` reports `canBond`, `canRequestPhy`, and
+`canRequestConnectionParameters` as `false`; every public
+`connection.android` member for those features (and `Bluey.bondedDevices`)
+throws `UnsupportedOperationException` from the domain capability gate; and
+the Android adapter's ten stubs beneath it throw `UnimplementedError` naming
+this item — reachable only if the gate were bypassed. What remains is Stage B:
+the Pigeon schema and Kotlin implementation that would let the flags flip to
+`true`.
 
-This is **worse** than throwing `UnimplementedError`: the API silently lies. A consumer reading the docstring on `Connection.bond()` ("This will start the bonding process") sees the future complete and assumes bonding succeeded. They then attempt to read an encryption-required characteristic, which fails — and the failure is opaque.
+(Historical, pre-Stage-A: the stubs returned hardcoded defaults or empty
+streams and resolved successfully, so the API silently lied.)
 
 ## Location
 
-`bluey_android/lib/src/android_connection_manager.dart:211-281`. All ten stub methods (`getBondState`, `bondStateStream`, `bond`, `removeBond`, `getBondedDevices`, `getPhy`, `phyStream`, `requestPhy`, `getConnectionParameters`, `requestConnectionParameters`) follow the same pattern — return hardcoded defaults or empty streams, do nothing.
-
-```dart
-// Representative example:
-Future<void> bond(String deviceId) async {
-  // TODO: Implement when Android Pigeon API supports bonding
-}
-```
+Domain gate: `bluey/lib/src/connection/bluey_connection.dart`
+(`_AndroidConnectionExtensionsImpl._requireCapability`), `bluey/lib/src/bluey.dart`
+(`bondedDevices`). Flags: `bluey_platform_interface/lib/src/capabilities.dart`.
+Adapter stubs: `bluey_android/lib/src/android_connection_manager.dart` — ten
+methods (`getBondState`, `bondStateStream`, `bond`, `removeBond`,
+`getBondedDevices`, `getPhy`, `phyStream`, `requestPhy`,
+`getConnectionParameters`, `requestConnectionParameters`), each
+`throw UnimplementedError('Android: <op> not yet implemented (I035)')`.
+Missing: the corresponding methods in `bluey_android/pigeons/messages.dart` and
+their Kotlin implementation.
 
 ## Root cause
 
