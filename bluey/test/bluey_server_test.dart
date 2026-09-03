@@ -1677,10 +1677,7 @@ void main() {
 
             // 2s more → past the 10s window from the user write → should fire.
             async.elapse(const Duration(seconds: 2));
-            expect(
-              disconnections,
-              equals([const ClientAddress('client-1')]),
-            );
+            expect(disconnections, equals([const ClientAddress('client-1')]));
 
             server.dispose();
           });
@@ -2235,7 +2232,9 @@ void main() {
         final e = ServerRespondFailedException(
           operation: 'respondToRead',
           status: 0x0A,
-          clientAddress: const ClientAddress('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+          clientAddress: const ClientAddress(
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          ),
           characteristicId: UUID('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
         );
         expect(e, isA<BlueyException>());
@@ -2475,6 +2474,80 @@ void main() {
           ),
         );
       });
+    });
+
+    group('I368 — dispose is terminal', () {
+      test('a call issued before dispose() first yields is rejected',
+          () async {
+        final server = bluey.server()!;
+
+        final disposing = server.dispose();
+
+        expect(
+          () => server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          throwsA(isA<StaleHandleException>()),
+        );
+        await disposing;
+      });
+
+      test('a late advertisingStateChanges subscriber after dispose sees the '
+          'current state, not invalidated', () async {
+        final server = bluey.server()!;
+
+        await server.dispose();
+
+        expect(
+          await server.advertisingStateChanges.toList(),
+          equals([AdvertisingState.idle]),
+        );
+        expect(server.advertisingState, equals(AdvertisingState.idle));
+      });
+
+      test('a lifecycle interval too short to halve is rejected at the '
+          'server boundary', () {
+        expect(
+          () => bluey.server(lifecycleInterval: const Duration(milliseconds: 1)),
+          throwsArgumentError,
+        );
+      });
+
+      test('addService after dispose throws StaleHandleException caused by '
+          'disposal', () async {
+        final server = bluey.server()!;
+
+        await server.dispose();
+
+        expect(
+          () => server.addService(
+            HostedService(uuid: UUID.short(0x180D), characteristics: const []),
+          ),
+          throwsA(
+            isA<StaleHandleException>()
+                .having((e) => e.cause, 'cause', const DisposalInvalidation())
+                .having(
+                  (e) => e.instanceType,
+                  'instanceType',
+                  InvalidatedInstance.server,
+                ),
+          ),
+        );
+      });
+
+      test(
+        'startAdvertising after dispose throws StaleHandleException',
+        () async {
+          final server = bluey.server()!;
+
+          await server.dispose();
+
+          expect(
+            () => server.startAdvertising(),
+            throwsA(isA<StaleHandleException>()),
+          );
+        },
+      );
     });
 
     group('I333 — adapter-state invalidation', () {

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:meta/meta.dart';
 
 import 'peer/server_id.dart';
 
@@ -227,15 +228,74 @@ class LifecycleCodec {
 /// this rather than constructing your own.
 const lifecycleCodec = LifecycleCodec();
 
-/// Decodes a 4-byte little-endian interval value (in milliseconds) from the
-/// interval characteristic.
-Duration decodeInterval(Uint8List bytes) {
-  if (bytes.length < 4) {
-    return defaultLifecycleInterval;
+/// How often a Bluey server expects to hear from a connected client — the
+/// value it serves through the interval characteristic.
+///
+/// Exists so the interval's one invariant and the client-side rule derived
+/// from it ([heartbeatCadence]) live in one place. The invariant is that the
+/// interval is at least [minimum]: shorter, and the server's silence timer
+/// would fire before the transport could physically carry a heartbeat
+/// across the link (I358).
+@immutable
+class LifecycleInterval {
+  final Duration value;
+  const LifecycleInterval._(this.value);
+
+  /// The shortest interval whose [heartbeatCadence] spans at least one BLE
+  /// connection event at the spec-minimum connection interval (7.5 ms, see
+  /// `ConnectionInterval.specMinimum`) — the fastest a heartbeat write can
+  /// possibly reach the server. This is the physical floor a value object
+  /// can verify, not operating guidance: the negotiated connection interval
+  /// is a runtime property of each link, so a usable interval must be chosen
+  /// well above this (see `Bluey.server`). Stated as a literal rather than
+  /// derived so the lifecycle protocol does not depend on the Connection
+  /// context; the relationship is pinned by a test.
+  static const Duration minimum = Duration(milliseconds: 15);
+
+  factory LifecycleInterval(Duration value) {
+    if (value < minimum) {
+      throw ArgumentError.value(
+        value,
+        'value',
+        'must be at least $minimum so a heartbeat cadence fits inside it',
+      );
+    }
+    return LifecycleInterval._(value);
   }
-  final byteData = ByteData.sublistView(bytes);
-  final ms = byteData.getInt32(0, Endian.little);
-  return Duration(milliseconds: ms);
+
+  /// The interval assumed when a server serves none, or serves one the
+  /// protocol cannot honor.
+  static const LifecycleInterval standard = LifecycleInterval._(
+    defaultLifecycleInterval,
+  );
+
+  /// Decodes the 4-byte little-endian millisecond wire value. Malformed
+  /// input (too short, or below [minimum]) decodes to [standard] because a
+  /// client with no cadence at all would be worse than one probing at the
+  /// protocol default.
+  factory LifecycleInterval.decode(Uint8List bytes) {
+    if (bytes.length < 4) return standard;
+    final ms = ByteData.sublistView(bytes).getInt32(0, Endian.little);
+    if (ms < minimum.inMilliseconds) return standard;
+    return LifecycleInterval._(Duration(milliseconds: ms));
+  }
+
+  /// How often a client should probe a server that serves this interval:
+  /// half of it, so a heartbeat always lands inside the server's silence
+  /// window. Positive by construction, because [value] is at least
+  /// [minimum].
+  Duration get heartbeatCadence =>
+      Duration(milliseconds: value.inMilliseconds ~/ 2);
+
+  @override
+  bool operator ==(Object other) =>
+      other is LifecycleInterval && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => 'LifecycleInterval($value)';
 }
 
 /// Builds the platform-level control service definition.

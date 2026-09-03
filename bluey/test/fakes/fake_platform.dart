@@ -2220,6 +2220,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopAdvertising() async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
+    _applyFaultRules(FakeOp.stopAdvertising);
     _isAdvertising = false;
     _advertiseConfig = null;
   }
@@ -2409,6 +2414,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> closeServer() async {
+    _applyFaultRules(FakeOp.closeServer);
     await stopAdvertising();
     for (final centralId in _connectedCentrals.keys.toList()) {
       simulateCentralDisconnection(centralId);
@@ -2569,6 +2575,8 @@ class FakeBleLink {
 /// Operations that [FakeBlueyPlatform.enqueueFault] can target.
 enum FakeOp {
   connect,
+  stopAdvertising,
+  closeServer,
   discoverServices,
   readCharacteristic,
   writeCharacteristic,

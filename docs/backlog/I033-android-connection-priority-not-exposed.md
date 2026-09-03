@@ -5,7 +5,7 @@ category: unimplemented
 severity: medium
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-09-02
 related: [I032]
 ---
 

@@ -21,13 +21,19 @@ Priority: `High` · `Medium` · `Low` · `Launch` (gated to before a public
 release). Priorities below are derived from each item's recorded severity and
 are the maintainer's to adjust.
 
-> **Health check (2026-07-10):** the 2026-07-07 full-stack audit (DA-##) and
-> the 2026-07-10 networking-test audit (NT-##) are now fully absorbed into
-> this roadmap — every open finding has a backlog item (I353–I377 for the
-> newly absorbed set); the audit reports remain the detailed evidence record.
-> One **High** is open (I353 — a documentation-honesty fix, not a runtime
-> bug); everything else is Medium or Low. The last two high-severity runtime
-> bugs (I339, I332) shipped before 2026-07-06.
+> **Health check (2026-09-02):** re-verified against HEAD after the July
+> audit cycle. Both audits (2026-07-07 full-stack DA-##, 2026-07-10
+> networking-test NT-##) are fully absorbed — every open finding has a backlog
+> item (I353–I379); the audit reports remain the detailed evidence record and
+> carry the two fixes that shipped without an item of their own (DA-02
+> handle-attributed notifications, A.2 identity-mismatch = disconnect, both
+> 2026-07-10). Since then: I346–I349 shipped (moved to the table below) and
+> `ScanMode` was wired end-to-end (`f29ec98`, 2026-08-20), which closes the
+> scan-mode half of I052 and the dead-enum half of I366. On 2026-09-02 the
+> sole **High** (I353, documentation honesty) shipped alongside two latent
+> hazards (I358, I368); **no High is open** — everything is Medium or Low.
+> The last two high-severity runtime bugs (I339, I332) shipped before
+> 2026-07-06.
 
 ## Guardrails (design invariants)
 
@@ -49,9 +55,9 @@ Non-negotiable constraints that shape *how* every item below gets implemented:
 Scanning and inbound advertisement data.
 
 - ☐ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded.
-- ☐ **Medium** — [Expose scan options (mode, filters, duplicates)](backlog/I052-scan-options-not-exposed.md) · Scan mode/dedup are hardcoded; no RSSI, manufacturer, name, or allow-duplicates controls.
+- ◐ **Medium** — [Expose scan options (mode, filters, duplicates)](backlog/I052-scan-options-not-exposed.md) · Scan mode shipped (`f29ec98`); allow-duplicates, RSSI, manufacturer, name, and address filters are still hardcoded.
 - ☐ **Medium** — [Close scanner streams on dispose](backlog/I094-scanner-controller-never-closed.md) · Platform scanner broadcast controllers are never closed (leak across instances).
-- ☐ **Medium** — [Fill or remove never-populated advertisement fields](backlog/I366-advertisement-surface-honesty.md) · `isConnectable` hardcoded true, `serviceData` always empty, `txPowerLevel` always null, `ScanMode` dead (audit DA-23).
+- ☐ **Medium** — [Fill or remove never-populated advertisement fields](backlog/I366-advertisement-surface-honesty.md) · `isConnectable` hardcoded true, `serviceData` always empty, `txPowerLevel` always null (audit DA-23; the dead `ScanMode` half was wired in `f29ec98`).
 - ☐ **Low** — [Return all manufacturer-data entries](backlog/I014-manufacturer-data-only-first-entry.md) · Android returns only the first company-ID entry in an advertisement.
 - ☐ **Low** — [Support overlapping scans](backlog/I336-scanner-overlapping-scan-not-supported.md) · A second `scan()` clobbers the first; concurrent scanners aren't multiplexed.
 
@@ -121,9 +127,7 @@ Local-as-peripheral: advertising, request/response handling, and outbound notifi
 The Bluey lifecycle protocol, stable peer identity, and peer discovery.
 
 - ☐ **Medium** — [Fix the LifecycleServer activity/timer race](backlog/I072-lifecycle-server-record-activity-race.md) · `recordActivity` does a check-then-act on the heartbeat timer map (single-threaded, defensive).
-- ☑ **Medium** — [Stop peer connect waiting out the full scan window](backlog/I349-peer-connect-waits-full-scan-window.md) · `connectTo`/`discover` collect-then-probe, so every peer connect costs the whole scanTimeout even on an instant match.
 - ☐ **Medium** — [Honest peer-upgrade failure semantics](backlog/I356-peer-upgrade-failure-semantics.md) · Transient failures become "not a peer"; unreadable identity fabricates a random ServerId (audit DA-06/07).
-- ☐ **Medium** — [Clamp malformed lifecycle intervals](backlog/I358-lifecycle-interval-clamp.md) · A zero/negative served interval busy-loops the heartbeat in release builds (audit DA-10).
 - ☐ **Low** — [Extract a shared peer-builder helper](backlog/I304-peer-builder-helper-extraction.md) · Two sites duplicate `PeerConnection` / `LifecycleClient` construction.
 - ☐ **Low** — [Remove the dormant silence-eviction machinery](backlog/I340-remove-dormant-silence-eviction-machinery.md) · Deferred cleanup of the reserved ATT-status eviction path — hold until Pattern B soaks in production.
 - ☐ **Low** — [Retry failed presence subscriptions](backlog/I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) · A failed presence-characteristic subscription leaves an iOS-server peer's disconnect undetectable.
@@ -143,11 +147,9 @@ Bluetooth adapter state, permissions, capabilities, and native threading / lifec
 
 Architecture / DDD refinement and test-fixture consistency — no user-visible behavior change.
 
-- ☐ **High** — [Correct docs advertising unshipped features](backlog/I353-docs-overstate-shipped-features.md) · README claims bond/PHY/conn-params ship; no platform has them (audit DA-01 — the sole MAJOR).
 - ☐ **Medium** — [Set up continuous integration](backlog/I351-continuous-integration.md) · No CI exists; all six test gates (4 Dart, Gradle, XCTest) run only by hand.
 - ☐ **Medium** — [Remove or wire the inert plumbing](backlog/I364-remove-inert-plumbing.md) · User-op accounting never engages; `GattException`/`GattStatus` are dead types consumers can catch in vain (audit DA-20/21r).
 - ☐ **Medium** — [Emit missing events + test the event bus](backlog/I365-events-emission-and-coverage.md) · `bluey.events` shows connects but never disconnects; 13 emitted types untested; two channels double-emit (audit DA-22/36).
-- ☐ **Medium** — [Make dispose terminal for Scanner/Server](backlog/I368-dispose-terminal-flag.md) · Post-dispose scan()/addService partially restarts over closed controllers (audit DA-26).
 - ☐ **Medium** — [Consolidate test doubles onto the fake](backlog/I375-test-double-consolidation.md) · Four diverged hand-rolled mocks, remaining SUT bypasses, legacy boolean seams, fixture duplication (audit DA-38/39, NT-13/14).
 - ☐ **Low** — [Stop the domain catching Flutter's PlatformException](backlog/I308-domain-catches-flutter-platform-exception.md) · The domain catch ladder depends on a Flutter framework type.
 - ☐ **Low** — [Route the domain through abstract repositories](backlog/I309-domain-imports-platform-interface-types-directly.md) · The domain imports platform-interface types directly instead of via a port.
@@ -155,9 +157,6 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☐ **Low** — [Express advertise intent, not platform mechanism](backlog/I320-domain-server-names-platform-mechanism.md) · `BlueyServer` names the platform "scan response" slot directly instead of the intent.
 - ☐ **Low** — [Reconcile the two fake requestMtu caps](backlog/I329-fake-mock-requestmtu-inconsistency.md) · Test fixtures disagree on whether to cap MTU at 512.
 - ☐ **Low** — [Shape the fake's disconnected error like the real one](backlog/I330-fake-platform-getmaximumwritelength-exception-shape.md) · `FakeBlueyPlatform` throws a raw `Exception` instead of a `gatt-disconnected`-shaped one.
-- ☑ **Low** — [Model the iOS shared-link trap in the fake platform](backlog/I346-fake-platform-shared-link-trap-model.md) · The fake's two roles can't share one physical link, so the documented bidirectional-discovery trap is untestable. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
-- ☑ **Low** — [Make the role-reversal ATT blackhole injectable in the fake](backlog/I347-fake-platform-role-reversal-att-blackhole.md) · No seam for "server silently receives nothing while the link looks healthy" (I208's condition), so death-watch convergence is untested. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
-- ☑ **Low** — [Accept inherited centrals before advertising in the fake](backlog/I348-fake-platform-inherited-central-before-advertising.md) · `simulateCentralConnection` throws pre-advertising, but real platforms deliver cached/inherited connections then. Follow-up to the 2026-07-10 test audit; sequence after its R1–R9.
 - ☐ **Low** — [Extend FakeBleLink model coverage](backlog/I352-fake-ble-link-model-limits.md) · Descriptors not routed over the link, duplicate-UUID trees unsupported, no indication acks, MTU fixed at setup.
 - ☐ **Low** — [Hoist the quadruplicated BluetoothState mapper](backlog/I367-hoist-bluetoothstate-mapper.md) · The same 5-case switch lives in four files (audit DA-24).
 - ☐ **Low** — [Defensive-copy byte buffers + unify DTO equality](backlog/I371-vo-dto-integrity.md) · Mutable `Uint8List` escapes value objects; 12 of 17 DTOs lack value equality (audit DA-29/30).
@@ -257,6 +256,13 @@ carries the detail and the shipping commit. Sorted by ID.
 | [I339](backlog/I339-ios-write-without-response-no-flow-control.md) | iOS write-without-response had no flow control (silent drops/corruption) | `d8277b7 (#39)` |
 | [I343](backlog/I343-ios-to-android-multi-chunk-writenoresponse-loses-2-bytes-per-frame.md) | iOS over-reported the WriteNoResponse max, truncating large frames | `c7f1446` |
 | [I344](backlog/I344-write-integrity-stress-test.md) | Write-integrity stress test (repro/regression harness for I339/I343) | `e5ca4e7` |
+| [I346](backlog/I346-fake-platform-shared-link-trap-model.md) | Model the iOS shared-link trap in the fake platform | `148c935` (audit R12) |
+| [I347](backlog/I347-fake-platform-role-reversal-att-blackhole.md) | Make the role-reversal ATT blackhole injectable in the fake | `148c935` (audit R12) |
+| [I348](backlog/I348-fake-platform-inherited-central-before-advertising.md) | Accept inherited centrals before advertising in the fake | `148c935` (audit R12) |
+| [I349](backlog/I349-peer-connect-waits-full-scan-window.md) | Peer connect waited out the full scan window; now probe-as-you-scan | `7816490` |
+| [I353](backlog/I353-docs-overstate-shipped-features.md) | Docs advertised bonding / PHY / connection parameters as shipped (audit DA-01) | `e5e86da` |
+| [I358](backlog/I358-lifecycle-interval-clamp.md) | Malformed (non-positive) lifecycle interval busy-looped the heartbeat in release builds (audit DA-10) | `ed89d09` |
+| [I368](backlog/I368-dispose-terminal-flag.md) | Scanner/Server dispose was not terminal; post-dispose calls restarted over closed controllers (audit DA-26) | `5a85cf3`, `56df832` |
 
 ## Limitations (wontfix)
 

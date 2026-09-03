@@ -5,18 +5,26 @@ category: no-op
 severity: medium
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-09-03
 ---
 
 ## Symptom
 
-`Connection.getConnectionParameters()` always returns `(intervalMs: 30, latency: 0, timeoutMs: 5000)` — a fabricated default, not what the radio negotiated. `Connection.requestConnectionParameters()` returns success without calling the platform.
+`connection.android?.connectionParameters` and
+`requestConnectionParameters(...)` throw `UnsupportedOperationException` on
+Android; `Capabilities.android.canRequestConnectionParameters` is `false`. The exception comes from the domain capability gate (action: "Check bluey.capabilities before calling"); the Android adapter's underlying stubs throw `UnimplementedError` (I035 Stage A) but are unreachable from the public API. This is honest — nothing silently succeeds any more — but the feature does not exist on any platform.
 
-Domain API: `bluey/lib/src/connection/connection.dart:286`.
+(Historical, pre-2026-04-26: the getter returned a fabricated
+`(30 ms, 0, 5000 ms)` and the request resolved without calling the platform.)
 
 ## Location
 
-`bluey_android/lib/src/android_connection_manager.dart:264-281` — two stubs with `// TODO: Implement when Android Pigeon API supports connection parameters`.
+Capability gate: `bluey/lib/src/connection/bluey_connection.dart`
+(`_AndroidConnectionExtensionsImpl._requireCapability`). Flag:
+`bluey_platform_interface/lib/src/capabilities.dart`. Adapter stubs:
+`bluey_android/lib/src/android_connection_manager.dart`
+(`getConnectionParameters`, `requestConnectionParameters` throw
+`UnimplementedError`).
 
 ## Root cause
 

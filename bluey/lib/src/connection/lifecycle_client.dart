@@ -363,11 +363,8 @@ class LifecycleClient {
             .readCharacteristic(_connectionId, intervalChar.handle.value)
             .then((bytes) {
               if (!_isRunning) return;
-              final serverInterval = lifecycle.decodeInterval(bytes);
-              final heartbeatInterval = Duration(
-                milliseconds: serverInterval.inMilliseconds ~/ 2,
-              );
-              _beginHeartbeat(heartbeatInterval);
+              final serverInterval = lifecycle.LifecycleInterval.decode(bytes);
+              _beginHeartbeat(serverInterval.heartbeatCadence);
             })
             .catchError((_) {
               if (!_isRunning) return;
@@ -457,8 +454,7 @@ class LifecycleClient {
             .characteristics()
             .where(
               (c) =>
-                  c.uuid.toString().toLowerCase() ==
-                  lifecycle.serverIdCharUuid,
+                  c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
             )
             .firstOrNull;
     if (serverIdChar == null) {
@@ -591,9 +587,8 @@ class LifecycleClient {
     );
   }
 
-  Duration get _defaultHeartbeatInterval => Duration(
-    milliseconds: lifecycle.defaultLifecycleInterval.inMilliseconds ~/ 2,
-  );
+  Duration get _defaultHeartbeatInterval =>
+      lifecycle.LifecycleInterval.standard.heartbeatCadence;
 
   void _beginHeartbeat(Duration interval) {
     _logger.log(
@@ -678,7 +673,10 @@ class LifecycleClient {
     );
     if (_deviceAddress != null) {
       _events?.emit(
-        HeartbeatSentEvent(deviceAddress: _deviceAddress, source: 'LifecycleClient'),
+        HeartbeatSentEvent(
+          deviceAddress: _deviceAddress,
+          source: 'LifecycleClient',
+        ),
       );
     }
     _monitor.markProbeInFlight();

@@ -24,6 +24,70 @@ void main() {
     await fakePlatform.dispose();
   });
 
+  group('I368 — dispose is terminal', () {
+    test('a late stateChanges subscriber after dispose sees the current '
+        'state, not invalidated', () async {
+      final scanner = bluey.scanner();
+
+      scanner.dispose();
+
+      expect(await scanner.stateChanges.toList(), equals([ScanState.stopped]));
+      expect(scanner.state, equals(ScanState.stopped));
+    });
+
+    test('scan() after dispose throws StaleHandleException caused by '
+        'disposal', () async {
+      final scanner = bluey.scanner();
+
+      scanner.dispose();
+
+      expect(
+        () => scanner.scan(),
+        throwsA(
+          isA<StaleHandleException>()
+              .having((e) => e.cause, 'cause', const DisposalInvalidation())
+              .having(
+                (e) => e.instanceType,
+                'instanceType',
+                InvalidatedInstance.scanner,
+              ),
+        ),
+      );
+    });
+
+    test(
+      'an adapter invalidation that precedes dispose keeps its cause',
+      () async {
+        final scanner = bluey.scanner();
+        fakePlatform.setState(platform.BluetoothState.off);
+        await pumpEventQueue();
+
+        scanner.dispose();
+
+        expect(
+          () => scanner.scan(),
+          throwsA(
+            isA<StaleHandleException>().having(
+              (e) => e.cause,
+              'cause',
+              const AdapterTransitionInvalidation(BluetoothState.off),
+            ),
+          ),
+        );
+      },
+    );
+
+    test('scan() after dispose does not start a platform scan', () async {
+      final scanner = bluey.scanner();
+      scanner.dispose();
+
+      expect(() => scanner.scan(), throwsA(isA<StaleHandleException>()));
+      await pumpEventQueue();
+
+      expect(fakePlatform.isScanning, isFalse);
+    });
+  });
+
   group('Scanner adapter-state invalidation', () {
     test('subsequent scan() throws StaleHandleException after off', () async {
       final scanner = bluey.scanner();

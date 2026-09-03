@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import '../discovery/device_address.dart';
 import '../gatt_server/client_address.dart';
 import '../peer/server_id.dart';
@@ -482,9 +484,51 @@ enum InvalidatedInstance {
   const InvalidatedInstance(this.displayName);
 }
 
+/// Why a [Server], [Connection], or [Scanner] instance became terminal.
+///
+/// Modelled as a value so the one consequence — the instance is dead and
+/// a fresh one must be constructed — has one exception type regardless of
+/// how it died, while callers that care can still match on the cause.
+@immutable
+sealed class InvalidationCause {
+  const InvalidationCause();
+}
+
+/// The Bluetooth adapter left [BluetoothState.on] (e.g. the user toggled
+/// Bluetooth off). [state] is the state it transitioned to, not the
+/// adapter's current state, which may have returned to `on` since.
+class AdapterTransitionInvalidation extends InvalidationCause {
+  final BluetoothState state;
+  const AdapterTransitionInvalidation(this.state);
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterTransitionInvalidation && other.state == state;
+
+  @override
+  int get hashCode => state.hashCode;
+
+  @override
+  String toString() => 'AdapterTransitionInvalidation(${state.name})';
+}
+
+/// The owner disposed the instance.
+class DisposalInvalidation extends InvalidationCause {
+  const DisposalInvalidation();
+
+  @override
+  bool operator ==(Object other) => other is DisposalInvalidation;
+
+  @override
+  int get hashCode => (DisposalInvalidation).hashCode;
+
+  @override
+  String toString() => 'DisposalInvalidation()';
+}
+
 /// A method was called on a [Server], [Connection], or [Scanner]
-/// instance that was invalidated by a prior Bluetooth-adapter state
-/// transition (e.g. the user toggled Bluetooth off).
+/// instance that is terminal — invalidated by a Bluetooth-adapter state
+/// transition, or disposed by its owner (see [cause]).
 ///
 /// Invalidation is **terminal**: the instance is dead and will not
 /// recover even if the adapter returns to [BluetoothState.on]. Construct
@@ -498,31 +542,37 @@ enum InvalidatedInstance {
 ///   await server!.addService(...);
 /// }
 /// ```
-///
-/// [triggeringState] is the adapter state that caused invalidation.
-/// It does **not** reflect the adapter's current state, which may have
-/// returned to [BluetoothState.on] since invalidation.
 class StaleHandleException extends BlueyException {
-  /// The adapter state that caused this instance to be invalidated.
-  final BluetoothState triggeringState;
-
   /// The instance type that was invalidated.
   final InvalidatedInstance instanceType;
 
-  // Note: `const` cannot be added here because Dart's const evaluator
-  // forbids string interpolation of instance-property getters (`.displayName`,
-  // `.name`) on constructor parameters, even when those parameters are
-  // compile-time constants. The constructor is intentionally non-const to
-  // preserve readable, human-friendly messages.
-  StaleHandleException({
-    required this.triggeringState,
-    required this.instanceType,
-  }) : super(
-         '${instanceType.displayName} was invalidated by adapter '
-         'transition to ${triggeringState.name}; the instance is dead '
-         'even if the adapter has since returned to BluetoothState.on.',
-         action:
-             'Construct a fresh ${instanceType.displayName} from Bluey '
-             'rather than reusing this one.',
-       );
+  /// Why the instance became terminal.
+  final InvalidationCause cause;
+
+  /// The adapter state that caused invalidation, when the cause was an
+  /// adapter transition; `null` when the instance was disposed.
+  BluetoothState? get triggeringState => switch (cause) {
+    AdapterTransitionInvalidation(:final state) => state,
+    DisposalInvalidation() => null,
+  };
+
+  StaleHandleException({required this.instanceType, required this.cause})
+    : super(
+        _describe(instanceType, cause),
+        action:
+            'Construct a fresh ${instanceType.displayName} from Bluey '
+            'rather than reusing this one.',
+      );
+
+  static String _describe(
+    InvalidatedInstance instanceType,
+    InvalidationCause cause,
+  ) => switch (cause) {
+    AdapterTransitionInvalidation(:final state) =>
+      '${instanceType.displayName} was invalidated by adapter '
+          'transition to ${state.name}; the instance is dead even if the '
+          'adapter has since returned to BluetoothState.on.',
+    DisposalInvalidation() =>
+      '${instanceType.displayName} was disposed; the instance is dead.',
+  };
 }

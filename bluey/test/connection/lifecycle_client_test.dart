@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/connection/lifecycle_client.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
+import 'package:bluey/src/log/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:fake_async/fake_async.dart';
@@ -27,6 +28,7 @@ _setUpConnectedClient({
   Duration peerSilenceTimeout = const Duration(seconds: 20),
   Duration intervalValue = const Duration(seconds: 10),
   required void Function() onServerUnreachable,
+  BlueyLogger? logger,
 }) async {
   final fakePlatform = FakeBlueyPlatform();
   platform.BlueyPlatform.instance = fakePlatform;
@@ -55,7 +57,7 @@ _setUpConnectedClient({
     localIdentity: TestServerIds.localIdentity,
     peerSilenceTimeout: peerSilenceTimeout,
     onServerUnreachable: onServerUnreachable,
-    logger: testLogger(),
+    logger: logger ?? testLogger(),
   );
 
   return (
@@ -513,6 +515,63 @@ void main() {
         client.stop();
       },
     );
+
+    // 5c. I358: a served interval that is (or halves to) zero would
+    // busy-loop the heartbeat in release builds. These assert on the
+    // interval log rather than heartbeat timing because in debug builds the
+    // monitor's assert plus the read-failure fallback already rescue the
+    // timing, which would hide the missing guard.
+    for (final (label, served) in [
+      ('zero', Duration.zero),
+      ('negative', const Duration(milliseconds: -1)),
+      ('sub-minimum (1ms)', const Duration(milliseconds: 1)),
+    ]) {
+      test('start() clamps a $label served interval to the default '
+          'heartbeat cadence without tripping the fallback', () {
+        fakeAsync((async) {
+          late LifecycleClient client;
+          late List<RemoteService> services;
+          late FakeBlueyPlatform fakePlatform;
+          final logger = BlueyLogger();
+          final intervalLogs = <int>[];
+          logger.events
+              .where((e) => e.message == 'heartbeat interval set')
+              .listen((e) => intervalLogs.add(e.data['intervalMs']! as int));
+
+          _setUpConnectedClient(
+            onServerUnreachable: () {},
+            intervalValue: served,
+            logger: logger,
+          ).then((setup) {
+            client = setup.client;
+            services = setup.services;
+            fakePlatform = setup.fakePlatform;
+          });
+          async.flushMicrotasks();
+
+          client.start(allServices: services);
+          async.flushMicrotasks();
+          fakePlatform.writeCharacteristicCalls.clear();
+
+          expect(
+            intervalLogs,
+            equals([5000]),
+            reason: 'The cadence must be set exactly once, at the default '
+                '(10s / 2 = 5s) — never at <= 0ms first',
+          );
+
+          async.elapse(const Duration(seconds: 5));
+          final heartbeatWrites = fakePlatform.writeCharacteristicCalls.where(
+            (call) =>
+                call.characteristicUuid == lifecycle.heartbeatCharUuid &&
+                call.value[1] == 0x01,
+          );
+          expect(heartbeatWrites, hasLength(1));
+
+          client.stop();
+        });
+      });
+    }
 
     // 6. start() falls back to default interval when interval read fails
     test('start() falls back to default interval when interval read fails', () {

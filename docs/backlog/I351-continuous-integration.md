@@ -5,7 +5,7 @@ category: unimplemented
 severity: medium
 platform: both
 status: open
-last_verified: 2026-07-10
+last_verified: 2026-09-02
 ---
 
 ## What this is

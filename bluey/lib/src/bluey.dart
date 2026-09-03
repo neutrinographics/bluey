@@ -850,6 +850,17 @@ class Bluey {
   /// has no callback for client disconnections. Set to null to disable
   /// lifecycle management and use raw BLE behavior.
   ///
+  /// The interval is the server's silence window: a client that sends no
+  /// heartbeat within it is reported gone. It must be at least
+  /// `LifecycleInterval.minimum` (the physical floor; shorter throws
+  /// [ArgumentError]), but that floor is not tuning guidance. Choose a value
+  /// that comfortably exceeds the negotiated connection interval (typically
+  /// 30 ms on phones, up to 4 s per the BLE spec) plus the peer's write
+  /// latency, and that tolerates the pauses your app expects (background
+  /// suspension pauses heartbeats entirely — see
+  /// `docs/cross-platform-quirks.md`). Sub-second values are rarely
+  /// meaningful; the 10 s default balances liveness against false timeouts.
+  ///
   /// Example:
   /// ```dart
   /// final server = bluey.server();

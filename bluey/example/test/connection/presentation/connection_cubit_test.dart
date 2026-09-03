@@ -149,7 +149,7 @@ void main() {
         when(() => mockConnection.stateChanges).thenAnswer((_) async* {
           await Future<void>.delayed(const Duration(milliseconds: 5));
           throw StaleHandleException(
-            triggeringState: BluetoothState.off,
+            cause: const AdapterTransitionInvalidation(BluetoothState.off),
             instanceType: InvalidatedInstance.connection,
           );
         });

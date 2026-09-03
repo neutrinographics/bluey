@@ -10,13 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
 - **Coverage targets**: 90% minimum for domain layer, 80% overall.
+- **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
 
 ## Project Overview
 
 Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (543 tests)
+bluey/                         Main library - domain models, public API, tests (1120 tests)
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
@@ -139,7 +140,7 @@ The domain layer uses bounded-context-aligned vocabulary; the platform-interface
 | **Peer** (`BlueyPeer`) | Peer | A `Device` (or, server-side, a `Client`) that speaks the Bluey lifecycle protocol. Promotion to peer happens only after control-service discovery; raw connections are protocol-free. |
 | **PeerConnection** | Peer | A `Connection` wrapped with a stable `ServerId` and the lifecycle-protocol disconnect path. Composition over inheritance — `peer.connection` exposes the raw GATT surface. |
 | **ServerId** | Peer | The stable identity advertised through the lifecycle control service. Survives MAC randomization on Android and CBPeripheral identifier rotation on iOS. |
-| **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `disconnectCentral`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
+| **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `centralConnections`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
 | **AttributeHandle** | Connection / GATT Client | Opaque platform-assigned identifier for a service / characteristic / descriptor. Valid only within one connection; invalidated on disconnect or Service Changed. |
 
 #### Quick reference (use / avoid)

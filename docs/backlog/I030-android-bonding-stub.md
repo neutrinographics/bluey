@@ -5,18 +5,27 @@ category: no-op
 severity: medium
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-09-03
 ---
 
 ## Symptom
 
-`Connection.bondState` always returns `BondState.none` on Android. `Connection.bond()` returns success without initiating pairing. `Connection.removeBond()` is a no-op. `Connection.bondStateChanges` is `Stream.empty()`. `Bluey.getBondedDevices()` returns `[]`. All of these are advertised as working in the domain-level `Connection` API (`bluey/lib/src/connection/connection.dart:210-237` and `bluey/lib/src/bluey.dart:458`).
+`connection.android?.bondState`, `bondStateChanges`, `bond()`, and `removeBond()`
+throw `UnsupportedOperationException` on Android; `Bluey.bondedDevices` throws
+the same. `Capabilities.android.canBond` is `false`. The exception comes from the domain capability gate (action: "Check bluey.capabilities before calling"); the Android adapter's underlying stubs throw `UnimplementedError` (I035 Stage A) but are unreachable from the public API. This is honest — nothing silently succeeds any more — but the feature does not exist on any platform.
 
-Silent "success" for something that didn't happen is worse than a thrown error — users ship apps assuming bonding works, because it visibly returns without throwing.
+(Historical, pre-2026-04-26: the stubs returned `BondState.none`, an empty
+stream, and silent success — the "API silently lies" shape this entry was
+filed against.)
 
 ## Location
 
-`bluey_android/lib/src/android_connection_manager.dart:211-236` — all five bonding methods are stubs with `// TODO: Implement when Android Pigeon API supports bonding`.
+Capability gate: `bluey/lib/src/connection/bluey_connection.dart`
+(`_AndroidConnectionExtensionsImpl._requireCapability`) and
+`bluey/lib/src/bluey.dart` (`bondedDevices`). Flag:
+`bluey_platform_interface/lib/src/capabilities.dart` (`Capabilities.android`).
+Adapter stubs: `bluey_android/lib/src/android_connection_manager.dart`
+(`throw UnimplementedError('Android: bond not yet implemented (I035)')` etc.).
 
 ## Root cause
 

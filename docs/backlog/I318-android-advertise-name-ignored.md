@@ -5,7 +5,7 @@ category: bug
 severity: medium
 platform: android
 status: open
-last_verified: 2026-05-04
+last_verified: 2026-09-02
 related: [I051, I205, I313]
 ---
 
