@@ -71,7 +71,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -94,7 +94,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -124,7 +124,7 @@ void main() {
       final gone = <String>[];
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: ServerId.generate(),
         onClientGone: (ca) => gone.add(ca.value),
         logger: testLogger(),
@@ -146,7 +146,7 @@ void main() {
     test('handleWriteRequest auto-responds when responseNeeded is true', () {
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
         logger: testLogger(),
@@ -176,7 +176,7 @@ void main() {
       () {
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (_) {},
           logger: testLogger(),
@@ -201,7 +201,7 @@ void main() {
       () {
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 15),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 15)),
           serverId: ServerId.generate(),
           onClientGone: (_) {},
           logger: testLogger(),
@@ -228,7 +228,7 @@ void main() {
     test('handleReadRequest returns false for non-control characteristics', () {
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: ServerId.generate(),
         onClientGone: (_) {},
         logger: testLogger(),
@@ -271,7 +271,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -299,7 +299,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -327,7 +327,7 @@ void main() {
       final identifications = <(String, ServerId)>[];
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: ServerId.generate(),
         onClientGone: (ca) => gone.add(ca.value),
         onPeerIdentified: (ca, sender) => identifications.add((ca.value, sender)),
@@ -352,7 +352,7 @@ void main() {
       final identifications = <(String, ServerId)>[];
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: ServerId.generate(),
         onClientGone: (ca) => gone.add(ca.value),
         onPeerIdentified: (ca, sender) => identifications.add((ca.value, sender)),
@@ -427,7 +427,7 @@ void main() {
       () async {
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (_) {},
           logger: testLogger(),
@@ -451,7 +451,7 @@ void main() {
       final id = ServerId.generate();
       final server = LifecycleServer(
         platformApi: fakePlatform,
-        interval: const Duration(seconds: 5),
+        interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
         serverId: id,
         onClientGone: (_) {},
         logger: testLogger(),
@@ -484,7 +484,7 @@ void main() {
         final events = <String>[];
         final server = LifecycleServer(
           platformApi: FakeBlueyPlatform(),
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => events.add('gone:${ca.value}'),
           logger: testLogger(),
@@ -558,7 +558,7 @@ void main() {
           final events = <String>[];
           final server = LifecycleServer(
             platformApi: FakeBlueyPlatform(),
-            interval: const Duration(seconds: 10),
+            interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
             serverId: ServerId.generate(),
             onClientGone: (ca) => events.add('gone:${ca.value}'),
             logger: testLogger(),
@@ -581,7 +581,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -613,7 +613,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -651,7 +651,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -688,7 +688,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -726,7 +726,7 @@ void main() {
         final gone = <String>[];
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 10),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 10)),
           serverId: ServerId.generate(),
           onClientGone: (ca) => gone.add(ca.value),
           logger: testLogger(),
@@ -757,7 +757,7 @@ void main() {
 
           final server = LifecycleServer(
             platformApi: fakePlatform,
-            interval: const Duration(seconds: 5),
+            interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
             serverId: ServerId.generate(),
             onClientGone: (_) {},
             logger: logger,
@@ -795,7 +795,7 @@ void main() {
 
         final server = LifecycleServer(
           platformApi: fakePlatform,
-          interval: const Duration(seconds: 5),
+          interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
           serverId: ServerId.generate(),
           onClientGone: (_) {},
           logger: logger,
@@ -826,7 +826,7 @@ void main() {
 
           final server = LifecycleServer(
             platformApi: fakePlatform,
-            interval: const Duration(seconds: 5),
+            interval: lifecycle.LifecycleInterval(const Duration(seconds: 5)),
             serverId: ServerId.generate(),
             onClientGone: (_) {},
             logger: logger,

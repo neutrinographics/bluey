@@ -21,7 +21,7 @@ import 'client_address.dart';
 /// GATT Server bounded context.
 class LifecycleServer {
   final platform.BlueyPlatform _platform;
-  final Duration? _interval;
+  final lifecycle.LifecycleInterval? _interval;
   final ServerId _serverId;
 
   /// Called when the heartbeat silence timer fires (no heartbeat received
@@ -53,7 +53,7 @@ class LifecycleServer {
 
   LifecycleServer({
     required platform.BlueyPlatform platformApi,
-    required Duration? interval,
+    required lifecycle.LifecycleInterval? interval,
     required ServerId serverId,
     required this.onClientGone,
     required BlueyLogger logger,
@@ -187,11 +187,11 @@ class LifecycleServer {
       return false;
     }
 
-    final interval = _interval ?? lifecycle.defaultLifecycleInterval;
+    final interval = _interval ?? lifecycle.LifecycleInterval.standard;
     _respondAndContain(
       req: req,
       branch: 'interval',
-      value: lifecycle.encodeInterval(interval),
+      value: lifecycle.encodeInterval(interval.value),
     );
 
     return true;
@@ -381,7 +381,7 @@ class LifecycleServer {
       return;
     }
 
-    state.timer = Timer(interval, () {
+    state.timer = Timer(interval.value, () {
       _logger.log(
         BlueyLogLevel.warn,
         'bluey.server.lifecycle',

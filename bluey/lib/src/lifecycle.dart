@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:meta/meta.dart';
 
-import 'connection/value_objects/connection_interval.dart';
 import 'peer/server_id.dart';
 
 /// Internal lifecycle management for Bluey peer-to-peer connections.
@@ -243,9 +242,12 @@ class LifecycleInterval {
   const LifecycleInterval._(this.value);
 
   /// The shortest interval whose [heartbeatCadence] spans at least one BLE
-  /// connection event at the spec-minimum connection interval — the fastest
-  /// a heartbeat write can possibly reach the server.
-  static final Duration minimum = ConnectionInterval.specMinimum * 2;
+  /// connection event at the spec-minimum connection interval (7.5 ms, see
+  /// `ConnectionInterval.specMinimum`) — the fastest a heartbeat write can
+  /// possibly reach the server. Stated as a literal rather than derived so
+  /// the lifecycle protocol does not depend on the Connection context; the
+  /// relationship is pinned by a test.
+  static const Duration minimum = Duration(milliseconds: 15);
 
   factory LifecycleInterval(Duration value) {
     if (value < minimum) {

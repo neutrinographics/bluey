@@ -125,7 +125,7 @@ class BlueyServer implements Server {
        _serverId = identity ?? ServerId.generate() {
     _lifecycle = LifecycleServer(
       platformApi: _platform,
-      interval: _validatedLifecycleInterval(lifecycleInterval),
+      interval: _lifecycleIntervalFrom(lifecycleInterval),
       serverId: _serverId,
       onClientGone: _handleLifecycleSilence,
       onExplicitDisconnect: _handleClientDisconnected,
@@ -355,12 +355,14 @@ class BlueyServer implements Server {
     }
   }
 
-  /// A server that serves an interval the protocol cannot honor would time
-  /// out every client before its first probe; failing at construction is
-  /// kinder than a server that silently sheds peers. `null` disables the
+  /// The public constructor takes a plain `Duration` so consumers need not
+  /// know the protocol's value object; it is promoted here, at the boundary,
+  /// so an interval the protocol cannot honor fails at construction instead
+  /// of producing a server that silently sheds peers. `null` disables the
   /// lifecycle protocol and is passed through.
-  static Duration? _validatedLifecycleInterval(Duration? interval) =>
-      interval == null ? null : lifecycle.LifecycleInterval(interval).value;
+  static lifecycle.LifecycleInterval? _lifecycleIntervalFrom(
+    Duration? interval,
+  ) => interval == null ? null : lifecycle.LifecycleInterval(interval);
 
   /// Dispose stops advertising after the server is already terminal, so it
   /// cannot go through the guarded public path. Skipped after an adapter
