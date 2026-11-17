@@ -135,6 +135,17 @@ void main() {
       expect(debt, (debt: '$_placed -> throw Gone', amount: 3));
     });
 
+    for (final miscounted in ['1 times', '2 time', '0 times']) {
+      test('is the entry itself, once, for a count written as $miscounted, '
+          'which the rule never writes', () {
+        // act
+        final debt = _rule.weigh('$_placed -> throw Gone, $miscounted');
+
+        // assert
+        expect(debt, (debt: '$_placed -> throw Gone, $miscounted', amount: 1));
+      });
+    }
+
     test('is the entry itself, once, for an entry of another shape', () {
       // act
       final debt = _rule.weigh('$_placed -> line 3: throw Gone');
@@ -173,6 +184,17 @@ void main() {
         '$_placed raises throw Gone 1 time, down from 2: lower its entry to '
         '1 time',
       );
+    });
+
+    test('is no change for a known entry whose count is miscounted', () {
+      // act
+      final change = _rule.change(
+        known: '$_placed -> throw Gone, 1 times',
+        found: '$_placed -> throw Gone, 1 time',
+      );
+
+      // assert
+      expect(change, isNull);
     });
 
     test('is no change for two raises of one file', () {

@@ -80,15 +80,22 @@ String _times(int count) => count == 1 ? '1 time' : '$count times';
 final class _Counted {
   _Counted(this.path, this.what, this.count);
 
-  static final _shape = RegExp(r'^(.+?) -> (.+), (\d+) times?$');
+  static final _shape = RegExp(r'^(.+?) -> (.+), (\d+ times?)$');
 
+  /// The entry's parts, or null for one the rule would never write: a count
+  /// of none, or one whose `time` or `times` does not agree with it (`1
+  /// times`), which is read as an entry of another shape rather than told
+  /// as a count that moved.
   static _Counted? parse(String entry) {
     if (_shape.firstMatch(entry)?.groups([1, 2, 3]) case [
       final path?,
       final what?,
-      final count?,
+      final written?,
     ]) {
-      return _Counted(path, what, int.parse(count));
+      final count = int.parse(written.split(' ').first);
+      if (count >= 1 && _times(count) == written) {
+        return _Counted(path, what, count);
+      }
     }
     return null;
   }
