@@ -202,22 +202,28 @@ void main() {
 
     test('PlatformConnectFailedException → ConnectionException '
         'carrying the device address', () {
-      final cx = translateConnect(platform.PlatformConnectFailureReason.unknown);
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.unknown,
+      );
       expect(cx.deviceAddress, DeviceAddress(testAddress));
     });
 
     test('reason timeout maps to ConnectionFailureReason.timeout', () {
-      final cx = translateConnect(platform.PlatformConnectFailureReason.timeout);
+      final cx = translateConnect(
+        platform.PlatformConnectFailureReason.timeout,
+      );
       expect(cx.reason, ConnectionFailureReason.timeout);
     });
 
-    test('reason deviceNotFound maps to ConnectionFailureReason.deviceNotFound',
-        () {
-      final cx = translateConnect(
-        platform.PlatformConnectFailureReason.deviceNotFound,
-      );
-      expect(cx.reason, ConnectionFailureReason.deviceNotFound);
-    });
+    test(
+      'reason deviceNotFound maps to ConnectionFailureReason.deviceNotFound',
+      () {
+        final cx = translateConnect(
+          platform.PlatformConnectFailureReason.deviceNotFound,
+        );
+        expect(cx.reason, ConnectionFailureReason.deviceNotFound);
+      },
+    );
 
     test('reason notConnectable maps to '
         'ConnectionFailureReason.deviceNotConnectable', () {
@@ -227,13 +233,15 @@ void main() {
       expect(cx.reason, ConnectionFailureReason.deviceNotConnectable);
     });
 
-    test('reason pairingFailed maps to ConnectionFailureReason.pairingFailed',
-        () {
-      final cx = translateConnect(
-        platform.PlatformConnectFailureReason.pairingFailed,
-      );
-      expect(cx.reason, ConnectionFailureReason.pairingFailed);
-    });
+    test(
+      'reason pairingFailed maps to ConnectionFailureReason.pairingFailed',
+      () {
+        final cx = translateConnect(
+          platform.PlatformConnectFailureReason.pairingFailed,
+        );
+        expect(cx.reason, ConnectionFailureReason.pairingFailed);
+      },
+    );
 
     test('reason connectionLimitReached maps to '
         'ConnectionFailureReason.connectionLimitReached', () {
@@ -268,24 +276,33 @@ void main() {
   });
 
   group('eviction-status translation', () {
-    test('reserved eviction status becomes DisconnectedException(evictedByServer)', () {
-      final translated = translatePlatformException(
-        platform.GattOperationStatusFailedException('write', lifecycleEvictionAttStatus),
-        operation: 'write',
-        address: 'AA:BB:CC:DD:EE:FF',
-      );
-      expect(translated, isA<DisconnectedException>());
-      final dx = translated as DisconnectedException;
-      expect(dx.reason, DisconnectReason.evictedByServer);
-      expect(dx.address, 'AA:BB:CC:DD:EE:FF');
-    });
+    test(
+      'reserved eviction status becomes DisconnectedException(evictedByServer)',
+      () {
+        final translated = translatePlatformException(
+          platform.GattOperationStatusFailedException(
+            'write',
+            lifecycleEvictionAttStatus,
+          ),
+          operation: 'write',
+          address: 'AA:BB:CC:DD:EE:FF',
+        );
+        expect(translated, isA<DisconnectedException>());
+        final dx = translated as DisconnectedException;
+        expect(dx.reason, DisconnectReason.evictedByServer);
+        expect(dx.address, 'AA:BB:CC:DD:EE:FF');
+      },
+    );
 
-    test('a non-reserved status still maps to GattOperationFailedException', () {
-      final translated = translatePlatformException(
-        platform.GattOperationStatusFailedException('write', 0x01),
-        operation: 'write',
-      );
-      expect(translated, isA<GattOperationFailedException>());
-    });
+    test(
+      'a non-reserved status still maps to GattOperationFailedException',
+      () {
+        final translated = translatePlatformException(
+          platform.GattOperationStatusFailedException('write', 0x01),
+          operation: 'write',
+        );
+        expect(translated, isA<GattOperationFailedException>());
+      },
+    );
   });
 }

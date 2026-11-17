@@ -8,4 +8,5 @@ export 'src/gates/line_coverage.dart';
 export 'src/gates/list_file.dart';
 export 'src/gates/list_growth.dart';
 export 'src/gates/list_growth_command.dart';
+export 'src/gates/path_pattern.dart';
 export 'src/gates/unreported_files.dart';

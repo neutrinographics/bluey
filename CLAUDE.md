@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TDD cycle**: Write a failing test first (Red), implement minimum code to pass (Green), then improve (Refactor). No production code without a failing test.
 - **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
-- **Coverage floor**: 90% of the lines of the `bluey` package, held by CI's coverage gate, which also fails on a file with code that no test loads (`docs/ARCHITECTURE.md` §10).
+- **Coverage floors**: 90% of the lines of the `bluey` package, and 95% of the lines under `lib/src/features/*/domain` and `lib/src/shared/domain`, each held by CI's coverage gate, which also fails on a file with code that no test loads (`docs/ARCHITECTURE.md` §10).
 - **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
 
 ### Design review before execution
@@ -83,8 +83,9 @@ cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api --writ
 # The known defects, which are expected to fail; each package's roster in test/known_defects/roster.dart names them (docs/ARCHITECTURE.md)
 cd bluey && flutter test test/known_defects --run-skipped --tags known-defect
 
-# The coverage floor
+# The coverage floors: the package, then the domain
 cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
+cd bluey && dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain
 
 # Once per checkout: create the Gradle wrapper, which is not committed
 cd bluey_android/android && gradle wrapper --gradle-version 8.14

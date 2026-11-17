@@ -124,6 +124,19 @@ void main() {
       expect(hashes[0], hashes[1]);
     });
 
+    test('two rights of one value are equal whatever their type arguments', () {
+      // arrange
+      const first = Right<String, int>(1);
+      const second = Right<Object, num>(1);
+
+      // act
+      final hashes = [first.hashCode, second.hashCode];
+
+      // assert
+      expect(first, second);
+      expect(hashes[0], hashes[1]);
+    });
+
     test('a left and a right of one value differ', () {
       // arrange
       const left = Left<String, String>('a');

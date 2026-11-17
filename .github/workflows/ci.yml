@@ -76,6 +76,10 @@ jobs:
       - uses: ./.github/actions/setup
       - run: flutter test --coverage
       - run: dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
+      # The domain is held higher than the package. The pattern is quoted so
+      # the gate, not the shell, reads its star.
+      - name: The domain's coverage floor
+        run: dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain
 
   architecture:
     name: Architecture

@@ -58,4 +58,19 @@ void main() {
       expect(coverage.meets(0), isFalse);
     });
   });
+
+  group('within', () {
+    test('keeps only the files the scope takes in', () {
+      // arrange
+      final coverage = LineCoverage.parse(_report);
+
+      // act
+      final scoped = coverage.within((path) => path == 'lib/a.dart');
+
+      // assert
+      expect(scoped.files, {'lib/a.dart'});
+      expect(scoped.found, 2);
+      expect(scoped.hit, 1);
+    });
+  });
 }
