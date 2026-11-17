@@ -88,4 +88,22 @@ void main() {
       expect(change, isNull);
     });
   });
+
+  group('the debt an entry records', () {
+    test('is its file, weighed by its lines', () {
+      // act
+      final debt = _rule.weigh('lib/a.dart -> 420 lines');
+
+      // assert
+      expect(debt, (debt: 'lib/a.dart', amount: 420));
+    });
+
+    test('is the entry itself, once, for an entry of another shape', () {
+      // act
+      final debt = _rule.weigh('lib/a.dart -> unplaced');
+
+      // assert
+      expect(debt, (debt: 'lib/a.dart -> unplaced', amount: 1));
+    });
+  });
 }

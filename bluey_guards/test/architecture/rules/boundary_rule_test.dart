@@ -180,4 +180,41 @@ void main() {
       ]);
     });
   });
+
+  group('the debt an entry records', () {
+    test("is its source's dependency on a context of today's folders", () {
+      // act
+      final debt = _rule.weigh(
+        'lib/src/connection/a.dart -> lib/src/discovery/b.dart',
+      );
+
+      // assert
+      expect(debt, (
+        debt: 'lib/src/connection/a.dart into discovery',
+        amount: 1,
+      ));
+    });
+
+    test('is the same debt when its target moved into the target layout', () {
+      // act
+      final debt = _rule.weigh(
+        'lib/src/connection/a.dart -> '
+        'lib/src/features/discovery/domain/b.dart',
+      );
+
+      // assert
+      expect(debt, (
+        debt: 'lib/src/connection/a.dart into discovery',
+        amount: 1,
+      ));
+    });
+
+    test('is the entry itself, once, when it names no context', () {
+      // act
+      final debt = _rule.weigh('lib/src/connection/a.dart -> 420 lines');
+
+      // assert
+      expect(debt, (debt: 'lib/src/connection/a.dart -> 420 lines', amount: 1));
+    });
+  });
 }

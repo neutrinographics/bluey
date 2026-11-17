@@ -3,23 +3,29 @@ import 'package:test/test.dart';
 
 const _path = 'bluey/test/architecture/known_violations.dart';
 
+/// Weighs a `<source> -> lib/src/<folder>/...` entry as one debt of its
+/// source into its folder, as a boundary rule might.
+({String debt, int amount}) _byFolder(String entry) {
+  final [source, target] = entry.split(' -> ');
+  return (debt: '$source into ${target.split('/')[2]}', amount: 1);
+}
+
+/// Weighs a `<path> -> <N> lines` entry as its path, by its lines, as a size
+/// rule might.
+({String debt, int amount}) _byLines(String entry) {
+  final [path, lines] = entry.split(' -> ');
+  return (debt: path, amount: int.parse(lines.split(' ').first));
+}
+
 void main() {
-  group('a list counted per source file and target context', () {
-    const byContext = {'boundaries'};
-
-    test('holds when an entry is rewritten because its target moved', () {
+  group('a list whose entries a rule weighs', () {
+    test('holds when an entry is rewritten for the same debt', () {
       // arrange
       final base = {
-        'boundaries': [
-          'lib/src/gatt_client/gatt.dart -> '
-              'lib/src/connection/value_objects/attribute_handle.dart',
-        ],
+        'boundaries': ['lib/src/peer/a.dart -> lib/src/connection/x.dart'],
       };
       final head = {
-        'boundaries': [
-          'lib/src/gatt_client/gatt.dart -> '
-              'lib/src/features/connection/domain/attribute_handle.dart',
-        ],
+        'boundaries': ['lib/src/peer/a.dart -> lib/src/connection/y.dart'],
       };
 
       // act
@@ -27,22 +33,22 @@ void main() {
         path: _path,
         base: base,
         head: head,
-        byContext: byContext,
+        weights: {'boundaries': _byFolder},
       );
 
       // assert
       expect(growth.holds, isTrue, reason: growth.describe());
     });
 
-    test('names an entry into a context its file did not depend on', () {
+    test('names each entry of a debt the base did not owe', () {
       // arrange
       final base = {
-        'boundaries': ['lib/src/peer/peer.dart -> lib/src/connection/a.dart'],
+        'boundaries': ['lib/src/peer/a.dart -> lib/src/connection/x.dart'],
       };
       final head = {
         'boundaries': [
-          'lib/src/peer/peer.dart -> lib/src/connection/a.dart',
-          'lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart',
+          'lib/src/peer/a.dart -> lib/src/connection/x.dart',
+          'lib/src/peer/a.dart -> lib/src/gatt_client/y.dart',
         ],
       };
 
@@ -51,26 +57,25 @@ void main() {
         path: _path,
         base: base,
         head: head,
-        byContext: byContext,
+        weights: {'boundaries': _byFolder},
       );
 
       // assert
       expect(growth.added, [
-        'boundaries: lib/src/peer/peer.dart into gatt_client, 1 entry where '
-            'the base had 0: '
-            'lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart',
+        'boundaries: lib/src/peer/a.dart -> lib/src/gatt_client/y.dart',
       ]);
+      expect(growth.raised, isEmpty);
     });
 
-    test('names a second entry into a context its file depended on', () {
+    test('names a debt the head owes more of, with its new entries', () {
       // arrange
       final base = {
-        'boundaries': ['lib/src/peer/peer.dart -> lib/src/connection/a.dart'],
+        'boundaries': ['lib/src/peer/a.dart -> lib/src/connection/x.dart'],
       };
       final head = {
         'boundaries': [
-          'lib/src/peer/peer.dart -> lib/src/connection/a.dart',
-          'lib/src/peer/peer.dart -> lib/src/features/connection/domain/b.dart',
+          'lib/src/peer/a.dart -> lib/src/connection/x.dart',
+          'lib/src/peer/a.dart -> lib/src/connection/y.dart',
         ],
       };
 
@@ -79,85 +84,83 @@ void main() {
         path: _path,
         base: base,
         head: head,
-        byContext: byContext,
+        weights: {'boundaries': _byFolder},
+      );
+
+      // assert
+      expect(growth.raised, [
+        'boundaries: lib/src/peer/a.dart into connection, 1 at the base and '
+            '2 at the head: lib/src/peer/a.dart -> lib/src/connection/y.dart',
+      ]);
+      expect(growth.added, isEmpty);
+    });
+
+    test('holds when a debt the base owed is owed less', () {
+      // arrange
+      final base = {
+        'oversized': ['lib/a.dart -> 420 lines'],
+      };
+      final head = {
+        'oversized': ['lib/a.dart -> 410 lines'],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        weights: {'oversized': _byLines},
+      );
+
+      // assert
+      expect(growth.holds, isTrue);
+    });
+
+    test('counts a repeated entry once', () {
+      // arrange
+      final base = {
+        'boundaries': ['lib/src/peer/a.dart -> lib/src/connection/x.dart'],
+      };
+      final head = {
+        'boundaries': [
+          'lib/src/peer/a.dart -> lib/src/connection/x.dart',
+          'lib/src/peer/a.dart -> lib/src/connection/x.dart',
+        ],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        weights: {'boundaries': _byFolder},
+      );
+
+      // assert
+      expect(growth.holds, isTrue);
+    });
+
+    test('holds every list it has no weight for entry by entry', () {
+      // arrange
+      final base = {
+        'layers': ['lib/src/peer/a.dart -> lib/src/connection/x.dart'],
+      };
+      final head = {
+        'layers': ['lib/src/peer/a.dart -> lib/src/connection/y.dart'],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        weights: {'boundaries': _byFolder},
       );
 
       // assert
       expect(growth.added, [
-        'boundaries: lib/src/peer/peer.dart into connection, 2 entries where '
-            'the base had 1: '
-            'lib/src/peer/peer.dart -> lib/src/features/connection/domain/b.dart',
+        'layers: lib/src/peer/a.dart -> lib/src/connection/y.dart',
       ]);
-    });
-
-    test('holds when an entry drops because its target moved into shared', () {
-      // arrange
-      final base = {
-        'boundaries': [
-          'lib/src/gatt_server/server.dart -> lib/src/peer/server_id.dart',
-        ],
-      };
-      final head = {'boundaries': <String>[]};
-
-      // act
-      final growth = ListGrowth.between(
-        path: _path,
-        base: base,
-        head: head,
-        byContext: byContext,
-      );
-
-      // assert
-      expect(growth.holds, isTrue, reason: growth.describe());
-    });
-
-    test(
-      'names an entry into shared as a context the file did not depend on',
-      () {
-        // arrange
-        final base = {
-          'boundaries': [
-            'lib/src/gatt_server/server.dart -> lib/src/peer/server_id.dart',
-          ],
-        };
-        final head = {
-          'boundaries': [
-            'lib/src/gatt_server/server.dart -> lib/src/shared/server_id.dart',
-          ],
-        };
-
-        // act
-        final growth = ListGrowth.between(
-          path: _path,
-          base: base,
-          head: head,
-          byContext: byContext,
-        );
-
-        // assert
-        expect(growth.holds, isFalse);
-      },
-    );
-
-    test('keeps every other list strict', () {
-      // arrange
-      final base = {
-        'layers': ['lib/src/a/x.dart -> lib/src/b/y.dart'],
-      };
-      final head = {
-        'layers': ['lib/src/a/x.dart -> lib/src/b/z.dart'],
-      };
-
-      // act
-      final growth = ListGrowth.between(
-        path: _path,
-        base: base,
-        head: head,
-        byContext: byContext,
-      );
-
-      // assert
-      expect(growth.added, ['layers: lib/src/a/x.dart -> lib/src/b/z.dart']);
     });
   });
 
@@ -260,7 +263,7 @@ void main() {
       expect(growth.holds, isTrue);
     });
 
-    test('holds when a size entry carries a lower count', () {
+    test('names a rewritten entry of a list it has no weight for', () {
       // arrange
       final base = {
         'oversized': ['lib/a.dart -> 420 lines'],
@@ -273,10 +276,10 @@ void main() {
       final growth = ListGrowth.between(path: _path, base: base, head: head);
 
       // assert
-      expect(growth.holds, isTrue);
+      expect(growth.added, ['oversized: lib/a.dart -> 410 lines']);
     });
 
-    test('names a size entry whose count was raised', () {
+    test('names a weighed entry whose amount was raised', () {
       // arrange
       final base = {
         'oversized': ['lib/a.dart -> 410 lines'],
@@ -286,17 +289,23 @@ void main() {
       };
 
       // act
-      final growth = ListGrowth.between(path: _path, base: base, head: head);
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        weights: {'oversized': _byLines},
+      );
 
       // assert
       expect(growth.raised, [
-        'oversized: lib/a.dart raised from 410 to 420 lines',
+        'oversized: lib/a.dart, 410 at the base and 420 at the head: '
+            'lib/a.dart -> 420 lines',
       ]);
       expect(growth.added, isEmpty);
       expect(growth.holds, isFalse);
     });
 
-    test('names a new size entry as an entry added', () {
+    test('names a new weighed entry as an entry added', () {
       // arrange
       final base = {'oversized': <String>[]};
       final head = {
@@ -304,7 +313,12 @@ void main() {
       };
 
       // act
-      final growth = ListGrowth.between(path: _path, base: base, head: head);
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        weights: {'oversized': _byLines},
+      );
 
       // assert
       expect(growth.added, ['oversized: lib/born.dart -> 301 lines']);
@@ -401,6 +415,7 @@ void main() {
           'boundaries': ['lib/a.dart -> lib/c.dart'],
           'oversized': ['lib/a.dart -> 420 lines'],
         },
+        weights: {'oversized': _byLines},
       );
 
       // act
@@ -414,7 +429,8 @@ void main() {
         'Added:\n'
         '  boundaries: lib/a.dart -> lib/c.dart\n'
         'Raised:\n'
-        '  oversized: lib/a.dart raised from 410 to 420 lines\n',
+        '  oversized: lib/a.dart, 410 at the base and 420 at the head: '
+        'lib/a.dart -> 420 lines\n',
       );
     });
   });

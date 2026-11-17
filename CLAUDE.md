@@ -73,8 +73,8 @@ cd bluey_guards && dart test
 # The architecture rules; each package keeps its lists in test/architecture/known_violations.dart
 cd bluey && flutter test test/architecture
 
-# No list grew since the branch left main (CI compares with the pull request's base)
-cd bluey && dart run bluey_guards:list_growth --by-context boundaries origin/main ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart
+# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package)
+cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart
 
 # The public API dump: check it, or rewrite it after a change that was meant
 cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api

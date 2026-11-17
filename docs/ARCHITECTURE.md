@@ -135,26 +135,25 @@ An entry is one line, `path -> detail`, with the path relative to the package ro
 
 A list only shrinks. Nothing is added to it and no count is raised: when a rule finds something new, the code is fixed. An entry leaves in the commit that fixes it. A size entry is rewritten with the lower count when its file shrinks, so the file can never grow back to its old ceiling.
 
-The architecture test can only see that a list matches the code; a line copied into the list would make it match again. So CI's Lists only shrink job compares each list file, these five and each package's known-defect roster (section 9), with the commit where the change left its base (`git merge-base`), a pull request's base branch or, on a push to `main`, the commit `main` stood at before. Every entry at the head must be in the list of the same name at the base, and a size entry may only carry a lower count. A list the base did not have counts as empty, so renaming a list carries nothing in; a list the base had must still be in the file, so it cannot leave the gate's sight by moving to another file; a list file the base did not have is the first statement of what its rules find, and holds. The gate fails naming each entry added and each count raised. This is a real run, from `bluey/`, after a line was copied into `boundaries` and the entry of `lib/src/bluey.dart` was raised:
+The architecture test can only see that a list matches the code; a line copied into the list would make it match again. So CI's Lists only shrink job compares each list file, these five and each package's known-defect roster (section 9), with the commit where the change left its base (`git merge-base`), a pull request's base branch or, on a push to `main`, the commit `main` stood at before. A list the base did not have counts as empty, so renaming a list carries nothing in; a list the base had must still be in the file, so it cannot leave the gate's sight by moving to another file; a list file the base did not have is the first statement of what its rules find, and holds.
+
+The gate knows no rule's entries. A rule whose entries record a debt that outlives their text says what each entry owes (a `WeighingRule`'s `weigh`), and the gate compares what each list owes at the base and at the head: a debt the base did not owe is an entry added, a debt owed more is a count raised, and a debt owed the same or less holds, however its entry is now written. Each package's `test/architecture/list_growth.dart` is the one place its rules meet the gate: it passes `weightsOf(<its rules>)` to the gate's `holdListsToShrinking`, and CI runs it in every package that has a `known_violations.dart`. A list whose rule weighs nothing, and the rosters, are held entry by entry: every entry at the head must be at the base. Two rules weigh their entries:
+
+- **A size entry** owes its file's lines, so it may be rewritten with a lower count and never with a higher one.
+- **A `boundaries` entry** owes its source file's dependency on the target's context, not on one path in it: `lib/src/gatt_client/gatt.dart -> lib/src/connection/value_objects/attribute_handle.dart` is the debt "`gatt.dart` depends on Connection". The rule reads the context through its own `LegacyLayout` and `Placement`, so `lib/src/connection/` and `lib/src/features/connection/` are the one context. For each source file and each context, the count of entries may fall but never rise.
+
+This is a real run, from `bluey/` against `HEAD`, after the `gatt.dart` entry above was rewritten to `lib/src/features/connection/domain/attribute_handle.dart` (which holds), two lines were copied in for `lib/src/peer/peer_remote_service_view.dart`, which already depended on `gatt_client` once and on `discovery` not at all, and the entry of `lib/src/bluey.dart` was raised:
 
 ```
-../bluey/test/architecture/known_violations.dart: 1 entry added, 1 count raised. A list only shrinks: fix the code and take the line out of the list.
+test/architecture/known_violations.dart: 1 entry added, 2 counts raised. A list only shrinks: fix the code and take the line out of the list.
 Added:
-  boundaries: lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart
+  boundaries: lib/src/peer/peer_remote_service_view.dart -> lib/src/discovery/device_address.dart
 Raised:
-  oversized: lib/src/bluey.dart raised from 1002 to 9999 lines
+  boundaries: lib/src/peer/peer_remote_service_view.dart into gatt_client, 1 at the base and 2 at the head: lib/src/peer/peer_remote_service_view.dart -> lib/src/gatt_client/value_objects.dart
+  oversized: lib/src/bluey.dart, 1002 at the base and 9999 at the head: lib/src/bluey.dart -> 9999 lines
 ```
 
-`boundaries` is the one list the gate counts another way (`--by-context boundaries`). Its debt is that a source file depends on another context, not on one path in it: `lib/src/gatt_client/gatt.dart -> lib/src/connection/value_objects/attribute_handle.dart` is the debt "`gatt.dart` depends on Connection". So the gate counts, for each source file and each target context, the entries at the base and at the head, and a count may fall but never rise. A target's context is its folder under `lib/src/`, and a placed target's is the folder under `lib/src/features/`, so `lib/src/connection/` and `lib/src/features/connection/` are the one context. This is a real run, from `bluey/` against `HEAD`, after the entry above was rewritten to `lib/src/features/connection/domain/attribute_handle.dart` (which holds) and two lines were copied in for `lib/src/peer/peer_remote_service_view.dart`, which already depended on `gatt_client` once and on `discovery` not at all:
-
-```
-../bluey/test/architecture/known_violations.dart: 2 entries added, 0 counts raised. A list only shrinks: fix the code and take the line out of the list.
-Added:
-  boundaries: lib/src/peer/peer_remote_service_view.dart into gatt_client, 2 entries where the base had 1: lib/src/peer/peer_remote_service_view.dart -> lib/src/gatt_client/value_objects.dart
-  boundaries: lib/src/peer/peer_remote_service_view.dart into discovery, 1 entry where the base had 0: lib/src/peer/peer_remote_service_view.dart -> lib/src/discovery/device_address.dart
-```
-
-Every other list stays strict, entry by entry. The gate knows nothing of git renames: a source file that moved is a new source file, so its entries read as added.
+The gate knows nothing of git renames: a source file that moved is a new source file, so its entries read as added.
 
 When a list and the code differ, the test prints up to three parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
 
@@ -257,7 +256,7 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android`, `bluey_ios`, `bluey/example` and `bluey_ios/example`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards), Tests (bluey/example), Tests (bluey_ios/example) |
 | The `bluey` suite and its coverage floor | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib` | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
-| No list grew | `git fetch origin main && cd bluey && dart run bluey_guards:list_growth --by-context boundaries origin/main ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart` | Lists only shrink |
+| No list grew | `git fetch origin main && cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart`, and the same in each package with a `known_violations.dart` (its roster only where it has one) | Lists only shrink |
 | The public API dump | `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api` | Public API |
 | The Kotlin unit tests | `cd bluey_android/android && FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")" ./gradlew test` | Kotlin tests |
 | The known defects | below | Known defects |

@@ -3,7 +3,7 @@ import '../source_tree.dart';
 
 /// Holds every file of one language under a number of lines, so no file
 /// grows past what a reader can hold in their head.
-final class SizeRule implements MeasuringRule {
+final class SizeRule implements MeasuringRule, WeighingRule {
   /// The rule for files with [extension] (such as `.dart`), at most [limit]
   /// lines each.
   const SizeRule({required this.limit, required this.extension});
@@ -23,6 +23,14 @@ final class SizeRule implements MeasuringRule {
       if (file.lineCount > limit)
         Violation(file.path, '${file.lineCount} lines'),
   ];
+
+  /// A size entry owes its file's lines, so a file that shrank owes less and
+  /// one that grew owes more.
+  @override
+  Debt weigh(String entry) => switch (_Measured.parse(entry)) {
+    final measured? => (debt: measured.path, amount: measured.lines),
+    null => (debt: entry, amount: 1),
+  };
 
   /// Shrink a file that grew back to its entry, and lower the entry of one
   /// that shrank, so the message never reads as an invitation to raise a

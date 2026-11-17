@@ -17,25 +17,22 @@ final class ListGrowth {
   ///
   /// Each list is compared with the list of the same name at the base; a list
   /// the base did not have counts as an empty one, so renaming a list cannot
-  /// carry new entries in. A count entry (`<path> -> <N> lines`) may be
-  /// rewritten with a lower count, since a file that shrank must lower its
-  /// entry. A file the base did not have holds whatever it lists: it is the
-  /// first statement of what its rules find. A list the base had must still
-  /// be in the head file, so a list cannot leave the gate's sight by moving
-  /// to another file under the same name; a file the head deleted holds,
-  /// since the test that reads it then fails.
+  /// carry new entries in. A file the base did not have holds whatever it
+  /// lists: it is the first statement of what its rules find. A list the base
+  /// had must still be in the head file, so a list cannot leave the gate's
+  /// sight by moving to another file under the same name; a file the head
+  /// deleted holds, since the test that reads it then fails.
   ///
-  /// A list named in [byContext] holds `<source> -> <target>` entries whose
-  /// debt is that the source depends on the target's context, not on its
-  /// path, so it is counted per source and context instead: an entry may be
-  /// rewritten when its target moved within its context, while an entry into
-  /// a context the source did not depend on, or one more into a context it
-  /// did, is added debt.
+  /// A list named in [weights] is judged by what its entries owe, as the rule
+  /// that finds them weighs them: an entry rewritten for a debt the base owed
+  /// holds while the debt is owed no more, a debt the base did not owe is an
+  /// entry added, and one owed more is a count raised. Every other list is
+  /// judged entry by entry.
   factory ListGrowth.between({
     required String path,
     required Map<String, List<String>>? base,
     required Map<String, List<String>>? head,
-    Set<String> byContext = const {},
+    Map<String, EntryWeight> weights = const {},
   }) {
     if (base == null) {
       return ListGrowth._(path: path, isNew: true, added: [], raised: []);
@@ -46,25 +43,19 @@ final class ListGrowth {
     final added = <String>[];
     final raised = <String>[];
     head.forEach((list, entries) {
-      final before = base[list] ?? const [];
-      if (byContext.contains(list)) {
-        added.addAll(_ContextDebt.grown(list, before: before, after: entries));
-        return;
-      }
-      final counted = {
-        for (final entry in before.map(_CountEntry.parse).nonNulls)
-          entry.path: entry.lines,
-      };
-      for (final entry in entries) {
-        if (before.contains(entry)) continue;
-        final count = _CountEntry.parse(entry);
-        final was = counted[count?.path];
-        if (count == null || was == null) {
-          added.add('$list: $entry');
-        } else if (count.lines > was) {
+      final before = (base[list] ?? const []).toSet();
+      final weigh = weights[list] ?? _itself;
+      final owed = _owed(before, weigh);
+      for (final MapEntry(key: debt, value: (:amount, :entries))
+          in _owed(entries.toSet(), weigh).entries) {
+        final was = owed[debt]?.amount;
+        final fresh = entries.where((entry) => !before.contains(entry));
+        if (was == null) {
+          added.addAll([for (final entry in fresh) '$list: $entry']);
+        } else if (amount > was) {
           raised.add(
-            '$list: ${count.path} raised from $was to '
-            '${count.lines} lines',
+            '$list: $debt, $was at the base and $amount at the head: '
+            '${fresh.join('; ')}',
           );
         }
       }
@@ -90,8 +81,9 @@ final class ListGrowth {
   /// `<list>: <entry>`.
   final List<String> added;
 
-  /// Each count entry whose count the head raised, as
-  /// `<list>: <path> raised from <was> to <now> lines`.
+  /// Each debt the head owes more of than the base did, as
+  /// `<list>: <debt>, <was> at the base and <now> at the head: <entries>`,
+  /// naming the entries the base did not hold.
   final List<String> raised;
 
   /// Each list the base had that the head file lacks.
@@ -137,64 +129,27 @@ final class ListGrowth {
   }
 }
 
-/// An entry that carries a count of its file's lines, read back into its two
-/// halves so a lower count reads as the same file shrinking.
-final class _CountEntry {
-  _CountEntry(this.path, this.lines);
+/// How a rule weighs one entry of its list: the debt the entry records and
+/// how much of it, so a gate compares what a list owes and not its text.
+typedef EntryWeight = ({String debt, int amount}) Function(String entry);
 
-  static final _shape = RegExp(r'^(.+) -> (\d+) lines$');
+({String debt, int amount}) _itself(String entry) => (debt: entry, amount: 1);
 
-  static _CountEntry? parse(String entry) {
-    if (_shape.firstMatch(entry)?.groups([1, 2]) case [
-      final path?,
-      final lines?,
-    ]) {
-      return _CountEntry(path, int.parse(lines));
-    }
-    return null;
+/// What [entries] owe, by debt: how much in all, and the entries owing it.
+Map<String, ({int amount, List<String> entries})> _owed(
+  Set<String> entries,
+  EntryWeight weigh,
+) {
+  final owed = <String, ({int amount, List<String> entries})>{};
+  for (final entry in entries) {
+    final (:debt, :amount) = weigh(entry);
+    final so = owed[debt];
+    owed[debt] = (
+      amount: (so?.amount ?? 0) + amount,
+      entries: [...?so?.entries, entry],
+    );
   }
-
-  final String path;
-  final int lines;
-}
-
-/// The entries of one source file into one context, keyed so a target that
-/// moved from a legacy folder (`lib/src/connection/`) to its placed home
-/// (`lib/src/features/connection/`) stays the same debt.
-final class _ContextDebt {
-  static final _shape = RegExp(r'^(.+) -> lib/src/(?:features/)?([^/]+)/');
-
-  /// Each source and context the [after] entries reach more often than the
-  /// [before] entries did, with the entries the base did not hold.
-  static List<String> grown(
-    String list, {
-    required List<String> before,
-    required List<String> after,
-  }) {
-    final was = _byKey(before);
-    return [
-      for (final MapEntry(key: key, value: entries) in _byKey(after).entries)
-        if (entries.length > (was[key]?.length ?? 0))
-          '$list: ${key.$1} into ${key.$2}, '
-              '${_count(entries.length, 'entry', 'entries')} where the base '
-              'had ${was[key]?.length ?? 0}: '
-              '${entries.where((entry) => !before.contains(entry)).join('; ')}',
-    ];
-  }
-
-  /// The entries grouped by source and context, a repeat counted once; an
-  /// entry of another shape is its own key, so it is held strictly.
-  static Map<(String, String), List<String>> _byKey(List<String> entries) {
-    final grouped = <(String, String), List<String>>{};
-    for (final entry in entries.toSet()) {
-      final key = switch (_shape.firstMatch(entry)?.groups([1, 2])) {
-        [final source?, final context?] => (source, context),
-        _ => (entry, entry),
-      };
-      grouped.putIfAbsent(key, () => []).add(entry);
-    }
-    return grouped;
-  }
+  return owed;
 }
 
 String _count(int count, String one, String many) =>

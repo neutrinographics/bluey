@@ -47,3 +47,28 @@ abstract interface class MeasuringRule implements ArchitectureRule {
   /// when they are not the same file measured twice.
   String? change({required String known, required String found});
 }
+
+/// What one entry of a rule's list owes: the [debt] it records and how much
+/// of it, so a list can be compared across commits by what it owes and not
+/// by its text.
+typedef Debt = ({String debt, int amount});
+
+/// A rule whose entries record a debt that outlives their text: a file that
+/// shrank, a target that moved within its context. A gate that compares the
+/// list across commits judges it by what it owes, so an entry rewritten for
+/// the same debt is never new debt, and a debt may only be owed less.
+abstract interface class WeighingRule implements ArchitectureRule {
+  /// The debt [entry] records. An entry of another shape is a debt of its
+  /// own, owed once, so it is held entry by entry.
+  Debt weigh(String entry);
+}
+
+/// How the list of each rule in [rules] that weighs its entries weighs them,
+/// by the list's name, for a gate that compares the lists across commits; a
+/// list left out is compared entry by entry.
+Map<String, Debt Function(String entry)> weightsOf(
+  Map<String, ArchitectureRule> rules,
+) => {
+  for (final MapEntry(key: list, value: rule) in rules.entries)
+    if (rule is WeighingRule) list: rule.weigh,
+};

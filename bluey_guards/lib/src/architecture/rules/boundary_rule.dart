@@ -9,7 +9,7 @@ import 'rule_support.dart';
 /// in today's folders and in the target layout alike, so a context reaches
 /// another only through a bridge, and a bridge only the other's domain and
 /// application.
-final class BoundaryRule implements ArchitectureRule {
+final class BoundaryRule implements WeighingRule {
   /// The rule for [package], whose code that has not moved yet is read
   /// through [legacy].
   const BoundaryRule({required this.package, required this.legacy});
@@ -33,6 +33,26 @@ final class BoundaryRule implements ArchitectureRule {
               when _crosses(placement, libraryPlacement(path)))
             Violation(source.path, path),
   ];
+
+  /// An entry owes its source's dependency on the target's context, not on
+  /// the target's path, so a target that moved within its context, or out of
+  /// today's folder into its place in the target layout, is the same debt.
+  @override
+  Debt weigh(String entry) {
+    if (_entryShape.firstMatch(entry)?.groups([1, 2]) case [
+      final source?,
+      final target?,
+    ]) {
+      if (libraryPlacement(target) case final placement?) {
+        if (_contextOf(placement) case final context?) {
+          return (debt: '$source into $context', amount: 1);
+        }
+      }
+    }
+    return (debt: entry, amount: 1);
+  }
+
+  static final _entryShape = RegExp(r'^(.+) -> (.+)$');
 
   bool _crosses(Placement from, Placement? to) {
     if (to == null) return false;

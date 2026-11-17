@@ -142,8 +142,7 @@ void main() {
       expect(result.stdout, contains('not at the base'));
     });
 
-    test('counts a list named by --by-context per source file and target '
-        'context', () async {
+    test('holds every list entry by entry', () async {
       // arrange
       await git(['checkout', '-q', 'main']);
       write(_listFile, _boundaries('lib/src/connection/a.dart'));
@@ -156,20 +155,16 @@ void main() {
       );
 
       // act
-      final strict = await run(['main', _listFile]);
-      final byContext = await run([
-        '--by-context',
-        'boundaries',
-        'main',
-        _listFile,
-      ]);
+      final result = await run(['main', _listFile]);
 
       // assert
-      expect(strict.exitCode, 1);
+      expect(result.exitCode, 1);
       expect(
-        byContext.exitCode,
-        0,
-        reason: '${byContext.stdout}${byContext.stderr}',
+        result.stdout,
+        contains(
+          '  boundaries: lib/src/peer/peer.dart -> '
+          'lib/src/features/connection/domain/a.dart\n',
+        ),
       );
     });
 
@@ -191,8 +186,7 @@ void main() {
       expect(
         result.stderr,
         contains(
-          'Usage: dart run bluey_guards:list_growth [--by-context <list>]... '
-          '<base> <list file>...',
+          'Usage: dart run bluey_guards:list_growth <base> <list file>...',
         ),
       );
     });

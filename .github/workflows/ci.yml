@@ -98,11 +98,29 @@ jobs:
       - uses: ./.github/actions/setup
       # A pull request is compared with where it left its base branch; a
       # push to main with the commit main stood at before it.
+      # Each package runs its own test/architecture/list_growth.dart, where
+      # its rules say how their entries weigh; a list file with no such
+      # script beside it fails the job rather than going unjudged.
       - name: No list grew since the change left its base
-        working-directory: bluey
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: dart run bluey_guards:list_growth --by-context boundaries "$BASE" ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart
+        run: |
+          status=0
+          for lists in */test/architecture/known_violations.dart; do
+            package="${lists%%/*}"
+            if [ ! -f "$package/test/architecture/list_growth.dart" ]; then
+              echo "$lists has no test/architecture/list_growth.dart beside it"
+              status=1
+              continue
+            fi
+            files=test/architecture/known_violations.dart
+            if [ -f "$package/test/known_defects/roster.dart" ]; then
+              files="$files test/known_defects/roster.dart"
+            fi
+            echo "== $package"
+            (cd "$package" && dart run test/architecture/list_growth.dart "$BASE" $files) || status=1
+          done
+          exit $status
 
   public-api:
     name: Public API
