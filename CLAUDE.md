@@ -37,6 +37,8 @@ cd bluey && flutter test
 cd bluey_platform_interface && flutter test
 cd bluey_android && flutter test
 cd bluey_ios && flutter test
+cd bluey/example && flutter test       # the example app, the one consumer of the public API here
+cd bluey_ios/example && flutter test
 
 # Run the Android native (Kotlin/JVM) unit tests — standalone Gradle.
 # Needs the Flutter SDK path: set FLUTTER_ROOT or bluey_android/android/local.properties (flutter.sdk=...).

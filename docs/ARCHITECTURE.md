@@ -242,7 +242,7 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | Gate | Command | CI job |
 | --- | --- | --- |
 | Analysis, and a lockfile that resolves as committed | `flutter pub get && test -z "$(git status --porcelain)" && flutter analyze`, at the repository root; the status check fails on a changed file and on a new one | Analyze |
-| The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android` and `bluey_ios`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards) |
+| The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android`, `bluey_ios`, `bluey/example` and `bluey_ios/example`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards), Tests (bluey/example), Tests (bluey_ios/example) |
 | The `bluey` suite and its coverage floor | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90` | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
 | No list grew | `git fetch origin main && cd bluey && dart run bluey_guards:list_growth origin/main ../bluey*/test/architecture/known_violations.dart` | Lists only shrink |
@@ -251,7 +251,7 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | The known defects | below | Known defects |
 | The XCTest suite | `cd bluey_ios/example && flutter build ios --config-only && (cd ios && pod install)`, then `xcodebuild test` in `bluey_ios/example/ios` (CLAUDE.md has the whole command) | XCTest, in `ios.yml`: on a pull request that touches `bluey_ios/`, `ios.yml` or the setup action, every night, and on demand |
 
-Branch protection on `main` requires every job of `ci.yml`: Analyze; Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios) and Tests (bluey_guards); Tests and coverage (bluey); Architecture; Lists only shrink; Public API; Kotlin tests; Known defects. XCTest is not required, since `ios.yml` runs only for the pull requests that touch iOS.
+Branch protection on `main` requires every job of `ci.yml`: Analyze; Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards), Tests (bluey/example) and Tests (bluey_ios/example); Tests and coverage (bluey); Architecture; Lists only shrink; Public API; Kotlin tests; Known defects. XCTest is not required, since `ios.yml` runs only for the pull requests that touch iOS.
 
 The known defects, run as the job runs them:
 
@@ -265,7 +265,7 @@ The two test runs exit non-zero, as they should; the verdict is the third comman
 
 The `bluey` suite runs once in CI, in the job that holds the coverage floor, and the Architecture job runs the four `test/architecture` folders again on their own, so a broken rule reads as "Architecture" in the checks list. The coverage floor is 90% of lines in the `bluey` package, the figure CLAUDE.md requires; a missing report fails too.
 
-**Where the gates stand.** On Flutter 3.47.2 every Dart gate is green: the `bluey` suite holds 1,139 tests at 90.5% line coverage against its 90% floor. The Kotlin suite (114 JVM tests, run on the debug and the release variant) and the XCTest suite (83 tests) were green on Joel's Mac at `a41a2de`, with Xcode 26.6.
+**Where the gates stand.** On Flutter 3.47.2 every Dart gate is green: the `bluey` suite holds 1,139 tests at 90.5% line coverage against its 90% floor, and the example app's suite 245. The example is the one consumer of the public API in the repository, so its suite is what sees a change to the API break an app's behaviour, which analysis alone does not. `bluey_ios/example` has its own lockfile, outside the workspace, and one smoke test. The Kotlin suite (114 JVM tests, run on the debug and the release variant) and the XCTest suite (83 tests) were green on Joel's Mac at `a41a2de`, with Xcode 26.6.
 
 **The Flutter pin.** Flutter is pinned by one line, `flutter: 3.47.2` under `environment:` in the root `pubspec.yaml`. Pub reads it as a floor, so an older Flutter refuses to resolve; CI installs exactly that version from the same line, so CI is the exact gate. The workspace lockfile, `pubspec.lock` at the root, is committed, so every checkout and CI resolve alike. To move the pin: change that one line, install that Flutter, run `flutter pub get` at the root, and commit `pubspec.yaml`, `pubspec.lock` and any other file the tool rewrote. The Analyze job fails when resolving changes the committed tree, so nothing the tool writes may be left out.
 

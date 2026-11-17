@@ -40,6 +40,8 @@ jobs:
           - { package: bluey_android, run: flutter test }
           - { package: bluey_ios, run: flutter test }
           - { package: bluey_guards, run: dart test }
+          - { package: bluey/example, run: flutter test }
+          - { package: bluey_ios/example, run: flutter test }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
