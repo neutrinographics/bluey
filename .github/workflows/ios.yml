@@ -1,0 +1,36 @@
+name: iOS
+
+on:
+  pull_request:
+    paths:
+      - 'bluey_ios/**'
+      - '.github/workflows/ios.yml'
+      - '.github/actions/setup/**'
+  schedule:
+    - cron: '0 18 * * *' # 01:00 in Jakarta
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  xctest:
+    name: XCTest
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: flutter build ios --config-only
+        working-directory: bluey_ios/example
+      - run: pod install
+        working-directory: bluey_ios/example/ios
+      - name: Run the tests on the first iPhone simulator the runner has
+        working-directory: bluey_ios/example/ios
+        run: |
+          simulator="$(xcrun simctl list devices available | grep -m1 -o 'iPhone [^(]*' | sed 's/ *$//')"
+          xcodebuild test -workspace Runner.xcworkspace -scheme Runner \
+            -destination "platform=iOS Simulator,name=$simulator" CODE_SIGNING_ALLOWED=NO

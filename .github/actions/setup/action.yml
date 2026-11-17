@@ -1,0 +1,12 @@
+name: Set up Flutter
+description: Install the Flutter version the root pubspec.yaml pins, then resolve the workspace.
+runs:
+  using: composite
+  steps:
+    - uses: subosito/flutter-action@v2
+      with:
+        channel: stable
+        flutter-version-file: pubspec.yaml
+        cache: true
+    - run: flutter pub get
+      shell: bash

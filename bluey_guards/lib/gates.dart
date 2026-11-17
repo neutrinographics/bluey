@@ -4,3 +4,4 @@
 library;
 
 export 'src/gates/known_defect_run.dart';
+export 'src/gates/line_coverage.dart';

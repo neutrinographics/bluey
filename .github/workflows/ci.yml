@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Resolving leaves the tree as committed
+        run: git diff --exit-code
+      - run: flutter analyze
+
+  suites:
+    name: Tests (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { package: bluey_platform_interface, run: flutter test }
+          - { package: bluey_android, run: flutter test }
+          - { package: bluey_ios, run: flutter test }
+          - { package: bluey_guards, run: dart test }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: ${{ matrix.run }}
+        working-directory: ${{ matrix.package }}
+
+  bluey:
+    name: Tests and coverage (bluey)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bluey
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: flutter test --coverage
+      - run: dart run bluey_guards:coverage_gate coverage/lcov.info 90
+
+  architecture:
+    name: Architecture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: |
+          for package in bluey bluey_platform_interface bluey_android bluey_ios; do
+            (cd "$package" && flutter test test/architecture)
+          done
+
+  public-api:
+    name: Public API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: dart run bluey_guards:public_api lib/bluey.dart api/bluey.api
+        working-directory: bluey
+
+  kotlin:
+    name: Kotlin tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: ./.github/actions/setup
+      - name: Fetch the Flutter embedding the Kotlin sources compile against
+        run: flutter precache --android
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+      - run: gradle test
+        working-directory: bluey_android/android
+
+  known-defects:
+    name: Known defects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run them; they are expected to fail
+        run: |
+          (cd bluey && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey.json" || true)
+          (cd bluey_android && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey_android.json" || true)
+      - name: Each one ran, and each one still fails
+        run: dart run bluey_guards:known_defects "$RUNNER_TEMP/bluey.json" "$RUNNER_TEMP/bluey_android.json"
+        working-directory: bluey
