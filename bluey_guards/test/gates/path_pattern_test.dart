@@ -14,6 +14,18 @@ void main() {
       expect(taken, isTrue);
     });
 
+    test('written with a trailing slash names the same folder', () {
+      // arrange
+      final pattern = PathPattern('lib/src/shared/domain/');
+
+      // act
+      final taken = pattern.takesIn('lib/src/shared/domain/either.dart');
+
+      // assert
+      expect(taken, isTrue);
+      expect(pattern.pattern, 'lib/src/shared/domain');
+    });
+
     test('reads a star as any one folder', () {
       // arrange
       final pattern = PathPattern('lib/src/features/*/domain');

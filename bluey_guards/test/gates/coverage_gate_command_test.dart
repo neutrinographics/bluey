@@ -215,6 +215,35 @@ void main() {
           'that runs, so the 95% floor holds nothing yet.\n',
         );
       });
+
+      test('exits 1 naming an unloaded file under the patterns when no line '
+          'under them is in the report', () async {
+        // arrange
+        write('coverage/lcov.info', _measured);
+        write('lib/src/shared/domain/unloaded.dart', 'int three() => 3;\n');
+
+        // act
+        final result = await run([
+          'coverage/lcov.info',
+          '95',
+          'lib',
+          'lib/src/shared/domain',
+        ]);
+
+        // assert
+        expect(result.exitCode, 1);
+        expect(result.stdout, isNot(contains('holds nothing yet')));
+        expect(
+          result.stdout,
+          startsWith(
+            'Line coverage of lib/src/shared/domain 0.0% (0 of 0 lines).',
+          ),
+        );
+        expect(
+          result.stdout,
+          contains('  lib/src/shared/domain/unloaded.dart\n'),
+        );
+      });
     });
 
     test('exits 64 with the usage line without the lib folder', () async {
