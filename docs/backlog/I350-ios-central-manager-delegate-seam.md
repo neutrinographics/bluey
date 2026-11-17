@@ -5,7 +5,7 @@ category: enhancement
 severity: medium
 platform: ios
 status: open
-last_verified: 2026-07-10
+last_verified: 2026-11-17
 related: [I345]
 ---
 
@@ -48,3 +48,7 @@ it as its own piece of work, not a quick patch.
 - The shipped server-role seam: `bluey_ios/ios/Classes/PeripheralManaging.swift` and `PeripheralManagerImplCoreTests.swift` (audit R5).
 - Audit: [2026-07-10 networking-scenario test audit](../reviews/2026-07-10-networking-scenario-test-audit.md) (finding NT-3 / recommendation R5).
 - [I345 — move bluey-ios off the main thread](I345-decouple-bluey-ios-from-main-thread.md) (touches the same class; coordinate).
+
+## Audit 2026-11-17
+
+The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) (M1) notes that the iOS pending-drop poisoning of [I359](I359-ios-pendingdrops-poison.md) cannot be regression-tested without this seam: `CentralManagerImpl` is over 1,000 lines with no direct test. It therefore goes first in slice 4 (native completions) of the architecture foundation ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)), before the native fixes.

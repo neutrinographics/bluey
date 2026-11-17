@@ -5,7 +5,7 @@ category: limitation
 severity: low
 platform: domain
 status: open
-last_verified: 2026-05-04
+last_verified: 2026-11-17
 related: [I313]
 ---
 
@@ -119,3 +119,7 @@ on the fake platform recorder. After this refactor they would assert on
 the same wire-level field (since the fake mirrors the wire DTO) — but
 the call site under test would be the intent-bearing factory, not
 direct field naming.
+
+## Audit 2026-11-17
+
+Measured by the `boundaries` and `frameworkPlacement` lists in `test/architecture/known_violations.dart`. Closed by slice 2 (scanning and advertising sessions), together with the advertising session. Each entry on those lists leaves in the commit that fixes it, so the lists show how far this has come. See [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) and the architecture foundation [design](../superpowers/specs/2026-11-17-architecture-foundation-design.md).

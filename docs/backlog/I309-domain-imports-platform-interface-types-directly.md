@@ -2,10 +2,10 @@
 id: I309
 title: Domain layer imports `bluey_platform_interface` types directly instead of going through an abstract repository
 category: limitation
-severity: low
+severity: medium
 platform: domain
 status: open
-last_verified: 2026-04-29
+last_verified: 2026-11-17
 related: [I308, I099]
 ---
 
@@ -37,3 +37,7 @@ After the refactor: the bluey-domain package compiles without `bluey_platform_in
 Cost-benefit: low severity. The current setup is "Clean Architecture-light" and works fine for the single-platform-interface reality. Real benefit accrues only if (a) we want a second platform-interface implementation (e.g. mock-only test backend that doesn't go through Pigeon), (b) we want to publish the bluey-domain package independently, or (c) we ever hit a refactoring scenario where platform-interface evolution is blocked by domain coupling.
 
 Related to I308 — both are facets of "domain layer has implementation-detail dependencies it shouldn't carry." A coordinated fix could address both in one architectural pass.
+
+## Audit 2026-11-17
+
+Measured by the `frameworkPlacement` and `publicExports` lists in `test/architecture/known_violations.dart`. Closed by each slice shrinking the lists, and slice 6 (what is left) emptying them. Each entry on those lists leaves in the commit that fixes it, so the lists show how far this has come. See [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) and the architecture foundation [design](../superpowers/specs/2026-11-17-architecture-foundation-design.md).
