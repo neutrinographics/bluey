@@ -176,6 +176,55 @@ class Boundaries {}
       // assert
       expect(read, throwsA(isA<ListFileRefusal>()));
     });
+
+    for (final directive in [
+      "import 'more_lists.dart';",
+      "export 'more_lists.dart';",
+      "part 'more_lists.dart';",
+      "part of 'lists.dart';",
+    ]) {
+      test('is refused: the directive $directive', () {
+        // arrange
+        final source =
+            '$directive\n'
+            "const unplaced = <String>['lib/a.dart -> unplaced'];\n";
+
+        // act
+        String refusal() {
+          try {
+            readLists(source);
+          } on ListFileRefusal catch (refusal) {
+            return refusal.message;
+          }
+          return '';
+        }
+
+        // assert
+        expect(
+          refusal(),
+          'A list file holds lists and nothing else, not: $directive',
+        );
+      });
+    }
+  });
+
+  test('reads a file that opens with a library directive, which carries the '
+      "file's doc comment and names no other file", () {
+    // arrange
+    const source = '''
+/// What the rules find today.
+library;
+
+const unplaced = <String>['lib/a.dart -> unplaced'];
+''';
+
+    // act
+    final lists = readLists(source);
+
+    // assert
+    expect(lists, {
+      'unplaced': ['lib/a.dart -> unplaced'],
+    });
   });
 
   test('names a refused list in one short line, however long the list', () {

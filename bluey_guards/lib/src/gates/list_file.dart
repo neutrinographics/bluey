@@ -14,13 +14,24 @@ import 'package:analyzer/dart/ast/ast.dart';
 /// past the gate by one token. An entry that is not a plain string, one built
 /// by interpolation or named by a constant, is refused too: a gate that
 /// cannot read an entry as written cannot say whether the list grew, and
-/// neither can one that reads a file that does not parse.
+/// neither can one that reads a file that does not parse. So is every
+/// directive but `library;`, which only carries the file's doc comment: an
+/// import, an export or a part would let the file hold or reach lists the
+/// gate never reads.
 Map<String, List<String>> readLists(String source) {
   final parsed = parseString(content: source, throwIfDiagnostics: false);
   if (parsed.errors case [final error, ...]) {
     throw ListFileRefusal('The list file does not parse: ${error.message}');
   }
   final unit = parsed.unit;
+  for (final directive in unit.directives) {
+    if (directive is! LibraryDirective) {
+      throw ListFileRefusal(
+        'A list file holds lists and nothing else, not: '
+        '${_firstLine(directive)}',
+      );
+    }
+  }
   final lists = <String, List<String>>{};
   for (final declaration in unit.declarations) {
     if (declaration is! TopLevelVariableDeclaration) {
