@@ -1,8 +1,7 @@
 import 'dart:io';
 
 import 'package:bluey_guards/architecture.dart';
-
-import 'known_violations.dart';
+import 'package:bluey_guards/gates.dart';
 
 const _package = 'bluey';
 const _compositionRoot = 'lib/src/api/bluey.dart';
@@ -26,57 +25,61 @@ SourceTree readBluey() => SourceTree.read(
   extensions: const {'.dart', '.yaml'},
 );
 
-/// Each rule Bluey is held to, with the list of what it is known to find
-/// today, so the architecture test judges one against the other.
-final Map<ArchitectureRule, List<String>> rulesAndKnownViolations = {
-  const PlacementRule(contexts: _contexts): unplaced,
-  BoundaryRule(
+/// What Bluey's rules are known to find today, read from the list file
+/// itself, so a rule is held to exactly the list the file declares and the
+/// list gate compares the same text.
+Map<String, List<String>> readKnownViolations() => readLists(
+  File('test/architecture/known_violations.dart').readAsStringSync(),
+);
+
+/// Each rule Bluey is held to, by the name of the list of what it is known
+/// to find today, so the architecture test judges one against the other.
+final Map<String, ArchitectureRule> blueyRules = {
+  'unplaced': const PlacementRule(contexts: _contexts),
+  'boundaries': BoundaryRule(
     package: _package,
     legacy: const LegacyLayout(contexts: _contexts, shared: {'shared', 'log'}),
-  ): boundaries,
-  FrameworkRule(
+  ),
+  'frameworkPlacement': FrameworkRule(
     package: _package,
     frameworks: const {'package:flutter', 'package:bluey_platform_interface'},
     compositionRoots: const {_compositionRoot},
-  ): frameworkPlacement,
-  PublicExportsRule(package: _package): publicExports,
-  LayerRule(
-        package: _package,
-        allowances: const LayerAllowances(
-          domain: {
-            'dart:core',
-            'dart:typed_data',
-            'dart:collection',
-            'dart:math',
-            'package:meta',
-          },
-          application: {'dart:async', 'package:clock'},
-          infrastructure: {
-            'package:bluey_platform_interface',
-            'package:flutter/services.dart',
-          },
-        ),
-        compositionRoots: const {_compositionRoot},
-      ):
-      layers,
-  ThrowsRule(
-        programmingErrors: const {
-          'StateError',
-          'ArgumentError',
-          'UnimplementedError',
-        },
-      ):
-      throws,
-  LintOptionsRule(
-        roots: const [
-          'lib/src/api',
-          'lib/src/features',
-          'lib/src/shared/domain',
-          'lib/src/shared/application',
-          'lib/src/shared/infrastructure',
-        ],
-        lints: const {'unawaited_futures', 'discarded_futures'},
-      ):
-      lintOptions,
-  SizeRule(limit: 300, extension: '.dart'): oversized,
+  ),
+  'publicExports': PublicExportsRule(package: _package),
+  'layers': LayerRule(
+    package: _package,
+    allowances: const LayerAllowances(
+      domain: {
+        'dart:core',
+        'dart:typed_data',
+        'dart:collection',
+        'dart:math',
+        'package:meta',
+      },
+      application: {'dart:async', 'package:clock'},
+      infrastructure: {
+        'package:bluey_platform_interface',
+        'package:flutter/services.dart',
+      },
+    ),
+    compositionRoots: const {_compositionRoot},
+  ),
+  'throws': ThrowsRule(
+    programmingErrors: const {
+      'StateError',
+      'ArgumentError',
+      'UnimplementedError',
+    },
+  ),
+  'lintOptions': LintOptionsRule(
+    roots: const [
+      'lib/src/api',
+      'lib/src/features',
+      'lib/src/shared/domain',
+      'lib/src/shared/application',
+      'lib/src/shared/infrastructure',
+    ],
+    lints: const {'unawaited_futures', 'discarded_futures'},
+  ),
+  'oversized': SizeRule(limit: 300, extension: '.dart'),
 };

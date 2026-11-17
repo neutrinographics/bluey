@@ -7,6 +7,7 @@ void main() {
     'bluey',
     tree: readBluey(),
     anchor: 'lib/bluey.dart',
-    rules: rulesAndKnownViolations,
+    rules: blueyRules,
+    lists: readKnownViolations(),
   );
 }

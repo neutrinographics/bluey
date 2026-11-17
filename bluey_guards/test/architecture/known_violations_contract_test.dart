@@ -5,15 +5,27 @@ import 'package:test/test.dart';
 
 const _fixture = 'test/architecture/fixtures/held_package.dart';
 
+const _listsTest =
+    'the architecture of held every list in the list file is held by one '
+    'rule, and every rule by one list';
+
 /// Each test the fixture registered, by its name, with how it finished and
 /// the error it reported, if any.
 typedef _Outcome = ({String result, String error});
 
-Future<Map<String, _Outcome>> _runFixture({String? anchor}) async {
+Future<Map<String, _Outcome>> _runFixture({
+  String? anchor,
+  String? strayList,
+  String? listlessRule,
+}) async {
   final run = await Process.run(
     Platform.resolvedExecutable,
     ['test', _fixture, '--reporter', 'json'],
-    environment: {if (anchor != null) 'ANCHOR': anchor},
+    environment: {
+      if (anchor != null) 'ANCHOR': anchor,
+      if (strayList != null) 'STRAY_LIST': strayList,
+      if (listlessRule != null) 'LISTLESS_RULE': listlessRule,
+    },
   );
   final names = <int, String>{};
   final errors = <int, String>{};
@@ -68,6 +80,34 @@ void main() {
           outcomes['the architecture of held reads the package from its root'];
       expect(anchored?.result, 'failure');
       expect(anchored?.error, contains('lib/elsewhere.dart'));
+    });
+
+    test('passes the lists test when each list has one rule', () async {
+      // act
+      final outcomes = await _runFixture();
+
+      // assert
+      expect(outcomes[_listsTest]?.result, 'success');
+    });
+
+    test('fails the lists test naming a list no rule holds', () async {
+      // act
+      final outcomes = await _runFixture(strayList: 'stray');
+
+      // assert
+      final lists = outcomes[_listsTest];
+      expect(lists?.result, 'failure');
+      expect(lists?.error, contains('stray'));
+    });
+
+    test('fails the lists test naming a rule that has no list', () async {
+      // act
+      final outcomes = await _runFixture(listlessRule: 'unwritten');
+
+      // assert
+      final lists = outcomes[_listsTest];
+      expect(lists?.result, 'failure');
+      expect(lists?.error, contains('unwritten'));
     });
 
     test('passes a rule whose list is what the rule finds', () async {
