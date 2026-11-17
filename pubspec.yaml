@@ -11,3 +11,4 @@ workspace:
   - bluey_ios
   - bluey
   - bluey/example
+  - bluey_guards
