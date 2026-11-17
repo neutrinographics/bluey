@@ -91,7 +91,7 @@ jobs:
         working-directory: bluey
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: dart run bluey_guards:list_growth "$BASE" ../bluey*/test/architecture/known_violations.dart
+        run: dart run bluey_guards:list_growth "$BASE" ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart
 
   public-api:
     name: Public API
@@ -126,13 +126,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      # A package's run leaves both steps in the commit that fixes its last
-      # known defect, or its empty run reads as "the run produced no result";
+      # A package's run and its roster leave both steps in the commit that
+      # fixes its last known defect, or its empty run reads as "the run produced no result";
       # the job goes with the last package.
       - name: Run them; they are expected to fail
         run: |
           (cd bluey && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey.json" || true)
           (cd bluey_android && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey_android.json" || true)
       - name: Each one ran, and each one still fails
-        run: dart run bluey_guards:known_defects "$RUNNER_TEMP/bluey.json" "$RUNNER_TEMP/bluey_android.json"
+        run: |
+          dart run bluey_guards:known_defects \
+            test/known_defects/roster.dart "$RUNNER_TEMP/bluey.json" \
+            ../bluey_android/test/known_defects/roster.dart "$RUNNER_TEMP/bluey_android.json"
         working-directory: bluey
