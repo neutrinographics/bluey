@@ -11,6 +11,10 @@ final _rule = BoundaryRule(
   ),
 );
 
+const _twoArrows =
+    'lib/src/connection/a.dart -> lib/src/shared/x.dart -> '
+    'lib/src/discovery/b.dart';
+
 void main() {
   group("today's folders", () {
     test('a context that names another context is a violation', () {
@@ -216,6 +220,14 @@ void main() {
       // assert
       expect(debt, (debt: 'lib/src/connection/a.dart -> 420 lines', amount: 1));
     });
+
+    test('is the entry itself, once, when it names more than one target', () {
+      // act
+      final debt = _rule.weigh(_twoArrows);
+
+      // assert
+      expect(debt, (debt: _twoArrows, amount: 1));
+    });
   });
 
   group('a known entry and a found entry of one source and context', () {
@@ -257,6 +269,20 @@ void main() {
 
       // act
       final change = _rule.change(known: known, found: found);
+
+      // assert
+      expect(change, isNull);
+    });
+
+    test('is no change, and no throw, when an entry names more than one '
+        'target', () {
+      // arrange
+      const found =
+          'lib/src/connection/a.dart -> lib/src/shared/x.dart -> '
+          'lib/src/features/discovery/domain/b.dart';
+
+      // act
+      final change = _rule.change(known: _twoArrows, found: found);
 
       // assert
       expect(change, isNull);

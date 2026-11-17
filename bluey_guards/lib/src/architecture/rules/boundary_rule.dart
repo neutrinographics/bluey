@@ -39,10 +39,7 @@ final class BoundaryRule implements MeasuringRule, WeighingRule {
   /// today's folder into its place in the target layout, is the same debt.
   @override
   Debt weigh(String entry) {
-    if (_entryShape.firstMatch(entry)?.groups([1, 2]) case [
-      final source?,
-      final target?,
-    ]) {
+    if (_Edge.parse(entry) case _Edge(:final source, :final target)) {
       if (libraryPlacement(target) case final placement?) {
         if (_contextOf(placement) case final context?) {
           return (debt: '$source into $context', amount: 1);
@@ -51,8 +48,6 @@ final class BoundaryRule implements MeasuringRule, WeighingRule {
     }
     return (debt: entry, amount: 1);
   }
-
-  static final _entryShape = RegExp(r'^(.+) -> (.+)$');
 
   /// A known entry and a found one that owe the same debt are one target
   /// that moved within its context, so the entry is rewritten, never told
@@ -63,11 +58,15 @@ final class BoundaryRule implements MeasuringRule, WeighingRule {
     if (known == found || was.debt == known || was != weigh(found)) {
       return null;
     }
-    final [source, from] = known.split(' -> ');
-    final to = found.split(' -> ').last;
-    final context = was.debt.substring('$source into '.length);
-    return '$source still depends on $context, but on $to, not on $from: '
-        'rewrite the entry to the new path';
+    if ((_Edge.parse(known), _Edge.parse(found)) case (
+      _Edge(:final source, target: final from),
+      _Edge(target: final to),
+    )) {
+      final context = was.debt.substring('$source into '.length);
+      return '$source still depends on $context, but on $to, not on $from: '
+          'rewrite the entry to the new path';
+    }
+    return null;
   }
 
   bool _crosses(Placement from, Placement? to) {
@@ -99,4 +98,20 @@ final class BoundaryRule implements MeasuringRule, WeighingRule {
     Unplaced(:final folder?) => legacy.shared.contains(folder),
     _ => false,
   };
+}
+
+/// A boundaries entry, `source -> target`, read back into its two halves
+/// the one way both [BoundaryRule.weigh] and [BoundaryRule.change] read it.
+/// An entry with more than one ` -> ` names no one target, so it is not of
+/// this shape and is a debt of its own.
+final class _Edge {
+  _Edge(this.source, this.target);
+
+  static _Edge? parse(String entry) => switch (entry.split(' -> ')) {
+    [final source, final target] => _Edge(source, target),
+    _ => null,
+  };
+
+  final String source;
+  final String target;
 }
