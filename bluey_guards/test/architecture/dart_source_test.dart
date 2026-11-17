@@ -86,6 +86,46 @@ void main() {
       expect(raises, ['3: addError', '4: rethrow']);
     });
 
+    test('names an addError tear-off', () {
+      // act
+      final raises = _raises(
+        'void f(dynamic s, dynamic c) {\n'
+        '  s.listen(null, onError: c.addError);\n'
+        '}\n',
+      );
+
+      // assert
+      expect(raises, ['2: addError']);
+    });
+
+    test('names an addError tear-off through a property, and a call once', () {
+      // act
+      final raises = _raises(
+        'void f(dynamic s, dynamic c, Object e) {\n'
+        '  s.listen(null, onError: c.sink.addError);\n'
+        '  c.sink.addError(e);\n'
+        '  c.addError(e);\n'
+        '}\n',
+      );
+
+      // assert
+      expect(raises, ['2: addError', '3: addError', '4: addError']);
+    });
+
+    test('ignores an addError named in a doc comment', () {
+      // act
+      final raises = _raises(
+        '/// Forwards to [StreamController.addError] and [sink.addError].\n'
+        'void f() {}\n'
+        '\n'
+        '/// See [Sink.addError].\n'
+        'void g() {}\n',
+      );
+
+      // assert
+      expect(raises, isEmpty);
+    });
+
     test('ignores the words inside a comment or a string', () {
       // act
       final raises = _raises(

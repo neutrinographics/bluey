@@ -1,0 +1,183 @@
+import 'package:bluey_guards/architecture.dart';
+import 'package:test/test.dart';
+
+import '../support/trees.dart';
+
+final _rule = BoundaryRule(
+  package: 'bluey',
+  legacy: const LegacyLayout(
+    contexts: {'connection', 'discovery'},
+    shared: {'shared', 'log'},
+  ),
+);
+
+void main() {
+  group("today's folders", () {
+    test('a context that names another context is a violation', () {
+      // arrange
+      final files = tree({
+        'lib/src/connection/a.dart': naming([
+          '../discovery/b.dart',
+          'package:bluey/src/discovery/c.dart',
+        ]),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/connection/a.dart -> lib/src/discovery/b.dart',
+        'lib/src/connection/a.dart -> lib/src/discovery/c.dart',
+      ]);
+    });
+
+    test('the kernel naming a context is a violation', () {
+      // arrange
+      final files = tree({
+        'lib/src/log/logger.dart': naming(['../connection/a.dart']),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, ['lib/src/log/logger.dart -> lib/src/connection/a.dart']);
+    });
+
+    test(
+      'a context may name itself, the kernel, a root file and other packages',
+      () {
+        // arrange
+        final files = tree({
+          'lib/src/connection/a.dart': naming([
+            'b.dart',
+            'value_objects/mtu.dart',
+            '../shared/uuid.dart',
+            '../log/log.dart',
+            '../events.dart',
+            'dart:async',
+            'package:meta/meta.dart',
+          ]),
+        });
+
+        // act
+        final found = entries(_rule, files);
+
+        // assert
+        expect(found, isEmpty);
+      },
+    );
+
+    test('a root file, the edge and a public library are never judged', () {
+      // arrange
+      final files = tree({
+        'lib/bluey.dart':
+            "export 'src/connection/a.dart';\nexport 'src/discovery/b.dart';",
+        'lib/src/api/bluey.dart': naming([
+          '../features/connection/application/connect_device.dart',
+          '../discovery/b.dart',
+        ]),
+        'lib/src/bluey.dart': naming(['connection/a.dart', 'discovery/b.dart']),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, isEmpty);
+    });
+  });
+
+  group('the target layout', () {
+    test(
+      'a context that names another context is a violation, placed or not',
+      () {
+        // arrange
+        final files = tree({
+          'lib/src/discovery/scanner.dart': naming([
+            '../features/connection/domain/link.dart',
+          ]),
+          'lib/src/features/peer/application/watch_peer.dart': naming([
+            '../../connection/domain/link.dart',
+            '../../../discovery/device.dart',
+          ]),
+        });
+
+        // act
+        final found = entries(_rule, files);
+
+        // assert
+        expect(found, [
+          'lib/src/discovery/scanner.dart -> '
+              'lib/src/features/connection/domain/link.dart',
+          'lib/src/features/peer/application/watch_peer.dart -> '
+              'lib/src/features/connection/domain/link.dart',
+          'lib/src/features/peer/application/watch_peer.dart -> '
+              'lib/src/discovery/device.dart',
+        ]);
+      },
+    );
+
+    test("a bridge may name the other context's domain and application, "
+        'not its infrastructure', () {
+      // arrange
+      const bridge =
+          'lib/src/features/peer/infrastructure/bridges/'
+          'connection_peer_link.dart';
+      final files = tree({
+        bridge: naming([
+          '../../../connection/application/disconnect.dart',
+          '../../../connection/domain/link.dart',
+          '../../../connection/infrastructure/adapters/platform_links.dart',
+        ]),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        '$bridge -> '
+            'lib/src/features/connection/infrastructure/adapters/'
+            'platform_links.dart',
+      ]);
+    });
+
+    test('an adapter is not a bridge', () {
+      // arrange
+      const adapter =
+          'lib/src/features/peer/infrastructure/adapters/'
+          'platform_peer_link.dart';
+      final files = tree({
+        adapter: naming(['../../../connection/application/disconnect.dart']),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        '$adapter -> lib/src/features/connection/application/disconnect.dart',
+      ]);
+    });
+
+    test('the placed kernel naming a context is a violation', () {
+      // arrange
+      final files = tree({
+        'lib/src/shared/domain/either.dart': naming([
+          '../../features/connection/domain/link.dart',
+        ]),
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/shared/domain/either.dart -> '
+            'lib/src/features/connection/domain/link.dart',
+      ]);
+    });
+  });
+}

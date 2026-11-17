@@ -63,8 +63,8 @@ final class DartSource {
   /// own surface.
   final List<String> exports;
 
-  /// Every `throw`, `rethrow` and `addError` call in the file, in source
-  /// order: the places an error leaves it.
+  /// Every `throw`, `rethrow`, `addError` call and `addError` tear-off in
+  /// the file, in source order: the places an error leaves it.
   final List<Raise> raises;
 
   @override
@@ -128,6 +128,32 @@ final class _RaiseFinder extends RecursiveAstVisitor<void> {
       );
     }
     super.visitMethodInvocation(node);
+  }
+
+  /// A doc comment's references (`[StreamController.addError]`) parse as
+  /// identifiers but raise nothing, so a comment is never walked.
+  @override
+  void visitComment(Comment node) {}
+
+  @override
+  void visitPrefixedIdentifier(PrefixedIdentifier node) {
+    _addErrorTearOff(node.identifier);
+    super.visitPrefixedIdentifier(node);
+  }
+
+  @override
+  void visitPropertyAccess(PropertyAccess node) {
+    _addErrorTearOff(node.propertyName);
+    super.visitPropertyAccess(node);
+  }
+
+  /// A tear-off of `addError` (`onError: controller.addError`) forwards an
+  /// error out of the file just as a call does. A call parses as a
+  /// [MethodInvocation], never as a property, so it is counted once.
+  void _addErrorTearOff(SimpleIdentifier name) {
+    if (name.name == 'addError') {
+      raises.add(Raise(line: _lineOf(name.offset), what: 'addError'));
+    }
   }
 }
 
