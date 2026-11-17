@@ -10,7 +10,7 @@ const _usage =
 /// change left [base], a commit or ref git knows, so a pull request cannot
 /// make a new violation pass by copying its line into a list. Each path is
 /// relative to the folder the command runs in, inside the repository; the
-/// head is the file as it is on disk. Each list named by `--by-context` is
+/// head is the file as it is on disk, and a file the head deleted holds. Each list named by `--by-context` is
 /// counted per source file and target context (see [ListGrowth.between]).
 Future<void> main(List<String> arguments) async {
   final byContext = <String>{};
@@ -44,7 +44,7 @@ Future<void> main(List<String> arguments) async {
     final growth = ListGrowth.between(
       path: path,
       base: await _listsAt(commit, path),
-      head: head.existsSync() ? readLists(head.readAsStringSync()) : const {},
+      head: head.existsSync() ? readLists(head.readAsStringSync()) : null,
       byContext: byContext,
     );
     stdout.write(growth.describe());

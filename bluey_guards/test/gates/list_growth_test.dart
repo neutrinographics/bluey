@@ -231,6 +231,35 @@ void main() {
       expect(growth.added, ['boundaries2: lib/a.dart -> lib/b.dart']);
     });
 
+    test('names a list the base had that the head file lacks', () {
+      // arrange
+      final base = {
+        'boundaries': ['lib/a.dart -> lib/b.dart'],
+        'unplaced': <String>[],
+      };
+      final head = {'unplaced': <String>[]};
+
+      // act
+      final growth = ListGrowth.between(path: _path, base: base, head: head);
+
+      // assert
+      expect(growth.gone, ['boundaries']);
+      expect(growth.holds, isFalse);
+    });
+
+    test('holds when the head no longer has the file', () {
+      // arrange
+      final base = {
+        'boundaries': ['lib/a.dart -> lib/b.dart'],
+      };
+
+      // act
+      final growth = ListGrowth.between(path: _path, base: base, head: null);
+
+      // assert
+      expect(growth.holds, isTrue);
+    });
+
     test('holds when a size entry carries a lower count', () {
       // arrange
       final base = {
@@ -336,6 +365,27 @@ void main() {
         text,
         '$_path: not at the base, so its lists are the first statement of '
         'what they hold.\n',
+      );
+    });
+
+    test('names each list that is gone, and what to do', () {
+      // arrange
+      final growth = ListGrowth.between(
+        path: _path,
+        base: {'boundaries': <String>[]},
+        head: {},
+      );
+
+      // act
+      final text = growth.describe();
+
+      // assert
+      expect(
+        text,
+        '$_path: 1 list gone. A list file keeps every list it had: put the '
+        'list back here, under its name.\n'
+        'Gone:\n'
+        '  boundaries\n',
       );
     });
 

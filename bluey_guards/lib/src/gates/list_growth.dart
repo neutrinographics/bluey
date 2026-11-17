@@ -8,17 +8,22 @@ final class ListGrowth {
     required this.isNew,
     required this.added,
     required this.raised,
+    this.gone = const [],
   });
 
   /// Compares the lists of the file at [path] as the [base] held them, null
-  /// when the base did not have the file, with the lists the [head] holds.
+  /// when the base did not have the file, with the lists the [head] holds,
+  /// null when the head no longer has the file.
   ///
   /// Each list is compared with the list of the same name at the base; a list
   /// the base did not have counts as an empty one, so renaming a list cannot
   /// carry new entries in. A count entry (`<path> -> <N> lines`) may be
   /// rewritten with a lower count, since a file that shrank must lower its
   /// entry. A file the base did not have holds whatever it lists: it is the
-  /// first statement of what its rules find.
+  /// first statement of what its rules find. A list the base had must still
+  /// be in the head file, so a list cannot leave the gate's sight by moving
+  /// to another file under the same name; a file the head deleted holds,
+  /// since the test that reads it then fails.
   ///
   /// A list named in [byContext] holds `<source> -> <target>` entries whose
   /// debt is that the source depends on the target's context, not on its
@@ -29,11 +34,14 @@ final class ListGrowth {
   factory ListGrowth.between({
     required String path,
     required Map<String, List<String>>? base,
-    required Map<String, List<String>> head,
+    required Map<String, List<String>>? head,
     Set<String> byContext = const {},
   }) {
     if (base == null) {
       return ListGrowth._(path: path, isNew: true, added: [], raised: []);
+    }
+    if (head == null) {
+      return ListGrowth._(path: path, isNew: false, added: [], raised: []);
     }
     final added = <String>[];
     final raised = <String>[];
@@ -66,6 +74,9 @@ final class ListGrowth {
       isNew: false,
       added: List.unmodifiable(added),
       raised: List.unmodifiable(raised),
+      gone: List.unmodifiable(
+        base.keys.where((list) => !head.containsKey(list)),
+      ),
     );
   }
 
@@ -83,24 +94,45 @@ final class ListGrowth {
   /// `<list>: <path> raised from <was> to <now> lines`.
   final List<String> raised;
 
+  /// Each list the base had that the head file lacks.
+  final List<String> gone;
+
   /// Whether no list of the file grew.
-  bool get holds => added.isEmpty && raised.isEmpty;
+  bool get holds => added.isEmpty && raised.isEmpty && gone.isEmpty;
 
   /// The verdict in words: that the file is new, that no list grew, or each
-  /// entry added and count raised with what to do.
+  /// entry added, count raised and list gone with what to do.
   String describe() {
     if (isNew) {
       return '$path: not at the base, so its lists are the first statement '
           'of what they hold.\n';
     }
     if (holds) return '$path: no list grew.\n';
-    final text = StringBuffer(
-      '$path: ${_count(added.length, 'entry', 'entries')} added, '
-      '${_count(raised.length, 'count', 'counts')} raised. A list only '
-      'shrinks: fix the code and take the line out of the list.\n',
-    );
+    final grew = added.isNotEmpty || raised.isNotEmpty;
+    final text =
+        StringBuffer('$path: ')
+          ..writeAll([
+            if (grew)
+              '${_count(added.length, 'entry', 'entries')} added, '
+                  '${_count(raised.length, 'count', 'counts')} raised',
+            if (gone.isNotEmpty) '${_count(gone.length, 'list', 'lists')} gone',
+          ], ', ')
+          ..write('.')
+          ..write(
+            grew
+                ? ' A list only shrinks: fix the code and take the line out of '
+                    'the list.'
+                : '',
+          )
+          ..writeln(
+            gone.isNotEmpty
+                ? ' A list file keeps every list it had: put the list back here, '
+                    'under its name.'
+                : '',
+          );
     _part(text, 'Added:', added);
     _part(text, 'Raised:', raised);
+    _part(text, 'Gone:', gone);
     return text.toString();
   }
 }

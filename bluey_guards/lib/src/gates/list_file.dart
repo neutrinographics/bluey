@@ -6,21 +6,34 @@ import 'package:analyzer/dart/ast/ast.dart';
 /// how a diff happens to lay their lines out.
 ///
 /// A list file holds lists and nothing else (a package's
-/// `test/architecture/known_violations.dart`, its known-defect roster). An
-/// entry that is not a plain string, one built by interpolation or named by
-/// a constant, is refused with a [ListFileRefusal]: a gate that cannot read
-/// an entry as written cannot say whether the list grew.
+/// `test/architecture/known_violations.dart`, its known-defect roster), so
+/// any other declaration is refused with a [ListFileRefusal]: a getter, a
+/// function, a class, or a variable whose value is anything but a list
+/// literal (`[...].toList()`, a set literal). A gate that skipped such a
+/// declaration would never compare the list it builds, and a list could grow
+/// past the gate by one token. An entry that is not a plain string, one built
+/// by interpolation or named by a constant, is refused too: a gate that
+/// cannot read an entry as written cannot say whether the list grew, and
+/// neither can one that reads a file that does not parse.
 Map<String, List<String>> readLists(String source) {
-  final unit = parseString(content: source, throwIfDiagnostics: false).unit;
-  return {
-    for (final declaration
-        in unit.declarations.whereType<TopLevelVariableDeclaration>())
-      for (final variable in declaration.variables.variables)
-        if (variable.initializer case ListLiteral(:final elements))
-          variable.name.lexeme: [
-            for (final element in elements) _entryOf(variable, element),
-          ],
-  };
+  final parsed = parseString(content: source, throwIfDiagnostics: false);
+  if (parsed.errors case [final error, ...]) {
+    throw ListFileRefusal('The list file does not parse: ${error.message}');
+  }
+  final unit = parsed.unit;
+  final lists = <String, List<String>>{};
+  for (final declaration in unit.declarations) {
+    if (declaration is! TopLevelVariableDeclaration) {
+      throw ListFileRefusal(
+        'A list file holds lists and nothing else, not: '
+        '${_firstLine(declaration)}',
+      );
+    }
+    for (final variable in declaration.variables.variables) {
+      lists[variable.name.lexeme] = _listOf(variable);
+    }
+  }
+  return lists;
 }
 
 /// Why a list file could not be read, naming the list and the entry.
@@ -34,6 +47,18 @@ final class ListFileRefusal implements Exception {
   @override
   String toString() => message;
 }
+
+List<String> _listOf(VariableDeclaration variable) {
+  if (variable.initializer case ListLiteral(:final elements)) {
+    return [for (final element in elements) _entryOf(variable, element)];
+  }
+  throw ListFileRefusal(
+    'The list ${variable.name.lexeme} is not a list literal of plain '
+    'strings: ${_firstLine(variable)}',
+  );
+}
+
+String _firstLine(AstNode node) => node.toSource().split('\n').first;
 
 String _entryOf(VariableDeclaration list, CollectionElement element) {
   if (element is StringLiteral) {

@@ -52,12 +52,126 @@ const oversized = <String>[
     test('refuses an entry that is not a plain string', () {
       // arrange
       const source = r'''
-const prefix = 'lib';
 const unplaced = <String>['$prefix/a.dart -> unplaced'];
 ''';
 
       // act
       List<String>? read() => readLists(source)['unplaced'];
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+  });
+
+  group('a declaration that is not a list of plain strings', () {
+    test('is refused: a list built by a call on a list literal', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+const boundaries = <String>[
+  'lib/a.dart -> lib/b.dart',
+].toList();
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a list built by a constructor', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+final boundaries = List<String>.unmodifiable(['lib/a.dart -> lib/b.dart']);
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a getter', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+List<String> get boundaries => ['lib/a.dart -> lib/b.dart'];
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a function', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+List<String> boundaries() => ['lib/a.dart -> lib/b.dart'];
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a set literal', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+const boundaries = <String>{'lib/a.dart -> lib/b.dart'};
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a variable with no initializer', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+late final List<String> boundaries;
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a file that does not parse', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
+
+      // assert
+      expect(read, throwsA(isA<ListFileRefusal>()));
+    });
+
+    test('is refused: a class', () {
+      // arrange
+      const source = '''
+const unplaced = <String>['lib/a.dart -> unplaced'];
+class Boundaries {}
+''';
+
+      // act
+      Map<String, List<String>> read() => readLists(source);
 
       // assert
       expect(read, throwsA(isA<ListFileRefusal>()));
