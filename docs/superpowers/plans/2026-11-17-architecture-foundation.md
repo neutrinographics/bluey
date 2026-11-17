@@ -1521,7 +1521,7 @@ void main() {
     test('leaves a left as it is', () => expect(_read(_refuses().map((value) => value + 1)), 'refused'));
   });
 
-  group('then', () {
+  group('flatMap', () {
     test('hands a right value to the next step', () {
       expect(_answers(1).flatMap((value) => _answers(value + 1)), const Right<_Refused, int>(2));
     });
