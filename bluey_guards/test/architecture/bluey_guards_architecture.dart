@@ -7,7 +7,8 @@ import 'package:bluey_guards/gates.dart';
 const package = 'bluey_guards';
 const anchor = 'lib/architecture.dart';
 
-/// The guards' library and command files, read from the package root a test runs in.
+/// The guards' library and command files, read from the package root a test
+/// runs in.
 SourceTree readPackage() => SourceTree.read(
   Directory.current,
   under: const ['lib', 'bin'],

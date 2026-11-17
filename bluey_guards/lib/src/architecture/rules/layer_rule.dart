@@ -36,12 +36,11 @@ final class LayerAllowances {
 
 /// Holds placed code to pointing inward, domain to application to
 /// infrastructure, within a context and within the kernel, and keeps every
-/// infrastructure, a context's and the kernel's, out of the edge and the
-/// public libraries but for the composition roots, so the rest of the edge
-/// is handed its ports by constructor. A public library is held as the edge is, since an
-/// export of an adapter would hand a consumer the infrastructure the edge
-/// keeps from them. A dependency on another context is left to the boundary
-/// rule.
+/// infrastructure, a context's and the kernel's, out of the edge and the public
+/// libraries but for the composition roots, so the rest of the edge is handed
+/// its ports by constructor. A public library is held as the edge is, since an
+/// export of an adapter would hand a consumer the infrastructure the edge keeps
+/// from them. A dependency on another context is left to the boundary rule.
 final class LayerRule implements ArchitectureRule {
   /// The rule for [package], where [allowances] say which outside libraries
   /// each layer may name and [compositionRoots] are the files of the edge, or
