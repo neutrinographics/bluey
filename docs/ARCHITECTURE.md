@@ -91,6 +91,8 @@ Allowances accumulate from the inside out. The table lists what each layer adds,
 
 A context names no other context. The one exception is a bridge, a file under `infrastructure/bridges/`, which answers a port of its own context by calling the other context's application units. Their signatures answer the other context's domain types, so a bridge names the other context's domain and application, and never its infrastructure.
 
+**What the kernel takes in.** A value object moves into `shared/domain` only when it is a plain identity or measure, holds no rule that belongs to one context, and is used by at least three contexts. `DeviceAddress` passes: it is an identity, it holds no context's rule, and Discovery, Connection, GATT Server and Peer all name it. Anything else stays with the context that owns it, and another context reaches it through a port of its own, answered by a bridge. Each slice's design names what it moves into the kernel and why, against this bar, so the kernel never grows by convenience.
+
 Placed code never names unplaced code, except from `api/`. Otherwise a file could move into place and keep its old couplings. The edge has to reach the classes that have not moved yet, so it may.
 
 A public library, `lib/<name>.dart`, is held as the edge is: it may not name a context's infrastructure or `shared/infrastructure` unless it is a composition root. Otherwise `lib/bluey.dart` could export an adapter and hand an app what the edge keeps from it.
@@ -116,6 +118,8 @@ Each rule reads Dart through the analyzer's parser, so a directive that spans li
 A file's length is its number of lines of text: a last line with no line break counts, and a Windows line break counts once, so a ceiling means the same on every machine. A generated file, one with `.g.` before its extension (Pigeon's `messages.g.dart`, `Messages.g.kt`, `Messages.g.swift`), is never measured.
 
 Why the two lints: a dropped future is how a failure or a late completion goes unseen, the class of bug behind audit finding M2. Placed code turns them on in a nested `analysis_options.yaml`; the old folders keep today's lints until they are empty. A slice that puts the first file into a root adds that root's options file, copied from [`bluey/lib/src/shared/domain/analysis_options.yaml`](../bluey/lib/src/shared/domain/analysis_options.yaml).
+
+Why `layers` is strict: its list is empty and stays empty, since placed code arrives clean (section 5). A placed file that points outward is fixed before it lands, never listed.
 
 Why the ceilings: a ceiling stops a fix from growing a class that is already too large. The numbers are a judgment, and they apply to new code from its first line.
 
@@ -155,6 +159,8 @@ Raised:
 ```
 
 The gate knows nothing of git renames: a source file that moved is a new source file, so its entries read as added.
+
+That is the gate holding, not a gap in it. **A file placed under `features/`, `api/` or `shared/{domain,application,infrastructure}` arrives clean**: it brings no `boundaries` entry and is within its size ceiling. Debt does not follow a source file into the target layout; a slice that moves a file fixes what it does wrong on the way in, and the old path's entries leave as debt paid. A file split out of an oversized one follows the same rule: each piece is within the ceiling, and the remainder's entry is only ever lowered.
 
 When a list and the code differ, the test prints up to three parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
 
