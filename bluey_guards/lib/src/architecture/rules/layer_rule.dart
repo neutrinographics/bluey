@@ -35,16 +35,18 @@ final class LayerAllowances {
 }
 
 /// Holds placed code to pointing inward, domain to application to
-/// infrastructure, within a context and within the kernel, and keeps a
-/// context's infrastructure out of the edge and the public libraries but for
-/// the composition roots. A public library is held as the edge is, since an
+/// infrastructure, within a context and within the kernel, and keeps every
+/// infrastructure, a context's and the kernel's, out of the edge and the
+/// public libraries but for the composition roots, so the rest of the edge
+/// is handed its ports by constructor. A public library is held as the edge is, since an
 /// export of an adapter would hand a consumer the infrastructure the edge
 /// keeps from them. A dependency on another context is left to the boundary
 /// rule.
 final class LayerRule implements ArchitectureRule {
   /// The rule for [package], where [allowances] say which outside libraries
   /// each layer may name and [compositionRoots] are the files of the edge, or
-  /// public libraries, that may name a context's infrastructure.
+  /// public libraries, that may name a context's or the kernel's
+  /// infrastructure.
   const LayerRule({
     required this.package,
     required this.allowances,
@@ -107,7 +109,8 @@ final class LayerRule implements ArchitectureRule {
   bool _breaksEdge(String path, Dependency to) =>
       !compositionRoots.contains(path) &&
       switch (targetPlacement(to)) {
-        InFeature(layer: Layer.infrastructure) => true,
+        InFeature(layer: Layer.infrastructure) ||
+        InShared(layer: Layer.infrastructure) => true,
         _ => false,
       };
 }

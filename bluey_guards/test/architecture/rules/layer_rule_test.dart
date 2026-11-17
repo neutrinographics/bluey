@@ -310,5 +310,32 @@ void main() {
         'lib/src/api/connection/connection.dart -> $_adapter',
       ]);
     });
+
+    test("only the composition root names the kernel's infrastructure", () {
+      // arrange
+      final files = {
+        'lib/src/api/bluey.dart': naming([
+          '../shared/infrastructure/platform_clock.dart',
+        ]),
+        'lib/src/api/connection/connection.dart': naming([
+          '../../shared/domain/either.dart',
+          '../../shared/application/ports/clock.dart',
+          '../../shared/infrastructure/platform_clock.dart',
+        ]),
+        'lib/bluey.dart': naming([
+          'src/shared/infrastructure/platform_clock.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        'lib/bluey.dart -> lib/src/shared/infrastructure/platform_clock.dart',
+        'lib/src/api/connection/connection.dart -> '
+            'lib/src/shared/infrastructure/platform_clock.dart',
+      ]);
+    });
   });
 }
