@@ -10,7 +10,8 @@ environment:
 dependencies:
   analyzer: ^12.1.0
   path: ^1.9.0
+  test: any
+  yaml: ^3.1.0
 
 dev_dependencies:
   lints: ^5.0.0
-  test: any

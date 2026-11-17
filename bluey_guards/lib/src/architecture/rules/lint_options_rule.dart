@@ -1,8 +1,12 @@
+import 'package:yaml/yaml.dart';
+
 import '../architecture_rule.dart';
+import '../source_file.dart';
 import '../source_tree.dart';
 
 /// Holds each root of new code to an `analysis_options.yaml` that turns on
-/// the lints it must keep, so a lint switched off there fails the build
+/// the lints it must keep, and every options file beneath it to keeping
+/// them on, so a lint switched off anywhere under a root fails the build
 /// rather than going unnoticed.
 final class LintOptionsRule implements ArchitectureRule {
   /// The rule for the folders [roots], each of which must turn on every one
@@ -27,20 +31,58 @@ final class LintOptionsRule implements ArchitectureRule {
   bool _holdsDart(SourceTree tree, String root) =>
       tree.withExtension('.dart').any((file) => file.path.startsWith('$root/'));
 
+  /// The root's own options file, then every deeper one in path order. A
+  /// deeper file replaces the root's for the folder it sits in, so it must
+  /// turn the lints on itself.
   List<Violation> _judge(SourceTree tree, String root) {
-    final options = tree.file('$root/analysis_options.yaml');
-    if (options == null) return [Violation(root, 'no analysis_options.yaml')];
+    final own = '$root/analysis_options.yaml';
+    final deeper = [
+      for (final file in tree.withExtension('.yaml'))
+        if (file.path.startsWith('$root/') &&
+            file.path.endsWith('/analysis_options.yaml') &&
+            file.path != own)
+          file,
+    ];
     return [
-      for (final lint in lints)
-        if (!_turnsOn(options.content, lint))
-          Violation(options.path, 'does not turn on $lint'),
+      if (tree.file(own) case final options?)
+        ..._judgeFile(options)
+      else
+        Violation(root, 'no analysis_options.yaml'),
+      for (final options in deeper) ..._judgeFile(options),
     ];
   }
 
-  /// Whether [options] holds an uncommented list item naming [lint], the
-  /// form a rule takes under `linter: rules:`.
-  bool _turnsOn(String options, String lint) {
-    final item = RegExp('^\\s*-\\s*${RegExp.escape(lint)}\\s*(#.*)?\$');
-    return options.split('\n').any((line) => item.hasMatch(line.trimRight()));
+  List<Violation> _judgeFile(SourceFile options) {
+    final Object? yaml;
+    try {
+      yaml = loadYaml(options.content);
+    } on YamlException {
+      return [Violation(options.path, 'does not parse as YAML')];
+    }
+    return [
+      for (final lint in lints)
+        if (!_turnsOn(yaml, lint))
+          Violation(options.path, 'does not turn on $lint'),
+      for (final lint in lints)
+        if (_ignores(yaml, lint))
+          Violation(options.path, 'sets $lint to ignore'),
+    ];
   }
+
+  /// Whether `linter: rules:` names [lint] as a list item, or maps it to
+  /// `true`.
+  bool _turnsOn(Object? options, String lint) => switch (options) {
+    {'linter': {'rules': final List<Object?> rules}} => rules.contains(lint),
+    {'linter': {'rules': final Map<Object?, Object?> rules}} =>
+      rules[lint] == true,
+    _ => false,
+  };
+
+  /// Whether `analyzer: errors:` turns [lint]'s diagnostics off, which
+  /// silences it however the rules turn it on.
+  bool _ignores(Object? options, String lint) => switch (options) {
+    {'analyzer': {'errors': final Map<Object?, Object?> errors}} =>
+      errors[lint] == 'ignore',
+    _ => false,
+  };
 }

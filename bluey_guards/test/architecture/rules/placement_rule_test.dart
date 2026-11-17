@@ -3,6 +3,8 @@ import 'package:test/test.dart';
 
 import '../support/trees.dart';
 
+const _rule = PlacementRule(contexts: {'connection', 'discovery'});
+
 void main() {
   group('a package with files in and out of the target layout', () {
     test('lists every Dart file that is not in the target layout', () {
@@ -19,7 +21,7 @@ void main() {
       });
 
       // act
-      final found = entries(PlacementRule(), files);
+      final found = entries(_rule, files);
 
       // assert
       expect(found, [
@@ -31,10 +33,29 @@ void main() {
 
     test('is named placement', () {
       // act
-      final name = PlacementRule().name;
+      final name = _rule.name;
 
       // assert
       expect(name, 'placement');
+    });
+  });
+
+  group('a feature folder that is not one of the contexts', () {
+    test('lists each file in it, naming the folder', () {
+      // arrange
+      final files = tree({
+        'lib/src/features/connectoin/domain/link.dart': '',
+        'lib/src/features/discovery/domain/scan.dart': '',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/features/connectoin/domain/link.dart -> '
+            'features/connectoin is not a context',
+      ]);
     });
   });
 }

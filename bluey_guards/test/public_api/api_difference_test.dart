@@ -1,16 +1,24 @@
 import 'package:bluey_guards/public_api.dart';
 import 'package:test/test.dart';
 
-const _committed =
-    'class A\n  String toString()\n  int get size\nclass B\n  String toString()\n';
+const _committed = '''
+class A
+  String toString()
+  int get size
+class B
+  String toString()
+''';
 
 void main() {
   group('ApiDifference', () {
     test('is empty for the same text', () {
+      // arrange
+      const current = _committed;
+
       // act
       final difference = ApiDifference.between(
         committed: _committed,
-        current: _committed,
+        current: current,
       );
 
       // assert
@@ -20,10 +28,18 @@ void main() {
     test(
       'sees a member leave one declaration though another keeps the same line',
       () {
+        // arrange
+        const current = '''
+class A
+  int get size
+class B
+  String toString()
+''';
+
         // act
         final difference = ApiDifference.between(
           committed: _committed,
-          current: 'class A\n  int get size\nclass B\n  String toString()\n',
+          current: current,
         );
 
         // assert
@@ -33,10 +49,16 @@ void main() {
     );
 
     test('names a new declaration and each of its members', () {
+      // arrange
+      const current = '''
+${_committed}class C
+  C()
+''';
+
       // act
       final difference = ApiDifference.between(
         committed: _committed,
-        current: '${_committed}class C\n  C()\n',
+        current: current,
       );
 
       // assert

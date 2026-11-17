@@ -7,6 +7,17 @@ import 'known_violations.dart';
 const _package = 'bluey';
 const _compositionRoot = 'lib/src/api/bluey.dart';
 
+/// The six bounded contexts, each a folder under `lib/src/features/` in the
+/// target layout and, until it moves, under `lib/src/` today.
+const _contexts = {
+  'connection',
+  'discovery',
+  'gatt_client',
+  'gatt_server',
+  'peer',
+  'platform',
+};
+
 /// The package's library files and options files, read from the package root
 /// a test runs in, so every rule judges the same snapshot.
 SourceTree readBluey() => SourceTree.read(
@@ -18,22 +29,11 @@ SourceTree readBluey() => SourceTree.read(
 /// Each rule Bluey is held to, with the list of what it is known to find
 /// today, so the architecture test judges one against the other.
 final Map<ArchitectureRule, List<String>> rulesAndKnownViolations = {
-  PlacementRule(): unplaced,
+  const PlacementRule(contexts: _contexts): unplaced,
   BoundaryRule(
-        package: _package,
-        legacy: const LegacyLayout(
-          contexts: {
-            'connection',
-            'discovery',
-            'gatt_client',
-            'gatt_server',
-            'peer',
-            'platform',
-          },
-          shared: {'shared', 'log'},
-        ),
-      ):
-      boundaries,
+    package: _package,
+    legacy: const LegacyLayout(contexts: _contexts, shared: {'shared', 'log'}),
+  ): boundaries,
   FrameworkRule(
     package: _package,
     frameworks: const {'package:flutter', 'package:bluey_platform_interface'},

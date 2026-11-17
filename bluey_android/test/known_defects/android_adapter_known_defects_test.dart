@@ -6,6 +6,7 @@
 /// it fixes and takes it out of this file.
 @Tags(['known-defect'])
 library;
+
 import 'dart:async';
 
 import 'package:bluey_android/src/android_connection_manager.dart';
@@ -26,45 +27,53 @@ void main() {
     registerFallbackValue(ScanConfigDto(serviceUuids: []));
   });
 
-  test('M3 (I369): a second connect() to a connected device does not orphan the '
-      'first connection\'s state stream', () async {
-    final hostApi = MockBlueyHostApi();
-    final manager = AndroidConnectionManager(hostApi);
-    when(() => hostApi.connect(any(), any())).thenAnswer((_) async => 'dev');
-    const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+  test(
+    'M3 (I369): a second connect() to a connected device does not orphan the '
+    'first connection\'s state stream',
+    () async {
+      // arrange
+      final hostApi = MockBlueyHostApi();
+      final manager = AndroidConnectionManager(hostApi);
+      when(() => hostApi.connect(any(), any())).thenAnswer((_) async => 'dev');
+      const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
 
-    await manager.connect('dev', config);
-    final states = <PlatformConnectionState>[];
-    manager.connectionStateStream('dev').listen(states.add);
+      await manager.connect('dev', config);
+      final states = <PlatformConnectionState>[];
+      manager.connectionStateStream('dev').listen(states.add);
 
-    // Native connect is idempotent for an already-connected device.
-    await manager.connect('dev', config);
-    manager.onConnectionStateChanged(
-      ConnectionStateEventDto(
-        deviceId: 'dev',
-        state: ConnectionStateDto.disconnected,
-      ),
-    );
-    await pumpEventQueue();
+      // act
+      // Native connect is idempotent for an already-connected device.
+      await manager.connect('dev', config);
+      manager.onConnectionStateChanged(
+        ConnectionStateEventDto(
+          deviceId: 'dev',
+          state: ConnectionStateDto.disconnected,
+        ),
+      );
+      await pumpEventQueue();
 
-    expect(
-      states,
-      contains(PlatformConnectionState.disconnected),
-      reason: 'the first Connection never learns the link dropped',
-    );
-  });
+      // assert
+      expect(
+        states,
+        contains(PlatformConnectionState.disconnected),
+        reason: 'the first Connection never learns the link dropped',
+      );
+    },
+  );
 
   test('M2 (I013): a rejected startScan surfaces on the scan stream, not as an '
       'unhandled async error', () async {
+    // arrange
     final hostApi = MockBlueyHostApi();
     final scanner = AndroidScanner(hostApi);
     when(() => hostApi.startScan(any())).thenAnswer(
       (_) async =>
           throw PlatformException(code: 'permission-denied', message: 'x'),
     );
-
     final unhandled = <Object>[];
     final streamErrors = <Object>[];
+
+    // act
     runZonedGuarded(() {
       scanner
           .scan(PlatformScanConfig(serviceUuids: const [], timeoutMs: null))
@@ -72,6 +81,7 @@ void main() {
     }, (e, _) => unhandled.add(e));
     await pumpEventQueue();
 
+    // assert
     expect(unhandled, isEmpty, reason: 'scan-start failure escapes the API');
     expect(streamErrors, isNotEmpty, reason: 'scan stream stays silent');
   });

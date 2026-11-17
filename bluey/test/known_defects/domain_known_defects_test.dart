@@ -6,6 +6,7 @@
 /// it fixes and takes it out of this file.
 @Tags(['known-defect'])
 library;
+
 import 'dart:async';
 
 import 'package:bluey/bluey.dart';
@@ -51,14 +52,17 @@ void main() {
 
   group('H3 (I381): remote disconnect never finalises the Connection', () {
     test('stateChanges closes after the peer drops the link', () async {
+      // arrange
       fake.simulatePeripheral(id: address);
       final connection = await bluey.connect(device(address));
       var done = false;
       connection.stateChanges.listen((_) {}, onDone: () => done = true);
 
+      // act
       fake.simulateDisconnection(address);
       await pumpEventQueue();
 
+      // assert
       expect(connection.state, ConnectionState.disconnected);
       expect(
         done,
@@ -68,16 +72,19 @@ void main() {
     });
 
     test('disconnect() after a remote drop still releases resources', () async {
+      // arrange
       fake.simulatePeripheral(id: address);
       final connection = await bluey.connect(device(address));
       var done = false;
       connection.stateChanges.listen((_) {}, onDone: () => done = true);
-
       fake.simulateDisconnection(address);
       await pumpEventQueue();
+
+      // act
       await connection.disconnect();
       await pumpEventQueue();
 
+      // assert
       expect(
         done,
         isTrue,
@@ -88,6 +95,7 @@ void main() {
 
   group('H2 (I380): peer discovery probes tear down live connections', () {
     test('discoverPeers leaves an existing peer connection intact', () async {
+      // arrange
       fake.simulateBlueyServer(
         address: address,
         serverId: TestServerIds.remoteIdentity,
@@ -95,9 +103,11 @@ void main() {
       final peer = await bluey.connectAsPeer(device(address));
       expect(fake.connectedDeviceIds, contains(address));
 
+      // act
       await bluey.discoverPeers(timeout: const Duration(milliseconds: 300));
       await pumpEventQueue();
 
+      // assert
       expect(
         fake.connectedDeviceIds,
         contains(address),
@@ -109,67 +119,79 @@ void main() {
 
   group('M4 (I336): scan restart without awaiting cancel', () {
     test('second scan delivers results', () async {
+      // arrange
       fake.simulatePeripheral(id: address, name: 'x');
       final scanner = bluey.scanner();
-
       final first = scanner.scan().listen((_) {});
       await pumpEventQueue();
-      unawaited(first.cancel());
-
       final results = <ScanResult>[];
+
+      // act
+      unawaited(first.cancel());
       final second = scanner.scan().listen(results.add);
       await pumpEventQueue();
 
+      // assert
       expect(results, isNotEmpty, reason: 'restarted scan is silently dead');
       expect(scanner.isScanning, isTrue);
       await second.cancel();
       scanner.dispose();
     });
 
-    test('platform scan is not left running while scanner says stopped',
-        () async {
-      fake.simulatePeripheral(id: address, name: 'x');
-      final scanner = bluey.scanner();
+    test(
+      'platform scan is not left running while scanner says stopped',
+      () async {
+        // arrange
+        fake.simulatePeripheral(id: address, name: 'x');
+        final scanner = bluey.scanner();
+        final first = scanner.scan().listen((_) {});
+        await pumpEventQueue();
 
-      final first = scanner.scan().listen((_) {});
-      await pumpEventQueue();
-      unawaited(first.cancel());
-      scanner.scan().listen((_) {});
-      await pumpEventQueue();
+        // act
+        unawaited(first.cancel());
+        scanner.scan().listen((_) {});
+        await pumpEventQueue();
 
-      expect(
-        fake.isScanning,
-        scanner.isScanning,
-        reason: 'radio keeps scanning but the domain reports stopped',
-      );
-    });
+        // assert
+        expect(
+          fake.isScanning,
+          scanner.isScanning,
+          reason: 'radio keeps scanning but the domain reports stopped',
+        );
+      },
+    );
   });
 
   group('M5 (I382): dispose while scanning', () {
     test('dispose stops the platform scan', () async {
+      // arrange
       final scanner = bluey.scanner();
       scanner.scan().listen((_) {});
       await pumpEventQueue();
       expect(fake.isScanning, isTrue);
 
+      // act
       scanner.dispose();
       await pumpEventQueue();
 
+      // assert
       expect(fake.isScanning, isFalse, reason: 'native scan leaks on dispose');
     });
   });
 
   group('L1 (I386): advertising state desync', () {
-    test('a rejected re-start does not make stopAdvertising a no-op',
-        () async {
+    test('a rejected re-start does not make stopAdvertising a no-op', () async {
+      // arrange
       final server = bluey.server()!;
       await server.startAdvertising(name: 'a');
       expect(fake.isAdvertising, isTrue);
-
       fake.advertisingShouldFail = true;
-      await expectLater(server.startAdvertising(name: 'b'), throwsA(anything));
 
+      // act
+      await expectLater(server.startAdvertising(name: 'b'), throwsA(anything));
       await server.stopAdvertising();
+
+      // assert
       expect(
         fake.isAdvertising,
         isFalse,
@@ -180,6 +202,7 @@ void main() {
 
   group('M7 (I384): server request with no handler attached', () {
     test('a read with no readRequests listener is answered', () async {
+      // arrange
       final server = bluey.server()!;
       await server.addService(
         HostedService(
@@ -192,6 +215,7 @@ void main() {
       fake.simulateCentralConnection(centralId: centralId);
       await pumpEventQueue();
 
+      // act
       final settled = fake
           .simulateReadRequest(
             centralId: centralId,
@@ -199,6 +223,7 @@ void main() {
           )
           .then<Object?>((v) => v, onError: (Object e) => e);
 
+      // assert
       await expectLater(
         settled.timeout(const Duration(seconds: 1)),
         completes,
@@ -209,8 +234,11 @@ void main() {
 
   group('M6 (I383): control-service registration failure', () {
     test('a transient addService failure does not brick the server', () async {
+      // arrange
       final unhandled = <Object>[];
       final outcome = Completer<List<Object?>>();
+
+      // act
       runZonedGuarded(() async {
         final failing = _ControlServiceRejectingPlatform();
         platform.BlueyPlatform.instance = failing;
@@ -243,13 +271,16 @@ void main() {
 
       final errors = await outcome.future;
       await pumpEventQueue();
+
+      // assert
       // ignore: avoid_print
       print('unhandled=$unhandled addService errors=$errors');
       expect(unhandled, isEmpty, reason: 'unhandled async error at server()');
       expect(
         errors.last,
         anyOf(isNull, isA<BlueyException>()),
-        reason: 'server is permanently unusable: every later call rethrows '
+        reason:
+            'server is permanently unusable: every later call rethrows '
             'the cached, untranslated platform error',
       );
     });

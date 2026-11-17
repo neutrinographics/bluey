@@ -12,7 +12,9 @@ on:
 
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a pull request's run gives way to a newer push; a nightly or
+  # requested run finishes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

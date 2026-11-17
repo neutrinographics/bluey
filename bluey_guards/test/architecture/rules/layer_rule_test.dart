@@ -36,15 +36,18 @@ void main() {
     test(
       "names its own domain, the kernel's domain and its allowed libraries",
       () {
-        // act
-        final violations = found({
+        // arrange
+        final files = {
           _domain: naming([
             'link_state.dart',
             '../../../shared/domain/either.dart',
             'dart:typed_data',
             'package:meta/meta.dart',
           ]),
-        });
+        };
+
+        // act
+        final violations = found(files);
 
         // assert
         expect(violations, isEmpty);
@@ -52,15 +55,18 @@ void main() {
     );
 
     test('may not reach outward', () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         _domain: naming([
           '../application/connect_device.dart',
           '../../../shared/application/log.dart',
           'dart:async',
           'package:clock/clock.dart',
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, [
@@ -75,8 +81,8 @@ void main() {
 
   group('application', () {
     test('names what domain may, its own layer and its allowed libraries', () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         _application: naming([
           '../domain/link.dart',
           'ports/links.dart',
@@ -85,21 +91,27 @@ void main() {
           'dart:math',
           'package:clock/clock.dart',
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, isEmpty);
     });
 
     test('may not name infrastructure or a framework', () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         _application: naming([
           '../infrastructure/adapters/platform_links.dart',
           '../../../shared/infrastructure/bluey_logger.dart',
           _platform,
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, [
@@ -114,8 +126,8 @@ void main() {
     test(
       'names its whole context, the whole kernel and its two frameworks',
       () {
-        // act
-        final violations = found({
+        // arrange
+        final files = {
           _adapter: naming([
             '../../domain/link.dart',
             '../../application/ports/links.dart',
@@ -123,7 +135,10 @@ void main() {
             _platform,
             'package:flutter/services.dart',
           ]),
-        });
+        };
+
+        // act
+        final violations = found(files);
 
         // assert
         expect(violations, isEmpty);
@@ -131,10 +146,13 @@ void main() {
     );
 
     test('may name no other part of Flutter', () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         _adapter: naming(['package:flutter/widgets.dart']),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, ['$_adapter -> package:flutter/widgets.dart']);
@@ -145,15 +163,16 @@ void main() {
     test('keeps the same order of layers and names no edge', () {
       // arrange
       const either = 'lib/src/shared/domain/either.dart';
-
-      // act
-      final violations = found({
+      final files = {
         either: naming([
           'failure.dart',
           '../application/log.dart',
           '../../api/exceptions.dart',
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, [
@@ -167,14 +186,17 @@ void main() {
     test(
       'placed code names no unplaced code, no edge and no public library',
       () {
-        // act
-        final violations = found({
+        // arrange
+        final files = {
           _application: naming([
             '../../../connection/bluey_connection.dart',
             '../../../api/exceptions.dart',
             '../../../../bluey.dart',
           ]),
-        });
+        };
+
+        // act
+        final violations = found(files);
 
         // assert
         expect(violations, [
@@ -189,11 +211,14 @@ void main() {
       "another context is the boundary rule's to judge, and unplaced code is "
       'not judged',
       () {
-        // act
-        final violations = found({
+        // arrange
+        final files = {
           _domain: naming(['../../peer/domain/server_id.dart']),
           'lib/src/connection/a.dart': naming(['dart:io', '../bluey.dart']),
-        });
+        };
+
+        // act
+        final violations = found(files);
 
         // assert
         expect(violations, isEmpty);
@@ -203,11 +228,14 @@ void main() {
 
   group('a public library', () {
     test("may not name a context's infrastructure", () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         'lib/bluey.dart':
             "export 'src/features/x/infrastructure/adapters/a.dart';",
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, [
@@ -244,8 +272,8 @@ void main() {
 
   group('the edge', () {
     test("names any context's domain and application, and unplaced code", () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         'lib/src/api/connection/connection.dart': naming([
           '../../features/connection/domain/link.dart',
           '../../features/peer/application/watch_peer.dart',
@@ -253,15 +281,18 @@ void main() {
           '../exceptions.dart',
           'dart:async',
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, isEmpty);
     });
 
     test('only the composition root names an infrastructure folder', () {
-      // act
-      final violations = found({
+      // arrange
+      final files = {
         'lib/src/api/bluey.dart': naming([
           '../features/connection/infrastructure/adapters/platform_links.dart',
         ]),
@@ -269,7 +300,10 @@ void main() {
           '../../features/connection/infrastructure/adapters/'
               'platform_links.dart',
         ]),
-      });
+      };
+
+      // act
+      final violations = found(files);
 
       // assert
       expect(violations, [

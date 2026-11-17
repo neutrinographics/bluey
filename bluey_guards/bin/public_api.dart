@@ -25,7 +25,7 @@ Future<void> main(List<String> arguments) async {
   final String current;
   try {
     current = await dumpPublicApi(library);
-  } on StateError catch (refusal) {
+  } on ApiDumpRefusal catch (refusal) {
     stderr.writeln(refusal.message);
     await stderr.flush();
     exit(1);

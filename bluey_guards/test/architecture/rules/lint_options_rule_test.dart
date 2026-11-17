@@ -65,4 +65,91 @@ void main() {
       },
     );
   });
+  group('every options file under a root', () {
+    test('a deeper options file must turn on each lint itself', () {
+      // arrange
+      final files = tree({
+        'lib/src/features/analysis_options.yaml': _both,
+        'lib/src/features/connection/analysis_options.yaml': '''
+linter:
+  rules:
+    - unawaited_futures
+''',
+        'lib/src/features/connection/domain/link.dart': '',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/features/connection/analysis_options.yaml -> '
+            'does not turn on discarded_futures',
+      ]);
+    });
+
+    test('no options file may set a lint to ignore under analyzer errors', () {
+      // arrange
+      final files = tree({
+        'lib/src/features/analysis_options.yaml': '''
+analyzer:
+  errors:
+    unawaited_futures: ignore
+    discarded_futures: warning
+linter:
+  rules:
+    - unawaited_futures
+    - discarded_futures
+''',
+        'lib/src/features/connection/domain/link.dart': '',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/features/analysis_options.yaml -> '
+            'sets unawaited_futures to ignore',
+      ]);
+    });
+
+    test('reads rules written as a map, true turning a lint on', () {
+      // arrange
+      final files = tree({
+        'lib/src/features/analysis_options.yaml': '''
+linter:
+  rules:
+    unawaited_futures: true
+    discarded_futures: false
+''',
+        'lib/src/features/connection/domain/link.dart': '',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/features/analysis_options.yaml -> '
+            'does not turn on discarded_futures',
+      ]);
+    });
+
+    test('an options file that is not YAML turns nothing on', () {
+      // arrange
+      final files = tree({
+        'lib/src/features/analysis_options.yaml': 'linter: [rules\n',
+        'lib/src/features/connection/domain/link.dart': '',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/features/analysis_options.yaml -> does not parse as YAML',
+      ]);
+    });
+  });
 }

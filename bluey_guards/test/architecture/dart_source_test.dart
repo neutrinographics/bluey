@@ -11,11 +11,16 @@ List<String> _raises(String content) => [
 void main() {
   group('uris', () {
     test('names every import, export and part, in source order', () {
+      // arrange
+      const content = '''
+import 'dart:async';
+import 'b.dart' as b show B;
+export 'c.dart' hide C;
+part 'd.dart';
+''';
+
       // act
-      final source = _parse(
-        "import 'dart:async';\nimport 'b.dart' as b show B;\n"
-        "export 'c.dart' hide C;\npart 'd.dart';\n",
-      );
+      final source = _parse(content);
 
       // assert
       expect(source.uris, ['dart:async', 'b.dart', 'c.dart', 'd.dart']);
@@ -23,22 +28,30 @@ void main() {
     });
 
     test('names each alternative of a conditional import that spans lines', () {
+      // arrange
+      const content = '''
+import 'stub.dart'
+    if (dart.library.io) 'io.dart'
+    if (dart.library.js_interop) 'web.dart';
+''';
+
       // act
-      final source = _parse(
-        "import 'stub.dart'\n    if (dart.library.io) 'io.dart'\n"
-        "    if (dart.library.js_interop) 'web.dart';\n",
-      );
+      final source = _parse(content);
 
       // assert
       expect(source.uris, ['stub.dart', 'io.dart', 'web.dart']);
     });
 
     test('ignores a directive inside a comment or a string', () {
+      // arrange
+      const content = '''
+// import 'no.dart';
+/* export 'no.dart'; */
+const text = "import 'no.dart';";
+''';
+
       // act
-      final source = _parse(
-        "// import 'no.dart';\n/* export 'no.dart'; */\n"
-        "const text = \"import 'no.dart';\";\n",
-      );
+      final source = _parse(content);
 
       // assert
       expect(source.uris, isEmpty);
@@ -47,8 +60,13 @@ void main() {
     test(
       'still names the directives of a file that does not parse cleanly',
       () {
+        // arrange
+        const content = '''
+import 'a.dart';
+class {''';
+
         // act
-        final source = _parse("import 'a.dart';\nclass {");
+        final source = _parse(content);
 
         // assert
         expect(source.uris, ['a.dart']);
@@ -58,13 +76,18 @@ void main() {
 
   group('raises', () {
     test('names what each throw raises, with its line', () {
+      // arrange
+      const content = '''
+void f() {
+  throw StateError('x');
+}
+void g() => throw const Gone();
+void h() => throw ArgumentError.value(1);
+void i(Object e) => throw e;
+''';
+
       // act
-      final raises = _raises(
-        "void f() {\n  throw StateError('x');\n}\n"
-        "void g() => throw const Gone();\n"
-        "void h() => throw ArgumentError.value(1);\n"
-        "void i(Object e) => throw e;\n",
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, [
@@ -75,38 +98,65 @@ void main() {
       ]);
     });
 
-    test('names a rethrow and an addError call', () {
+    test('names what a throw in parentheses raises', () {
+      // arrange
+      const content = '''
+void f() => throw (StateError('x'));
+void g() => throw ((const Gone()));
+''';
+
       // act
-      final raises = _raises(
-        "void f(dynamic sink) {\n  try {} catch (e) {\n"
-        "    sink.addError(e);\n    rethrow;\n  }\n}\n",
-      );
+      final raises = _raises(content);
+
+      // assert
+      expect(raises, ['1: throw StateError', '2: throw Gone']);
+    });
+
+    test('names a rethrow and an addError call', () {
+      // arrange
+      const content = '''
+void f(dynamic sink) {
+  try {} catch (e) {
+    sink.addError(e);
+    rethrow;
+  }
+}
+''';
+
+      // act
+      final raises = _raises(content);
 
       // assert
       expect(raises, ['3: addError', '4: rethrow']);
     });
 
     test('names an addError tear-off', () {
+      // arrange
+      const content = '''
+void f(dynamic s, dynamic c) {
+  s.listen(null, onError: c.addError);
+}
+''';
+
       // act
-      final raises = _raises(
-        'void f(dynamic s, dynamic c) {\n'
-        '  s.listen(null, onError: c.addError);\n'
-        '}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, ['2: addError']);
     });
 
     test('names an addError tear-off through a property, and a call once', () {
+      // arrange
+      const content = '''
+void f(dynamic s, dynamic c, Object e) {
+  s.listen(null, onError: c.sink.addError);
+  c.sink.addError(e);
+  c.addError(e);
+}
+''';
+
       // act
-      final raises = _raises(
-        'void f(dynamic s, dynamic c, Object e) {\n'
-        '  s.listen(null, onError: c.sink.addError);\n'
-        '  c.sink.addError(e);\n'
-        '  c.addError(e);\n'
-        '}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, ['2: addError', '3: addError', '4: addError']);
@@ -114,41 +164,50 @@ void main() {
 
     test('names a bare addError tear-off inside a sink class, and a bare call '
         'once', () {
+      // arrange
+      const content = '''
+class Relay implements EventSink<int> {
+  void watch(Stream<int> s) => s.listen(null, onError: addError);
+  void fail(Object e) => addError(e);
+}
+''';
+
       // act
-      final raises = _raises(
-        'class Relay implements EventSink<int> {\n'
-        '  void watch(Stream<int> s) => s.listen(null, onError: addError);\n'
-        '  void fail(Object e) => addError(e);\n'
-        '}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, ['2: addError', '3: addError']);
     });
 
     test('names a completeError call and a completeError tear-off', () {
+      // arrange
+      const content = '''
+void f(Completer<void> c, Stream<int> s, Object e) {
+  c.completeError(e);
+  s.listen(null, onError: c.completeError);
+}
+''';
+
       // act
-      final raises = _raises(
-        'void f(Completer<void> c, Stream<int> s, Object e) {\n'
-        '  c.completeError(e);\n'
-        '  s.listen(null, onError: c.completeError);\n'
-        '}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, ['2: completeError', '3: completeError']);
     });
 
-    test('names a Future.error and a Stream.error however each is written', () {
+    test('names a Future.error and a Stream.error however each is called', () {
+      // arrange
+      const content = '''
+Future<int> f(Object e) => Future.error(e);
+Future<int> g(Object e) => Future<int>.error(e);
+Future<int> h(Object e) => new Future.error(e);
+Stream<int> i(Object e) => Stream.error(e);
+Stream<int> j(Object e) => async.Stream<int>.error(e);
+Future<int> k(Object e) => async.Future.error(e);
+''';
+
       // act
-      final raises = _raises(
-        'Future<int> f(Object e) => Future.error(e);\n'
-        'Future<int> g(Object e) => Future<int>.error(e);\n'
-        'Future<int> h(Object e) => new Future.error(e);\n'
-        'Stream<int> i(Object e) => Stream.error(e);\n'
-        'Stream<int> j(Object e) => async.Stream<int>.error(e);\n'
-        'Future<int> k(Object e) => async.Future.error(e);\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, [
@@ -161,16 +220,42 @@ void main() {
       ]);
     });
 
+    test('names a Future.error and a Stream.error tear-off', () {
+      // arrange
+      const content = '''
+void f(Future<int> a, Stream<int> s) {
+  a.then((_) {}, onError: Future.error);
+  s.handleError(Stream.error);
+  a.catchError(async.Future.error);
+  a.catchError(Future<int>.error);
+}
+''';
+
+      // act
+      final raises = _raises(content);
+
+      // assert
+      expect(raises, [
+        '2: Future.error',
+        '3: Stream.error',
+        '4: Future.error',
+        '5: Future.error',
+      ]);
+    });
+
     test(
       'names Error.throwWithStackTrace as a throw of its first argument',
       () {
+        // arrange
+        const content = '''
+void f(Object e, StackTrace s) {
+  Error.throwWithStackTrace(StateError('x'), s);
+  Error.throwWithStackTrace(e, s);
+}
+''';
+
         // act
-        final raises = _raises(
-          'void f(Object e, StackTrace s) {\n'
-          "  Error.throwWithStackTrace(StateError('x'), s);\n"
-          '  Error.throwWithStackTrace(e, s);\n'
-          '}\n',
-        );
+        final raises = _raises(content);
 
         // assert
         expect(raises, ['2: throw StateError', '3: throw e']);
@@ -178,41 +263,51 @@ void main() {
     );
 
     test('ignores an error member that is not a raise', () {
+      // arrange
+      const content = '''
+void f(dynamic r, Object e) {
+  r.error(e);
+  Failure.error(e);
+  final handler = Failure.error;
+  final addError = r.handler;
+  r.on(addError: e);
+}
+''';
+
       // act
-      final raises = _raises(
-        'void f(dynamic r, Object e) {\n'
-        '  r.error(e);\n'
-        '  Failure.error(e);\n'
-        '  final addError = r.handler;\n'
-        '  r.on(addError: e);\n'
-        '}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, isEmpty);
     });
 
     test('ignores an addError named in a doc comment', () {
+      // arrange
+      const content = '''
+/// Forwards to [StreamController.addError] and [sink.addError].
+void f() {}
+
+/// See [Sink.addError], [Completer.completeError], [Future.error]
+/// and [Error.throwWithStackTrace].
+void g() {}
+''';
+
       // act
-      final raises = _raises(
-        '/// Forwards to [StreamController.addError] and [sink.addError].\n'
-        'void f() {}\n'
-        '\n'
-        '/// See [Sink.addError], [Completer.completeError], [Future.error]\n'
-        '/// and [Error.throwWithStackTrace].\n'
-        'void g() {}\n',
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, isEmpty);
     });
 
     test('ignores the words inside a comment or a string', () {
+      // arrange
+      const content = '''
+// throw StateError('x');
+const text = 'rethrow; throw x; addError(y)';
+''';
+
       // act
-      final raises = _raises(
-        "// throw StateError('x');\n"
-        "const text = 'rethrow; throw x; addError(y)';\n",
-      );
+      final raises = _raises(content);
 
       // assert
       expect(raises, isEmpty);

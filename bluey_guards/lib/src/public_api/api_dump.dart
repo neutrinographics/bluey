@@ -16,7 +16,7 @@ import 'package:path/path.dart' as p;
 /// analysis is rooted at the package holding the library, so its own
 /// package configuration resolves what it imports.
 ///
-/// Throws a [StateError] instead of answering text when the library, or a
+/// Throws an [ApiDumpRefusal] instead of answering text when the library, or a
 /// library declaring something it exports, has an error-severity
 /// diagnostic (the first few are named), or when the text would name
 /// `InvalidType`, a type the analyzer could not resolve. Either means the
@@ -29,7 +29,7 @@ Future<String> dumpPublicApi(String libraryPath) async {
     final session = collection.contextFor(path).currentSession;
     final result = await session.getResolvedLibrary(path);
     if (result is! ResolvedLibraryResult) {
-      throw StateError('Cannot resolve $libraryPath: $result');
+      throw ApiDumpRefusal('Cannot resolve $libraryPath: $result');
     }
     final declarations = _exportedDeclarations(result.element);
     final errors = [
@@ -38,7 +38,7 @@ Future<String> dumpPublicApi(String libraryPath) async {
         ..._errorsIn(await session.getResolvedLibraryByElement(library)),
     ];
     if (errors.isNotEmpty) {
-      throw StateError(
+      throw ApiDumpRefusal(
         'Cannot dump the public API of $libraryPath: it has '
         '${errors.length} error(s), so what it exports cannot be read '
         '(has pub get run?):\n'
@@ -49,6 +49,20 @@ Future<String> dumpPublicApi(String libraryPath) async {
   } finally {
     await collection.dispose();
   }
+}
+
+/// Why the public API of a library could not be dumped. It is an outcome a
+/// caller expects, such as a package read before `pub get`, so it is not a
+/// [StateError], which means a bug.
+final class ApiDumpRefusal implements Exception {
+  /// A refusal that says [message].
+  const ApiDumpRefusal(this.message);
+
+  /// Why, naming the library and the first few errors.
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 const _errorsNamed = 3;
@@ -101,7 +115,7 @@ String _refuseUnresolvedTypes(String libraryPath, String dump) {
       if (_invalidType.hasMatch(line)) '  ${line.trimLeft()}',
   ];
   if (unresolved.isEmpty) return dump;
-  throw StateError(
+  throw ApiDumpRefusal(
     'Cannot dump the public API of $libraryPath: it names '
     '${unresolved.length} type(s) the analyzer could not resolve '
     '(has pub get run?):\n'

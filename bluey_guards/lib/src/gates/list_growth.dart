@@ -101,8 +101,10 @@ final class _CountEntry {
   static final _shape = RegExp(r'^(.+) -> (\d+) lines$');
 
   static _CountEntry? parse(String entry) {
-    if (_shape.firstMatch(entry) case final match?) {
-      final [path, lines] = match.groups([1, 2]).nonNulls.toList();
+    if (_shape.firstMatch(entry)?.groups([1, 2]) case [
+      final path?,
+      final lines?,
+    ]) {
       return _CountEntry(path, int.parse(lines));
     }
     return null;

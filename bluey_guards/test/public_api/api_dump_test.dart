@@ -155,7 +155,7 @@ void main() {
       await expectLater(
         dumping,
         throwsA(
-          isA<StateError>().having(
+          isA<ApiDumpRefusal>().having(
             (error) => error.message,
             'message',
             allOf(contains('broken.dart'), contains("'missing.dart'")),
@@ -182,7 +182,7 @@ void main() {
         await expectLater(
           dumping,
           throwsA(
-            isA<StateError>().having(
+            isA<ApiDumpRefusal>().having(
               (error) => error.message,
               'message',
               allOf(
@@ -210,7 +210,7 @@ void main() {
       await expectLater(
         dumping,
         throwsA(
-          isA<StateError>().having(
+          isA<ApiDumpRefusal>().having(
             (error) => error.message,
             'message',
             allOf(contains('quiet.dart'), contains('final InvalidType x')),

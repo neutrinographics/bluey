@@ -38,3 +38,12 @@ abstract interface class ArchitectureRule {
   /// within a file.
   List<Violation> check(SourceTree tree);
 }
+
+/// A rule whose entries carry a measure of their file, so an entry its list
+/// holds and one it finds for the same file read as one file that changed,
+/// with which way to move, never as new debt beside paid debt.
+abstract interface class MeasuringRule implements ArchitectureRule {
+  /// What to do about the one file [known] and [found] both name, or null
+  /// when they are not the same file measured twice.
+  String? change({required String known, required String found});
+}

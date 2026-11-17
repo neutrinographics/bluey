@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TDD cycle**: Write a failing test first (Red), implement minimum code to pass (Green), then improve (Refactor). No production code without a failing test.
 - **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
-- **Coverage targets**: 90% minimum for domain layer, 80% overall.
+- **Coverage floor**: 90% of the lines of the `bluey` package, held by CI's coverage gate, which also fails on a file with code that no test loads (`docs/ARCHITECTURE.md` §10).
 - **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
 
 ### Design review before execution
@@ -64,6 +64,9 @@ cd bluey && flutter test --coverage
 # Analyze (lint)
 flutter analyze
 
+# Formatting, as CI's Analyze job holds it: the guards and every root of new code that exists
+dart format --output=none --set-exit-if-changed bluey_guards bluey/lib/src/shared/domain
+
 # The guards' own tests
 cd bluey_guards && dart test
 
@@ -100,9 +103,11 @@ cd bluey/example && flutter run
 
 ### Clean Architecture Layers
 
+The packages, from the consumer down. Inside `bluey`, the layers (`domain`, `application`, `infrastructure`) are those of each `features/<context>/` and of `shared/`, as `docs/ARCHITECTURE.md` §3 lays out.
+
 ```
-Application Layer     ← Example app / consumer code
-Domain Layer          ← bluey package (UUID, Device, Advertisement, Connection, Server, exceptions, events)
+Consumer              ← Example app / consumer code
+Library               ← bluey package (UUID, Device, Advertisement, Connection, Server, exceptions, events)
 Platform Interface    ← bluey_platform_interface (BlueyPlatform abstract class, platform DTOs)
 Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kotlin/Swift)
 ```

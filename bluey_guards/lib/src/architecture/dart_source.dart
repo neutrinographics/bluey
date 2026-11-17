@@ -63,8 +63,8 @@ final class DartSource {
   /// own surface.
   final List<String> exports;
 
-  /// Every `throw`, `rethrow`, `Error.throwWithStackTrace`, `Future.error`
-  /// and `Stream.error`, and every `addError` and `completeError` call and
+  /// Every `throw`, `rethrow` and `Error.throwWithStackTrace`, and every
+  /// `Future.error`, `Stream.error`, `addError` and `completeError` call and
   /// tear-off in the file, in source order: the places an error leaves it.
   final List<Raise> raises;
 
@@ -152,6 +152,32 @@ final class _RaiseFinder extends RecursiveAstVisitor<void> {
     return (type.name.lexeme, name.name?.name);
   }
 
+  /// A tear-off of `Future.error` or `Stream.error` (`onError:
+  /// Future.error`) makes a failing future or stream just as a call does.
+  @override
+  void visitPrefixedIdentifier(PrefixedIdentifier node) {
+    if (node.identifier.name == 'error' &&
+        _errorCreators.contains(node.prefix.name)) {
+      _addErrorCreator(node.prefix.name, node.identifier.offset);
+    }
+    super.visitPrefixedIdentifier(node);
+  }
+
+  /// The same tear-off behind an import prefix (`async.Future.error`) or
+  /// with type arguments (`Future<int>.error`).
+  @override
+  void visitPropertyAccess(PropertyAccess node) {
+    if (_typeNamedBy(node.target) case final type?
+        when node.propertyName.name == 'error' &&
+            _errorCreators.contains(type)) {
+      _addErrorCreator(type, node.propertyName.offset);
+    }
+    super.visitPropertyAccess(node);
+  }
+
+  void _addErrorCreator(String type, int offset) =>
+      raises.add(Raise(line: _lineOf(offset), what: '$type.error'));
+
   /// A doc comment's references (`[StreamController.addError]`) parse as
   /// identifiers but raise nothing, so a comment is never walked.
   @override
@@ -201,11 +227,22 @@ const _forwarders = {'addError', 'completeError'};
 /// fails.
 const _errorCreators = {'Future', 'Stream'};
 
+/// The name of the type an expression names, read through an import prefix
+/// (`async.Future`) and type arguments (`Future<int>`), or null when it names
+/// none.
+String? _typeNamedBy(Expression? expression) => switch (expression) {
+  SimpleIdentifier(:final name) => name,
+  PrefixedIdentifier(:final identifier) => identifier.name,
+  FunctionReference(:final function) => _typeNamedBy(function),
+  TypeLiteral(:final type) => type.name.lexeme,
+  _ => null,
+};
+
 /// The name of what a `throw` raises: its expression up to the first `(`,
-/// without a leading `const` or `new`, so `throw const Gone()` reads as the
-/// class it raises.
+/// without its parentheses or a leading `const` or `new`, so `throw const
+/// Gone()` and `throw (StateError('x'))` read as the class each raises.
 String _thrown(Expression expression) {
-  final source = expression.toSource();
+  final source = expression.unParenthesized.toSource();
   final call = source.indexOf('(');
   final named = call == -1 ? source : source.substring(0, call);
   return named.replaceFirst(RegExp(r'^(const|new)\s+'), '').trim();

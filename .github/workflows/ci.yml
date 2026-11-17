@@ -7,7 +7,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push replaces a pull request's run; every run on main finishes,
+  # so each commit there keeps its result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -28,6 +30,15 @@ jobs:
             exit 1
           fi
       - run: flutter analyze
+      # The guards and every root of new code that exists; the old folders
+      # keep their layout until their code moves.
+      - name: The guards and the placed code are formatted
+        run: |
+          paths="bluey_guards"
+          for root in bluey/lib/src/api bluey/lib/src/features bluey/lib/src/shared/domain bluey/lib/src/shared/application bluey/lib/src/shared/infrastructure; do
+            if [ -d "$root" ]; then paths="$paths $root"; fi
+          done
+          dart format --output=none --set-exit-if-changed $paths
 
   suites:
     name: Tests (${{ matrix.package }})
