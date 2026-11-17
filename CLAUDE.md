@@ -12,9 +12,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Coverage targets**: 90% minimum for domain layer, 80% overall.
 - **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
 
+### Design review before execution
+
+Every spec and every plan carries a "Design review (cohesion, coupling, DDD, Clean Architecture)" section that ends `Verdict: ready.` before any task starts: each unit's single responsibility, each dependency and its direction, the bounded context and its language, and the layer each file lands in. A claim that names an existing class is checked against that class's source before the verdict is written. A finding is fixed in the document before any task starts.
+
 ## Project Overview
 
-Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
+Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 5 packages:
 
 ```
 bluey/                         Main library - domain models, public API, tests (1120 tests)
@@ -22,6 +26,7 @@ bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabili
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
 bluey/example/                 Demo app with scanner, connection, GATT, server features
+bluey_guards/                  The guards the build runs (architecture rules, the public API dump, the CI gate tools), dev-only and never published
 ```
 
 ## Build & Test Commands
@@ -57,6 +62,25 @@ cd bluey && flutter test --coverage
 # Analyze (lint)
 flutter analyze
 
+# The guards' own tests
+cd bluey_guards && dart test
+
+# The architecture rules; each package keeps its lists in test/architecture/known_violations.dart
+cd bluey && flutter test test/architecture
+
+# The public API dump: check it, or rewrite it after a change that was meant
+cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api
+cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api --write
+
+# The known defects, which are expected to fail (docs/ARCHITECTURE.md)
+cd bluey && flutter test test/known_defects --run-skipped --tags known-defect
+
+# The coverage floor
+cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90
+
+# Once per checkout: create the Gradle wrapper, which is not committed
+cd bluey_android/android && gradle wrapper --gradle-version 8.14
+
 # Generate Pigeon bindings (from package root)
 cd bluey_android && dart run pigeon --input pigeons/messages.dart
 cd bluey_ios && dart run pigeon --input pigeons/messages.dart
@@ -66,6 +90,8 @@ cd bluey/example && flutter run
 ```
 
 ## Architecture
+
+`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow.
 
 ### Clean Architecture Layers
 
@@ -170,6 +196,10 @@ When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `te
 
 ## Key Files
 
+- `docs/ARCHITECTURE.md` - the authoritative guide to the structure, the rules the build holds and the gates; this file is its short version
+- `bluey/test/architecture/known_violations.dart` - what the architecture rules find today, as lists that only shrink (each package has one)
+- `bluey/api/bluey.api` - the committed public API dump; a change to it is reviewed as an API change
+- `.github/workflows/ci.yml` - the gates every pull request runs (XCTest runs from `ios.yml`)
 - `bluey_android/pigeons/messages.dart` - Pigeon API definition for Android (generates `Messages.g.kt` + `messages.g.dart`)
 - `bluey_ios/pigeons/messages.dart` - Pigeon API definition for iOS (generates `Messages.g.swift` + `messages.g.dart`)
 - `docs/roadmap.md` - the development roadmap: source of truth for what to work on next (priority, status, ordering, grouped by bounded context). Start here for outstanding work.

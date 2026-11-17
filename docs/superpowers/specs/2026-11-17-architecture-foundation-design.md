@@ -122,7 +122,7 @@ bluey/lib/
 | `features/{context}/application` | Orchestration: one unit per intent (`ConnectDevice`), sessions that feed a state machine from a port's stream and run its timers, and the ports | Its own domain and application, `shared/domain`, `shared/application`, `dart:async`, `package:clock` |
 | `features/{context}/infrastructure` | Adapters and bridges, and nothing that decides | Its own context, `shared`, `bluey_platform_interface`, `package:flutter/services.dart`. A bridge also names the other context's domain and application |
 | `shared` | The kernel every context uses | No context, and no `api` |
-| `api` | The public surface: interfaces, implementations that call one application unit and translate its failure, and the composition root | The domain and application of every context. Only `api/bluey.dart` names an `infrastructure` folder |
+| `api` | The public surface: interfaces, implementations that call one application unit and translate its failure, and the composition root | The domain and application of every context. Only `api/bluey.dart` names a context's `infrastructure` folder |
 
 A layer folder groups by role once it holds three or more files of one kind (`value_objects/`, `events/`, `failures/`), as Eventur does. File names stay Dart's `snake_case`; class names follow the Kotlin repositories (`ConnectDevice`, `PlatformScanning`, `InMemoryScanning`).
 
