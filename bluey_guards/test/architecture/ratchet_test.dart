@@ -91,7 +91,7 @@ void main() {
         '  new\n'
         'On the list but no longer true. Delete the entry:\n'
         '  old\n'
-        'On the list, but its file changed:\n'
+        'On the list, but what it names changed:\n'
         '  lib/a.dart changed from "lib/a.dart -> 410 lines" to '
         '"lib/a.dart -> 420 lines"\n',
       );

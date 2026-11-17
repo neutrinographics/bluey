@@ -13,10 +13,10 @@ RatchetVerdict ratchet({
   );
 }
 
-/// What a rule says about a [known] entry and a [found] one that are the
-/// same file measured twice, or null when they are not. A rule whose entries
-/// carry a measure supplies one, so a file that changed reads as one change
-/// with which way to move, never as new debt beside paid debt.
+/// What a rule says about a [known] entry and a [found] one that name the
+/// same thing changed (a file measured twice, a target that moved), or null
+/// when they do not. A rule that can tell supplies one, so the change reads
+/// as one change with what to do, never as new debt beside paid debt.
 typedef EntryChange =
     String? Function({required String known, required String found});
 
@@ -37,7 +37,7 @@ final class RatchetVerdict {
 
   /// The failure message for [rule]'s list: the counts, then each part that
   /// is not empty with what to do about it. A stale and an unlisted entry
-  /// that [change] reads as one file that changed are told together, in the
+  /// that [change] reads as one thing that changed are told together, in the
   /// rule's words, and in neither of the other parts.
   String describe(String rule, {EntryChange? change}) {
     final changes = <String>[];
@@ -67,7 +67,7 @@ final class RatchetVerdict {
       'On the list but no longer true. Delete the entry:',
       stale.where(unpaired),
     );
-    _part(text, 'On the list, but its file changed:', changes);
+    _part(text, 'On the list, but what it names changed:', changes);
     return text.toString();
   }
 }

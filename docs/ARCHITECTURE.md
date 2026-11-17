@@ -159,13 +159,21 @@ When a list and the code differ, the test prints up to three parts. This is a re
 
 ```
 size of .dart files: 1 not on its list, 1 on its list that no longer holds.
-On the list, but its file changed:
+On the list, but what it names changed:
   lib/src/bluey.dart shrank from 1040 to 1002 lines: lower its entry to 1002
 ```
 
-- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a new file over its ceiling. Change the code until the line goes away. Never copy the line into the list, with one exception: a `boundaries` entry whose target moved, within its context or out of a legacy folder into its `features/` home, is the same debt, and the entry is rewritten to the new path. A moved or split target passes as long as the source file is left with no more entries into that context than it had (a source that now imports both halves of a split target has one entry more, and fails); a dependency on a context the file did not depend on, or one more entry into a context it did, is new debt. A target that lands in `shared/` is no boundary at all: its entry is deleted.
+And this one, after the entry of `lib/src/gatt_client/gatt.dart` was written as if its target still sat at `lib/src/connection/attribute_handle.dart`:
+
+```
+boundaries: 1 not on its list, 1 on its list that no longer holds.
+On the list, but what it names changed:
+  lib/src/gatt_client/gatt.dart still depends on connection, but on lib/src/connection/value_objects/attribute_handle.dart, not on lib/src/connection/attribute_handle.dart: rewrite the entry to the new path
+```
+
+- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a new file over its ceiling. Change the code until the line goes away. Never copy the line into the list. A `boundaries` entry whose target moved, within its context or out of a legacy folder into its `features/` home, is not new debt: the test tells it under the third part, below, and the entry is rewritten to the new path. A moved or split target passes as long as the source file is left with no more entries into that context than it had (a source that now imports both halves of a split target has one entry more, and fails); a dependency on a context the file did not depend on, or one more entry into a context it did, is new debt. A target that lands in `shared/` is no boundary at all: its entry is deleted.
 - **On the list but no longer true** is debt paid: the file moved, was deleted or was fixed. Delete the entry.
-- **On the list, but its file changed** is a listed file whose length moved (the size rule reads its entry and the one it found as one file; the ratchet itself knows no rule's entries), and the line says which way. One that shrank ends `lower its entry to <count>`: rewrite the entry with that count. One that grew reads `grew from 990 to 1002 lines: shrink the file to 990 lines or fewer; never raise the entry`: shrink the file until the test passes with the entry as it is. A count is never raised. The heading's two figures each count such a file once.
+- **On the list, but what it names changed** is a listed entry the rule reads as one thing changed, with the entry it found (the ratchet itself knows no rule's entries). For `boundaries` it is a target that moved within its context, and the line ends `rewrite the entry to the new path`. For a size list it is a listed file whose length moved, and the line says which way. One that shrank ends `lower its entry to <count>`: rewrite the entry with that count. One that grew reads `grew from 990 to 1002 lines: shrink the file to 990 lines or fewer; never raise the entry`: shrink the file until the test passes with the entry as it is. A count is never raised. The heading's two figures each count such a file once.
 
 A slice that moves a file usually sees both parts at once, under several rules: the old path's entries are stale, and anything the moved file still does wrong is new. Fix the new, delete the stale, and the lists end the slice shorter than they began.
 

@@ -9,7 +9,7 @@ import 'rule_support.dart';
 /// in today's folders and in the target layout alike, so a context reaches
 /// another only through a bridge, and a bridge only the other's domain and
 /// application.
-final class BoundaryRule implements WeighingRule {
+final class BoundaryRule implements MeasuringRule, WeighingRule {
   /// The rule for [package], whose code that has not moved yet is read
   /// through [legacy].
   const BoundaryRule({required this.package, required this.legacy});
@@ -53,6 +53,22 @@ final class BoundaryRule implements WeighingRule {
   }
 
   static final _entryShape = RegExp(r'^(.+) -> (.+)$');
+
+  /// A known entry and a found one that owe the same debt are one target
+  /// that moved within its context, so the entry is rewritten, never told
+  /// as new debt beside paid debt.
+  @override
+  String? change({required String known, required String found}) {
+    final was = weigh(known);
+    if (known == found || was.debt == known || was != weigh(found)) {
+      return null;
+    }
+    final [source, from] = known.split(' -> ');
+    final to = found.split(' -> ').last;
+    final context = was.debt.substring('$source into '.length);
+    return '$source still depends on $context, but on $to, not on $from: '
+        'rewrite the entry to the new path';
+  }
 
   bool _crosses(Placement from, Placement? to) {
     if (to == null) return false;

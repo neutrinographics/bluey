@@ -217,4 +217,61 @@ void main() {
       expect(debt, (debt: 'lib/src/connection/a.dart -> 420 lines', amount: 1));
     });
   });
+
+  group('a known entry and a found entry of one source and context', () {
+    test('tells a target that moved to rewrite the entry', () {
+      // arrange
+      const known = 'lib/src/connection/a.dart -> lib/src/discovery/b.dart';
+      const found =
+          'lib/src/connection/a.dart -> '
+          'lib/src/features/discovery/domain/b.dart';
+
+      // act
+      final change = _rule.change(known: known, found: found);
+
+      // assert
+      expect(
+        change,
+        'lib/src/connection/a.dart still depends on discovery, but on '
+        'lib/src/features/discovery/domain/b.dart, not on '
+        'lib/src/discovery/b.dart: rewrite the entry to the new path',
+      );
+    });
+
+    test('is no change when the two entries are into different contexts', () {
+      // arrange
+      const known = 'lib/src/connection/a.dart -> lib/src/discovery/b.dart';
+      const found = 'lib/src/connection/a.dart -> lib/src/log/c.dart';
+
+      // act
+      final change = _rule.change(known: known, found: found);
+
+      // assert
+      expect(change, isNull);
+    });
+
+    test('is no change when the two entries are of different sources', () {
+      // arrange
+      const known = 'lib/src/connection/a.dart -> lib/src/discovery/b.dart';
+      const found = 'lib/src/connection/z.dart -> lib/src/discovery/b.dart';
+
+      // act
+      final change = _rule.change(known: known, found: found);
+
+      // assert
+      expect(change, isNull);
+    });
+
+    test('is no change when an entry names no context', () {
+      // arrange
+      const known = 'lib/src/connection/a.dart -> 420 lines';
+      const found = 'lib/src/connection/a.dart -> 410 lines';
+
+      // act
+      final change = _rule.change(known: known, found: found);
+
+      // assert
+      expect(change, isNull);
+    });
+  });
 }
