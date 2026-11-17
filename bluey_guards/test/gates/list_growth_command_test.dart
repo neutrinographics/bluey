@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 const _listFile = 'pkg/test/architecture/known_violations.dart';
+const _usage = 'Usage: list_growth_entry <base> <list file>...';
 
 String _lists(List<String> unplaced) =>
     'const unplaced = <String>[\n'
@@ -45,7 +46,7 @@ void main() {
       final compile = await Process.run(Platform.resolvedExecutable, [
         'compile',
         'kernel',
-        'bin/list_growth.dart',
+        'test/gates/support/list_growth_entry.dart',
         '-o',
         command,
       ]);
@@ -221,12 +222,17 @@ void main() {
 
       // assert
       expect(result.exitCode, 64);
-      expect(
-        result.stderr,
-        contains(
-          'Usage: dart run bluey_guards:list_growth <base> <list file>...',
-        ),
-      );
+      expect(result.stderr, contains(_usage));
     });
+  });
+
+  test('bluey_guards ships no list_growth command, since a command that '
+      'knows no rule judges every entry by its text and fails a rewritten '
+      'entry that holds', () {
+    // act
+    final shipped = File('bin/list_growth.dart').existsSync();
+
+    // assert
+    expect(shipped, isFalse);
   });
 }

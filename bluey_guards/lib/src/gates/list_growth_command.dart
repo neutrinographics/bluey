@@ -9,17 +9,18 @@ import 'list_growth.dart';
 /// copying its line into a list. Each path is relative to the folder the
 /// command runs in, inside the repository; the head is the file as it is on
 /// disk. Each list named in [weights] is judged by what its rule says an
-/// entry owes (see [ListGrowth.between]), every other entry by entry.
+/// entry owes (see [ListGrowth.between]), every other entry by entry. Both
+/// [weights] and [usage] are the caller's, since only a package's own
+/// composition root knows its rules and how it is run; a gate that ran with
+/// no weights would fail a rewritten entry that holds.
 ///
 /// Answers the exit code: 0 when every list held, 1 when one grew, a list
 /// file at the base or the head cannot be read, or the base cannot be found,
 /// and 64 with [usage] when no list file is named.
 Future<int> holdListsToShrinking(
   List<String> arguments, {
-  Map<String, EntryWeight> weights = const {},
-  String usage =
-      'Usage: dart run bluey_guards:list_growth <base> '
-          '<list file>...',
+  required Map<String, EntryWeight> weights,
+  required String usage,
 }) async {
   if (arguments.length < 2) {
     stderr.writeln(usage);
