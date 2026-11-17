@@ -69,6 +69,9 @@ final started = DateTime.now();
       'a top-level function': '''
 int twice(int value) => value * 2;
 ''',
+      'an extension type, even one with no members': '''
+extension type ServerId(String value) {}
+''',
     };
     for (final MapEntry(key: shape, value: source) in somethingRuns.entries) {
       test('is true for $shape', () {

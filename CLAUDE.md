@@ -65,7 +65,7 @@ cd bluey && flutter test --coverage
 flutter analyze
 
 # Formatting, as CI's Analyze job holds it: the guards and every root of new code that exists
-dart format --output=none --set-exit-if-changed bluey_guards bluey/lib/src/shared/domain
+dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/shared/domain
 
 # The guards' own tests
 cd bluey_guards && dart test

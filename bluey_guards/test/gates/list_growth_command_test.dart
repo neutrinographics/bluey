@@ -168,6 +168,44 @@ void main() {
       );
     });
 
+    test(
+      'exits 1 naming the file and why when a list file cannot be read',
+      () async {
+        // arrange
+        write(
+          _listFile,
+          "const unplaced = <String>['lib/a.dart -> unplaced'].toList();\n",
+        );
+
+        // act
+        final result = await run(['main', _listFile]);
+
+        // assert
+        expect(result.exitCode, 1);
+        expect(result.stderr, contains('$_listFile: '));
+        expect(
+          result.stderr,
+          contains('is not a list literal of plain strings'),
+        );
+      },
+    );
+
+    test('exits 1 when the base held a list file it cannot read', () async {
+      // arrange
+      await git(['checkout', '-q', 'main']);
+      write(_listFile, 'List<String> get unplaced => [];\n');
+      await commit('main holds a getter');
+      await git(['checkout', '-q', 'change']);
+      await git(['merge', '-q', 'main']);
+
+      // act
+      final result = await run(['main', _listFile]);
+
+      // assert
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('$_listFile at the base: '));
+    });
+
     test('exits 1 when the base cannot be found', () async {
       // act
       final result = await run(['no-such-ref', _listFile]);

@@ -15,14 +15,15 @@ List<String> unreportedFiles(
   Map<String, String> sources,
   LineCoverage coverage,
 ) => [
-  for (final path in sources.keys.toList()..sort())
-    if (!coverage.files.contains(path) && declaresCodeThatRuns(sources[path]!))
-      path,
+  for (final MapEntry(key: path, value: source)
+      in sources.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
+    if (!coverage.files.contains(path) && declaresCodeThatRuns(source)) path,
 ];
 
 /// Whether [source] declares anything a coverage report would count: a body
-/// (of a function, method, getter, setter or operator), a constructor, or a
-/// variable that is not a constant and has an initializer.
+/// (of a function, method, getter, setter or operator), a constructor, an
+/// extension type, or a variable that is not a constant and has an
+/// initializer.
 ///
 /// The rule leans towards code that runs: a constructor counts even when it
 /// is `const` and has no body, since it can still be called with `new`.
@@ -45,6 +46,13 @@ final class _RunningCodeFinder extends GeneralizingAstVisitor<void> {
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     if (node.externalKeyword == null) found = true;
+  }
+
+  /// An extension type's representation is a constructor a coverage report
+  /// counts, even when the type declares nothing else.
+  @override
+  void visitExtensionTypeDeclaration(ExtensionTypeDeclaration node) {
+    found = true;
   }
 
   @override

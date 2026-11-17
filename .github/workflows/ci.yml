@@ -30,12 +30,13 @@ jobs:
             exit 1
           fi
       - run: flutter analyze
-      # The guards and every root of new code that exists; the old folders
-      # keep their layout until their code moves.
-      - name: The guards and the placed code are formatted
+      # The guards, every package's architecture tests and known defects,
+      # and every root of new code that exists; the old folders keep their
+      # layout until their code moves.
+      - name: The guards, the lists and the placed code are formatted
         run: |
           paths="bluey_guards"
-          for root in bluey/lib/src/api bluey/lib/src/features bluey/lib/src/shared/domain bluey/lib/src/shared/application bluey/lib/src/shared/infrastructure; do
+          for root in */test/architecture */test/known_defects bluey/lib/src/api bluey/lib/src/features bluey/lib/src/shared/domain bluey/lib/src/shared/application bluey/lib/src/shared/infrastructure; do
             if [ -d "$root" ]; then paths="$paths $root"; fi
           done
           dart format --output=none --set-exit-if-changed $paths
@@ -58,6 +59,11 @@ jobs:
       - uses: ./.github/actions/setup
       - run: ${{ matrix.run }}
         working-directory: ${{ matrix.package }}
+      # A package outside the workspace, such as bluey_ios/example, resolves
+      # against its own lockfile when its suite runs; a lockfile the run
+      # rewrote is a dependency change nobody reviewed.
+      - name: No lockfile changed
+        run: git diff --exit-code -- '*pubspec.lock'
 
   bluey:
     name: Tests and coverage (bluey)
