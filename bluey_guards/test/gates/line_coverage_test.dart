@@ -20,6 +20,17 @@ void main() {
       expect(coverage.percent, 90.0);
     });
 
+    test('names the files it measured', () {
+      // arrange
+      const report = _report;
+
+      // act
+      final coverage = LineCoverage.parse(report);
+
+      // assert
+      expect(coverage.files, {'lib/a.dart', 'lib/b.dart'});
+    });
+
     test('meets a floor it reaches and not one above it', () {
       // arrange
       final coverage = LineCoverage.parse(_report);

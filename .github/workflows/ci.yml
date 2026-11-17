@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - run: flutter test --coverage
-      - run: dart run bluey_guards:coverage_gate coverage/lcov.info 90
+      - run: dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
 
   architecture:
     name: Architecture

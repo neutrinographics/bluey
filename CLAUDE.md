@@ -81,7 +81,7 @@ cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api --writ
 cd bluey && flutter test test/known_defects --run-skipped --tags known-defect
 
 # The coverage floor
-cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90
+cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
 
 # Once per checkout: create the Gradle wrapper, which is not committed
 cd bluey_android/android && gradle wrapper --gradle-version 8.14

@@ -7,3 +7,4 @@ export 'src/gates/known_defect_run.dart';
 export 'src/gates/line_coverage.dart';
 export 'src/gates/list_file.dart';
 export 'src/gates/list_growth.dart';
+export 'src/gates/unreported_files.dart';
