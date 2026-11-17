@@ -144,7 +144,16 @@ Raised:
   oversized: lib/src/bluey.dart raised from 1002 to 9999 lines
 ```
 
-The gate is strict: an entry rewritten because the file it points at moved reads as new. Whether such a rewrite may be allowed is still to be decided.
+`boundaries` is the one list the gate counts another way (`--by-context boundaries`). Its debt is that a source file depends on another context, not on one path in it: `lib/src/gatt_client/gatt.dart -> lib/src/connection/value_objects/attribute_handle.dart` is the debt "`gatt.dart` depends on Connection". So the gate counts, for each source file and each target context, the entries at the base and at the head, and a count may fall but never rise. A target's context is its folder under `lib/src/`, and a placed target's is the folder under `lib/src/features/`, so `lib/src/connection/` and `lib/src/features/connection/` are the one context. This is a real run, from `bluey/` against `HEAD`, after the entry above was rewritten to `lib/src/features/connection/domain/attribute_handle.dart` (which holds) and two lines were copied in for `lib/src/peer/peer_remote_service_view.dart`, which already depended on `gatt_client` once and on `discovery` not at all:
+
+```
+../bluey/test/architecture/known_violations.dart: 2 entries added, 0 counts raised. A list only shrinks: fix the code and take the line out of the list.
+Added:
+  boundaries: lib/src/peer/peer_remote_service_view.dart into gatt_client, 2 entries where the base had 1: lib/src/peer/peer_remote_service_view.dart -> lib/src/gatt_client/value_objects.dart
+  boundaries: lib/src/peer/peer_remote_service_view.dart into discovery, 1 entry where the base had 0: lib/src/peer/peer_remote_service_view.dart -> lib/src/discovery/device_address.dart
+```
+
+Every other list stays strict, entry by entry. The gate knows nothing of git renames: a source file that moved is a new source file, so its entries read as added.
 
 When a list and the code differ, the test prints up to three parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
 
@@ -154,7 +163,7 @@ On the list, but its file changed:
   lib/src/bluey.dart shrank from 1040 to 1002 lines: lower its entry to 1002
 ```
 
-- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a new file over its ceiling. Change the code until the line goes away. Never copy the line into the list.
+- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a new file over its ceiling. Change the code until the line goes away. Never copy the line into the list, with one exception: a `boundaries` entry whose target moved, within its context or out of a legacy folder into its `features/` home, is the same debt, and the entry is rewritten to the new path. A moved or split target passes as long as the source file is left with no more entries into that context than it had (a source that now imports both halves of a split target has one entry more, and fails); a dependency on a context the file did not depend on, or one more entry into a context it did, is new debt. A target that lands in `shared/` is no boundary at all: its entry is deleted.
 - **On the list but no longer true** is debt paid: the file moved, was deleted or was fixed. Delete the entry.
 - **On the list, but its file changed** is a listed file whose length moved (the size rule reads its entry and the one it found as one file; the ratchet itself knows no rule's entries), and the line says which way. One that shrank ends `lower its entry to <count>`: rewrite the entry with that count. One that grew reads `grew from 990 to 1002 lines: shrink the file to 990 lines or fewer; never raise the entry`: shrink the file until the test passes with the entry as it is. A count is never raised. The heading's two figures each count such a file once.
 
@@ -247,7 +256,7 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android`, `bluey_ios`, `bluey/example` and `bluey_ios/example`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards), Tests (bluey/example), Tests (bluey_ios/example) |
 | The `bluey` suite and its coverage floor | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib` | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
-| No list grew | `git fetch origin main && cd bluey && dart run bluey_guards:list_growth origin/main ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart` | Lists only shrink |
+| No list grew | `git fetch origin main && cd bluey && dart run bluey_guards:list_growth --by-context boundaries origin/main ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart` | Lists only shrink |
 | The public API dump | `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api` | Public API |
 | The Kotlin unit tests | `cd bluey_android/android && FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")" ./gradlew test` | Kotlin tests |
 | The known defects | below | Known defects |

@@ -10,6 +10,9 @@ String _lists(List<String> unplaced) =>
     '${[for (final entry in unplaced) "  '$entry',\n"].join()}'
     '];\n';
 
+String _boundaries(String target) =>
+    "const boundaries = <String>['lib/src/peer/peer.dart -> $target'];\n";
+
 void main() {
   group('the list_growth command', () {
     late Directory compiled;
@@ -139,6 +142,37 @@ void main() {
       expect(result.stdout, contains('not at the base'));
     });
 
+    test('counts a list named by --by-context per source file and target '
+        'context', () async {
+      // arrange
+      await git(['checkout', '-q', 'main']);
+      write(_listFile, _boundaries('lib/src/connection/a.dart'));
+      await commit('main holds a boundary');
+      await git(['checkout', '-q', 'change']);
+      await git(['merge', '-q', 'main']);
+      write(
+        _listFile,
+        _boundaries('lib/src/features/connection/domain/a.dart'),
+      );
+
+      // act
+      final strict = await run(['main', _listFile]);
+      final byContext = await run([
+        '--by-context',
+        'boundaries',
+        'main',
+        _listFile,
+      ]);
+
+      // assert
+      expect(strict.exitCode, 1);
+      expect(
+        byContext.exitCode,
+        0,
+        reason: '${byContext.stdout}${byContext.stderr}',
+      );
+    });
+
     test('exits 1 when the base cannot be found', () async {
       // act
       final result = await run(['no-such-ref', _listFile]);
@@ -157,7 +191,8 @@ void main() {
       expect(
         result.stderr,
         contains(
-          'Usage: dart run bluey_guards:list_growth <base> <list file>...',
+          'Usage: dart run bluey_guards:list_growth [--by-context <list>]... '
+          '<base> <list file>...',
         ),
       );
     });

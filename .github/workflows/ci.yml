@@ -102,7 +102,7 @@ jobs:
         working-directory: bluey
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: dart run bluey_guards:list_growth "$BASE" ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart
+        run: dart run bluey_guards:list_growth --by-context boundaries "$BASE" ../bluey*/test/architecture/known_violations.dart ../bluey*/test/known_defects/roster.dart
 
   public-api:
     name: Public API

@@ -19,10 +19,18 @@ final class ListGrowth {
   /// rewritten with a lower count, since a file that shrank must lower its
   /// entry. A file the base did not have holds whatever it lists: it is the
   /// first statement of what its rules find.
+  ///
+  /// A list named in [byContext] holds `<source> -> <target>` entries whose
+  /// debt is that the source depends on the target's context, not on its
+  /// path, so it is counted per source and context instead: an entry may be
+  /// rewritten when its target moved within its context, while an entry into
+  /// a context the source did not depend on, or one more into a context it
+  /// did, is added debt.
   factory ListGrowth.between({
     required String path,
     required Map<String, List<String>>? base,
     required Map<String, List<String>> head,
+    Set<String> byContext = const {},
   }) {
     if (base == null) {
       return ListGrowth._(path: path, isNew: true, added: [], raised: []);
@@ -31,6 +39,10 @@ final class ListGrowth {
     final raised = <String>[];
     head.forEach((list, entries) {
       final before = base[list] ?? const [];
+      if (byContext.contains(list)) {
+        added.addAll(_ContextDebt.grown(list, before: before, after: entries));
+        return;
+      }
       final counted = {
         for (final entry in before.map(_CountEntry.parse).nonNulls)
           entry.path: entry.lines,
@@ -112,6 +124,45 @@ final class _CountEntry {
 
   final String path;
   final int lines;
+}
+
+/// The entries of one source file into one context, keyed so a target that
+/// moved from a legacy folder (`lib/src/connection/`) to its placed home
+/// (`lib/src/features/connection/`) stays the same debt.
+final class _ContextDebt {
+  static final _shape = RegExp(r'^(.+) -> lib/src/(?:features/)?([^/]+)/');
+
+  /// Each source and context the [after] entries reach more often than the
+  /// [before] entries did, with the entries the base did not hold.
+  static List<String> grown(
+    String list, {
+    required List<String> before,
+    required List<String> after,
+  }) {
+    final was = _byKey(before);
+    return [
+      for (final MapEntry(key: key, value: entries) in _byKey(after).entries)
+        if (entries.length > (was[key]?.length ?? 0))
+          '$list: ${key.$1} into ${key.$2}, '
+              '${_count(entries.length, 'entry', 'entries')} where the base '
+              'had ${was[key]?.length ?? 0}: '
+              '${entries.where((entry) => !before.contains(entry)).join('; ')}',
+    ];
+  }
+
+  /// The entries grouped by source and context, a repeat counted once; an
+  /// entry of another shape is its own key, so it is held strictly.
+  static Map<(String, String), List<String>> _byKey(List<String> entries) {
+    final grouped = <(String, String), List<String>>{};
+    for (final entry in entries.toSet()) {
+      final key = switch (_shape.firstMatch(entry)?.groups([1, 2])) {
+        [final source?, final context?] => (source, context),
+        _ => (entry, entry),
+      };
+      grouped.putIfAbsent(key, () => []).add(entry);
+    }
+    return grouped;
+  }
 }
 
 String _count(int count, String one, String many) =>

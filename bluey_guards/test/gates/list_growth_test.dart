@@ -4,6 +4,163 @@ import 'package:test/test.dart';
 const _path = 'bluey/test/architecture/known_violations.dart';
 
 void main() {
+  group('a list counted per source file and target context', () {
+    const byContext = {'boundaries'};
+
+    test('holds when an entry is rewritten because its target moved', () {
+      // arrange
+      final base = {
+        'boundaries': [
+          'lib/src/gatt_client/gatt.dart -> '
+              'lib/src/connection/value_objects/attribute_handle.dart',
+        ],
+      };
+      final head = {
+        'boundaries': [
+          'lib/src/gatt_client/gatt.dart -> '
+              'lib/src/features/connection/domain/attribute_handle.dart',
+        ],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        byContext: byContext,
+      );
+
+      // assert
+      expect(growth.holds, isTrue, reason: growth.describe());
+    });
+
+    test('names an entry into a context its file did not depend on', () {
+      // arrange
+      final base = {
+        'boundaries': ['lib/src/peer/peer.dart -> lib/src/connection/a.dart'],
+      };
+      final head = {
+        'boundaries': [
+          'lib/src/peer/peer.dart -> lib/src/connection/a.dart',
+          'lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart',
+        ],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        byContext: byContext,
+      );
+
+      // assert
+      expect(growth.added, [
+        'boundaries: lib/src/peer/peer.dart into gatt_client, 1 entry where '
+            'the base had 0: '
+            'lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart',
+      ]);
+    });
+
+    test('names a second entry into a context its file depended on', () {
+      // arrange
+      final base = {
+        'boundaries': ['lib/src/peer/peer.dart -> lib/src/connection/a.dart'],
+      };
+      final head = {
+        'boundaries': [
+          'lib/src/peer/peer.dart -> lib/src/connection/a.dart',
+          'lib/src/peer/peer.dart -> lib/src/features/connection/domain/b.dart',
+        ],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        byContext: byContext,
+      );
+
+      // assert
+      expect(growth.added, [
+        'boundaries: lib/src/peer/peer.dart into connection, 2 entries where '
+            'the base had 1: '
+            'lib/src/peer/peer.dart -> lib/src/features/connection/domain/b.dart',
+      ]);
+    });
+
+    test('holds when an entry drops because its target moved into shared', () {
+      // arrange
+      final base = {
+        'boundaries': [
+          'lib/src/gatt_server/server.dart -> lib/src/peer/server_id.dart',
+        ],
+      };
+      final head = {'boundaries': <String>[]};
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        byContext: byContext,
+      );
+
+      // assert
+      expect(growth.holds, isTrue, reason: growth.describe());
+    });
+
+    test(
+      'names an entry into shared as a context the file did not depend on',
+      () {
+        // arrange
+        final base = {
+          'boundaries': [
+            'lib/src/gatt_server/server.dart -> lib/src/peer/server_id.dart',
+          ],
+        };
+        final head = {
+          'boundaries': [
+            'lib/src/gatt_server/server.dart -> lib/src/shared/server_id.dart',
+          ],
+        };
+
+        // act
+        final growth = ListGrowth.between(
+          path: _path,
+          base: base,
+          head: head,
+          byContext: byContext,
+        );
+
+        // assert
+        expect(growth.holds, isFalse);
+      },
+    );
+
+    test('keeps every other list strict', () {
+      // arrange
+      final base = {
+        'layers': ['lib/src/a/x.dart -> lib/src/b/y.dart'],
+      };
+      final head = {
+        'layers': ['lib/src/a/x.dart -> lib/src/b/z.dart'],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        byContext: byContext,
+      );
+
+      // assert
+      expect(growth.added, ['layers: lib/src/a/x.dart -> lib/src/b/z.dart']);
+    });
+  });
+
   group('a list file that existed at the base', () {
     test('holds when every list kept or lost entries', () {
       // arrange
