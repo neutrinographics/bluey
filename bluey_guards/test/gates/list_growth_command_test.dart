@@ -1,0 +1,165 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart';
+
+const _listFile = 'pkg/test/architecture/known_violations.dart';
+
+String _lists(List<String> unplaced) =>
+    'const unplaced = <String>[\n'
+    '${[for (final entry in unplaced) "  '$entry',\n"].join()}'
+    '];\n';
+
+void main() {
+  group('the list_growth command', () {
+    late Directory compiled;
+    late String command;
+    late Directory repository;
+
+    Future<ProcessResult> git(List<String> arguments) =>
+        Process.run('git', arguments, workingDirectory: repository.path);
+
+    Future<ProcessResult> run(List<String> arguments, {String? from}) =>
+        Process.run(Platform.resolvedExecutable, [
+          command,
+          ...arguments,
+        ], workingDirectory: from ?? repository.path);
+
+    void write(String path, String content) {
+      File(p.join(repository.path, path))
+        ..createSync(recursive: true)
+        ..writeAsStringSync(content);
+    }
+
+    Future<void> commit(String message) async {
+      await git(['add', '-A']);
+      await git(['commit', '-q', '-m', message]);
+    }
+
+    setUpAll(() async {
+      compiled = Directory.systemTemp.createTempSync('list_growth_command_');
+      command = '${compiled.path}/list_growth.dill';
+      final compile = await Process.run(Platform.resolvedExecutable, [
+        'compile',
+        'kernel',
+        'bin/list_growth.dart',
+        '-o',
+        command,
+      ]);
+      expect(compile.exitCode, 0, reason: '${compile.stdout}${compile.stderr}');
+    });
+
+    tearDownAll(() => compiled.deleteSync(recursive: true));
+
+    setUp(() async {
+      repository = Directory.systemTemp.createTempSync('list_growth_');
+      await git(['init', '-q', '-b', 'main']);
+      await git(['config', 'user.email', 'guard@example.com']);
+      await git(['config', 'user.name', 'Guard']);
+      write(_listFile, _lists(['lib/a.dart -> unplaced']));
+      await commit('base');
+      await git(['checkout', '-q', '-b', 'change']);
+    });
+
+    tearDown(() => repository.deleteSync(recursive: true));
+
+    test('exits 0 when a list shrank since the merge base', () async {
+      // arrange
+      write(_listFile, _lists([]));
+      await commit('fix a');
+
+      // act
+      final result = await run(['main', _listFile]);
+
+      // assert
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+      expect(result.stdout, '$_listFile: no list grew.\n');
+    });
+
+    test('exits 1 naming an entry added since the merge base', () async {
+      // arrange
+      write(
+        _listFile,
+        _lists(['lib/a.dart -> unplaced', 'lib/b.dart -> unplaced']),
+      );
+
+      // act
+      final result = await run(['main', _listFile]);
+
+      // assert
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('  unplaced: lib/b.dart -> unplaced\n'));
+    });
+
+    test(
+      'compares with the merge base, not with the base as it is now',
+      () async {
+        // arrange
+        await git(['checkout', '-q', 'main']);
+        write(_listFile, _lists([]));
+        await commit('main fixes a');
+        await git(['checkout', '-q', 'change']);
+
+        // act
+        final result = await run(['main', _listFile]);
+
+        // assert
+        expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+      },
+    );
+
+    test('reads a path relative to the folder it runs in', () async {
+      // arrange
+      write('pkg/pubspec.yaml', 'name: pkg\n');
+      write(
+        _listFile,
+        _lists(['lib/a.dart -> unplaced', 'lib/c.dart -> unplaced']),
+      );
+
+      // act
+      final result = await run([
+        'main',
+        'test/architecture/known_violations.dart',
+      ], from: p.join(repository.path, 'pkg'));
+
+      // assert
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('  unplaced: lib/c.dart -> unplaced\n'));
+    });
+
+    test('holds a list file the merge base did not have', () async {
+      // arrange
+      write('other/known_violations.dart', _lists(['lib/x.dart -> unplaced']));
+
+      // act
+      final result = await run(['main', 'other/known_violations.dart']);
+
+      // assert
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+      expect(result.stdout, contains('not at the base'));
+    });
+
+    test('exits 1 when the base cannot be found', () async {
+      // act
+      final result = await run(['no-such-ref', _listFile]);
+
+      // assert
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('no-such-ref'));
+    });
+
+    test('exits 64 with the usage line when no list file is named', () async {
+      // act
+      final result = await run(['main']);
+
+      // assert
+      expect(result.exitCode, 64);
+      expect(
+        result.stderr,
+        contains(
+          'Usage: dart run bluey_guards:list_growth <base> <list file>...',
+        ),
+      );
+    });
+  });
+}

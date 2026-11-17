@@ -75,6 +75,22 @@ jobs:
             exit 1
           fi
 
+  list-growth:
+    name: Lists only shrink
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      # A pull request is compared with where it left its base branch; a
+      # push to main with the commit main stood at before it.
+      - name: No list grew since the change left its base
+        working-directory: bluey
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: dart run bluey_guards:list_growth "$BASE" ../bluey*/test/architecture/known_violations.dart
+
   public-api:
     name: Public API
     runs-on: ubuntu-latest

@@ -134,6 +134,18 @@ An entry is one line, `path -> detail`, with the path relative to the package ro
 
 A list only shrinks. Nothing is added to it and no count is raised: when a rule finds something new, the code is fixed. An entry leaves in the commit that fixes it. A size entry is rewritten with the lower count when its file shrinks, so the file can never grow back to its old ceiling.
 
+The architecture test can only see that a list matches the code; a line copied into the list would make it match again. So CI's Lists only shrink job compares each list file with the commit where the change left its base (`git merge-base`), a pull request's base branch or, on a push to `main`, the commit `main` stood at before. Every entry at the head must be in the list of the same name at the base, and a size entry may only carry a lower count. A list the base did not have counts as empty, so renaming a list carries nothing in; a list file the base did not have is the first statement of what its rules find, and holds. The gate fails naming each entry added and each count raised. This is a real run, from `bluey/`, after a line was copied into `boundaries` and the entry of `lib/src/bluey.dart` was raised:
+
+```
+../bluey/test/architecture/known_violations.dart: 1 entry added, 1 count raised. A list only shrinks: fix the code and take the line out of the list.
+Added:
+  boundaries: lib/src/peer/peer.dart -> lib/src/gatt_client/gatt.dart
+Raised:
+  oversized: lib/src/bluey.dart raised from 1002 to 9999 lines
+```
+
+The gate is strict: an entry rewritten because the file it points at moved reads as new. Whether such a rewrite may be allowed is still to be decided.
+
 When a list and the code differ, the test prints up to three parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
 
 ```
@@ -233,10 +245,13 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android` and `bluey_ios`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards) |
 | The `bluey` suite and its coverage floor | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90` | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
+| No list grew | `git fetch origin main && cd bluey && dart run bluey_guards:list_growth origin/main ../bluey*/test/architecture/known_violations.dart` | Lists only shrink |
 | The public API dump | `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api` | Public API |
 | The Kotlin unit tests | `cd bluey_android/android && FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")" ./gradlew test` | Kotlin tests |
 | The known defects | below | Known defects |
 | The XCTest suite | `cd bluey_ios/example && flutter build ios --config-only && (cd ios && pod install)`, then `xcodebuild test` in `bluey_ios/example/ios` (CLAUDE.md has the whole command) | XCTest, in `ios.yml`: on a pull request that touches `bluey_ios/`, `ios.yml` or the setup action, every night, and on demand |
+
+Branch protection on `main` requires every job of `ci.yml`: Analyze; Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios) and Tests (bluey_guards); Tests and coverage (bluey); Architecture; Lists only shrink; Public API; Kotlin tests; Known defects. XCTest is not required, since `ios.yml` runs only for the pull requests that touch iOS.
 
 The known defects, run as the job runs them:
 
