@@ -42,14 +42,14 @@ final class ListGrowth {
     }
     final added = <String>[];
     final raised = <String>[];
-    head.forEach((list, entries) {
+    head.forEach((list, listed) {
       final before = (base[list] ?? const []).toSet();
       final weigh = weights[list] ?? _itself;
       final owed = _owed(before, weigh);
-      for (final MapEntry(key: debt, value: (:amount, :entries))
-          in _owed(entries.toSet(), weigh).entries) {
+      for (final MapEntry(key: debt, value: (:amount, entries: owing))
+          in _owed(listed.toSet(), weigh).entries) {
         final was = owed[debt]?.amount;
-        final fresh = entries.where((entry) => !before.contains(entry));
+        final fresh = owing.where((entry) => !before.contains(entry));
         if (was == null) {
           added.addAll([for (final entry in fresh) '$list: $entry']);
         } else if (amount > was) {
