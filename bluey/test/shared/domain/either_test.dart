@@ -68,13 +68,13 @@ void main() {
     });
   });
 
-  group('then', () {
+  group('flatMap', () {
     test('hands a right value to the next step', () {
       // arrange
       final either = _answers(1);
 
       // act
-      final result = either.then((value) => _answers(value + 1));
+      final result = either.flatMap((value) => _answers(value + 1));
 
       // assert
       expect(result, const Right<_Refused, int>(2));
@@ -85,7 +85,7 @@ void main() {
       var ran = false;
 
       // act
-      final result = _refuses().then((value) {
+      final result = _refuses().flatMap((value) {
         ran = true;
         return _answers(value);
       });
@@ -102,7 +102,7 @@ void main() {
         final Either<Failure, int> widened = _answers(1);
 
         // act
-        final result = widened.then<String>((_) => const Left(_Lost()));
+        final result = widened.flatMap<String>((_) => const Left(_Lost()));
 
         // assert
         expect(_read(result), 'lost');

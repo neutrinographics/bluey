@@ -57,10 +57,11 @@ final class Right<L, R> extends Either<L, R> {
 /// by the receiver's left type, so a caller holding an `Either<ConnectionFailure,
 /// T>` as an `Either<Failure, T>` would fail at run time when its next step
 /// answered a different failure.
-extension EitherThen<L, R> on Either<L, R> {
+extension EitherFlatMap<L, R> on Either<L, R> {
   /// Runs [next] on a success and stops at the first failure.
-  Either<L, T> then<T>(Either<L, T> Function(R right) next) => switch (this) {
-    Left<L, R>(:final value) => Left<L, T>(value),
-    Right<L, R>(:final value) => next(value),
-  };
+  Either<L, T> flatMap<T>(Either<L, T> Function(R right) next) =>
+      switch (this) {
+        Left<L, R>(:final value) => Left<L, T>(value),
+        Right<L, R>(:final value) => next(value),
+      };
 }

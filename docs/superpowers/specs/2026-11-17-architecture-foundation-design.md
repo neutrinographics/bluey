@@ -183,7 +183,7 @@ Future<Connection> connect(Device device, {Duration? timeout}) async =>
         .fold(throwAsBlueyException, _connections.wrap);
 ```
 
-- **`Either`** is Bluey's own sealed type in `shared/domain`, with `Left`, `Right`, `then`, `map` and `fold`, mirroring the kernel's. No package is added.
+- **`Either`** is Bluey's own sealed type in `shared/domain`, with `Left`, `Right`, `flatMap`, `map` and `fold`. The kernel calls its chaining step `then`; Bluey names it `flatMap`, the name Dart readers know, since `then` reads as `Future.then` beside the futures around it. No package is added.
 - **`Failure`** is an interface in `shared/domain`. Each context declares its own sealed family (`ConnectionFailure`, `ScanFailure`) in its `domain/`, because Dart seals a family within one file. A failure carries typed fields, never a map.
 - **The translator** in `api/failure_translation.dart` switches exhaustively over each family, so a new failure with no public exception fails to compile.
 - **Adapters** catch everything `BlueyPlatform` throws and answer a failure. A throw they do not recognise becomes an `UnexpectedPlatformFailure` that carries the cause; it is never swallowed.

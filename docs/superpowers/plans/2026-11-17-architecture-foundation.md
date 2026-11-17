@@ -120,7 +120,7 @@ bluey_guards/
 
 | File | Change | Responsibility |
 | --- | --- | --- |
-| `bluey/lib/src/shared/domain/either.dart` | New | `Either`, `Left`, `Right` and `then` |
+| `bluey/lib/src/shared/domain/either.dart` | New | `Either`, `Left`, `Right` and `flatMap` |
 | `bluey/lib/src/shared/domain/failure.dart` | New | `Failure` |
 | `bluey/lib/src/shared/domain/analysis_options.yaml` | New | The two future lints for this folder |
 | `bluey/test/shared/domain/either_test.dart` | New | Mirrors `either.dart` |
@@ -1475,8 +1475,8 @@ sealed class Either<L, R> {
 final class Left<L, R> extends Either<L, R> { const Left(this.value); final L value; }
 final class Right<L, R> extends Either<L, R> { const Right(this.value); final R value; }
 
-extension EitherThen<L, R> on Either<L, R> {
-  Either<L, T> then<T>(Either<L, T> Function(R right) next);
+extension EitherFlatMap<L, R> on Either<L, R> {
+  Either<L, T> flatMap<T>(Either<L, T> Function(R right) next);
 }
 
 // failure.dart
@@ -1485,7 +1485,7 @@ abstract interface class Failure {
 }
 ```
 
-`Left` and `Right` are equal by value whatever their type arguments, and print as `Left(<value>)` and `Right(<value>)`. `then` is an extension, not a member, for a reason the test below pins: a unit that answers `Either<ConnectionFailure, T>` is handed to a caller as `Either<Failure, T>`, and a member `then` would fail at run time when that caller's next step answers a different failure.
+`Left` and `Right` are equal by value whatever their type arguments, and print as `Left(<value>)` and `Right(<value>)`. `flatMap` is an extension, not a member, for a reason the test below pins: a unit that answers `Either<ConnectionFailure, T>` is handed to a caller as `Either<Failure, T>`, and a member `flatMap` would fail at run time when that caller's next step answers a different failure.
 
 - [ ] **Step 1: Write the failing test.** `bluey/test/shared/domain/either_test.dart`:
 
@@ -1523,12 +1523,12 @@ void main() {
 
   group('then', () {
     test('hands a right value to the next step', () {
-      expect(_answers(1).then((value) => _answers(value + 1)), const Right<_Refused, int>(2));
+      expect(_answers(1).flatMap((value) => _answers(value + 1)), const Right<_Refused, int>(2));
     });
 
     test('does not run the next step after a left', () {
       var ran = false;
-      final result = _refuses().then((value) {
+      final result = _refuses().flatMap((value) {
         ran = true;
         return _answers(value);
       });
@@ -1538,7 +1538,7 @@ void main() {
 
     test('lets the next step answer another failure once the first is seen as a Failure', () {
       final Either<Failure, int> widened = _answers(1);
-      final result = widened.then<String>((_) => const Left(_Lost()));
+      final result = widened.flatMap<String>((_) => const Left(_Lost()));
       expect(_read(result), 'lost');
     });
   });
@@ -1563,7 +1563,7 @@ void main() {
 
 - [ ] **Step 2: Run it.** Run: `cd bluey && flutter test test/shared/domain/either_test.dart`. Expected: FAIL to load, `either.dart` does not exist.
 
-- [ ] **Step 3: Implement `failure.dart` and `either.dart`** to the signatures above. `fold`, `map` and `then` each switch exhaustively over `Left` and `Right`. Neither file imports anything.
+- [ ] **Step 3: Implement `failure.dart` and `either.dart`** to the signatures above. `fold`, `map` and `flatMap` each switch exhaustively over `Left` and `Right`. Neither file imports anything.
 
 - [ ] **Step 4: Run the test.** Expected: PASS, ten tests.
 
@@ -2377,7 +2377,7 @@ The design is a proposal with its reasons and alternatives. The guide is what st
 | 3 | Layers | The layer table: what each layer holds and may name. Allowances accumulate from the inside out. A bridge names the other context's domain and application | Design, as amended by Rulings 4 and 6 |
 | 4 | The rules the build holds | One row per rule under the name its test prints (`placement`, `boundaries`, `framework placement`, `public exports`, `layers`, `throws`, `lint options`, `size of .dart files`): what it flags and where it is configured. Placed code never names unplaced code, except from `api/` | Task 5's table, Ruling 5 |
 | 5 | The lists | Where each package's lists are. The two parts of a failure message, quoted from a real run, and what to do for each. A list only shrinks: nothing is added, no count is raised. A size entry is rewritten with the lower count | New |
-| 6 | Failures as values | `Either` and `Failure`, what throws and what answers, the translator in `api/`, streams, parsed input, programming errors. Why `then` is an extension | Design, "Failures as values"; Task 7 |
+| 6 | Failures as values | `Either` and `Failure`, what throws and what answers, the translator in `api/`, streams, parsed input, programming errors. Why `flatMap` is an extension | Design, "Failures as values"; Task 7 |
 | 7 | State and ports | The three state rules with the findings each answers. Ports, adapters, bridges, the composition root. Contract suites | Design, "State and ports" |
 | 8 | Native packages | The pure core and its adapter in Kotlin and Swift. The 400-line ceiling | Design, "Native packages and tests" |
 | 9 | Tests | A test mirrors its source's path. `group`, then arrange, act, assert. In-memory doubles, no mocks. Known defects: the tag, the folder, and that a fix slice starts by moving its test into the mirrored tree as its red step | Design; Task 9 |
