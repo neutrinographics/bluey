@@ -74,11 +74,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: flutter test --coverage
+      - id: suite
+        run: flutter test --coverage
       - run: dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
       # The domain is held higher than the package. The pattern is quoted so
-      # the gate, not the shell, reads its star.
+      # the gate, not the shell, reads its star. It runs when the package's
+      # floor failed too, so both floors report, but not after the suite
+      # failed, since then neither figure means anything.
       - name: The domain's coverage floor
+        if: ${{ !cancelled() && steps.suite.outcome == 'success' }}
         run: dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain
 
   architecture:
