@@ -46,10 +46,10 @@ void main() {
 
       // assert
       expect(found, [
-        '$_placed -> line 3: throw Gone',
-        '$_placed -> line 5: addError',
-        '$_placed -> line 6: rethrow',
-        '$_placed -> line 9: throw StateErrors',
+        '$_placed -> throw Gone, 1 time',
+        '$_placed -> addError, 1 time',
+        '$_placed -> rethrow, 1 time',
+        '$_placed -> throw StateErrors, 1 time',
       ]);
     });
 
@@ -72,10 +72,10 @@ void main() {
 
       // assert
       expect(found, [
-        '$_placed -> line 2: completeError',
-        '$_placed -> line 3: Future.error',
-        '$_placed -> line 4: Stream.error',
-        '$_placed -> line 5: throw e',
+        '$_placed -> completeError, 1 time',
+        '$_placed -> Future.error, 1 time',
+        '$_placed -> Stream.error, 1 time',
+        '$_placed -> throw e, 1 time',
       ]);
     });
   });
@@ -97,9 +97,93 @@ void main() {
 
         // assert
         expect(found, [
-          'lib/src/shared/domain/either.dart -> line 1: throw Gone',
+          'lib/src/shared/domain/either.dart -> throw Gone, 1 time',
         ]);
       },
     );
+  });
+
+  group('one entry per file and raise', () {
+    test('counts each raise of a file, in the order it first appears, and no '
+        'line', () {
+      // arrange
+      final files = tree({
+        _placed:
+            'void f() => throw Gone();\n'
+            'void g(dynamic s, Object e) => s.addError(e);\n'
+            'void h() => throw Gone();\n'
+            'void i() => throw Gone();\n',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        '$_placed -> throw Gone, 3 times',
+        '$_placed -> addError, 1 time',
+      ]);
+    });
+  });
+
+  group('the debt an entry records', () {
+    test('is its file and raise, weighed by the count', () {
+      // act
+      final debt = _rule.weigh('$_placed -> throw Gone, 3 times');
+
+      // assert
+      expect(debt, (debt: '$_placed -> throw Gone', amount: 3));
+    });
+
+    test('is the entry itself, once, for an entry of another shape', () {
+      // act
+      final debt = _rule.weigh('$_placed -> line 3: throw Gone');
+
+      // assert
+      expect(debt, (debt: '$_placed -> line 3: throw Gone', amount: 1));
+    });
+  });
+
+  group('a known entry and a found entry of one file and raise', () {
+    test('tells a raise that grew to go, never to raise its entry', () {
+      // act
+      final change = _rule.change(
+        known: '$_placed -> throw Gone, 2 times',
+        found: '$_placed -> throw Gone, 3 times',
+      );
+
+      // assert
+      expect(
+        change,
+        '$_placed raises throw Gone 3 times, up from 2: answer the new one as '
+        'a value; never raise the entry',
+      );
+    });
+
+    test('tells a raise that fell to lower its entry', () {
+      // act
+      final change = _rule.change(
+        known: '$_placed -> throw Gone, 2 times',
+        found: '$_placed -> throw Gone, 1 time',
+      );
+
+      // assert
+      expect(
+        change,
+        '$_placed raises throw Gone 1 time, down from 2: lower its entry to '
+        '1 time',
+      );
+    });
+
+    test('is no change for two raises of one file', () {
+      // act
+      final change = _rule.change(
+        known: '$_placed -> throw Gone, 2 times',
+        found: '$_placed -> rethrow, 2 times',
+      );
+
+      // assert
+      expect(change, isNull);
+    });
   });
 }

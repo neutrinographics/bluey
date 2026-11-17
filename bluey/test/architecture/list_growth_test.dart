@@ -22,6 +22,21 @@ ListGrowth _growthAfter(
   );
 }
 
+/// Bluey's lists as the file holds them today, with the throws list
+/// [atBase] at the base and [atHead] at the head, since the list is empty
+/// today and a change to it needs an entry at the base.
+ListGrowth _throwsGrowth(List<String> atBase, List<String> atHead) {
+  final lists = readKnownViolations();
+  return ListGrowth.between(
+    path: _path,
+    base: {...lists, 'throws': atBase},
+    head: {...lists, 'throws': atHead},
+    weights: weightsOf(blueyRules),
+  );
+}
+
+const _raising = 'lib/src/features/connection/application/connect_device.dart';
+
 void main() {
   group("Bluey's lists judged by its rules' weights", () {
     test('a boundaries entry whose target moved to its place in the target '
@@ -115,6 +130,31 @@ void main() {
 
       // assert
       expect(growth.holds, isTrue, reason: growth.describe());
+    });
+
+    test('a throws entry whose count fell holds', () {
+      // act
+      final growth = _throwsGrowth(
+        ['$_raising -> throw Gone, 2 times'],
+        ['$_raising -> throw Gone, 1 time'],
+      );
+
+      // assert
+      expect(growth.holds, isTrue, reason: growth.describe());
+    });
+
+    test('a throws entry whose count rose grows the list', () {
+      // act
+      final growth = _throwsGrowth(
+        ['$_raising -> throw Gone, 2 times'],
+        ['$_raising -> throw Gone, 3 times'],
+      );
+
+      // assert
+      expect(growth.raised, [
+        'throws: $_raising -> throw Gone, 2 at the base and 3 at the head: '
+            '$_raising -> throw Gone, 3 times',
+      ]);
     });
   });
 }

@@ -803,7 +803,7 @@ What each rule flags:
 | `FrameworkRule`, `framework placement` | A file under `lib/src` that names a library within one of `frameworks`, unless its layer is `infrastructure` or it is one of `compositionRoots` | The URI |
 | `PublicExportsRule`, `public exports` | A public library that exports anything but a file of its own package under `lib/src/` | The URI |
 | `LayerRule`, `layers` | See below | The target's path, or the URI |
-| `ThrowsRule`, `throws` | In an `InFeature` or `InShared` file, a raise that is not a `throw` of one of `programmingErrors` (the name exactly, or followed by `.`) | `line N: <what>` |
+| `ThrowsRule`, `throws` | In an `InFeature` or `InShared` file, a raise that is not a `throw` of one of `programmingErrors` (the name exactly, or followed by `.`) | `<what>, N times` (`1 time` for one), one entry per file and raise in the order each first appears; the rule weighs it as the debt `<file> -> <what>` owed N times |
 | `SizeRule`, `size of <extension> files` | A file with that extension whose `lineCount` exceeds `limit` | `N lines` |
 | `LintOptionsRule`, `lint options` | A root that holds a Dart file and has no `analysis_options.yaml` directly in it; or such an options file with no uncommented line `- <lint>` for one of `lints` | `no analysis_options.yaml` on the root's path; `does not turn on <lint>` on the options file's path |
 
@@ -1192,10 +1192,10 @@ test('placed code may not throw a failure, rethrow or add an error to a stream',
         '    sink.addError(e);\n    rethrow;\n  }\n}\nvoid g() => throw StateErrors();\n',
   }));
   expect(found, [
-    '$_placed -> line 3: throw Gone',
-    '$_placed -> line 5: addError',
-    '$_placed -> line 6: rethrow',
-    '$_placed -> line 9: throw StateErrors',
+    '$_placed -> throw Gone, 1 time',
+    '$_placed -> addError, 1 time',
+    '$_placed -> rethrow, 1 time',
+    '$_placed -> throw StateErrors, 1 time',
   ]);
 });
 
@@ -1205,7 +1205,7 @@ test('the kernel is held to it, and the edge and unplaced code are not', () {
     'lib/src/connection/a.dart': 'void f() {\n  try {} catch (e) {\n    rethrow;\n  }\n}\n',
     'lib/src/shared/domain/either.dart': 'void f() => throw Gone();',
   }));
-  expect(found, ['lib/src/shared/domain/either.dart -> line 1: throw Gone']);
+  expect(found, ['lib/src/shared/domain/either.dart -> throw Gone, 1 time']);
 });
 ```
 

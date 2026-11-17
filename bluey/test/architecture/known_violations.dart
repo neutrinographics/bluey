@@ -130,7 +130,9 @@ const publicExports = <String>[
 /// The placed files that point outward.
 const layers = <String>[];
 
-/// The placed files that raise anything but a programming error.
+/// The placed files that raise anything but a programming error, each
+/// entry a file and a raise with how often the file makes it, which may
+/// fall and never rise.
 const throws = <String>[];
 
 /// The roots of new code whose options file leaves a required lint off.
