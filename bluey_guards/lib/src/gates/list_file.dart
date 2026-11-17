@@ -58,7 +58,12 @@ List<String> _listOf(VariableDeclaration variable) {
   );
 }
 
-String _firstLine(AstNode node) => node.toSource().split('\n').first;
+/// The start of [node] as written, cut short, so a refusal stays one line a
+/// reader can take in however long the list is.
+String _firstLine(AstNode node) {
+  final source = node.toSource().split('\n').first;
+  return source.length <= 60 ? source : '${source.substring(0, 60)}...';
+}
 
 String _entryOf(VariableDeclaration list, CollectionElement element) {
   if (element is StringLiteral) {

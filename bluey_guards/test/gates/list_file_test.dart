@@ -177,4 +177,24 @@ class Boundaries {}
       expect(read, throwsA(isA<ListFileRefusal>()));
     });
   });
+
+  test('names a refused list in one short line, however long the list', () {
+    // arrange
+    final entries = [for (var i = 0; i < 50; i++) "'lib/a$i.dart -> unplaced'"];
+    final source = 'const unplaced = <String>[${entries.join(', ')}].toList();';
+
+    // act
+    String refusal() {
+      try {
+        readLists(source);
+      } on ListFileRefusal catch (refusal) {
+        return refusal.message;
+      }
+      return '';
+    }
+
+    // assert
+    expect(refusal().length, lessThan(160));
+    expect(refusal(), startsWith('The list unplaced is not a list literal'));
+  });
 }
