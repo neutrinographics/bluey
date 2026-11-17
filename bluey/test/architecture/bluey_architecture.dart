@@ -6,7 +6,6 @@ import 'known_violations.dart';
 
 const _package = 'bluey';
 const _compositionRoot = 'lib/src/api/bluey.dart';
-const _compositionRootToday = 'lib/src/bluey.dart';
 
 /// The package's library files and options files, read from the package root
 /// a test runs in, so every rule judges the same snapshot.
@@ -38,7 +37,7 @@ final Map<ArchitectureRule, List<String>> rulesAndKnownViolations = {
   FrameworkRule(
     package: _package,
     frameworks: const {'package:flutter', 'package:bluey_platform_interface'},
-    compositionRoots: const {_compositionRoot, _compositionRootToday},
+    compositionRoots: const {_compositionRoot},
   ): frameworkPlacement,
   PublicExportsRule(package: _package): publicExports,
   LayerRule(

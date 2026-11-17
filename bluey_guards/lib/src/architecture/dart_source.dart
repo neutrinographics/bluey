@@ -63,8 +63,9 @@ final class DartSource {
   /// own surface.
   final List<String> exports;
 
-  /// Every `throw`, `rethrow`, `addError` call and `addError` tear-off in
-  /// the file, in source order: the places an error leaves it.
+  /// Every `throw`, `rethrow`, `Error.throwWithStackTrace`, `Future.error`
+  /// and `Stream.error`, and every `addError` and `completeError` call and
+  /// tear-off in the file, in source order: the places an error leaves it.
   final List<Raise> raises;
 
   @override
@@ -81,7 +82,8 @@ final class Raise {
   final int line;
 
   /// What is raised: `throw StateError`, `throw ArgumentError.value`,
-  /// `throw e`, `rethrow` or `addError`.
+  /// `throw e`, `rethrow`, `addError`, `completeError`, `Future.error` or
+  /// `Stream.error`.
   final String what;
 
   @override
@@ -122,12 +124,32 @@ final class _RaiseFinder extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (node.methodName.name == 'addError') {
-      raises.add(
-        Raise(line: _lineOf(node.methodName.offset), what: 'addError'),
-      );
+    final what = _raisedBy(node);
+    if (what != null) {
+      raises.add(Raise(line: _lineOf(node.methodName.offset), what: what));
     }
     super.visitMethodInvocation(node);
+  }
+
+  @override
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    final (type, constructor) = _typeAndConstructor(node.constructorName);
+    if (constructor == 'error' && _errorCreators.contains(type)) {
+      raises.add(Raise(line: _lineOf(node.offset), what: '$type.error'));
+    }
+    super.visitInstanceCreationExpression(node);
+  }
+
+  /// Unresolved, `new Future.error(e)` reads as the type `error` behind an
+  /// import prefix `Future`, since the parser cannot tell a prefix from a
+  /// class; with no constructor name, the prefix is read as the class.
+  (String, String?) _typeAndConstructor(ConstructorName name) {
+    final type = name.type;
+    final prefix = type.importPrefix;
+    if (name.name == null && prefix != null) {
+      return (prefix.name.lexeme, type.name.lexeme);
+    }
+    return (type.name.lexeme, name.name?.name);
   }
 
   /// A doc comment's references (`[StreamController.addError]`) parse as
@@ -135,27 +157,49 @@ final class _RaiseFinder extends RecursiveAstVisitor<void> {
   @override
   void visitComment(Comment node) {}
 
+  /// A tear-off of `addError` or `completeError` (`onError: c.addError`,
+  /// or a bare `onError: addError` inside a sink) forwards an error out of
+  /// the file just as a call does. A call's name is counted with the call,
+  /// and a named argument's label raises nothing, so neither is counted here.
   @override
-  void visitPrefixedIdentifier(PrefixedIdentifier node) {
-    _addErrorTearOff(node.identifier);
-    super.visitPrefixedIdentifier(node);
-  }
-
-  @override
-  void visitPropertyAccess(PropertyAccess node) {
-    _addErrorTearOff(node.propertyName);
-    super.visitPropertyAccess(node);
-  }
-
-  /// A tear-off of `addError` (`onError: controller.addError`) forwards an
-  /// error out of the file just as a call does. A call parses as a
-  /// [MethodInvocation], never as a property, so it is counted once.
-  void _addErrorTearOff(SimpleIdentifier name) {
-    if (name.name == 'addError') {
-      raises.add(Raise(line: _lineOf(name.offset), what: 'addError'));
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    final parent = node.parent;
+    final isCallName = parent is MethodInvocation && parent.methodName == node;
+    if (_forwarders.contains(node.name) && !isCallName && parent is! Label) {
+      raises.add(Raise(line: _lineOf(node.offset), what: node.name));
     }
+    super.visitSimpleIdentifier(node);
+  }
+
+  /// What a call raises: a forwarded error, an error future or stream made
+  /// with `Future.error` or `Stream.error`, or a throw through
+  /// `Error.throwWithStackTrace`, named as a `throw` of its first argument
+  /// so a programming error stays one.
+  String? _raisedBy(MethodInvocation node) {
+    final method = node.methodName.name;
+    if (_forwarders.contains(method)) return method;
+    final target = switch (node.target) {
+      SimpleIdentifier(:final name) => name,
+      PrefixedIdentifier(:final identifier) => identifier.name,
+      _ => null,
+    };
+    if (method == 'error' && _errorCreators.contains(target)) {
+      return '$target.error';
+    }
+    if (method == 'throwWithStackTrace' && target == 'Error') {
+      final arguments = node.argumentList.arguments;
+      return arguments.isEmpty ? 'throw' : 'throw ${_thrown(arguments.first)}';
+    }
+    return null;
   }
 }
+
+/// The members that hand an error on to whoever listens or awaits.
+const _forwarders = {'addError', 'completeError'};
+
+/// The classes whose `error` constructor makes a future or a stream that
+/// fails.
+const _errorCreators = {'Future', 'Stream'};
 
 /// The name of what a `throw` raises: its expression up to the first `(`,
 /// without a leading `const` or `new`, so `throw const Gone()` reads as the

@@ -15,6 +15,10 @@ String _done(
     '{"testID":$id,"result":"$result","skipped":$skipped,"hidden":$hidden,'
     '"type":"testDone"}';
 
+/// The reporter's last event, which a run that finished always ends with,
+/// whatever its tests did.
+const _finished = '{"success":false,"type":"done","time":1200}';
+
 void main() {
   group('parse', () {
     test(
@@ -28,6 +32,7 @@ void main() {
           _done(2, 'failure'),
           _start(3, 'H3 finalise'),
           _done(3, 'error'),
+          _finished,
         ];
 
         // act
@@ -111,15 +116,52 @@ void main() {
       expect(run.describe(), 'Known defects: the run produced no result.\n');
     });
 
+    test('does not hold when the log stops before the run finished', () {
+      // arrange
+      final lines = [
+        _start(1, _loading),
+        _done(1, 'success', hidden: true),
+        _start(2, 'H2 probes'),
+        _done(2, 'failure'),
+        _start(3, 'H3 finalise'),
+        _done(3, 'error'),
+      ];
+
+      // act
+      final run = KnownDefectRun.parse(lines);
+
+      // assert
+      expect(run.stillFailing, ['H2 probes', 'H3 finalise']);
+      expect(run.finished, isFalse);
+      expect(run.holds, isFalse);
+    });
+
+    test('holds when the run finished, whatever the reporter says of its '
+        'success', () {
+      // arrange
+      final lines = [
+        _start(2, 'H2 probes'),
+        _done(2, 'failure'),
+        '{"success":true,"type":"done","time":900}',
+      ];
+
+      // act
+      final run = KnownDefectRun.parse(lines);
+
+      // assert
+      expect(run.finished, isTrue);
+      expect(run.holds, isTrue);
+    });
+
     test('passes over lines that are not events', () {
       // arrange
       final lines = [
         'Woah! You appear to be trying to run flutter as root.',
         '',
         '[1, 2]',
-        '{"type":"done","success":false}',
         _start(2, 'H2 probes'),
         _done(2, 'failure'),
+        _finished,
       ];
 
       // act
@@ -132,6 +174,26 @@ void main() {
   });
 
   group('describe', () {
+    test('says that a run which did not finish proves nothing', () {
+      // arrange
+      final run = KnownDefectRun.parse([
+        _start(1, 'H2 probes'),
+        _done(1, 'failure'),
+      ]);
+
+      // act
+      final description = run.describe();
+
+      // assert
+      expect(
+        description,
+        'Known defects: 1 still failing, 0 now passing, 0 not run.\n'
+        'The run did not finish: the reporter never sent its last event, so '
+        'a known defect that never started is not counted. Fix what stopped '
+        'the run.\n',
+      );
+    });
+
     test(
       'counts each kind and says what to do about the two that fail the gate',
       () {
@@ -143,6 +205,7 @@ void main() {
           _done(2, 'success'),
           _start(3, _loading),
           _done(3, 'error'),
+          _finished,
         ]);
 
         // act

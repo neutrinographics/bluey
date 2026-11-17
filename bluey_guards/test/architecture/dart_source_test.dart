@@ -112,13 +112,94 @@ void main() {
       expect(raises, ['2: addError', '3: addError', '4: addError']);
     });
 
+    test('names a bare addError tear-off inside a sink class, and a bare call '
+        'once', () {
+      // act
+      final raises = _raises(
+        'class Relay implements EventSink<int> {\n'
+        '  void watch(Stream<int> s) => s.listen(null, onError: addError);\n'
+        '  void fail(Object e) => addError(e);\n'
+        '}\n',
+      );
+
+      // assert
+      expect(raises, ['2: addError', '3: addError']);
+    });
+
+    test('names a completeError call and a completeError tear-off', () {
+      // act
+      final raises = _raises(
+        'void f(Completer<void> c, Stream<int> s, Object e) {\n'
+        '  c.completeError(e);\n'
+        '  s.listen(null, onError: c.completeError);\n'
+        '}\n',
+      );
+
+      // assert
+      expect(raises, ['2: completeError', '3: completeError']);
+    });
+
+    test('names a Future.error and a Stream.error however each is written', () {
+      // act
+      final raises = _raises(
+        'Future<int> f(Object e) => Future.error(e);\n'
+        'Future<int> g(Object e) => Future<int>.error(e);\n'
+        'Future<int> h(Object e) => new Future.error(e);\n'
+        'Stream<int> i(Object e) => Stream.error(e);\n'
+        'Stream<int> j(Object e) => async.Stream<int>.error(e);\n'
+        'Future<int> k(Object e) => async.Future.error(e);\n',
+      );
+
+      // assert
+      expect(raises, [
+        '1: Future.error',
+        '2: Future.error',
+        '3: Future.error',
+        '4: Stream.error',
+        '5: Stream.error',
+        '6: Future.error',
+      ]);
+    });
+
+    test(
+      'names Error.throwWithStackTrace as a throw of its first argument',
+      () {
+        // act
+        final raises = _raises(
+          'void f(Object e, StackTrace s) {\n'
+          "  Error.throwWithStackTrace(StateError('x'), s);\n"
+          '  Error.throwWithStackTrace(e, s);\n'
+          '}\n',
+        );
+
+        // assert
+        expect(raises, ['2: throw StateError', '3: throw e']);
+      },
+    );
+
+    test('ignores an error member that is not a raise', () {
+      // act
+      final raises = _raises(
+        'void f(dynamic r, Object e) {\n'
+        '  r.error(e);\n'
+        '  Failure.error(e);\n'
+        '  final addError = r.handler;\n'
+        '  r.on(addError: e);\n'
+        '}\n',
+      );
+
+      // assert
+      expect(raises, isEmpty);
+    });
+
     test('ignores an addError named in a doc comment', () {
       // act
       final raises = _raises(
         '/// Forwards to [StreamController.addError] and [sink.addError].\n'
         'void f() {}\n'
         '\n'
-        '/// See [Sink.addError].\n'
+        '/// See [Sink.addError], [Completer.completeError], [Future.error]\n'
+        '/// and [Error.throwWithStackTrace].\n'
         'void g() {}\n',
       );
 

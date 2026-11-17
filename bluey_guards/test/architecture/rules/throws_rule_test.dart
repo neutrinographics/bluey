@@ -52,6 +52,32 @@ void main() {
         '$_placed -> line 9: throw StateErrors',
       ]);
     });
+
+    test('placed code may not complete, create or rethrow an error with its '
+        'stack trace, unless it is a programming error', () {
+      // arrange
+      final files = tree({
+        _placed:
+            'void f(Completer<void> c, Object e, StackTrace s) {\n'
+            '  c.completeError(e);\n'
+            '  Future<void>.error(e);\n'
+            '  Stream<int>.error(e);\n'
+            '  Error.throwWithStackTrace(e, s);\n'
+            "  Error.throwWithStackTrace(StateError('x'), s);\n"
+            '}\n',
+      });
+
+      // act
+      final found = entries(_rule, files);
+
+      // assert
+      expect(found, [
+        '$_placed -> line 2: completeError',
+        '$_placed -> line 3: Future.error',
+        '$_placed -> line 4: Stream.error',
+        '$_placed -> line 5: throw e',
+      ]);
+    });
   });
 
   group('the kernel, the edge and unplaced code', () {

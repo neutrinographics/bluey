@@ -20,7 +20,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Resolving leaves the tree as committed
-        run: git diff --exit-code
+        run: |
+          status="$(git status --porcelain)"
+          if [ -n "$status" ]; then
+            echo "Resolving changed or added these files; commit them:"
+            echo "$status"
+            exit 1
+          fi
       - run: flutter analyze
 
   suites:
@@ -58,10 +64,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: |
+      - name: Every package's rules, each judged even when another fails
+        run: |
+          failed=""
           for package in bluey bluey_platform_interface bluey_android bluey_ios; do
-            (cd "$package" && flutter test test/architecture)
+            (cd "$package" && flutter test test/architecture) || failed="$failed $package"
           done
+          if [ -n "$failed" ]; then
+            echo "The architecture rules failed in:$failed"
+            exit 1
+          fi
 
   public-api:
     name: Public API
@@ -96,6 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      # A package's run leaves both steps in the commit that fixes its last
+      # known defect, or its empty run reads as "the run produced no result";
+      # the job goes with the last package.
       - name: Run them; they are expected to fail
         run: |
           (cd bluey && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey.json" || true)

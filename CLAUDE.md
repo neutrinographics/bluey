@@ -21,7 +21,7 @@ Every spec and every plan carries a "Design review (cohesion, coupling, DDD, Cle
 Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 5 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (1120 tests)
+bluey/                         Main library - domain models, public API, tests
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
@@ -32,7 +32,7 @@ bluey_guards/                  The guards the build runs (architecture rules, th
 ## Build & Test Commands
 
 ```bash
-# Run the Dart tests in a package (all four have Dart suites)
+# Run the Dart tests in a package (all five have Dart suites; bluey_guards' runs with `dart test`, below)
 cd bluey && flutter test
 cd bluey_platform_interface && flutter test
 cd bluey_android && flutter test

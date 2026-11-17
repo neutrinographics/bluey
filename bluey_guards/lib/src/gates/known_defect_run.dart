@@ -9,6 +9,7 @@ final class KnownDefectRun {
     required this.stillFailing,
     required this.nowPassing,
     required this.notRun,
+    required this.finished,
   });
 
   /// Reads the reporter's events, one per line, judging each test by how it
@@ -17,8 +18,11 @@ final class KnownDefectRun {
   factory KnownDefectRun.parse(Iterable<String> lines) {
     final names = <Object, String>{};
     final outcomes = <Object, _Outcome>{};
+    var finished = false;
     for (final event in lines.map(_eventOf).whereType<Map<String, Object?>>()) {
       switch (event) {
+        case {'type': 'done'}:
+          finished = true;
         case {
           'type': 'testStart',
           'test': {'id': final Object id, 'name': final String name},
@@ -51,6 +55,7 @@ final class KnownDefectRun {
       stillFailing: List.unmodifiable(stillFailing),
       nowPassing: List.unmodifiable(nowPassing),
       notRun: List.unmodifiable(notRun),
+      finished: finished,
     );
   }
 
@@ -66,10 +71,18 @@ final class KnownDefectRun {
   /// known defects from running.
   final List<String> notRun;
 
-  /// Whether the run is what the gate expects: every known defect ran and
-  /// failed, and at least one did.
+  /// Whether the reporter sent its last event. A log cut short, by a killed
+  /// process or a full disk, names only the tests that started, so the
+  /// known defects after the cut would otherwise go unseen.
+  final bool finished;
+
+  /// Whether the run is what the gate expects: it finished, every known
+  /// defect ran and failed, and at least one did.
   bool get holds =>
-      nowPassing.isEmpty && notRun.isEmpty && stillFailing.isNotEmpty;
+      finished &&
+      nowPassing.isEmpty &&
+      notRun.isEmpty &&
+      stillFailing.isNotEmpty;
 
   /// The verdict in words, naming each test that fails the gate and what to
   /// do about it.
@@ -81,6 +94,13 @@ final class KnownDefectRun {
       'Known defects: ${stillFailing.length} still failing, '
       '${nowPassing.length} now passing, ${notRun.length} not run.\n',
     );
+    if (!finished) {
+      text.writeln(
+        'The run did not finish: the reporter never sent its last event, so '
+        'a known defect that never started is not counted. Fix what stopped '
+        'the run.',
+      );
+    }
     _section(
       text,
       'Now passing. The defect is fixed: move its test into the normal '

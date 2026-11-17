@@ -104,6 +104,7 @@ const boundaries = <String>[
 /// The files outside infrastructure that name Flutter or the platform
 /// interface.
 const frameworkPlacement = <String>[
+  'lib/src/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/bluey_connection.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/connection_parameters_mapper.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/lifecycle_client.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',

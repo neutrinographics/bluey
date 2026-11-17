@@ -63,9 +63,76 @@ void main() {
         'boundaries: 1 not on its list, 1 on its list that no longer holds.\n'
         'Not on the list. Fix it; a list never grows:\n'
         '  new\n'
-        'On the list but no longer true. Delete the entry, or for a size '
-        'entry write the new count:\n'
+        'On the list but no longer true. Delete the entry:\n'
         '  old\n',
+      );
+    });
+
+    test('tells a file that grew to shrink, and never to raise its entry', () {
+      // arrange
+      final verdict = Ratchet.judge(
+        found: ['lib/a.dart -> 420 lines'],
+        known: ['lib/a.dart -> 410 lines'],
+      );
+
+      // act
+      final text = verdict.describe('size of .dart files');
+
+      // assert
+      expect(
+        text,
+        'size of .dart files: 1 not on its list, 1 on its list that no longer '
+        'holds.\n'
+        'A size entry that no longer matches its file:\n'
+        '  lib/a.dart grew from 410 to 420 lines: shrink the file to 410 '
+        'lines or fewer; never raise the entry\n',
+      );
+    });
+
+    test('tells a file that shrank to lower its entry to the new count', () {
+      // arrange
+      final verdict = Ratchet.judge(
+        found: ['lib/src/bluey.dart -> 1002 lines', 'new'],
+        known: ['lib/src/bluey.dart -> 1040 lines', 'old'],
+      );
+
+      // act
+      final text = verdict.describe('size of .dart files');
+
+      // assert
+      expect(
+        text,
+        'size of .dart files: 2 not on its list, 2 on its list that no longer '
+        'holds.\n'
+        'Not on the list. Fix it; a list never grows:\n'
+        '  new\n'
+        'On the list but no longer true. Delete the entry:\n'
+        '  old\n'
+        'A size entry that no longer matches its file:\n'
+        '  lib/src/bluey.dart shrank from 1040 to 1002 lines: lower its entry '
+        'to 1002\n',
+      );
+    });
+
+    test('reads a size entry alone in one part as any other entry', () {
+      // arrange
+      final verdict = Ratchet.judge(
+        found: ['lib/born.dart -> 301 lines'],
+        known: ['lib/gone.dart -> 500 lines'],
+      );
+
+      // act
+      final text = verdict.describe('size of .dart files');
+
+      // assert
+      expect(
+        text,
+        'size of .dart files: 1 not on its list, 1 on its list that no longer '
+        'holds.\n'
+        'Not on the list. Fix it; a list never grows:\n'
+        '  lib/born.dart -> 301 lines\n'
+        'On the list but no longer true. Delete the entry:\n'
+        '  lib/gone.dart -> 500 lines\n',
       );
     });
 

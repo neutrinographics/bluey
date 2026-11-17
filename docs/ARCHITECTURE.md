@@ -12,7 +12,7 @@ The reasons and the alternatives are in the [architecture foundation design](sup
 
 ## 2. The layout
 
-The repository is a Dart workspace of five packages. The root `pubspec.yaml` lists them and pins Flutter.
+The repository is a Dart workspace of five packages and the example app. The root `pubspec.yaml` lists all six members and pins Flutter.
 
 ```
 bluey/                       The library apps depend on: the domain, the application units and the public API
@@ -23,7 +23,7 @@ bluey_ios/                   BlueyPlatform on iOS: Dart over Pigeon, Swift under
 bluey_guards/                The guards the build runs: architecture rules, the public API dump, the CI gate tools
 ```
 
-`bluey_guards` is dev-only and never published. The four other packages name it as a path dev dependency from their tests alone, so nothing an app installs depends on it. It names no Bluey package: a package's name is a string its configuration hands it.
+`bluey_guards` is dev-only and never published. The four other packages name it as a path dev dependency, so nothing an app installs depends on it. It names no Bluey package: a package's name is a string its configuration hands it.
 
 Inside `bluey`, the target layout is this:
 
@@ -105,10 +105,10 @@ Each rule reads Dart through the analyzer's parser, so a directive that spans li
 | --- | --- | --- |
 | `placement` | A Dart file under `lib/` that is not in the target layout | Nothing to configure |
 | `boundaries` | A context file that names a file of another context, unless the source is a bridge and the target is the other context's domain or application. A kernel file that names a context file. Code in the old layout is judged by its folder: `connection`, `discovery`, `gatt_client`, `gatt_server`, `peer` and `platform` are contexts, `shared` and `log` are kernel. A public library, the edge and a file directly in `lib/src` are not judged | `LegacyLayout` in `bluey_architecture.dart` |
-| `framework placement` | A file under `lib/src` that names `package:flutter` or `package:bluey_platform_interface` and is neither in an `infrastructure/` layer nor a composition root. The composition roots are `lib/src/api/bluey.dart` and today's `lib/src/bluey.dart`, which becomes it. A public library is left to `public exports` | `frameworks` and `compositionRoots` in `bluey_architecture.dart` |
+| `framework placement` | A file under `lib/src` that names `package:flutter` or `package:bluey_platform_interface` and is neither in an `infrastructure/` layer nor a composition root. The composition root is `lib/src/api/bluey.dart`; today's `lib/src/bluey.dart`, which becomes it, is on the list until it moves. A public library is not judged here; `public exports` holds what it exports | `frameworks` and `compositionRoots` in `bluey_architecture.dart` |
 | `public exports` | A public library that exports anything but a file of its own package under `lib/src/` | The package's name |
 | `layers` | A placed file that names what its layer may not (section 3): an outer layer of its own context or of the kernel, an outside library beyond its allowances, the edge, a public library, or unplaced code. An edge file or a public library that names a context's infrastructure and is not the composition root `lib/src/api/bluey.dart`. A dependency on another context is left to `boundaries` | `LayerAllowances` and `compositionRoots` in `bluey_architecture.dart` |
-| `throws` | In a file under `features/` or `shared/`, a raise that is not a `throw` of a programming error. A raise is a `throw`, a `rethrow`, an `addError` call and an `addError` tear-off (`onError: controller.addError`). The programming errors are `StateError`, `ArgumentError` and `UnimplementedError`, each with any of its named constructors (`ArgumentError.value`) | `programmingErrors` in `bluey_architecture.dart` |
+| `throws` | In a placed file under `features/` or `shared/<layer>/`, a raise that is not a `throw` of a programming error. A raise is a `throw`, a `rethrow`, an `Error.throwWithStackTrace` (read as a `throw` of its first argument), a `Future.error` or `Stream.error` however it is written, and an `addError` or `completeError` call or tear-off (`onError: controller.addError`, or a bare `addError` inside a sink). The programming errors are `StateError`, `ArgumentError` and `UnimplementedError`, each with any of its named constructors (`ArgumentError.value`) | `programmingErrors` in `bluey_architecture.dart` |
 | `lint options` | A root of new code that holds a Dart file and has no `analysis_options.yaml` directly in it, or whose options file does not turn on `unawaited_futures` and `discarded_futures` as uncommented `- <lint>` lines. The roots are `lib/src/api`, `lib/src/features`, `lib/src/shared/domain`, `lib/src/shared/application` and `lib/src/shared/infrastructure` | `roots` and `lints` in `bluey_architecture.dart` |
 | `size of .dart files` | A hand-written Dart file under `lib/` longer than 300 lines, in each of the four packages | Each package's `test/architecture/` |
 | `size of .kt files`, `size of .swift files` | A Kotlin file under `bluey_android/android/src/main/kotlin`, or a Swift file under `bluey_ios/ios/Classes`, longer than 400 lines | `bluey_android/test/architecture/size_test.dart`, `bluey_ios/test/architecture/size_test.dart` |
@@ -125,7 +125,7 @@ Today's code breaks most of these rules. What each rule finds today is written d
 
 | Package | File | Lists |
 | --- | --- | --- |
-| `bluey` | [`bluey/test/architecture/known_violations.dart`](../bluey/test/architecture/known_violations.dart) | `unplaced` (53), `boundaries` (33), `frameworkPlacement` (13), `publicExports` (1), `layers`, `throws` and `lintOptions` (empty), `oversized` (9) |
+| `bluey` | [`bluey/test/architecture/known_violations.dart`](../bluey/test/architecture/known_violations.dart) | `unplaced` (53), `boundaries` (33), `frameworkPlacement` (14), `publicExports` (1), `layers`, `throws` and `lintOptions` (empty), `oversized` (9) |
 | `bluey_platform_interface` | [`bluey_platform_interface/test/architecture/known_violations.dart`](../bluey_platform_interface/test/architecture/known_violations.dart) | `oversizedDart` (2) |
 | `bluey_android` | [`bluey_android/test/architecture/known_violations.dart`](../bluey_android/test/architecture/known_violations.dart) | `oversizedDart` (3), `oversizedKotlin` (3) |
 | `bluey_ios` | [`bluey_ios/test/architecture/known_violations.dart`](../bluey_ios/test/architecture/known_violations.dart) | `oversizedDart` (3), `oversizedSwift` (2) |
@@ -134,19 +134,17 @@ An entry is one line, `path -> detail`, with the path relative to the package ro
 
 A list only shrinks. Nothing is added to it and no count is raised: when a rule finds something new, the code is fixed. An entry leaves in the commit that fixes it. A size entry is rewritten with the lower count when its file shrinks, so the file can never grow back to its old ceiling.
 
-When a list and the code differ, the test prints two parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
+When a list and the code differ, the test prints up to three parts. This is a real run, after `lib/src/bluey.dart` shrank from 1,040 lines to 1,002 and its entry was not rewritten:
 
 ```
 size of .dart files: 1 not on its list, 1 on its list that no longer holds.
-Not on the list. Fix it; a list never grows:
-  lib/src/bluey.dart -> 1002 lines
-On the list but no longer true. Delete the entry, or for a size entry write the new count:
-  lib/src/bluey.dart -> 1040 lines
+A size entry that no longer matches its file:
+  lib/src/bluey.dart shrank from 1040 to 1002 lines: lower its entry to 1002
 ```
 
-- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a file that grew. Change the code until the line goes away. Never copy the line into the list.
+- **Not on the list** is new debt: a file born outside the layout, an import across a boundary, a throw in placed code, a new file over its ceiling. Change the code until the line goes away. Never copy the line into the list.
 - **On the list but no longer true** is debt paid: the file moved, was deleted or was fixed. Delete the entry.
-- **The same file in both parts, with two counts**, is a size entry that no longer matches. Compare the counts. If the first part's count is lower, as above, the file shrank: rewrite its entry with that count. If it is higher, the file grew: shrink the file until the test passes with the entry as it is. Never raise a count. The tool's "write the new count" means a lower one.
+- **A size entry that no longer matches its file** is a listed file whose length moved, and the line says which way. One that shrank ends `lower its entry to <count>`: rewrite the entry with that count. One that grew reads `grew from 990 to 1002 lines: shrink the file to 990 lines or fewer; never raise the entry`: shrink the file until the test passes with the entry as it is. A count is never raised. The heading's two figures each count such a file once.
 
 A slice that moves a file usually sees both parts at once, under several rules: the old path's entries are stale, and anything the moved file still does wrong is new. Fix the new, delete the stale, and the lists end the slice shorter than they began.
 
@@ -220,8 +218,8 @@ Application units are tested against in-memory doubles of their ports (`InMemory
 **Known defects.** A known defect is a test that reproduces an audit finding and fails until the slice that owns it fixes the bug. The eleven from the November audit live in [`bluey/test/known_defects/domain_known_defects_test.dart`](../bluey/test/known_defects/domain_known_defects_test.dart) (nine) and [`bluey_android/test/known_defects/android_adapter_known_defects_test.dart`](../bluey_android/test/known_defects/android_adapter_known_defects_test.dart) (two), each named by its finding and backlog id (`H3 (I381): ...`). The two `bluey_android` ones keep the mocktail mocks they were written with, as that suite's other tests do.
 
 - **The tag.** Each file opens with `@Tags(['known-defect'])`. The package's `dart_test.yaml` declares the tag with a skip reason, so a normal `flutter test` shows each file as one skipped suite and stays green.
-- **The run.** CI's Known defects job runs them with `flutter test test/known_defects --run-skipped --tags known-defect --reporter json`, and `bluey_guards:known_defects` reads the output. It fails when a known defect passes, when one does not run to a result (a file that no longer compiles, a failing `setUpAll`), or when the run produced nothing. A still-failing known defect is what it expects.
-- **The fix.** A fix slice starts by moving its test out of the known-defect file into the mirrored tree, where it fails: that is its red step. The fix makes it pass. The move and the fix land in one commit, so the normal suite never holds a failing test and the Known defects job never sees a passing one.
+- **The run.** CI's Known defects job runs them with `flutter test test/known_defects --run-skipped --tags known-defect --reporter json`, and `bluey_guards:known_defects` reads the output. It fails when a known defect passes, when one does not run to a result (a file that no longer compiles, a failing `setUpAll`), when the run produced nothing, or when the log stops before the reporter's last event, `done`, so a run cut short never hides the known defects it did not reach. A still-failing known defect is what it expects.
+- **The fix.** A fix slice starts by moving its test out of the known-defect file into the mirrored tree, where it fails: that is its red step. The fix makes it pass. The move and the fix land in one commit, so the normal suite never holds a failing test and the Known defects job never sees a passing one. When a package's last known defect is fixed, the same commit deletes its known-defect file and its `dart_test.yaml` tag and takes its run and its JSON file out of the Known defects job, since an empty run reads as "the run produced no result"; the job goes with the last package.
 
 A finding traced by reading has no test yet. It gets one as the red step of its own slice.
 
@@ -231,7 +229,7 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 
 | Gate | Command | CI job |
 | --- | --- | --- |
-| Analysis, and a lockfile that resolves as committed | `flutter pub get && git diff --exit-code && flutter analyze`, at the repository root | Analyze |
+| Analysis, and a lockfile that resolves as committed | `flutter pub get && test -z "$(git status --porcelain)" && flutter analyze`, at the repository root; the status check fails on a changed file and on a new one | Analyze |
 | The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android` and `bluey_ios`; `dart test` in `bluey_guards` | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards) |
 | The `bluey` suite and its coverage floor | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90` | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
