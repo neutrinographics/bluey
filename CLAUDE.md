@@ -9,29 +9,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TDD cycle**: Write a failing test first (Red), implement minimum code to pass (Green), then improve (Refactor). No production code without a failing test.
 - **DDD**: Use ubiquitous language consistently (see Ubiquitous Language table below). Respect bounded context boundaries. Value objects are immutable with equality by value.
 - **Clean Architecture**: Dependencies point inward only. Domain layer has zero framework dependencies. Platform implementations are swappable.
-- **Coverage targets**: 90% minimum for domain layer, 80% overall.
+- **Coverage floors**: 90% of the lines of the `bluey` package, and 95% of the lines under `lib/src/features/*/domain` and `lib/src/shared/domain`, each held by CI's coverage gate, which also fails on a file with code that no test loads (`docs/ARCHITECTURE.md` §10).
 - **Comments explain why, never how** (Clean Code). A doc comment on a class or function says why a reader would use it and what non-obvious consequence to expect; the code itself shows how it works. Avoid inline comments: if a line needs explaining, extract it into a well-named function and document that function instead. Reserve inline comments for a genuinely special line (a platform quirk, a spec constraint). Delete commented-out code, journal comments, and comments that restate the code.
+
+### Design review before execution
+
+Every spec and every plan carries a "Design review (cohesion, coupling, DDD, Clean Architecture)" section that ends `Verdict: ready.` before any task starts: each unit's single responsibility, each dependency and its direction, the bounded context and its language, and the layer each file lands in. A claim that names an existing class is checked against that class's source before the verdict is written. A finding is fixed in the document before any task starts.
 
 ## Project Overview
 
-Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 4 packages:
+Bluey is a Flutter BLE (Bluetooth Low Energy) library organized as a Dart workspace monorepo with 5 packages:
 
 ```
-bluey/                         Main library - domain models, public API, tests (1120 tests)
+bluey/                         Main library - domain models, public API, tests
 bluey_platform_interface/      Abstract BlueyPlatform base class, DTOs, capabilities
 bluey_android/                 Android implementation (Kotlin + Pigeon)
 bluey_ios/                     iOS implementation (Swift + Pigeon)
 bluey/example/                 Demo app with scanner, connection, GATT, server features
+bluey_guards/                  The guards the build runs (architecture rules, the public API dump, the CI gate tools), dev-only and never published
 ```
 
 ## Build & Test Commands
 
 ```bash
-# Run the Dart tests in a package (all four have Dart suites)
+# Run the Dart tests in a package (all five have Dart suites; bluey_guards' runs with `dart test`, below)
 cd bluey && flutter test
 cd bluey_platform_interface && flutter test
 cd bluey_android && flutter test
 cd bluey_ios && flutter test
+cd bluey/example && flutter test       # the example app, the one consumer of the public API here
+cd bluey_ios/example && flutter test
 
 # Run the Android native (Kotlin/JVM) unit tests — standalone Gradle.
 # Needs the Flutter SDK path: set FLUTTER_ROOT or bluey_android/android/local.properties (flutter.sdk=...).
@@ -57,6 +64,32 @@ cd bluey && flutter test --coverage
 # Analyze (lint)
 flutter analyze
 
+# Formatting, as CI's Analyze job holds it: the guards and every root of new code that exists
+dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/shared/domain
+
+# The guards' own tests
+cd bluey_guards && dart test
+
+# The architecture rules; each package keeps its lists in test/architecture/known_violations.dart
+cd bluey && flutter test test/architecture
+
+# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package)
+cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart
+
+# The public API dump: check it, or rewrite it after a change that was meant
+cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api
+cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api --write
+
+# The known defects, which are expected to fail; each package's roster in test/known_defects/roster.dart names them (docs/ARCHITECTURE.md)
+cd bluey && flutter test test/known_defects --run-skipped --tags known-defect
+
+# The coverage floors: the package, then the domain
+cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib
+cd bluey && dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain
+
+# Once per checkout: create the Gradle wrapper, which is not committed
+cd bluey_android/android && gradle wrapper --gradle-version 8.14
+
 # Generate Pigeon bindings (from package root)
 cd bluey_android && dart run pigeon --input pigeons/messages.dart
 cd bluey_ios && dart run pigeon --input pigeons/messages.dart
@@ -67,11 +100,15 @@ cd bluey/example && flutter run
 
 ## Architecture
 
+`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow.
+
 ### Clean Architecture Layers
 
+The packages, from the consumer down. Inside `bluey`, the layers (`domain`, `application`, `infrastructure`) are those of each `features/<context>/` and of `shared/`, as `docs/ARCHITECTURE.md` §3 lays out.
+
 ```
-Application Layer     ← Example app / consumer code
-Domain Layer          ← bluey package (UUID, Device, Advertisement, Connection, Server, exceptions, events)
+Consumer              ← Example app / consumer code
+Library               ← bluey package (UUID, Device, Advertisement, Connection, Server, exceptions, events)
 Platform Interface    ← bluey_platform_interface (BlueyPlatform abstract class, platform DTOs)
 Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kotlin/Swift)
 ```
@@ -170,6 +207,10 @@ When writing tests, use `FakeBlueyPlatform` (not mocks) and the helpers from `te
 
 ## Key Files
 
+- `docs/ARCHITECTURE.md` - the authoritative guide to the structure, the rules the build holds and the gates; this file is its short version
+- `bluey/test/architecture/known_violations.dart` - what the architecture rules find today, as lists that only shrink (each package has one)
+- `bluey/api/bluey.api` - the committed public API dump; a change to it is reviewed as an API change
+- `.github/workflows/ci.yml` - the gates every pull request runs (XCTest runs from `ios.yml`)
 - `bluey_android/pigeons/messages.dart` - Pigeon API definition for Android (generates `Messages.g.kt` + `messages.g.dart`)
 - `bluey_ios/pigeons/messages.dart` - Pigeon API definition for iOS (generates `Messages.g.swift` + `messages.g.dart`)
 - `docs/roadmap.md` - the development roadmap: source of truth for what to work on next (priority, status, ordering, grouped by bounded context). Start here for outstanding work.

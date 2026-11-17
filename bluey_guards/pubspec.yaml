@@ -1,0 +1,17 @@
+name: bluey_guards
+description: The guards Bluey's build runs. Architecture rules, the public API dump and the CI gate tools. Never published.
+version: 0.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  analyzer: ^12.1.0
+  path: ^1.9.0
+  test: ^1.31.0
+  yaml: ^3.1.0
+
+dev_dependencies:
+  lints: ^5.0.0

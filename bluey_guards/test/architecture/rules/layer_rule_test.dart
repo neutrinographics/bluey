@@ -1,0 +1,341 @@
+import 'package:bluey_guards/architecture.dart';
+import 'package:test/test.dart';
+
+import '../support/trees.dart';
+
+const _domain = 'lib/src/features/connection/domain/link.dart';
+const _application =
+    'lib/src/features/connection/application/connect_device.dart';
+const _adapter =
+    'lib/src/features/connection/infrastructure/adapters/platform_links.dart';
+const _platform =
+    'package:bluey_platform_interface/bluey_platform_interface.dart';
+final _rule = LayerRule(
+  package: 'bluey',
+  allowances: const LayerAllowances(
+    domain: {
+      'dart:core',
+      'dart:typed_data',
+      'dart:collection',
+      'dart:math',
+      'package:meta',
+    },
+    application: {'dart:async', 'package:clock'},
+    infrastructure: {
+      'package:bluey_platform_interface',
+      'package:flutter/services.dart',
+    },
+  ),
+  compositionRoots: const {'lib/src/api/bluey.dart'},
+);
+
+List<String> found(Map<String, String> files) => entries(_rule, tree(files));
+
+void main() {
+  group('domain', () {
+    test(
+      "names its own domain, the kernel's domain and its allowed libraries",
+      () {
+        // arrange
+        final files = {
+          _domain: naming([
+            'link_state.dart',
+            '../../../shared/domain/either.dart',
+            'dart:typed_data',
+            'package:meta/meta.dart',
+          ]),
+        };
+
+        // act
+        final violations = found(files);
+
+        // assert
+        expect(violations, isEmpty);
+      },
+    );
+
+    test('may not reach outward', () {
+      // arrange
+      final files = {
+        _domain: naming([
+          '../application/connect_device.dart',
+          '../../../shared/application/log.dart',
+          'dart:async',
+          'package:clock/clock.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        '$_domain -> lib/src/features/connection/application/'
+            'connect_device.dart',
+        '$_domain -> lib/src/shared/application/log.dart',
+        '$_domain -> dart:async',
+        '$_domain -> package:clock/clock.dart',
+      ]);
+    });
+  });
+
+  group('application', () {
+    test('names what domain may, its own layer and its allowed libraries', () {
+      // arrange
+      final files = {
+        _application: naming([
+          '../domain/link.dart',
+          'ports/links.dart',
+          '../../../shared/application/log.dart',
+          'dart:async',
+          'dart:math',
+          'package:clock/clock.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, isEmpty);
+    });
+
+    test('may not name infrastructure or a framework', () {
+      // arrange
+      final files = {
+        _application: naming([
+          '../infrastructure/adapters/platform_links.dart',
+          '../../../shared/infrastructure/bluey_logger.dart',
+          _platform,
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        '$_application -> $_adapter',
+        '$_application -> lib/src/shared/infrastructure/bluey_logger.dart',
+        '$_application -> $_platform',
+      ]);
+    });
+  });
+
+  group('infrastructure', () {
+    test(
+      'names its whole context, the whole kernel and its two frameworks',
+      () {
+        // arrange
+        final files = {
+          _adapter: naming([
+            '../../domain/link.dart',
+            '../../application/ports/links.dart',
+            '../../../../shared/infrastructure/platform_errors.dart',
+            _platform,
+            'package:flutter/services.dart',
+          ]),
+        };
+
+        // act
+        final violations = found(files);
+
+        // assert
+        expect(violations, isEmpty);
+      },
+    );
+
+    test('may name no other part of Flutter', () {
+      // arrange
+      final files = {
+        _adapter: naming(['package:flutter/widgets.dart']),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, ['$_adapter -> package:flutter/widgets.dart']);
+    });
+  });
+
+  group('the kernel', () {
+    test('keeps the same order of layers and names no edge', () {
+      // arrange
+      const either = 'lib/src/shared/domain/either.dart';
+      final files = {
+        either: naming([
+          'failure.dart',
+          '../application/log.dart',
+          '../../api/exceptions.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        '$either -> lib/src/shared/application/log.dart',
+        '$either -> lib/src/api/exceptions.dart',
+      ]);
+    });
+  });
+
+  group('placed and unplaced code', () {
+    test(
+      'placed code names no unplaced code, no edge and no public library',
+      () {
+        // arrange
+        final files = {
+          _application: naming([
+            '../../../connection/bluey_connection.dart',
+            '../../../api/exceptions.dart',
+            '../../../../bluey.dart',
+          ]),
+        };
+
+        // act
+        final violations = found(files);
+
+        // assert
+        expect(violations, [
+          '$_application -> lib/src/connection/bluey_connection.dart',
+          '$_application -> lib/src/api/exceptions.dart',
+          '$_application -> lib/bluey.dart',
+        ]);
+      },
+    );
+
+    test(
+      "another context is the boundary rule's to judge, and unplaced code is "
+      'not judged',
+      () {
+        // arrange
+        final files = {
+          _domain: naming(['../../peer/domain/server_id.dart']),
+          'lib/src/connection/a.dart': naming(['dart:io', '../bluey.dart']),
+        };
+
+        // act
+        final violations = found(files);
+
+        // assert
+        expect(violations, isEmpty);
+      },
+    );
+  });
+
+  group('a public library', () {
+    test("may not name a context's infrastructure", () {
+      // arrange
+      final files = {
+        'lib/bluey.dart':
+            "export 'src/features/x/infrastructure/adapters/a.dart';",
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        'lib/bluey.dart -> lib/src/features/x/infrastructure/adapters/a.dart',
+      ]);
+    });
+
+    test(
+      "may name a context's infrastructure when it is a composition root",
+      () {
+        // arrange
+        final rule = LayerRule(
+          package: 'bluey',
+          allowances: const LayerAllowances(
+            domain: {},
+            application: {},
+            infrastructure: {},
+          ),
+          compositionRoots: const {'lib/bluey.dart'},
+        );
+        final files = tree({
+          'lib/bluey.dart':
+              "export 'src/features/x/infrastructure/adapters/a.dart';",
+        });
+
+        // act
+        final violations = entries(rule, files);
+
+        // assert
+        expect(violations, isEmpty);
+      },
+    );
+  });
+
+  group('the edge', () {
+    test("names any context's domain and application, and unplaced code", () {
+      // arrange
+      final files = {
+        'lib/src/api/connection/connection.dart': naming([
+          '../../features/connection/domain/link.dart',
+          '../../features/peer/application/watch_peer.dart',
+          '../../connection/bluey_connection.dart',
+          '../exceptions.dart',
+          'dart:async',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, isEmpty);
+    });
+
+    test('only the composition root names an infrastructure folder', () {
+      // arrange
+      final files = {
+        'lib/src/api/bluey.dart': naming([
+          '../features/connection/infrastructure/adapters/platform_links.dart',
+        ]),
+        'lib/src/api/connection/connection.dart': naming([
+          '../../features/connection/infrastructure/adapters/'
+              'platform_links.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        'lib/src/api/connection/connection.dart -> $_adapter',
+      ]);
+    });
+
+    test("only the composition root names the kernel's infrastructure", () {
+      // arrange
+      final files = {
+        'lib/src/api/bluey.dart': naming([
+          '../shared/infrastructure/platform_clock.dart',
+        ]),
+        'lib/src/api/connection/connection.dart': naming([
+          '../../shared/domain/either.dart',
+          '../../shared/application/ports/clock.dart',
+          '../../shared/infrastructure/platform_clock.dart',
+        ]),
+        'lib/bluey.dart': naming([
+          'src/shared/infrastructure/platform_clock.dart',
+        ]),
+      };
+
+      // act
+      final violations = found(files);
+
+      // assert
+      expect(violations, [
+        'lib/bluey.dart -> lib/src/shared/infrastructure/platform_clock.dart',
+        'lib/src/api/connection/connection.dart -> '
+            'lib/src/shared/infrastructure/platform_clock.dart',
+      ]);
+    });
+  });
+}

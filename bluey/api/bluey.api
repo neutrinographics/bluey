@@ -1,0 +1,755 @@
+class AdapterTransitionInvalidation extends InvalidationCause
+  String toString()
+  bool ==(Object other)
+  const AdapterTransitionInvalidation(BluetoothState state)
+  final BluetoothState state
+  int get hashCode
+enum AdvertiseMode
+  AdvertiseMode balanced
+  AdvertiseMode lowLatency
+  AdvertiseMode lowPower
+class Advertisement
+  Advertisement({required List<UUID> serviceUuids, required Map<UUID, Uint8List> serviceData, ManufacturerData? manufacturerData, int? txPowerLevel, required bool isConnectable})
+  String toString()
+  bool ==(Object other)
+  factory Advertisement.empty()
+  final List<UUID> serviceUuids
+  final ManufacturerData? manufacturerData
+  final Map<UUID, Uint8List> serviceData
+  final bool isConnectable
+  final int? txPowerLevel
+  int get hashCode
+class AdvertisingException extends BlueyException
+  const AdvertisingException(AdvertisingFailureReason reason)
+  final AdvertisingFailureReason reason
+enum AdvertisingFailureReason
+  AdvertisingFailureReason alreadyAdvertising
+  AdvertisingFailureReason dataTooBig
+  AdvertisingFailureReason hardwareError
+  AdvertisingFailureReason notSupported
+  AdvertisingFailureReason unknown
+final class AdvertisingStartedEvent extends BlueyEvent
+  AdvertisingStartedEvent({String? name, List<UUID>? services, String? source})
+  String toString()
+  final List<UUID>? services
+  final String? name
+final class AdvertisingStartingEvent extends BlueyEvent
+  AdvertisingStartingEvent({String? source})
+  String toString()
+enum AdvertisingState
+  AdvertisingState advertising
+  AdvertisingState idle
+  AdvertisingState invalidated
+  AdvertisingState starting
+  AdvertisingState stopping
+final class AdvertisingStoppedEvent extends BlueyEvent
+  AdvertisingStoppedEvent({String? source})
+  String toString()
+final class AdvertisingStoppingEvent extends BlueyEvent
+  AdvertisingStoppingEvent({String? source})
+  String toString()
+class AmbiguousAttributeException extends BlueyException
+  AmbiguousAttributeException(UUID uuid, int matchCount, {required String attributeKind})
+  final String attributeKind
+  final UUID uuid
+  final int matchCount
+abstract class AndroidConnectionExtensions
+  BondState get bondState
+  ConnectionParameters get connectionParameters
+  Future<Mtu> requestMtu(Mtu desired)
+  Future<void> bond()
+  Future<void> removeBond()
+  Future<void> requestConnectionParameters(ConnectionParameters params)
+  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy})
+  Mtu get mtu
+  Phy get rxPhy
+  Phy get txPhy
+  Stream<({Phy rx, Phy tx})> get phyChanges
+  Stream<BondState> get bondStateChanges
+class AttributeHandle
+  AttributeHandle(int value)
+  String toString()
+  bool ==(Object other)
+  final int value
+  int get hashCode
+class AttributeHandleInvalidatedException extends BlueyException
+  AttributeHandleInvalidatedException()
+class AttributeNotFoundException extends BlueyException
+  AttributeNotFoundException()
+class BluetoothDisabledException extends BlueyException
+  const BluetoothDisabledException()
+enum BluetoothState
+  BluetoothState off
+  BluetoothState on
+  BluetoothState unauthorized
+  BluetoothState unknown
+  BluetoothState unsupported
+  bool get canBeEnabled
+  bool get isReady
+class BluetoothUnavailableException extends BlueyException
+  const BluetoothUnavailableException()
+class Bluey
+  BluetoothState get currentState
+  BlueyLogger get logger
+  BlueyPeer peer(ServerId serverId, {Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout})
+  Capabilities get capabilities
+  Future<BluetoothState> get state
+  Future<Connection> connect(Device device, {Duration? timeout})
+  Future<List<BlueyPeer>> discoverPeers({Duration timeout = const Duration(seconds: 5), Duration probeTimeout = PeerDiscovery.defaultProbeTimeout})
+  Future<List<Device>> get bondedDevices
+  Future<PeerConnection> connectAsPeer(Device device, {Duration? timeout, Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout})
+  Future<PeerConnection?> tryUpgrade(Connection connection)
+  Future<bool> authorize()
+  Future<bool> requestEnable()
+  Future<void> configure({bool cleanupOnActivityDestroy = true, GattTimeouts gattTimeouts = const GattTimeouts()})
+  Future<void> dispose()
+  Future<void> openSettings()
+  Scanner scanner()
+  Server? server({Duration? lifecycleInterval = const Duration(seconds: 10)})
+  Stream<BluetoothState> get stateStream
+  Stream<BlueyEvent> get events
+  Stream<BlueyLogEvent> get logEvents
+  Stream<PeerConnection?> watchPeer(Connection connection)
+  static Future<Bluey> create({ServerId? localIdentity, Duration initialStateTimeout = const Duration(seconds: 2)})
+  void setLogLevel(BlueyLogLevel level)
+sealed class BlueyEvent
+  BlueyEvent({DateTime? timestamp, String? source})
+  String toString()
+  final DateTime timestamp
+  final String? source
+sealed class BlueyException implements Exception
+  String toString()
+  const BlueyException(String message, {String? action, Object? cause})
+  final Object? cause
+  final String message
+  final String? action
+class BlueyLogEvent
+  String toString()
+  bool ==(Object other)
+  const BlueyLogEvent({required DateTime timestamp, required BlueyLogLevel level, required String context, required String message, Map<String, Object?> data = const {}, String? errorCode})
+  final BlueyLogLevel level
+  final DateTime timestamp
+  final Map<String, Object?> data
+  final String context
+  final String message
+  final String? errorCode
+  int get hashCode
+enum BlueyLogLevel
+  BlueyLogLevel debug
+  BlueyLogLevel error
+  BlueyLogLevel info
+  BlueyLogLevel trace
+  BlueyLogLevel warn
+abstract class BlueyPeer
+  Future<PeerConnection> connect({Duration? scanTimeout, Duration? probeTimeout})
+  ServerId get serverId
+class BlueyPlatformException extends BlueyException
+  BlueyPlatformException(String message, {String? code, Object? cause})
+  final String? code
+enum BondState
+  BondState bonded
+  BondState bonding
+  BondState none
+class Capabilities
+  String toString()
+  bool ==(Object other)
+  const Capabilities({required PlatformKind platformKind, bool canScan = true, bool canConnect = true, bool canAdvertise = false, bool canRequestMtu = false, int maxMtu = 23, bool canScanInBackground = false, bool canAdvertiseInBackground = false, bool canBond = false, bool canRequestPhy = false, bool canRequestConnectionParameters = false, bool canRequestEnable = false, bool canAdvertiseManufacturerData = false, bool reportsCentralDisconnects = false})
+  final PlatformKind platformKind
+  final bool canAdvertise
+  final bool canAdvertiseInBackground
+  final bool canAdvertiseManufacturerData
+  final bool canBond
+  final bool canConnect
+  final bool canRequestConnectionParameters
+  final bool canRequestEnable
+  final bool canRequestMtu
+  final bool canRequestPhy
+  final bool canScan
+  final bool canScanInBackground
+  final bool reportsCentralDisconnects
+  final int maxMtu
+  int get hashCode
+  static const Capabilities android
+  static const Capabilities fake
+  static const Capabilities iOS
+  static const Capabilities linux
+  static const Capabilities macOS
+  static const Capabilities windows
+class CharacteristicNotFoundException extends BlueyException
+  const CharacteristicNotFoundException(UUID characteristicUuid)
+  final UUID characteristicUuid
+class CharacteristicProperties
+  String toString()
+  bool ==(Object other)
+  bool get canSubscribe
+  bool get canWriteAny
+  const CharacteristicProperties({bool canRead = false, bool canWrite = false, bool canWriteWithoutResponse = false, bool canNotify = false, bool canIndicate = false})
+  factory CharacteristicProperties.fromFlags(int flags)
+  final bool canIndicate
+  final bool canNotify
+  final bool canRead
+  final bool canWrite
+  final bool canWriteWithoutResponse
+  int get hashCode
+final class CharacteristicReadEvent extends BlueyEvent
+  CharacteristicReadEvent({required DeviceAddress deviceAddress, required UUID characteristicId, required int valueLength, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final UUID characteristicId
+  final int valueLength
+final class CharacteristicWrittenEvent extends BlueyEvent
+  CharacteristicWrittenEvent({required DeviceAddress deviceAddress, required UUID characteristicId, required int valueLength, required bool withResponse, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final UUID characteristicId
+  final bool withResponse
+  final int valueLength
+abstract final class Characteristics
+  static final UUID appearance
+  static final UUID batteryLevel
+  static final UUID bloodPressureMeasurement
+  static final UUID bodySensorLocation
+  static final UUID deviceName
+  static final UUID firmwareRevision
+  static final UUID hardwareRevision
+  static final UUID heartRateControlPoint
+  static final UUID heartRateMeasurement
+  static final UUID manufacturerName
+  static final UUID modelNumber
+  static final UUID serialNumber
+  static final UUID softwareRevision
+  static final UUID systemId
+  static final UUID temperatureMeasurement
+abstract class Client
+  ClientAddress get address
+  int get mtu
+class ClientAddress
+  String toShortString()
+  String toString()
+  bool ==(Object other)
+  const ClientAddress(String value)
+  final String value
+  int get hashCode
+final class ClientConnectedEvent extends BlueyEvent
+  ClientConnectedEvent({required ClientAddress clientAddress, int? mtu, String? source})
+  String toString()
+  final ClientAddress clientAddress
+  final int? mtu
+final class ClientDisconnectedEvent extends BlueyEvent
+  ClientDisconnectedEvent({required ClientAddress clientAddress, String? source})
+  String toString()
+  final ClientAddress clientAddress
+final class ClientLifecycleTimeoutEvent extends BlueyEvent
+  ClientLifecycleTimeoutEvent({required ClientAddress clientAddress, String? source})
+  String toString()
+  final ClientAddress clientAddress
+final class ConnectedEvent extends BlueyEvent
+  ConnectedEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+final class ConnectingEvent extends BlueyEvent
+  ConnectingEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+abstract class Connection
+  AndroidConnectionExtensions? get android
+  ConnectionState get state
+  DeviceAddress get deviceAddress
+  Future<List<RemoteService>> services({bool cache = false})
+  Future<WritePayloadLimit> maxWritePayload({required bool withResponse})
+  Future<bool> hasService(UUID uuid)
+  Future<int> readRssi()
+  Future<void> disconnect()
+  IosConnectionExtensions? get ios
+  RemoteService service(UUID uuid)
+  Stream<ConnectionState> get stateChanges
+  Stream<List<RemoteService>> get servicesChanges
+class ConnectionException extends BlueyException
+  const ConnectionException(DeviceAddress deviceAddress, ConnectionFailureReason reason)
+  final ConnectionFailureReason reason
+  final DeviceAddress deviceAddress
+enum ConnectionFailureReason
+  ConnectionFailureReason connectionLimitReached
+  ConnectionFailureReason deviceNotConnectable
+  ConnectionFailureReason deviceNotFound
+  ConnectionFailureReason pairingFailed
+  ConnectionFailureReason timeout
+  ConnectionFailureReason unknown
+class ConnectionInterval
+  ConnectionInterval(double milliseconds)
+  String toString()
+  bool ==(Object other)
+  final double milliseconds
+  int get hashCode
+  static const Duration specMaximum
+  static const Duration specMinimum
+class ConnectionParameters
+  ConnectionParameters({required ConnectionInterval interval, required PeripheralLatency latency, required SupervisionTimeout timeout})
+  String toString()
+  bool ==(Object other)
+  final ConnectionInterval interval
+  final PeripheralLatency latency
+  final SupervisionTimeout timeout
+  int get hashCode
+enum ConnectionState
+  ConnectionState connecting
+  ConnectionState disconnected
+  ConnectionState disconnecting
+  ConnectionState invalidated
+  ConnectionState linked
+  ConnectionState ready
+  bool get isActive
+  bool get isConnected
+  bool get isReady
+final class DebugEvent extends BlueyEvent
+  DebugEvent({required String message, String? source})
+  String toString()
+  final String message
+abstract final class Descriptors
+  static final UUID characteristicAggregateFormat
+  static final UUID characteristicExtendedProperties
+  static final UUID characteristicPresentationFormat
+  static final UUID characteristicUserDescription
+  static final UUID clientCharacteristicConfiguration
+  static final UUID serverCharacteristicConfiguration
+class Device
+  Device copyWith({Object? name = _sentinel})
+  Device({required DeviceAddress address, String? name})
+  String toString()
+  bool ==(Object other)
+  final DeviceAddress address
+  final String? name
+  int get hashCode
+class DeviceAddress
+  String toShortString()
+  String toString()
+  bool ==(Object other)
+  const DeviceAddress(String value)
+  final String value
+  int get hashCode
+final class DeviceDiscoveredEvent extends BlueyEvent
+  DeviceDiscoveredEvent({required DeviceAddress deviceAddress, String? name, int? rssi, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final String? name
+  final int? rssi
+enum DisconnectReason
+  DisconnectReason evictedByServer
+  DisconnectReason linkLoss
+  DisconnectReason remoteDisconnect
+  DisconnectReason requested
+  DisconnectReason timeout
+  DisconnectReason unknown
+final class DisconnectedEvent extends BlueyEvent
+  DisconnectedEvent({required DeviceAddress deviceAddress, String? reason, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final String? reason
+class DisconnectedException extends BlueyException
+  const DisconnectedException(String address, DisconnectReason reason)
+  final DisconnectReason reason
+  final String address
+final class DiscoveringServicesEvent extends BlueyEvent
+  DiscoveringServicesEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+class DisposalInvalidation extends InvalidationCause
+  String toString()
+  bool ==(Object other)
+  const DisposalInvalidation()
+  int get hashCode
+final class ErrorEvent extends BlueyEvent
+  ErrorEvent({required String message, Object? error, String? source})
+  String toString()
+  final Object? error
+  final String message
+class GattException extends BlueyException
+  const GattException(GattStatus status)
+  final GattStatus status
+class GattOperationFailedException extends BlueyException
+  const GattOperationFailedException(String operation, int status)
+  final String operation
+  final int status
+enum GattPermission
+  GattPermission read
+  GattPermission readEncrypted
+  GattPermission write
+  GattPermission writeEncrypted
+enum GattResponseStatus
+  GattResponseStatus insufficientAuthentication
+  GattResponseStatus insufficientEncryption
+  GattResponseStatus invalidAttributeLength
+  GattResponseStatus invalidOffset
+  GattResponseStatus readNotPermitted
+  GattResponseStatus requestNotSupported
+  GattResponseStatus success
+  GattResponseStatus writeNotPermitted
+enum GattStatus
+  GattStatus insufficientAuthentication
+  GattStatus insufficientEncryption
+  GattStatus invalidAttributeLength
+  GattStatus invalidOffset
+  GattStatus readNotPermitted
+  GattStatus requestNotSupported
+  GattStatus success
+  GattStatus writeNotPermitted
+class GattTimeoutException extends BlueyException
+  const GattTimeoutException(String operation)
+  final String operation
+class GattTimeouts
+  bool ==(Object other)
+  const GattTimeouts({Duration discoverServices = const Duration(seconds: 15), Duration readCharacteristic = const Duration(seconds: 10), Duration writeCharacteristic = const Duration(seconds: 10), Duration readDescriptor = const Duration(seconds: 10), Duration writeDescriptor = const Duration(seconds: 10), Duration requestMtu = const Duration(seconds: 10), Duration readRssi = const Duration(seconds: 5)})
+  final Duration discoverServices
+  final Duration readCharacteristic
+  final Duration readDescriptor
+  final Duration readRssi
+  final Duration requestMtu
+  final Duration writeCharacteristic
+  final Duration writeDescriptor
+  int get hashCode
+final class HeartbeatAcknowledgedEvent extends BlueyEvent
+  HeartbeatAcknowledgedEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+final class HeartbeatFailedEvent extends BlueyEvent
+  HeartbeatFailedEvent({required DeviceAddress deviceAddress, required bool isDeadPeerSignal, String? reason, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final String? reason
+  final bool isDeadPeerSignal
+final class HeartbeatSentEvent extends BlueyEvent
+  HeartbeatSentEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+class HostedCharacteristic
+  bool ==(Object other)
+  const HostedCharacteristic({required UUID uuid, required CharacteristicProperties properties, required List<GattPermission> permissions, List<HostedDescriptor> descriptors = const []})
+  factory HostedCharacteristic.notifiable({required UUID uuid, List<HostedDescriptor> descriptors = const []})
+  factory HostedCharacteristic.readable({required UUID uuid, List<HostedDescriptor> descriptors = const []})
+  factory HostedCharacteristic.writable({required UUID uuid, bool withResponse = true, List<HostedDescriptor> descriptors = const []})
+  final CharacteristicProperties properties
+  final List<GattPermission> permissions
+  final List<HostedDescriptor> descriptors
+  final UUID uuid
+  int get hashCode
+class HostedDescriptor
+  bool ==(Object other)
+  const HostedDescriptor({required UUID uuid, required List<GattPermission> permissions, Uint8List? value})
+  factory HostedDescriptor.immutable({required UUID uuid, required Uint8List value})
+  final List<GattPermission> permissions
+  final UUID uuid
+  final Uint8List? value
+  int get hashCode
+class HostedService
+  bool ==(Object other)
+  const HostedService({required UUID uuid, bool isPrimary = true, required List<HostedCharacteristic> characteristics, List<HostedService> includedServices = const []})
+  final List<HostedCharacteristic> characteristics
+  final List<HostedService> includedServices
+  final UUID uuid
+  final bool isPrimary
+  int get hashCode
+final class IndicationSentEvent extends BlueyEvent
+  IndicationSentEvent({required UUID characteristicId, required int valueLength, ClientAddress? clientAddress, String? source})
+  String toString()
+  final ClientAddress? clientAddress
+  final UUID characteristicId
+  final int valueLength
+enum InvalidatedInstance
+  InvalidatedInstance connection
+  InvalidatedInstance scanner
+  InvalidatedInstance server
+  const InvalidatedInstance(String displayName)
+  final String displayName
+sealed class InvalidationCause
+  const InvalidationCause()
+abstract class IosConnectionExtensions
+class LifecycleInterval
+  Duration get heartbeatCadence
+  String toString()
+  bool ==(Object other)
+  factory LifecycleInterval(Duration value)
+  factory LifecycleInterval.decode(Uint8List bytes)
+  final Duration value
+  int get hashCode
+  static const Duration minimum
+  static const LifecycleInterval standard
+final class LifecyclePausedForPendingRequestEvent extends BlueyEvent
+  LifecyclePausedForPendingRequestEvent({required ClientAddress clientAddress, String? source})
+  String toString()
+  final ClientAddress clientAddress
+class LocalIdentityRequiredException extends BlueyException
+  const LocalIdentityRequiredException(String operation)
+class ManufacturerData
+  String toString()
+  bool ==(Object other)
+  const ManufacturerData(int companyId, Uint8List data)
+  final Uint8List data
+  final int companyId
+  int get hashCode
+  static const int apple
+  static const int google
+  static const int microsoft
+class Mtu
+  String toString()
+  bool ==(Object other)
+  factory Mtu(int value, {required Capabilities capabilities})
+  factory Mtu.fromPlatform(int value)
+  final int value
+  int get hashCode
+  static const Mtu minimum
+class NotABlueyPeerException extends BlueyException
+  NotABlueyPeerException(DeviceAddress deviceAddress)
+  String toString()
+  final DeviceAddress deviceAddress
+final class NotificationReceivedEvent extends BlueyEvent
+  NotificationReceivedEvent({required DeviceAddress deviceAddress, required UUID characteristicId, required int valueLength, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final UUID characteristicId
+  final int valueLength
+final class NotificationSentEvent extends BlueyEvent
+  NotificationSentEvent({required UUID characteristicId, required int valueLength, ClientAddress? clientAddress, String? source})
+  String toString()
+  final ClientAddress? clientAddress
+  final UUID characteristicId
+  final int valueLength
+final class NotificationSubscriptionEvent extends BlueyEvent
+  NotificationSubscriptionEvent({required DeviceAddress deviceAddress, required UUID characteristicId, required bool enabled, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final UUID characteristicId
+  final bool enabled
+class OperationNotSupportedException extends BlueyException
+  const OperationNotSupportedException(String operation)
+  final String operation
+abstract class PeerClient
+  Client get client
+  ServerId get serverId
+  factory PeerClient.create({required Client client, required ServerId serverId})
+abstract class PeerConnection
+  Connection get connection
+  Future<List<RemoteService>> services({bool cache = false})
+  Future<bool> hasService(UUID uuid)
+  Future<void> disconnect()
+  RemoteService service(UUID uuid)
+  ServerId get serverId
+  factory PeerConnection.create({required Connection connection, required ServerId serverId, required LifecycleClient lifecycleClient})
+final class PeerDeclaredUnreachableEvent extends BlueyEvent
+  PeerDeclaredUnreachableEvent({required DeviceAddress deviceAddress, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+class PeerIdentityMismatchException extends BlueyException
+  PeerIdentityMismatchException(ServerId expected, ServerId actual)
+  final ServerId actual
+  final ServerId expected
+class PeerNotFoundException extends BlueyException
+  PeerNotFoundException(ServerId expected, Duration timeout)
+  final Duration timeout
+  final ServerId expected
+class PeripheralLatency
+  PeripheralLatency(int events)
+  String toString()
+  bool ==(Object other)
+  final int events
+  int get hashCode
+class PermissionDeniedException extends BlueyException
+  PermissionDeniedException(List<String> permissions)
+  final List<String> permissions
+enum Phy
+  Phy le1m
+  Phy le2m
+  Phy leCoded
+class ReadRequest
+  const ReadRequest({required Client client, required UUID characteristicId, required int offset, required int internalRequestId})
+  final Client client
+  final UUID characteristicId
+  final int internalRequestId
+  final int offset
+final class ReadRequestEvent extends BlueyEvent
+  ReadRequestEvent({required ClientAddress clientAddress, required UUID characteristicId, String? source})
+  String toString()
+  final ClientAddress clientAddress
+  final UUID characteristicId
+abstract class RemoteCharacteristic
+  AttributeHandle get handle
+  CharacteristicProperties get properties
+  Future<Uint8List> read()
+  Future<void> write(Uint8List value, {bool withResponse = true})
+  List<RemoteDescriptor> descriptors({UUID? uuid})
+  RemoteDescriptor descriptor(UUID uuid)
+  Stream<Uint8List> get notifications
+  UUID get uuid
+abstract class RemoteDescriptor
+  AttributeHandle get handle
+  Future<Uint8List> read()
+  Future<void> write(Uint8List value)
+  UUID get uuid
+abstract class RemoteService
+  List<RemoteCharacteristic> characteristics({UUID? uuid})
+  List<RemoteService> get includedServices
+  RemoteCharacteristic characteristic(UUID uuid)
+  UUID get uuid
+  bool get isPrimary
+class RespondNotFoundException extends BlueyException
+  String toString()
+  const RespondNotFoundException(String message)
+enum ScanMode
+  ScanMode balanced
+  ScanMode lowLatency
+  ScanMode lowPower
+class ScanResult
+  ScanResult({required Device device, required int rssi, required Advertisement advertisement, DateTime? lastSeen})
+  String toString()
+  bool ==(Object other)
+  final Advertisement advertisement
+  final DateTime lastSeen
+  final Device device
+  final int rssi
+  int get hashCode
+final class ScanStartedEvent extends BlueyEvent
+  ScanStartedEvent({List<UUID>? serviceFilter, Duration? timeout, String? source})
+  String toString()
+  final Duration? timeout
+  final List<UUID>? serviceFilter
+final class ScanStartingEvent extends BlueyEvent
+  ScanStartingEvent({List<UUID>? serviceFilter, Duration? timeout, String? source})
+  String toString()
+  final Duration? timeout
+  final List<UUID>? serviceFilter
+enum ScanState
+  ScanState invalidated
+  ScanState scanning
+  ScanState starting
+  ScanState stopped
+  ScanState stopping
+final class ScanStoppedEvent extends BlueyEvent
+  ScanStoppedEvent({String? reason, String? source})
+  String toString()
+  final String? reason
+final class ScanStoppingEvent extends BlueyEvent
+  ScanStoppingEvent({String? source})
+  String toString()
+abstract class Scanner
+  Future<void> stop()
+  ScanState get state
+  Stream<ScanResult> scan({List<UUID>? services, Duration? timeout, ScanMode? mode})
+  Stream<ScanState> get stateChanges
+  bool get isScanning
+  void dispose()
+abstract class Server
+  AdvertisingState get advertisingState
+  Future<void> addService(HostedService service)
+  Future<void> dispose()
+  Future<void> indicate(UUID characteristic, {required Uint8List data})
+  Future<void> indicateTo(Client client, UUID characteristic, {required Uint8List data})
+  Future<void> notify(UUID characteristic, {required Uint8List data})
+  Future<void> notifyTo(Client client, UUID characteristic, {required Uint8List data})
+  Future<void> removeService(UUID uuid)
+  Future<void> respondToRead(ReadRequest request, {required GattResponseStatus status, Uint8List? value})
+  Future<void> respondToWrite(WriteRequest request, {required GattResponseStatus status})
+  Future<void> startAdvertising({String? name, List<UUID>? services, ManufacturerData? manufacturerData, Duration? timeout, AdvertiseMode? mode, bool peerDiscoverable = false})
+  Future<void> stopAdvertising()
+  List<Client> get connectedClients
+  ServerId get serverId
+  Stream<AdvertisingState> get advertisingStateChanges
+  Stream<Client> get connections
+  Stream<ClientAddress> get disconnections
+  Stream<PeerClient> get peerConnections
+  Stream<ReadRequest> get readRequests
+  Stream<WriteRequest> get writeRequests
+  bool get isAdvertising
+  bool isClientConnected(ClientAddress address)
+class ServerId
+  ServerId(String value)
+  String toString()
+  Uint8List toBytes()
+  bool ==(Object other)
+  factory ServerId.fromBytes(Uint8List bytes)
+  factory ServerId.generate()
+  final String value
+  int get hashCode
+class ServerRespondFailedException extends BlueyException
+  ServerRespondFailedException({required String operation, required int status, required ClientAddress clientAddress, required UUID characteristicId})
+  final ClientAddress clientAddress
+  final String operation
+  final UUID characteristicId
+  final int status
+final class ServerStartedEvent extends BlueyEvent
+  ServerStartedEvent({String? source})
+  String toString()
+final class ServiceAddedEvent extends BlueyEvent
+  ServiceAddedEvent({required UUID serviceId, String? source})
+  String toString()
+  final UUID serviceId
+class ServiceNotFoundException extends BlueyException
+  const ServiceNotFoundException(UUID serviceUuid)
+  final UUID serviceUuid
+abstract final class Services
+  static final UUID battery
+  static final UUID bloodPressure
+  static final UUID currentTime
+  static final UUID cyclingPower
+  static final UUID cyclingSpeedAndCadence
+  static final UUID deviceInformation
+  static final UUID environmentalSensing
+  static final UUID fitnessMachine
+  static final UUID genericAccess
+  static final UUID genericAttribute
+  static final UUID healthThermometer
+  static final UUID heartRate
+  static final UUID immediateAlert
+  static final UUID linkLoss
+  static final UUID locationAndNavigation
+  static final UUID runningSpeedAndCadence
+  static final UUID txPower
+final class ServicesDiscoveredEvent extends BlueyEvent
+  ServicesDiscoveredEvent({required DeviceAddress deviceAddress, required int serviceCount, String? source})
+  String toString()
+  final DeviceAddress deviceAddress
+  final int serviceCount
+class StaleHandleException extends BlueyException
+  BluetoothState? get triggeringState
+  StaleHandleException({required InvalidatedInstance instanceType, required InvalidationCause cause})
+  final InvalidatedInstance instanceType
+  final InvalidationCause cause
+class SupervisionTimeout
+  String toString()
+  SupervisionTimeout(int milliseconds)
+  bool ==(Object other)
+  final int milliseconds
+  int get hashCode
+class UUID
+  String get shortString
+  String toShortString()
+  String toString()
+  UUID(String value)
+  bool ==(Object other)
+  bool get isShort
+  factory UUID.short(int value)
+  int get hashCode
+class UnsupportedOperationException extends BlueyException
+  const UnsupportedOperationException(String operation, String platform)
+  final String operation
+  final String platform
+class WritePayloadLimit
+  String toString()
+  bool ==(Object other)
+  factory WritePayloadLimit(int value)
+  factory WritePayloadLimit.fromPlatform(int value)
+  final int value
+  int get hashCode
+class WriteRequest
+  const WriteRequest({required Client client, required UUID characteristicId, required Uint8List value, required int offset, required bool responseNeeded, required int internalRequestId})
+  final Client client
+  final UUID characteristicId
+  final Uint8List value
+  final bool responseNeeded
+  final int internalRequestId
+  final int offset
+final class WriteRequestEvent extends BlueyEvent
+  String toString()
+  WriteRequestEvent({required ClientAddress clientAddress, required UUID characteristicId, required int valueLength, String? source})
+  final ClientAddress clientAddress
+  final UUID characteristicId
+  final int valueLength
+const int maxAttributeValueLength

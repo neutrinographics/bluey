@@ -4,8 +4,9 @@ title: Set up continuous integration so all six test gates run automatically
 category: unimplemented
 severity: medium
 platform: both
-status: open
-last_verified: 2026-09-02
+status: fixed
+last_verified: 2026-11-17
+fixed_in: 0c62903
 ---
 
 ## What this is
@@ -42,3 +43,7 @@ documented in CLAUDE.md.
 
 - [Testing conventions](../testing-conventions.md) — "Which gate to run".
 - Audit context: [2026-07-10 networking-scenario test audit](../reviews/2026-07-10-networking-scenario-test-audit.md) (R5 asked for XCTest "in the routine gate"; this item is what makes any gate routine).
+
+## Audit 2026-11-17
+
+Fixed by `0c62903` (Run every gate on every pull request with GitHub Actions). The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) (L12) found that a fresh checkout did not resolve on current Flutter stable, because no SDK version was pinned and no lockfile was committed; `fa63907` (Pin Flutter 3.47.2 and commit the workspace lockfile) closed that. Both landed in the architecture foundation slice ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)).

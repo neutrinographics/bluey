@@ -2,10 +2,10 @@
 id: I063
 title: Android late GATT callback can be misrouted after app-level timeout
 category: bug
-severity: medium
+severity: high
 platform: android
 status: open
-last_verified: 2026-04-23
+last_verified: 2026-11-17
 ---
 
 ## Symptom
@@ -34,3 +34,7 @@ Two concerns:
 Option 1 (iOS-parity) is the most robust. Option 2 (queue pause) is simpler but relies on the assumption that a late callback does arrive. If the native stack never delivers it (e.g., connection dropped silently), the queue is permanently stuck — worse than today.
 
 Implement option 1: add an `expectedDrops: Int` counter on the queue. On timeout, `expectedDrops += 1`. In `onComplete`, if `expectedDrops > 0`, decrement and return without touching `current`. Reset on `drainAll`. Same shape as OpSlot's `pendingDrops`.
+
+## Audit 2026-11-17
+
+The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) (H1) gives this a trigger that needs no timeout: any unsolicited callback, such as an MTU change the peer starts. `GattOpQueue.onComplete` completes the current op with no check that the callback belongs to it, and every `onMtuChanged` is routed there, including the peer-initiated ones. A service discovery in flight completes early with a partial tree, a write completes as a false success and shifts every later result by one, and a read hits a failing cast that the queue swallows so the Dart future never completes. Found by reading; whether Android delivers the event to the client callback needs a device or emulator check. Severity is now high. Closed by slice 4 (native completions) of the architecture foundation ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)): tag each callback with its op kind and complete only a matching op.

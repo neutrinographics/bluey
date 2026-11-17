@@ -2,10 +2,10 @@
 id: I308
 title: Domain layer catches Flutter `PlatformException` directly (framework dependency leak)
 category: limitation
-severity: low
+severity: medium
 platform: domain
 status: open
-last_verified: 2026-04-29
+last_verified: 2026-11-17
 related: [I309, I099]
 ---
 
@@ -31,3 +31,7 @@ Fix shape: move the Pigeon-`PlatformException` wrapping into the platform adapte
 Cost-benefit: low severity. The current setup works; the dependency leak is purely architectural. Worth fixing if a non-Flutter Dart consumer of the domain layer ever materializes, or as part of a broader DDD pass on bounded-context dependencies.
 
 Related to I309 — both are facets of "domain layer has implementation-detail dependencies it shouldn't carry."
+
+## Audit 2026-11-17
+
+Measured by the `frameworkPlacement` and `publicExports` lists in `test/architecture/known_violations.dart`. Closed by each slice shrinking the lists, and slice 6 (what is left) emptying them. Each entry on those lists leaves in the commit that fixes it, so the lists show how far this has come. See [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) and the architecture foundation [design](../superpowers/specs/2026-11-17-architecture-foundation-design.md).

@@ -2,9 +2,10 @@
 id: I336
 title: `BlueyScanner` does not support overlapping `scan()` calls
 category: bug
-severity: low
+severity: medium
 platform: domain
 status: open
+last_verified: 2026-11-17
 related: [I335]
 ---
 
@@ -82,3 +83,7 @@ Codex on PR #32 as a P2 footgun.
 - Both resolution options are independent of the stream-conventions
   work that just shipped; the design conventions themselves are
   uniform either way.
+
+## Audit 2026-11-17
+
+The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) (M4) names the everyday trigger: restarting a scan without awaiting the cancel (`sub.cancel(); scanner.scan()`), or as the timeout fires. The suspended `stop()` resumes, cancels the new subscription and sets `stopped`, so the radio keeps scanning, the stream is silent and `stop()` is a no-op. Severity is now medium. Test: `M4 (I336)` in `bluey/test/known_defects/domain_known_defects_test.dart`. Closed by slice 2 (scanning and advertising sessions) of the architecture foundation ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)).

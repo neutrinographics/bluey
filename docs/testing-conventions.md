@@ -67,11 +67,72 @@ classes drift (audit DA-38). The scenario surface, briefly:
   prefer asserting on them over `expect(true, isTrue)`-style "didn't
   throw" tests.
 
+## Where a test lives
+
+A test file mirrors its source file's path, so the test of a file is
+found without searching: `lib/src/features/connection/domain/link_state.dart`
+is tested by `test/features/connection/domain/link_state_test.dart`. An
+existing test moves with its source, in the slice that moves it. In-memory
+doubles of a port live in `test/fixtures/` under the same tree.
+
+## How a test is laid out
+
+A `group` names the scenario, and each test inside it is laid out with
+`// arrange`, `// act` and `// assert`. Leave a phase comment out only
+when that phase has no statement.
+
+```dart
+group('a scan that is restarted', () {
+  test('delivers the second scan\'s results', () async {
+    // arrange
+    ...
+    // act
+    ...
+    // assert
+    ...
+  });
+});
+```
+
+## Known defects
+
+A known defect is a test that reproduces an audit finding and fails until
+the slice that owns it fixes the bug. The files live in
+`test/known_defects/` (in `bluey` and `bluey_android`) and open with
+`@Tags(['known-defect'])`. Each package's `dart_test.yaml` gives the tag a
+skip reason, so a normal `flutter test` shows each file as one skipped suite.
+Run them on purpose with:
+
+```bash
+cd bluey && flutter test test/known_defects --run-skipped --tags known-defect
+```
+
+They are expected to fail. CI's Known defects job fails when one passes or
+stops running. A fix slice starts by moving its test out of the known-defect
+file into the mirrored tree, where it fails: that is its red step. The move
+and the fix land in one commit. `docs/ARCHITECTURE.md` (section 9) has the
+whole rule.
+
 ## Which gate to run
 
-Dart: `flutter test` per package. Android native: Gradle (see
-CLAUDE.md). iOS native: XCTest via xcodebuild (see CLAUDE.md; the
-scheme's eligible simulator list is constrained — check
-`xcodebuild -showdestinations` when the destination errors). There is
-no CI yet (backlog I351) — run the native gates manually when touching
-Kotlin/Swift.
+CI runs all of these: every pull request runs `.github/workflows/ci.yml`,
+and XCTest runs from `ios.yml`. `docs/ARCHITECTURE.md` (section 10) lists
+each gate with its CI job. Locally:
+
+- **Dart:** `flutter test` per package; `dart test` in `bluey_guards`.
+- **Architecture:** `flutter test test/architecture` in a package. A failure
+  names what is new and what is stale on its list; `docs/ARCHITECTURE.md`
+  (section 5) says what to do with each.
+- **Public API:** `cd bluey && dart run bluey_guards:public_api lib/bluey.dart
+  api/bluey.api`. Add `--write` after a change that was meant, and review the
+  dump's diff as an API change.
+- **Coverage floor:** `cd bluey && flutter test --coverage && dart run
+  bluey_guards:coverage_gate coverage/lcov.info 90`.
+- **Known defects:** the command above, or the job's JSON form and verdict in
+  `docs/ARCHITECTURE.md` (section 10).
+- **Android native:** Gradle (see CLAUDE.md; create the wrapper once per
+  checkout).
+- **iOS native:** XCTest via xcodebuild (see CLAUDE.md; the scheme's eligible
+  simulator list is constrained — check `xcodebuild -showdestinations` when
+  the destination errors). CI runs it only for pull requests that touch
+  `bluey_ios/`, and nightly, so run it yourself when touching Swift.
