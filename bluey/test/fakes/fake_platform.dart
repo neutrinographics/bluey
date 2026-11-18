@@ -1353,16 +1353,20 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _isScanningPlatform = false;
   }
 
-  /// Keeps a live device's streams across a second connect, and leaves a
-  /// device whose connect fails with no streams and no link, as the real
-  /// platforms do (I369).
+  /// Keeps a live device's link and streams across a second connect, and a
+  /// failed connect undoes only what it opened itself, as the real platforms
+  /// do (I369): a device still connected keeps its link, a first connect
+  /// that fails leaves no streams and no link.
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    final opens = !_connectionStateControllers.containsKey(deviceId);
     try {
       return await _connect(deviceId, config);
     } catch (_) {
-      _connections.remove(deviceId);
-      await _closeDeviceStreams(deviceId);
+      if (opens) {
+        _connections.remove(deviceId);
+        await _closeDeviceStreams(deviceId);
+      }
       rethrow;
     }
   }
@@ -1419,15 +1423,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       StreamController<PlatformNotification>.broadcast,
     );
 
-    _connections[deviceId] = _ConnectedDevice(
-      peripheral: peripheral,
-      stateController: stateController,
-      notificationController: notificationController,
-      mtu: config.mtu ?? 23,
-      subscribedCharacteristics: {},
-    );
-
     if (!alreadyConnected) {
+      _connections[deviceId] = _ConnectedDevice(
+        peripheral: peripheral,
+        stateController: stateController,
+        notificationController: notificationController,
+        mtu: config.mtu ?? 23,
+        subscribedCharacteristics: {},
+      );
       stateController.add(PlatformConnectionState.connected);
     }
 

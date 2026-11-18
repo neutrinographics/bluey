@@ -59,6 +59,26 @@ void main() {
     );
   });
 
+  group('a device connected twice keeps its link', () {
+    test(
+      'the MTU negotiated on the first connect survives the second',
+      () async {
+        // arrange
+        await fake.connect(deviceId, config);
+        await fake.requestMtu(deviceId, 185);
+
+        // act
+        await fake.connect(deviceId, config);
+
+        // assert
+        expect(
+          await fake.getMaximumWriteLength(deviceId, withResponse: true),
+          182,
+        );
+      },
+    );
+  });
+
   group('a drop', () {
     test('reports disconnected, then ends the state stream', () async {
       // arrange
@@ -131,10 +151,14 @@ void main() {
       );
     });
 
-    test('ends the streams of a device that had them', () async {
+    test('leaves a connected device its streams and its connection, since '
+        'an earlier connect opened them', () async {
       // arrange
       await fake.connect(deviceId, config);
-      final states = fake.connectionStateStream(deviceId);
+      final expectation = expectLater(
+        fake.connectionStateStream(deviceId),
+        emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+      );
       fake.simulateConnectFailure(
         deviceId,
         PlatformConnectFailureReason.unknown,
@@ -147,8 +171,9 @@ void main() {
       );
 
       // assert
-      await expectLater(states, emitsDone);
-      expect(fake.connectedDeviceIds, isEmpty);
+      expect(fake.connectedDeviceIds, [deviceId]);
+      fake.simulateDisconnection(deviceId);
+      await expectation;
     });
   });
 
