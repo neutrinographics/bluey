@@ -102,12 +102,12 @@ class _BlueyPeerConnection implements PeerConnection {
     // leak heartbeat traffic until the LifecycleClient's own peer-silence
     // timeout fires (~30s).
     //
-    // The `onDone` path is the I333 invalidation case: when
-    // `BlueyConnection._invalidate()` closes its state controller (e.g.
-    // because the adapter went unavailable), subscribers receive an
-    // `onDone` callback rather than a `disconnected` data event. Without
-    // mirroring the stop here, the lifecycle would keep firing futile
-    // heartbeat probes until its peer-silence-timeout fallback fires.
+    // The `onDone` path matters because every end of a link closes
+    // `stateChanges`, and a link that ends by a radio outage (I333) ends
+    // in `invalidated`, never `disconnected`, so its subscribers see only
+    // the stream close. Without mirroring the stop here, the lifecycle
+    // would keep firing futile heartbeat probes until its
+    // peer-silence-timeout fallback fires.
     _stateSub = _connection.stateChanges.listen(
       (s) {
         if (s == ConnectionState.disconnected) {

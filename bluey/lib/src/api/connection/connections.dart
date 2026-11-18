@@ -6,8 +6,8 @@ import 'connection.dart';
 /// the app already has.
 ///
 /// It keys by session, never by link id, since a later link to the same
-/// device may carry the same id. Both lookups are weak: a Connection the app
-/// has dropped is not kept alive here.
+/// device may carry the same id. A Connection lives as long as its session,
+/// whether or not the app still holds it, and nothing here outlives that.
 final class Connections {
   /// Builds over [present], which assembles the Connection a session shows
   /// the app; the composition root hands it in, since what a Connection is

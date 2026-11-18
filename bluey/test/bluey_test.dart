@@ -399,33 +399,38 @@ void main() {
         expect(connection.deviceAddress, equals(device.address));
       });
 
-      test('a connecting or connected report leaves a live connection as it is', () async {
-        final device = Device(
-          address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
-        );
+      test(
+        'a connecting or connected report leaves a live connection as it is',
+        () async {
+          final device = Device(
+            address: const DeviceAddress(
+              '00000000-0000-0000-0000-aabbccddeeff',
+            ),
+          );
 
-        final states = <ConnectionState>[];
-        final connection = await bluey.connect(device);
-        final subscription = connection.stateChanges.listen(states.add);
+          final states = <ConnectionState>[];
+          final connection = await bluey.connect(device);
+          final subscription = connection.stateChanges.listen(states.add);
 
-        mockPlatform.emitConnectionState(
-          device.address.value,
-          platform.PlatformConnectionState.connecting,
-        );
-        mockPlatform.emitConnectionState(
-          device.address.value,
-          platform.PlatformConnectionState.connected,
-        );
+          mockPlatform.emitConnectionState(
+            device.address.value,
+            platform.PlatformConnectionState.connecting,
+          );
+          mockPlatform.emitConnectionState(
+            device.address.value,
+            platform.PlatformConnectionState.connected,
+          );
 
-        await pumpEventQueue();
-        await subscription.cancel();
+          await pumpEventQueue();
+          await subscription.cancel();
 
-        // The link is already up, so the radio saying it is connecting or
-        // connected changes nothing (design 6.3): the listener sees only the
-        // state replayed to it.
-        expect(states, [ConnectionState.linked]);
-        expect(connection.state, ConnectionState.linked);
-      });
+          // The link is already up, so the radio saying it is connecting or
+          // connected changes nothing (design 6.3): the listener sees only the
+          // state replayed to it.
+          expect(states, [ConnectionState.linked]);
+          expect(connection.state, ConnectionState.linked);
+        },
+      );
     });
 
     group('disconnect', () {

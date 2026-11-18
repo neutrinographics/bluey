@@ -13,12 +13,12 @@ const _measurement = '00002a37-0000-1000-8000-00805f9b34fb';
 
 void main() {
   const address = 'AA:BB:CC:DD:EE:01';
-  late FakeBlueyPlatform fake;
+  late _DisconnectCountingPlatform fake;
   late Bluey bluey;
   final device = Device(address: const DeviceAddress(address));
 
   setUp(() async {
-    fake = FakeBlueyPlatform(capabilities: platform.Capabilities.android);
+    fake = _DisconnectCountingPlatform();
     platform.BlueyPlatform.instance = fake;
     bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
   });
@@ -83,15 +83,16 @@ void main() {
       await pumpEventQueue();
 
       // act
-      await connection.disconnect();
-      await pumpEventQueue();
+      final disconnecting = connection.disconnect();
 
       // assert
+      await expectLater(disconnecting, completes);
       expect(
         done,
         isTrue,
         reason: 'disconnect() early-returns, so cleanup can never run',
       );
+      expect(fake.disconnectsAsked, 0);
     });
   });
 
@@ -247,4 +248,19 @@ void main() {
       expect(reconnected.state.isConnected, isTrue);
     });
   });
+}
+
+/// The fake on Android's capabilities, counting the disconnects asked of it,
+/// so a test can show that a link already gone is not closed again.
+final class _DisconnectCountingPlatform extends FakeBlueyPlatform {
+  _DisconnectCountingPlatform()
+    : super(capabilities: platform.Capabilities.android);
+
+  int disconnectsAsked = 0;
+
+  @override
+  Future<void> disconnect(String deviceId) {
+    disconnectsAsked++;
+    return super.disconnect(deviceId);
+  }
 }

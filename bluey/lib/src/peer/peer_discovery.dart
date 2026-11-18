@@ -118,9 +118,9 @@ class PeerDiscovery {
 
     try {
       await windowClosed.future;
+    } finally {
       // Queued probes return at once; only the one in flight is awaited.
       await probeChain;
-    } finally {
       deadline.cancel();
       // Not awaited — see the matching note in [connectTo].
       unawaited(sub.cancel());

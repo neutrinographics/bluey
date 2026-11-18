@@ -26,8 +26,9 @@ final class BorrowedConnection {
 
   /// Ends the borrow; the link closes only if nobody else uses it.
   ///
-  /// Throws a BlueyException when the close fails, and the link then stays
-  /// as it was.
+  /// Throws a BlueyException when the close fails. The borrow is over even
+  /// then: a second give-back does nothing, and the link stays up until
+  /// someone disconnects it.
   Future<void> giveBack() => _giveBack();
 
   /// Ends the borrow by handing the link to the app, which then holds it and

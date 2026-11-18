@@ -534,9 +534,9 @@ class Bluey {
   /// Attempts to wrap an existing raw [Connection] in a [PeerConnection].
   ///
   /// Returns `null` if [connection] does not host the Bluey lifecycle
-  /// control service. Unlike [connectAsPeer], this does not disconnect
-  /// the connection on miss — the caller already owns it and decides
-  /// what to do next.
+  /// control service. This never closes the link on a miss: the caller
+  /// already owns the connection and decides what to do next, as with
+  /// any link it holds.
   ///
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer

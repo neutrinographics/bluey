@@ -116,7 +116,7 @@ final class PlatformLinks implements Links {
             BlueyLogLevel.warn,
             'bluey.connection',
             'link left open',
-            data: {'device': connectionId},
+            data: {'link': connectionId},
             errorCode: failure.runtimeType.toString(),
           ),
           (_) {},

@@ -104,7 +104,7 @@ void main() {
           (BlueyLogLevel.warn, 'bluey.connection', 'link left open'),
         ],
       );
-      expect(log.records.last.data, {'device': device.value});
+      expect(log.records.last.data, {'link': device.value});
     });
   });
 
