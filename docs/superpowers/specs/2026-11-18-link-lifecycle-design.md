@@ -308,6 +308,9 @@ Apart from `Mtu`'s constructor and those last two points, this pull request chan
 | `disconnect()` that fails leaves the Connection usable instead of stuck in `disconnecting` | Fix |
 | A `connecting` or `connected` report from the platform about a live Connection no longer changes its state (section 6.3's table) | Refinement (added during the build) |
 | `connectAsPeer` on a device the app is already linked to leaves that link up when the device turns out not to be a peer, and a link it opened is closed when the peer check itself fails | Fix (section 6.5, plan ruling 3; added during the build) |
+| A Connection the app holds in `linked` becomes `ready`, and reports it on `stateChanges`, when a probe reads over its link, because the probe discovers services (section 6.9) | Refinement (added during the build) |
+| A second `disconnect()` made while one is in flight waits for it and answers as it does, a failure included, where it returned at once | Refinement (added during the build) |
+| An error on the platform's connection-state stream no longer reaches `Connection.stateChanges`; the Connection ends as a drop, and the platform is asked to close the link | Refinement (added during the build) |
 | `DisconnectedException.reason` on an ended Connection is `requested` after the app's own disconnect and `linkLoss` after a drop, where it was `unknown` for both | Refinement (call 4) |
 | `DisconnectedEvent` is now emitted when a link ends, and probe links appear on `bluey.events` | Refinement (call 5) |
 | `BlueyEvent` is no longer sealed | Breaking, approved in the foundation design |

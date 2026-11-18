@@ -91,6 +91,7 @@ Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and r
 - ☐ **Low** — [Answer a pending connect when the disconnect fallback fires](backlog/I389-answer-pending-connect-when-disconnect-fallback-fires.md) · The 5 s disconnect fallback leaves a pending connect unanswered (audit L4). · Slice 4 (native completions)
 - ☑ **Low** — [Keep a disconnected Connection disconnected](backlog/I391-keep-disconnected-connection-disconnected.md) · A re-emitting platform stream can move a `disconnected` connection back to `linked` (audit L6). · Slice 1 (link lifecycle), fixed in `3e6a653`
 - ☐ **Low** — [Report an app-requested iOS disconnect as done when the link is down](backlog/I395-report-app-requested-ios-disconnect-as-done-when-link-down.md) · A disconnect the app asked for reports failure when the link dropped with an error (audit L10). · Slice 4 (native completions)
+- ☐ **Low** — [Emit Android's `DISCONNECTING` only after `gatt.disconnect()` succeeds](backlog/I397-emit-android-disconnecting-only-after-gatt-disconnect-succeeds.md) · The plugin echoes a local disconnect request as `DISCONNECTING` even when the request then fails; the Dart side filters it.
 
 ## GATT Client
 

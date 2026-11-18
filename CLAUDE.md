@@ -129,7 +129,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 - **Streams over callbacks** - all async events use Dart Streams
 - **Immutable data, mutable connections** - Device/Advertisement are snapshots; Connection state is observable
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
-- **Sealed classes** for exceptions and domain events (exhaustive pattern matching)
+- **Sealed exceptions, open events** - exceptions are sealed families (exhaustive pattern matching); domain events share an open base, `BlueyEvent`, so a `switch` over them needs a default branch
 
 ### Handle-based attribute identity (post-I088)
 
