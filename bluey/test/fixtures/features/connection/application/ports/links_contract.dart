@@ -80,6 +80,8 @@ void linksContract(String name, LinksHarness Function() create) {
       },
     );
 
+    // A platform reports the close it was asked for, the in-memory radio
+    // says nothing: either way nothing but that close may come before the end.
     test('a closed link\'s reports end', () async {
       // arrange
       final id = await openLink();
@@ -89,7 +91,10 @@ void linksContract(String name, LinksHarness Function() create) {
 
       // assert
       expect(answer, const Right<ConnectionFailure, void>(null));
-      await expectLater(h.links.reportsOf(id), emitsThrough(emitsDone));
+      await expectLater(
+        h.links.reportsOf(id),
+        emitsInOrder([mayEmit(LinkReport.disconnected), emitsDone]),
+      );
     });
 
     test(
