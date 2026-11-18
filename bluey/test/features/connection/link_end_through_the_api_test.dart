@@ -96,27 +96,6 @@ void main() {
   });
 
   group('A Connection whose link the peer dropped', () {
-    test(
-      'a dropped Connection stays disconnected when the device links again',
-      () async {
-        // arrange
-        fake.simulatePeripheral(id: address);
-        final connection = await bluey.connect(device);
-
-        // act
-        fake.simulateDisconnection(address);
-        await pumpEventQueue();
-        final again = await bluey.connect(device);
-        await pumpEventQueue();
-
-        // assert
-        expect(
-          (connection.state, again.state.isConnected),
-          (ConnectionState.disconnected, true),
-        );
-      },
-    );
-
     test('an operation after a drop fails with linkLoss', () async {
       // arrange
       simulateSensor();

@@ -143,18 +143,21 @@ void main() {
       mockPlatform.dispose();
     });
 
-    test('a second connect returns the same Connection and announces nothing', () async {
-      // arrange
-      final first = await bluey.connect(device);
+    test(
+      'a second connect returns the same Connection and announces nothing',
+      () async {
+        // arrange
+        final first = await bluey.connect(device);
 
-      // act
-      final second = await bluey.connect(device);
-      await pumpEventQueue();
+        // act
+        final second = await bluey.connect(device);
+        await pumpEventQueue();
 
-      // assert
-      expect(identical(first, second), isTrue);
-      expect(events.whereType<ConnectedEvent>(), hasLength(1));
-    });
+        // assert
+        expect(identical(first, second), isTrue);
+        expect(events.whereType<ConnectedEvent>(), hasLength(1));
+      },
+    );
 
     test('two connects at once start one platform connect', () async {
       // act
@@ -184,6 +187,29 @@ void main() {
       expect(mockPlatform.connects, hasLength(2));
     });
 
+    test(
+      'a dropped Connection stays disconnected when the platform reports the device connected again',
+      () async {
+        // arrange
+        final connection = await bluey.connect(device);
+        mockPlatform.emitConnectionState(
+          device.address.value,
+          platform.PlatformConnectionState.disconnected,
+        );
+        await pumpEventQueue();
+
+        // act
+        mockPlatform.emitConnectionState(
+          device.address.value,
+          platform.PlatformConnectionState.connected,
+        );
+        await pumpEventQueue();
+
+        // assert
+        expect(connection.state, ConnectionState.disconnected);
+      },
+    );
+
     test('a drop publishes DisconnectedEvent with linkLoss', () async {
       // arrange
       await bluey.connect(device);
@@ -198,37 +224,41 @@ void main() {
       expect(disconnected.reason, 'linkLoss');
     });
 
-    test('a failed connect publishes the ErrorEvent with the exception it throws', () async {
-      // arrange
-      mockPlatform.connectError = const platform.PlatformConnectFailedException(
-        platform.PlatformConnectFailureReason.timeout,
-      );
+    test(
+      'a failed connect publishes the ErrorEvent with the exception it throws',
+      () async {
+        // arrange
+        mockPlatform
+            .connectError = const platform.PlatformConnectFailedException(
+          platform.PlatformConnectFailureReason.timeout,
+        );
 
-      // act
-      Object? thrown;
-      try {
-        await bluey.connect(device);
-      } catch (error) {
-        thrown = error;
-      }
-      await pumpEventQueue();
+        // act
+        Object? thrown;
+        try {
+          await bluey.connect(device);
+        } catch (error) {
+          thrown = error;
+        }
+        await pumpEventQueue();
 
-      // assert
-      expect(
-        thrown,
-        isA<ConnectionException>().having(
-          (e) => e.reason,
-          'reason',
-          ConnectionFailureReason.timeout,
-        ),
-      );
-      final error = events.whereType<ErrorEvent>().single;
-      expect(error.error, same(thrown));
-      expect(
-        error.message,
-        'Connection failed to ${device.address.toShortString()}',
-      );
-    });
+        // assert
+        expect(
+          thrown,
+          isA<ConnectionException>().having(
+            (e) => e.reason,
+            'reason',
+            ConnectionFailureReason.timeout,
+          ),
+        );
+        final error = events.whereType<ErrorEvent>().single;
+        expect(error.error, same(thrown));
+        expect(
+          error.message,
+          'Connection failed to ${device.address.toShortString()}',
+        );
+      },
+    );
   });
 }
 
