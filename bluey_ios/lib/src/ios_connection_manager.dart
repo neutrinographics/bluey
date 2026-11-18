@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter/services.dart' show PlatformException;
 
+import 'device_streams.dart';
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
@@ -72,23 +72,20 @@ Future<T> _translateGattPlatformError<T>(
 /// Handles BLE connection management, GATT client operations, bonding, PHY,
 /// and connection parameter stubs for the iOS platform.
 ///
-/// Delegates to [BlueyHostApi] for native communication and manages
-/// per-device streams for connection state and notifications. Unlike Android,
-/// iOS auto-negotiates MTU and does not expose bonding, PHY, or connection
-/// parameter APIs.
+/// Delegates to [BlueyHostApi] for native communication and to
+/// [DeviceStreams] for each device's connection state and notifications.
+/// Unlike Android, iOS auto-negotiates MTU and does not expose bonding, PHY,
+/// or connection parameter APIs.
 class IosConnectionManager {
   final BlueyHostApi _hostApi;
-
-  final Map<String, StreamController<PlatformConnectionState>>
-  _connectionStateControllers = {};
-  final Map<String, StreamController<PlatformNotification>>
-  _notificationControllers = {};
+  final DeviceStreams _streams = DeviceStreams();
 
   IosConnectionManager(this._hostApi);
 
   // === Connection ===
 
-  /// Connects to a device and creates per-device streams.
+  /// Connects to a device, opening its streams (keeping any a previous
+  /// connect opened) and closing them when the connect fails.
   ///
   /// Failures are re-expressed as [PlatformConnectFailedException]: this
   /// call site knows positionally that no link was ever established, so
@@ -105,13 +102,20 @@ class IosConnectionManager {
   ///
   /// Adapter-unavailable errors keep their own typed form.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    _streams.open(deviceId);
+    try {
+      return await _connectOnHost(deviceId, config);
+    } catch (_) {
+      await _streams.close(deviceId);
+      rethrow;
+    }
+  }
+
+  Future<String> _connectOnHost(
+    String deviceId,
+    PlatformConnectConfig config,
+  ) async {
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
-
-    _connectionStateControllers[deviceId] =
-        StreamController<PlatformConnectionState>.broadcast();
-    _notificationControllers[deviceId] =
-        StreamController<PlatformNotification>.broadcast();
-
     try {
       return await _translateGattPlatformError(
         'connect',
@@ -141,55 +145,35 @@ class IosConnectionManager {
   /// Disconnects from a device and cleans up per-device streams.
   Future<void> disconnect(String deviceId) async {
     await _hostApi.disconnect(deviceId);
-
-    final stateController = _connectionStateControllers.remove(deviceId);
-    await stateController?.close();
-
-    final notificationController = _notificationControllers.remove(deviceId);
-    await notificationController?.close();
+    await _streams.close(deviceId);
   }
 
   /// Returns the connection state stream for a connected device.
-  Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
-    final controller = _connectionStateControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
-  }
+  Stream<PlatformConnectionState> connectionStateStream(String deviceId) =>
+      _streams.statesOf(deviceId);
 
   /// Returns the notification stream for a connected device.
-  Stream<PlatformNotification> notificationStream(String deviceId) {
-    final controller = _notificationControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
-  }
+  Stream<PlatformNotification> notificationStream(String deviceId) =>
+      _streams.notificationsOf(deviceId);
 
   // === Callback Handlers ===
 
   /// Handles connection state change events from the platform.
   void onConnectionStateChanged(ConnectionStateEventDto event) {
-    final controller = _connectionStateControllers[event.deviceId];
-    if (controller != null) {
-      controller.add(_mapConnectionState(event.state));
-    }
+    _streams.reportState(event.deviceId, _mapConnectionState(event.state));
   }
 
   /// Handles notification events from the platform, expanding short UUIDs.
   void onNotification(NotificationEventDto event) {
-    final controller = _notificationControllers[event.deviceId];
-    if (controller != null) {
-      controller.add(
-        PlatformNotification(
-          deviceId: event.deviceId,
-          characteristicUuid: expandUuid(event.characteristicUuid),
-          value: event.value,
-          characteristicHandle: event.characteristicHandle,
-        ),
-      );
-    }
+    _streams.reportNotification(
+      event.deviceId,
+      PlatformNotification(
+        deviceId: event.deviceId,
+        characteristicUuid: expandUuid(event.characteristicUuid),
+        value: event.value,
+        characteristicHandle: event.characteristicHandle,
+      ),
+    );
   }
 
   /// Handles MTU change events from the platform.
