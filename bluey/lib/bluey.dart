@@ -25,9 +25,9 @@ export 'src/discovery/scan_state.dart';
 export 'src/discovery/scan.dart';
 
 // Connection bounded context
-export 'src/connection/connection.dart';
-export 'src/connection/android_connection_extensions.dart';
-export 'src/connection/ios_connection_extensions.dart';
+export 'src/api/connection/connection.dart';
+export 'src/api/connection/android_connection_extensions.dart';
+export 'src/api/connection/ios_connection_extensions.dart';
 export 'src/connection/value_objects/attribute_handle.dart';
 export 'src/connection/value_objects/mtu.dart';
 export 'src/connection/value_objects/connection_interval.dart';

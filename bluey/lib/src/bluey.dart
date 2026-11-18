@@ -5,7 +5,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:meta/meta.dart';
 
 import 'connection/bluey_connection.dart';
-import 'connection/connection.dart';
+import 'api/connection/connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';

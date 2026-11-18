@@ -1,4 +1,4 @@
-import '../connection/connection.dart' show Connection;
+import '../api/connection/connection.dart' show Connection;
 import '../gatt_client/gatt.dart' show RemoteService;
 import '../lifecycle.dart' as lifecycle;
 import '../shared/exceptions.dart' show ServiceNotFoundException;

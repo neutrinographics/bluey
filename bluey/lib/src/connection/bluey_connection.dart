@@ -14,10 +14,10 @@ import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
-import 'android_connection_extensions.dart';
-import 'connection.dart';
+import '../api/connection/android_connection_extensions.dart';
+import '../api/connection/connection.dart';
 import 'connection_parameters_mapper.dart';
-import 'ios_connection_extensions.dart';
+import '../api/connection/ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
 import 'value_objects/attribute_handle.dart';
 

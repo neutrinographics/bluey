@@ -1,18 +1,19 @@
-import '../shared/domain/device_address.dart';
-import '../gatt_client/gatt.dart';
-import '../shared/uuid.dart';
+import '../../shared/domain/device_address.dart';
+import '../../gatt_client/gatt.dart';
+import '../../shared/uuid.dart';
 import 'android_connection_extensions.dart';
-import '../features/connection/domain/connection_state.dart';
+import '../../features/connection/domain/connection_state.dart';
 import 'ios_connection_extensions.dart';
-import 'value_objects/write_payload_limit.dart';
+import '../../connection/value_objects/write_payload_limit.dart';
 
-export '../features/connection/domain/connection_state.dart';
-export 'value_objects/connection_interval.dart';
-export 'value_objects/mtu.dart';
-export 'value_objects/peripheral_latency.dart';
-export 'value_objects/supervision_timeout.dart';
-export 'value_objects/write_payload_limit.dart';
-export 'value_objects/connection_parameters.dart' show ConnectionParameters;
+export '../../features/connection/domain/connection_state.dart';
+export '../../connection/value_objects/connection_interval.dart';
+export '../../connection/value_objects/mtu.dart';
+export '../../connection/value_objects/peripheral_latency.dart';
+export '../../connection/value_objects/supervision_timeout.dart';
+export '../../connection/value_objects/write_payload_limit.dart';
+export '../../connection/value_objects/connection_parameters.dart'
+    show ConnectionParameters;
 
 /// Bonding state of a device.
 ///

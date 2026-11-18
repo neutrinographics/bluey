@@ -4,7 +4,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
 import '../connection/bluey_connection.dart';
-import '../connection/connection.dart';
+import '../api/connection/connection.dart';
 import '../shared/domain/device_address.dart';
 import '../shared/application/event_publisher.dart';
 import '../lifecycle.dart' as lifecycle;
