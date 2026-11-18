@@ -1159,14 +1159,33 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   /// Simulates the peripheral disconnecting from us (as central).
+  ///
+  /// The `disconnected` report is the device's last event, as on the real
+  /// platforms (I369): once it is delivered both of the device's streams end
+  /// and are forgotten, so a reconnect opens new ones.
   void simulateDisconnection(String deviceId) {
-    final connection = _connections[deviceId];
+    final connection = _connections.remove(deviceId);
     if (connection != null) {
-      _connections.remove(deviceId);
       connection.stateController.add(PlatformConnectionState.disconnected);
     }
+    unawaited(_closeDeviceStreams(deviceId));
     _failParkedWrites(deviceId);
     _clearHandles(deviceId);
+  }
+
+  /// Ends [deviceId]'s state and notification streams and forgets them;
+  /// safe when it has none.
+  Future<void> _closeDeviceStreams(String deviceId) async {
+    final states = _connectionStateControllers.remove(deviceId);
+    final notifications = _notificationControllers.remove(deviceId);
+    await states?.close();
+    await notifications?.close();
+  }
+
+  /// Fails [deviceId]'s connection-state stream with [error], as a platform
+  /// channel that breaks mid-link would; the stream stays open.
+  void simulateConnectionStateError(String deviceId, Object error) {
+    _connectionStateControllers[deviceId]?.addError(error);
   }
 
   /// Simulates a notification from a connected peripheral.
@@ -1334,8 +1353,21 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _isScanningPlatform = false;
   }
 
+  /// Keeps a live device's streams across a second connect, and leaves a
+  /// device whose connect fails with no streams and no link, as the real
+  /// platforms do (I369).
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    try {
+      return await _connect(deviceId, config);
+    } catch (_) {
+      _connections.remove(deviceId);
+      await _closeDeviceStreams(deviceId);
+      rethrow;
+    }
+  }
+
+  Future<String> _connect(String deviceId, PlatformConnectConfig config) async {
     lastConnectConfig = config;
 
     final latency = operationLatency;
@@ -1377,13 +1409,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Device not found: $deviceId');
     }
 
-    final stateController =
-        StreamController<PlatformConnectionState>.broadcast();
-    final notificationController =
-        StreamController<PlatformNotification>.broadcast();
-
-    _connectionStateControllers[deviceId] = stateController;
-    _notificationControllers[deviceId] = notificationController;
+    final alreadyConnected = _connections.containsKey(deviceId);
+    final stateController = _connectionStateControllers.putIfAbsent(
+      deviceId,
+      StreamController<PlatformConnectionState>.broadcast,
+    );
+    final notificationController = _notificationControllers.putIfAbsent(
+      deviceId,
+      StreamController<PlatformNotification>.broadcast,
+    );
 
     _connections[deviceId] = _ConnectedDevice(
       peripheral: peripheral,
@@ -1393,7 +1427,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       subscribedCharacteristics: {},
     );
 
-    stateController.add(PlatformConnectionState.connected);
+    if (!alreadyConnected) {
+      stateController.add(PlatformConnectionState.connected);
+    }
 
     final link = _outboundLink;
     if (link != null && link.deviceId == deviceId) {
@@ -1410,13 +1446,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> disconnect(String deviceId) async {
+    _applyFaultRules(FakeOp.disconnect, deviceId: deviceId);
     final connection = _connections.remove(deviceId);
     if (connection != null) {
       connection.stateController.add(PlatformConnectionState.disconnected);
-      await connection.stateController.close();
-      await connection.notificationController.close();
-      _connectionStateControllers.remove(deviceId);
-      _notificationControllers.remove(deviceId);
+    }
+    await _closeDeviceStreams(deviceId);
+    if (connection != null) {
       final link = _outboundLink;
       if (link != null && link.deviceId == deviceId) {
         link.peripheral.simulateCentralDisconnection(link.centralId);
@@ -2575,6 +2611,7 @@ class FakeBleLink {
 /// Operations that [FakeBlueyPlatform.enqueueFault] can target.
 enum FakeOp {
   connect,
+  disconnect,
   stopAdvertising,
   closeServer,
   discoverServices,
