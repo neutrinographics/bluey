@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+- **A link the peer dropped ends like one the app closed (H3, I381).** A
+  `Connection` whose link drops now moves to `disconnected`, closes
+  `stateChanges` and its other streams, and fails operations in flight with
+  `DisconnectedException`. Before, only the app's own `disconnect()` cleaned
+  up, and `await for` over a dropped Connection's streams never finished.
+- **An ended Connection stays ended (L6, I391).** A late or repeated platform
+  report can no longer move a `disconnected` Connection back to `linked`.
+  **Behavior change:** a `connecting` or `connected` report from the platform
+  about a live Connection no longer changes its state either.
+- **One link per device, one `Connection`.** A second `bluey.connect(device)`
+  to a device that is already linked returns the same `Connection` object, and
+  publishes no `ConnectingEvent` or `ConnectedEvent`, since no link was opened.
+- **Peer discovery leaves the app's links alone (H2, I380).**
+  `discoverPeers()` and `BlueyPeer.connect()` read a device the app is already
+  linked to over that link and leave it up, where the probe used to disconnect
+  it. A link a probe opens is closed when the probe is done with it. One case
+  is unchanged: on iOS, a probe of a device attached to our `Server` as a
+  client still drops that client (I374).
+- **`connectAsPeer` keeps a link the app holds.** On a device the app is
+  already linked to, `connectAsPeer` leaves that link up when the device turns
+  out not to be a peer, where it used to disconnect it. A link it opened itself
+  is closed both when the device is not a peer and when the peer check fails,
+  where a failed check used to leave it open with nothing able to close it.
+- **Peer discovery stops at the end of its window (L9, I394).** Once the scan
+  window closes no new probe starts: a candidate seen inside the window whose
+  probe has not started when the window closes is not probed and not listed.
+  `discoverPeers()` waits for the probe in flight before it returns, and a
+  `stopScan` that fails is logged and no longer hides the results.
+- **A `disconnect()` that fails leaves the Connection usable**, back in the
+  state it had, instead of stuck in `disconnecting`.
+- **Disconnect reasons say what happened.** `DisconnectedException.reason` on
+  an ended Connection is `requested` after the app's own `disconnect()` and
+  `linkLoss` after a drop, where it was `unknown` for both.
+- **`DisconnectedEvent` is published.** It was declared and never emitted; it
+  is now published on `bluey.events` when a link ends, with `reason`
+  `requested`, `linkLoss` or `radioOutage`. Links that peer discovery opens
+  now appear on `bluey.events` like any other.
+- **`BlueyEvent` is no longer sealed.** **API change:** a `switch` over every
+  `BlueyEvent` needs a default branch.
 - **Dispose is terminal for `Scanner` and `Server` (I368).** Calling
   `scan()`, `addService()`, `startAdvertising()` etc. on a disposed instance
   now throws `StaleHandleException` instead of partially restarting over

@@ -306,6 +306,8 @@ Apart from `Mtu`'s constructor and those last two points, this pull request chan
 | A second `connect()` to a linked device returns the same `Connection`, and announces nothing, since no link was opened | Decided |
 | `discoverPeers()` and `BlueyPeer.connect()` leave the app's links alone | Fix (H2) |
 | `disconnect()` that fails leaves the Connection usable instead of stuck in `disconnecting` | Fix |
+| A `connecting` or `connected` report from the platform about a live Connection no longer changes its state (section 6.3's table) | Refinement (added during the build) |
+| `connectAsPeer` on a device the app is already linked to leaves that link up when the device turns out not to be a peer, and a link it opened is closed when the peer check itself fails | Fix (section 6.5, plan ruling 3; added during the build) |
 | `DisconnectedException.reason` on an ended Connection is `requested` after the app's own disconnect and `linkLoss` after a drop, where it was `unknown` for both | Refinement (call 4) |
 | `DisconnectedEvent` is now emitted when a link ends, and probe links appear on `bluey.events` | Refinement (call 5) |
 | `BlueyEvent` is no longer sealed | Breaking, approved in the foundation design |
