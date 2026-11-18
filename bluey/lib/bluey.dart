@@ -13,11 +13,12 @@ export 'src/shared/manufacturer_data.dart';
 export 'src/shared/characteristic_properties.dart';
 export 'src/shared/exceptions.dart';
 export 'src/shared/gatt_timeouts.dart';
+export 'src/shared/domain/device_address.dart';
+export 'src/shared/domain/bluey_event.dart';
 
 // Discovery bounded context
 export 'src/discovery/scanner.dart';
 export 'src/discovery/device.dart';
-export 'src/discovery/device_address.dart';
 export 'src/discovery/advertisement.dart';
 export 'src/discovery/scan_result.dart';
 export 'src/discovery/scan_state.dart';
@@ -66,5 +67,5 @@ export 'src/lifecycle.dart' show LifecycleInterval;
 export 'src/events.dart';
 
 // Structured logging
-export 'src/log/log_event.dart' show BlueyLogEvent;
-export 'src/log/log_level.dart' show BlueyLogLevel;
+export 'src/shared/application/log_event.dart' show BlueyLogEvent;
+export 'src/shared/application/log_level.dart' show BlueyLogLevel;

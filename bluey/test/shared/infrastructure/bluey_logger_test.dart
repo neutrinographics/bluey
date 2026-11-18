@@ -1,6 +1,7 @@
-import 'package:bluey/src/log/bluey_logger.dart';
-import 'package:bluey/src/log/log_event.dart';
-import 'package:bluey/src/log/log_level.dart';
+import 'package:bluey/src/shared/application/log.dart';
+import 'package:bluey/src/shared/application/log_event.dart';
+import 'package:bluey/src/shared/application/log_level.dart';
+import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -168,6 +169,24 @@ void main() {
       // Nothing was emitted after dispose.
       expect(captured, isEmpty);
       await sub.cancel();
+    });
+
+    test('the logger is the Log port', () {
+      // arrange, act, assert
+      expect(logger, isA<Log>());
+    });
+
+    test('platformLevelOf maps every level by name', () {
+      for (final level in BlueyLogLevel.values) {
+        // arrange
+        final expected = level.name;
+
+        // act
+        final mapped = BlueyLogger.platformLevelOf(level);
+
+        // assert
+        expect(mapped.name, expected);
+      }
     });
   });
 }

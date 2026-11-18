@@ -1,5 +1,5 @@
 import 'package:bluey/src/discovery/device.dart';
-import 'package:bluey/src/discovery/device_address.dart';
+import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

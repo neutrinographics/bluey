@@ -21,8 +21,7 @@ class DeviceAddress {
   const DeviceAddress(this.value);
 
   /// A short form for display/logging only (first 8 chars).
-  String toShortString() =>
-      value.length <= 8 ? value : value.substring(0, 8);
+  String toShortString() => value.length <= 8 ? value : value.substring(0, 8);
 
   @override
   bool operator ==(Object other) =>

@@ -2,7 +2,7 @@ import 'package:bluey/bluey.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../fakes/fake_platform.dart';
+import '../../fakes/fake_platform.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;

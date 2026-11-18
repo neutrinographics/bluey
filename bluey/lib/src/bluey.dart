@@ -11,23 +11,24 @@ import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
-import 'event_bus.dart';
 import 'events.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
-import 'log/bluey_logger.dart';
-import 'log/log_event.dart';
-import 'log/log_level.dart';
 import 'peer/bluey_peer.dart';
 import 'peer/peer.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
-import 'discovery/device_address.dart';
+import 'shared/application/log_event.dart';
+import 'shared/application/log_level.dart';
+import 'shared/domain/bluey_event.dart';
+import 'shared/domain/device_address.dart';
 import 'shared/error_translation.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
+import 'shared/infrastructure/bluey_event_bus.dart';
+import 'shared/infrastructure/bluey_logger.dart';
 
 export 'events.dart';
 export 'discovery/scanner.dart';
@@ -305,7 +306,7 @@ class Bluey {
     _logger.setLevel(level);
     // Fire-and-forget: native filter updates eventually-consistently;
     // events emitted in the meantime are filtered Dart-side anyway.
-    unawaited(_platform.setLogLevel(_mapLogLevelToPlatform(level)));
+    unawaited(_platform.setLogLevel(BlueyLogger.platformLevelOf(level)));
   }
 
   /// Internal logger seam for tests.
@@ -963,21 +964,6 @@ class Bluey {
     await _stateController.close();
     await _eventBus.close();
     await _logger.dispose();
-  }
-
-  platform.PlatformLogLevel _mapLogLevelToPlatform(BlueyLogLevel level) {
-    switch (level) {
-      case BlueyLogLevel.trace:
-        return platform.PlatformLogLevel.trace;
-      case BlueyLogLevel.debug:
-        return platform.PlatformLogLevel.debug;
-      case BlueyLogLevel.info:
-        return platform.PlatformLogLevel.info;
-      case BlueyLogLevel.warn:
-        return platform.PlatformLogLevel.warn;
-      case BlueyLogLevel.error:
-        return platform.PlatformLogLevel.error;
-    }
   }
 
   BluetoothState _mapState(platform.BluetoothState platformState) {

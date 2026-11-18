@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
-import 'log_event.dart';
-import 'log_level.dart';
+import '../application/log.dart';
+import '../application/log_event.dart';
+import '../application/log_level.dart';
 
 /// Internal, in-memory structured logger used across the Bluey domain.
 ///
@@ -13,7 +14,7 @@ import 'log_level.dart';
 ///
 /// This class is the *internal* sink — public exposure (e.g. via the
 /// `Bluey` facade) is layered on top and out of scope for this type.
-class BlueyLogger {
+class BlueyLogger implements Log {
   /// Creates a logger with the given minimum severity threshold.
   BlueyLogger({BlueyLogLevel level = BlueyLogLevel.info}) : _minLevel = level;
 
@@ -40,6 +41,7 @@ class BlueyLogger {
   /// threshold and the logger has not been disposed.
   ///
   /// The event's `timestamp` is captured here using `DateTime.now()`.
+  @override
   void log(
     BlueyLogLevel level,
     String context,
@@ -88,6 +90,23 @@ class BlueyLogger {
   Future<void> dispose() async {
     _disposed = true;
     await _controller.close();
+  }
+
+  /// The platform's name for [level], which the native side filters by, so
+  /// a level set on Bluey costs no Pigeon traffic for the lines it drops.
+  static PlatformLogLevel platformLevelOf(BlueyLogLevel level) {
+    switch (level) {
+      case BlueyLogLevel.trace:
+        return PlatformLogLevel.trace;
+      case BlueyLogLevel.debug:
+        return PlatformLogLevel.debug;
+      case BlueyLogLevel.info:
+        return PlatformLogLevel.info;
+      case BlueyLogLevel.warn:
+        return PlatformLogLevel.warn;
+      case BlueyLogLevel.error:
+        return PlatformLogLevel.error;
+    }
   }
 
   static BlueyLogLevel _mapPlatformLevel(PlatformLogLevel level) {

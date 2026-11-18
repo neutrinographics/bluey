@@ -3,12 +3,12 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import '../discovery/device_address.dart';
-import '../event_bus.dart';
+import '../shared/domain/device_address.dart';
+import '../shared/application/event_publisher.dart';
 import '../events.dart';
 import '../gatt_client/gatt.dart';
-import '../log/bluey_logger.dart';
-import '../log/log_level.dart';
+import '../shared/infrastructure/bluey_logger.dart';
+import '../shared/application/log_level.dart';
 import '../platform/bluetooth_state.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';

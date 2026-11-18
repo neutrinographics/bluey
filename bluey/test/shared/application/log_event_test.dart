@@ -1,5 +1,5 @@
-import 'package:bluey/src/log/log_event.dart';
-import 'package:bluey/src/log/log_level.dart';
+import 'package:bluey/src/shared/application/log_event.dart';
+import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

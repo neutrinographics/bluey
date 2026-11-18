@@ -5,11 +5,11 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 
 import '../connection/bluey_connection.dart';
 import '../connection/connection.dart';
-import '../discovery/device_address.dart';
-import '../event_bus.dart';
+import '../shared/domain/device_address.dart';
+import '../shared/application/event_publisher.dart';
 import '../lifecycle.dart' as lifecycle;
-import '../log/bluey_logger.dart';
-import '../log/log_level.dart';
+import '../shared/infrastructure/bluey_logger.dart';
+import '../shared/application/log_level.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
 

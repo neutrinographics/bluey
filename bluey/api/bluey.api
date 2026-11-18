@@ -112,7 +112,7 @@ class Bluey
   Stream<PeerConnection?> watchPeer(Connection connection)
   static Future<Bluey> create({ServerId? localIdentity, Duration initialStateTimeout = const Duration(seconds: 2)})
   void setLogLevel(BlueyLogLevel level)
-sealed class BlueyEvent
+abstract class BlueyEvent
   BlueyEvent({DateTime? timestamp, String? source})
   String toString()
   final DateTime timestamp
