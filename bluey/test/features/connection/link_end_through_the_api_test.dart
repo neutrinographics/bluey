@@ -177,4 +177,42 @@ void main() {
       },
     );
   });
+
+  group('A connect that overlaps the end of a requested disconnect', () {
+    test('a connect made after the answer and before the ended link\'s last '
+        'report gives a Connection that stays connected', () async {
+      // arrange
+      fake.simulatePeripheral(id: address);
+      fake.disconnectSignals = FakeDisconnectSignals.answerThenReport;
+      final connection = await bluey.connect(device);
+      await connection.disconnect();
+
+      // act
+      final next = await bluey.connect(device);
+      await pumpEventQueue();
+
+      // assert
+      expect(next, isNot(same(connection)));
+      expect(next.state.isConnected, isTrue);
+    });
+
+    test('a connect made while the close is in flight gives a Connection that '
+        'stays connected after the old answer arrives', () async {
+      // arrange
+      fake.simulatePeripheral(id: address);
+      fake.disconnectSignals = FakeDisconnectSignals.reportThenAnswer;
+      final connection = await bluey.connect(device);
+      final closing = connection.disconnect();
+
+      // act
+      final next = bluey.connect(device);
+      await closing;
+      final reconnected = await next;
+      await pumpEventQueue();
+
+      // assert
+      expect(reconnected, isNot(same(connection)));
+      expect(reconnected.state.isConnected, isTrue);
+    });
+  });
 }

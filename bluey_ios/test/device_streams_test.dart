@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluey_ios/src/device_streams.dart';
@@ -160,5 +161,135 @@ void main() {
       // assert
       await received;
     });
+  });
+
+  group('a requested disconnect\'s two signals', () {
+    Future<void> answered() async {}
+
+    test('rule 1: an answer that comes after the last report leaves the '
+        'link opened in between alone', () async {
+      // arrange
+      streams.open('dev');
+      final answer = Completer<void>();
+      final closing = streams.disconnect('dev', () => answer.future);
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+      await pumpEventQueue();
+      streams.open('dev');
+      final next = expectLater(
+        streams.statesOf('dev'),
+        emitsInOrder([
+          PlatformConnectionState.connected,
+          PlatformConnectionState.disconnected,
+          emitsDone,
+        ]),
+      );
+
+      // act
+      answer.complete();
+      await closing;
+      await pumpEventQueue();
+      streams.reportState('dev', PlatformConnectionState.connected);
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+
+      // assert
+      await next;
+    });
+
+    test('rule 2: a last report that comes after the answer is owed to the '
+        'ended link and never reaches the link opened in between', () async {
+      // arrange
+      streams.open('dev');
+      final ended = expectLater(streams.statesOf('dev'), emitsDone);
+      await streams.disconnect('dev', answered);
+      await ended;
+      streams.open('dev');
+      final next = expectLater(
+        streams.statesOf('dev'),
+        emitsInOrder([
+          PlatformConnectionState.connected,
+          PlatformConnectionState.disconnected,
+          emitsDone,
+        ]),
+      );
+
+      // act
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+      await pumpEventQueue();
+      streams.reportState('dev', PlatformConnectionState.connected);
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+
+      // assert
+      await next;
+    });
+
+    test('rule 3: a report about the next link forgives the owed report, so '
+        'the next disconnected report ends the next link', () async {
+      // arrange
+      streams.open('dev');
+      await streams.disconnect('dev', answered);
+      streams.open('dev');
+      final next = expectLater(
+        streams.statesOf('dev'),
+        emitsInOrder([
+          PlatformConnectionState.connected,
+          PlatformConnectionState.disconnected,
+          emitsDone,
+        ]),
+      );
+
+      // act
+      streams.reportState('dev', PlatformConnectionState.connected);
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+
+      // assert
+      await next;
+    });
+
+    test('rule 4: a disconnected report with nothing owed ends the device\'s '
+        'current streams', () async {
+      // arrange
+      streams.open('dev');
+      final answer = Completer<void>();
+      final closing = streams.disconnect('dev', () => answer.future);
+      final states = expectLater(
+        streams.statesOf('dev'),
+        emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+      );
+
+      // act
+      streams.reportState('dev', PlatformConnectionState.disconnected);
+
+      // assert
+      await states;
+      answer.complete();
+      await closing;
+    });
+
+    test(
+      'rule 5: a failed disconnect closes nothing and owes nothing',
+      () async {
+        // arrange
+        streams.open('dev');
+        final states = expectLater(
+          streams.statesOf('dev'),
+          emitsInOrder([
+            PlatformConnectionState.connected,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+
+        // act
+        await expectLater(
+          streams.disconnect('dev', () async => throw StateError('refused')),
+          throwsStateError,
+        );
+        streams.reportState('dev', PlatformConnectionState.connected);
+        streams.reportState('dev', PlatformConnectionState.disconnected);
+
+        // assert
+        await states;
+      },
+    );
   });
 }

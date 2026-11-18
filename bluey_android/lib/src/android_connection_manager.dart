@@ -125,11 +125,9 @@ class AndroidConnectionManager {
     }
   }
 
-  /// Disconnects from a device and cleans up per-device streams.
-  Future<void> disconnect(String deviceId) async {
-    await _hostApi.disconnect(deviceId);
-    await _streams.close(deviceId);
-  }
+  /// Disconnects from a device and ends the streams of the link it closed.
+  Future<void> disconnect(String deviceId) =>
+      _streams.disconnect(deviceId, () => _hostApi.disconnect(deviceId));
 
   /// Returns the connection state stream for the given device.
   ///

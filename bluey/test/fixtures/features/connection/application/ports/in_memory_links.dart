@@ -32,6 +32,8 @@ class InMemoryLinks implements Links, LinksHarness {
   final Map<DeviceAddress, int> _opens = {};
   final Map<DeviceAddress, int> _closes = {};
   final List<Duration?> _openTimeouts = [];
+  final Map<DeviceAddress, CloseSignals> _closeOrders = {};
+  final Map<DeviceAddress, Completer<void>> _heldAnswers = {};
   final StreamController<RadioOutage> _outages =
       StreamController<RadioOutage>.broadcast();
 
@@ -70,6 +72,13 @@ class InMemoryLinks implements Links, LinksHarness {
         UnexpectedPlatformFailure('the close was told to fail'),
       );
     }
+    if (_closeOrders[device] == CloseSignals.reportThenAnswer) {
+      drop(device);
+      final answer = Completer<void>();
+      _heldAnswers[device] = answer;
+      await answer.future;
+      return const Right(null);
+    }
     _end(device);
     return const Right(null);
   }
@@ -100,6 +109,12 @@ class InMemoryLinks implements Links, LinksHarness {
   @override
   void outage(RadioOutage outage) => _outages.add(outage);
 
+  /// A close that answers first never reports afterwards: the radio here
+  /// keeps a late report with the link it is about.
+  @override
+  void orderCloseSignals(DeviceAddress device, CloseSignals order) =>
+      _closeOrders[device] = order;
+
   /// The radio says [report] about [device]'s link.
   void report(DeviceAddress device, LinkReport report) =>
       _reports[_linkOf(device)]!.add(report);
@@ -121,6 +136,7 @@ class InMemoryLinks implements Links, LinksHarness {
     _live[device] = link;
     _devices[link] = device;
     _reports[link] = StreamController<LinkReport>();
+    _heldAnswers.remove(device)?.complete();
     return link;
   }
 

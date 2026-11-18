@@ -25,12 +25,20 @@ abstract class LinksHarness {
   /// Makes the next close of [device]'s link fail.
   void failNextClose(DeviceAddress device);
 
-  /// The peer drops [device]'s link.
+  /// The remote device drops [device]'s link.
   void drop(DeviceAddress device);
 
   /// The adapter leaves `on` for [outage].
   void outage(RadioOutage outage);
+
+  /// Makes every later close of [device]'s link send its two signals in
+  /// [order], the second waiting until the device's next open has linked.
+  void orderCloseSignals(DeviceAddress device, CloseSignals order);
 }
+
+/// The two orders in which a platform sends the signals a requested close
+/// ends a link with, its last report and the close's answer.
+enum CloseSignals { reportThenAnswer, answerThenReport }
 
 const _device = DeviceAddress('AA:BB:CC:DD:EE:01');
 
@@ -193,6 +201,54 @@ void linksContract(String name, LinksHarness Function() create) {
         );
       },
     );
+
+    Future<void> expectLiveReports(LinkId link) async {
+      final seen = <LinkReport>[];
+      var ended = false;
+      h.links.reportsOf(link).listen(seen.add, onDone: () => ended = true);
+      await pumpEventQueue();
+      expect(ended, isFalse, reason: 'a signal about the ended link ended it');
+      h.drop(_device);
+      await pumpEventQueue();
+      expect(seen, [LinkReport.disconnected]);
+      expect(ended, isTrue);
+    }
+
+    test('a link opened between an ended link\'s last report and its close\'s '
+        'answer has live reports', () async {
+      // arrange
+      final first = await openLink();
+      final firstReports = h.links.reportsOf(first);
+      h.orderCloseSignals(_device, CloseSignals.reportThenAnswer);
+      var answered = false;
+      final closing = h.links.close(first).whenComplete(() => answered = true);
+      await expectLater(
+        firstReports,
+        emitsInOrder([mayEmit(LinkReport.disconnected), emitsDone]),
+      );
+      expect(answered, isFalse);
+
+      // act
+      final second = await openLink();
+      await closing;
+
+      // assert
+      await expectLiveReports(second);
+    });
+
+    test('a link opened between a close\'s answer and the ended link\'s last '
+        'report has live reports', () async {
+      // arrange
+      final first = await openLink();
+      h.orderCloseSignals(_device, CloseSignals.answerThenReport);
+      await h.links.close(first);
+
+      // act
+      final second = await openLink();
+
+      // assert
+      await expectLiveReports(second);
+    });
 
     test('an outage reaches every listener in Connection\'s words', () async {
       // arrange

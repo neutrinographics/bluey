@@ -239,4 +239,50 @@ void main() {
       await expectation;
     });
   });
+
+  group('a connect between a requested disconnect\'s two signals', () {
+    Future<void> expectTheNextLinkKeepsItsStreams() async {
+      final next = expectLater(
+        fake.connectionStateStream(deviceId),
+        emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+      );
+      await pumpEventQueue();
+      fake.simulateDisconnection(deviceId);
+      await next;
+    }
+
+    test('a connect made between the last report and the answer keeps its '
+        'streams', () async {
+      // arrange
+      fake.disconnectSignals = FakeDisconnectSignals.reportThenAnswer;
+      await fake.connect(deviceId, config);
+      var answered = false;
+      final closing = fake
+          .disconnect(deviceId)
+          .whenComplete(() => answered = true);
+      await pumpEventQueue();
+      expect(answered, isFalse);
+
+      // act
+      await fake.connect(deviceId, config);
+      await closing;
+
+      // assert
+      await expectTheNextLinkKeepsItsStreams();
+    });
+
+    test('a connect made between the answer and the last report keeps its '
+        'streams', () async {
+      // arrange
+      fake.disconnectSignals = FakeDisconnectSignals.answerThenReport;
+      await fake.connect(deviceId, config);
+      await fake.disconnect(deviceId);
+
+      // act
+      await fake.connect(deviceId, config);
+
+      // assert
+      await expectTheNextLinkKeepsItsStreams();
+    });
+  });
 }

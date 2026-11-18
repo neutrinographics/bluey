@@ -259,6 +259,13 @@ class _FakePlatformHarness implements LinksHarness {
   void drop(DeviceAddress device) => fake.simulateDisconnection(device.value);
 
   @override
+  void orderCloseSignals(DeviceAddress device, CloseSignals order) =>
+      fake.disconnectSignals = switch (order) {
+        CloseSignals.reportThenAnswer => FakeDisconnectSignals.reportThenAnswer,
+        CloseSignals.answerThenReport => FakeDisconnectSignals.answerThenReport,
+      };
+
+  @override
   void outage(RadioOutage outage) => fake.setBluetoothState(switch (outage) {
     RadioOutage.off => BluetoothState.off,
     RadioOutage.unauthorized => BluetoothState.unauthorized,

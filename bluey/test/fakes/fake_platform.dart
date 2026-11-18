@@ -548,6 +548,21 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// tests it would sleep the wall clock.
   Duration? operationLatency;
 
+  /// The order in which a requested disconnect sends its two signals about
+  /// the link it ends, the terminal `disconnected` report and the answer to
+  /// [disconnect]. Android sends the report first and iOS the answer; by
+  /// default the fake sends both at once, so no gap exists between them.
+  ///
+  /// In either order the second signal waits until the device's next
+  /// [connect] has opened its streams, the point at which a late signal can
+  /// meet the device's next link on a phone; a disconnect held for its
+  /// answer completes only then. The fake then keeps each signal with the
+  /// link it is about, as the platform packages' `DeviceStreams` do.
+  FakeDisconnectSignals disconnectSignals = FakeDisconnectSignals.together;
+
+  final Map<String, void Function()> _secondDisconnectSignals = {};
+  final Set<String> _owedLastReport = {};
+
   // === Fault-rule queue (audit R2 / NT-5) ===
   //
   // The general fault-injection mechanism: scripted, ordered rules with
@@ -1423,6 +1438,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       deviceId,
       StreamController<PlatformNotification>.broadcast,
     );
+    _secondDisconnectSignals.remove(deviceId)?.call();
 
     if (!alreadyConnected) {
       _connections[deviceId] = _ConnectedDevice(
@@ -1451,11 +1467,46 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   @override
   Future<void> disconnect(String deviceId) async {
     _applyFaultRules(FakeOp.disconnect, deviceId: deviceId);
-    final connection = _connections.remove(deviceId);
-    if (connection != null) {
-      connection.stateController.add(PlatformConnectionState.disconnected);
+    switch (disconnectSignals) {
+      case FakeDisconnectSignals.together:
+        final connection = _reportLastState(deviceId);
+        await _closeDeviceStreams(deviceId);
+        _tearDownLink(deviceId, connection);
+      case FakeDisconnectSignals.reportThenAnswer:
+        final asked = _connectionStateControllers[deviceId];
+        final connection = _reportLastState(deviceId);
+        unawaited(_closeDeviceStreams(deviceId));
+        _tearDownLink(deviceId, connection);
+        final answer = Completer<void>();
+        _secondDisconnectSignals[deviceId] = answer.complete;
+        await answer.future;
+        if (asked != null &&
+            identical(_connectionStateControllers[deviceId], asked)) {
+          await _closeDeviceStreams(deviceId);
+        }
+      case FakeDisconnectSignals.answerThenReport:
+        final connection = _connections.remove(deviceId);
+        if (_connectionStateControllers.containsKey(deviceId)) {
+          _owedLastReport.add(deviceId);
+        }
+        await _closeDeviceStreams(deviceId);
+        _tearDownLink(deviceId, connection);
+        _secondDisconnectSignals[deviceId] = () =>
+            _reportState(deviceId, PlatformConnectionState.disconnected);
     }
-    await _closeDeviceStreams(deviceId);
+  }
+
+  /// Forgets the device's link, if it has one, and reports `disconnected`
+  /// to it.
+  _ConnectedDevice? _reportLastState(String deviceId) {
+    final connection = _connections.remove(deviceId);
+    connection?.stateController.add(PlatformConnectionState.disconnected);
+    return connection;
+  }
+
+  /// Takes the device's ended link down at the far end and fails what was
+  /// parked on it.
+  void _tearDownLink(String deviceId, _ConnectedDevice? connection) {
     if (connection != null) {
       final link = _outboundLink;
       if (link != null && link.deviceId == deviceId) {
@@ -1465,6 +1516,22 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
     _failParkedWrites(deviceId);
     _clearHandles(deviceId);
+  }
+
+  /// Delivers [state] to the device's current link as the platform packages
+  /// do: a link's last report that its disconnect's answer already
+  /// accounted for is dropped, and any other report means it is no longer
+  /// coming.
+  void _reportState(String deviceId, PlatformConnectionState state) {
+    final owed = _owedLastReport.remove(deviceId);
+    if (owed && state == PlatformConnectionState.disconnected) return;
+    final states = _connectionStateControllers[deviceId];
+    if (states == null) return;
+    states.add(state);
+    if (state == PlatformConnectionState.disconnected) {
+      _connections.remove(deviceId);
+      unawaited(_closeDeviceStreams(deviceId));
+    }
   }
 
   @override
@@ -2610,6 +2677,19 @@ class FakeBleLink {
           service.includedServices.map(_asRemoteService).toList(),
     );
   }
+}
+
+/// How [FakeBlueyPlatform.disconnect] orders the two signals about the link
+/// it ends.
+enum FakeDisconnectSignals {
+  /// Both at once, with no gap between them.
+  together,
+
+  /// The `disconnected` report, then the answer, as Android sends them.
+  reportThenAnswer,
+
+  /// The answer, then the `disconnected` report, as iOS sends them.
+  answerThenReport,
 }
 
 /// Operations that [FakeBlueyPlatform.enqueueFault] can target.

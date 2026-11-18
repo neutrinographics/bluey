@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show PlatformException;
@@ -297,6 +298,77 @@ void main() {
           connectionManager.connectionStateStream('device-1'),
           emitsError(isA<StateError>()),
         );
+      });
+    });
+
+    group('a connect between a requested disconnect\'s two signals', () {
+      const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+
+      void report(ConnectionStateDto state) =>
+          connectionManager.onConnectionStateChanged(
+            ConnectionStateEventDto(deviceId: 'dev', state: state),
+          );
+
+      Future<void> expectTheNextLinkKeepsItsStreams(
+        Future<void> Function() signalAboutTheEndedLink,
+      ) async {
+        final next = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([
+            PlatformConnectionState.connected,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+        await signalAboutTheEndedLink();
+        await pumpEventQueue();
+        report(ConnectionStateDto.connected);
+        report(ConnectionStateDto.disconnected);
+        await next;
+      }
+
+      setUp(() {
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenAnswer((_) async => 'dev');
+      });
+
+      test('a connect made between the last report and the disconnect\'s '
+          'answer keeps its streams', () async {
+        // arrange
+        final answer = Completer<void>();
+        when(
+          () => mockHostApi.disconnect(any()),
+        ).thenAnswer((_) => answer.future);
+        await connectionManager.connect('dev', config);
+        final closing = connectionManager.disconnect('dev');
+        report(ConnectionStateDto.disconnected);
+        await pumpEventQueue();
+
+        // act
+        await connectionManager.connect('dev', config);
+
+        // assert
+        await expectTheNextLinkKeepsItsStreams(() {
+          answer.complete();
+          return closing;
+        });
+      });
+
+      test('a connect made between the disconnect\'s answer and the last '
+          'report keeps its streams', () async {
+        // arrange
+        when(() => mockHostApi.disconnect(any())).thenAnswer((_) async {});
+        await connectionManager.connect('dev', config);
+        await connectionManager.disconnect('dev');
+
+        // act
+        await connectionManager.connect('dev', config);
+
+        // assert
+        await expectTheNextLinkKeepsItsStreams(() async {
+          report(ConnectionStateDto.disconnected);
+        });
       });
     });
 
