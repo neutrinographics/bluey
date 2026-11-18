@@ -50,8 +50,9 @@ class PeerDiscovery {
   /// Scans for Bluey servers, briefly connects to each to read its
   /// [ServerId], and returns a deduplicated list.
   ///
-  /// [timeout] bounds the scan phase. After the timeout, the scan is
-  /// stopped and the collected candidates are probed sequentially.
+  /// [timeout] bounds the scan window: only candidates seen inside it are
+  /// probed, and the result waits for the probe still in flight when it
+  /// closes.
   /// [probeTimeout] bounds each individual probe-connect attempt;
   /// defaults to [defaultProbeTimeout].
   Future<List<ServerId>> discover({
@@ -107,6 +108,7 @@ class PeerDiscovery {
     );
     final sub = _platform.scan(scanConfig).listen(
       (device) {
+        if (windowClosed.isCompleted) return;
         if (!probed.add(device.id)) return;
         probeChain = probeChain.then((_) => probe(device.id));
       },
@@ -129,7 +131,7 @@ class PeerDiscovery {
       deadline.cancel();
       // Not awaited — see the matching note in [connectTo].
       unawaited(sub.cancel());
-      await _platform.stopScan();
+      await _stopScan('discoverPeers');
     }
     _logger.log(
       BlueyLogLevel.info,
@@ -223,7 +225,23 @@ class PeerDiscovery {
       // escapes fakeAsync (parking the caller on the real event loop).
       // stopScan is the authoritative radio-stop.
       unawaited(sub.cancel());
+      await _stopScan('connectTo');
+    }
+  }
+
+  /// Stops the scan, logging a failure rather than raising it: by the time
+  /// the scan is stopped the caller's answer is already known, and a radio
+  /// that refuses to stop must not turn it into an error.
+  Future<void> _stopScan(String operation) async {
+    try {
       await _platform.stopScan();
+    } catch (e) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.peer.discovery',
+        '$operation stopScan failed',
+        data: {'exception': e.runtimeType.toString()},
+      );
     }
   }
 

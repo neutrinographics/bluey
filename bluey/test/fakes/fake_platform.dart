@@ -1350,6 +1350,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    _applyFaultRules(FakeOp.stopScan);
     _isScanningPlatform = false;
   }
 
@@ -2615,6 +2616,7 @@ class FakeBleLink {
 enum FakeOp {
   connect,
   disconnect,
+  stopScan,
   stopAdvertising,
   closeServer,
   discoverServices,
