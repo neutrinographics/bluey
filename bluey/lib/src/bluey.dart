@@ -273,22 +273,18 @@ class Bluey {
   /// receives the current [BluetoothState] as its first event, so callers
   /// never need to read [currentState] separately to seed their UI.
   /// Subsequent events are live platform transitions as usual.
-  Stream<BluetoothState> get stateStream => Stream<BluetoothState>.multi(
-    (controller) {
-      // Replay the current value to this subscriber immediately.
-      if (!_stateController.isClosed) {
-        controller.add(_currentState);
-      }
-      // Then forward all future events from the broadcast controller.
-      final sub = _stateController.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = sub.cancel;
-    },
-    isBroadcast: true,
-  );
+  Stream<BluetoothState> get stateStream =>
+      Stream<BluetoothState>.multi((controller) {
+        if (!_stateController.isClosed) {
+          controller.add(_currentState);
+        }
+        final sub = _stateController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller.onCancel = sub.cancel;
+      }, isBroadcast: true);
 
   /// Stream of diagnostic events from Bluey.
   ///
@@ -418,10 +414,7 @@ class Bluey {
     return BlueyScanner(_platform, _eventBus);
   }
 
-  /// Connect to a device.
-  ///
-  /// [device] - The device to connect to.
-  /// [timeout] - Optional connection timeout.
+  /// Connect to a device, within [timeout] when one is given.
   ///
   /// Returns a raw [Connection]. This method does **not** auto-upgrade
   /// to the Bluey peer protocol even when the device hosts the control
@@ -430,7 +423,16 @@ class Bluey {
   /// devices) or call [tryUpgrade] on the returned connection.
   ///
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(Device device, {Duration? timeout}) async {
+  Future<Connection> connect(Device device, {Duration? timeout}) =>
+      _connecting(device, () async {
+        final answer = await _connectDevice.run(
+          ConnectDeviceRequest(device: device.address, timeout: timeout),
+        );
+        return _connections.of(valueOrThrow(answer, device: device.address));
+      });
+
+  /// Runs [attempt] with [connect]'s checks, log line and [ErrorEvent].
+  Future<T> _connecting<T>(Device device, Future<T> Function() attempt) async {
     _requireAdapterOn();
     _logger.log(
       BlueyLogLevel.info,
@@ -438,24 +440,17 @@ class Bluey {
       'connect entered',
       data: {'address': device.address.value},
     );
-    final request = ConnectDeviceRequest(
-      device: device.address,
-      timeout: timeout,
-    );
-    final answer = await _connectDevice.run(request);
-    return answer.fold((failure) {
-      final error = connectionFailureAsException(
-        failure,
-        device: device.address,
-      );
+    try {
+      return await attempt();
+    } on BlueyException catch (error) {
       _emitEvent(
         ErrorEvent(
           message: 'Connection failed to ${device.address.toShortString()}',
           error: error,
         ),
       );
-      throw error;
-    }, _connections.of);
+      rethrow;
+    }
   }
 
   /// The public Connection a link's session is shown as.
@@ -478,10 +473,10 @@ class Bluey {
   /// Connects to [device] and returns a [PeerConnection] if the device
   /// hosts the Bluey lifecycle control service.
   ///
-  /// Internally calls [connect] to establish the raw GATT connection,
-  /// then attempts to build a peer wrapper. If the device is not a
-  /// Bluey peer (no control service), the underlying connection is
-  /// disconnected and [NotABlueyPeerException] is thrown.
+  /// The device's link is borrowed while it is checked, so a device that
+  /// is not a Bluey peer loses its link only if this call opened it and
+  /// nobody else uses it: a link the app holds stays up. A peer's link
+  /// becomes the app's, and [connect] then returns the same [Connection].
   ///
   /// Use this when the caller knows the target should be a Bluey peer
   /// and wants the peer-protocol surface (stable [ServerId], filtered
@@ -490,8 +485,8 @@ class Bluey {
   ///
   /// Throws [ConnectionException] if the underlying connect fails.
   /// Throws [NotABlueyPeerException] if the device connected but does
-  /// not host the Bluey control service. The underlying connection has
-  /// already been disconnected when this is thrown.
+  /// not host the Bluey control service. The link has already been given
+  /// back when this, or any failure while checking, is thrown.
   ///
   /// **iOS caveat (bidirectional discovery).** On iOS, Core Bluetooth
   /// represents a peer device as a single `CBPeer` regardless of GAP
@@ -515,18 +510,25 @@ class Bluey {
       'connectAsPeer entered',
       data: {'address': device.address.value},
     );
-    final connection = await connect(device, timeout: timeout);
-    final peer = await _tryBuildPeerConnection(
-      connection,
-      peerSilenceTimeout: peerSilenceTimeout,
+    final borrowed = await _connecting(
+      device,
+      () => _borrow(device.address, timeout: timeout),
     );
-    if (peer == null) {
-      // The device connected but isn't a Bluey peer — disconnect and
-      // throw so we don't leak a half-formed connection.
-      await connection.disconnect();
-      throw NotABlueyPeerException(device.address);
+    try {
+      final peer = await _tryBuildPeerConnection(
+        borrowed.connection,
+        peerSilenceTimeout: peerSilenceTimeout,
+      );
+      if (peer != null) {
+        borrowed.keep();
+        return peer;
+      }
+    } catch (_) {
+      await borrowed.giveBack();
+      rethrow;
     }
-    return peer;
+    await borrowed.giveBack();
+    throw NotABlueyPeerException(device.address);
   }
 
   /// Attempts to wrap an existing raw [Connection] in a [PeerConnection].
@@ -720,7 +722,6 @@ class Bluey {
         return null;
       }
 
-      // Read the ServerId.
       final serverIdChar =
           controlService
               .characteristics()
@@ -770,7 +771,6 @@ class Bluey {
         lifecycleClient: lifecycleClient,
       );
     } catch (_) {
-      // Service discovery failed — treat as "not a bluey peer".
       return null;
     }
   }
