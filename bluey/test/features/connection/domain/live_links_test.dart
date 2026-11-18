@@ -232,6 +232,30 @@ void main() {
     });
   });
 
+  group('a give-back or keep with no borrower', () {
+    test('giving back a link no borrower uses is a programming error', () {
+      // arrange
+      final links = heldBy(LinkUser.app);
+
+      // act
+      void giveBackUnborrowed() => links.giveBack(device);
+
+      // assert
+      expect(giveBackUnborrowed, throwsStateError);
+    });
+
+    test('keeping a link no borrower uses is a programming error', () {
+      // arrange
+      final links = heldBy(LinkUser.app);
+
+      // act
+      void keepUnborrowed() => links.keep(device);
+
+      // assert
+      expect(keepUnborrowed, throwsStateError);
+    });
+  });
+
   group('forgetting and other devices', () {
     test('forget removes the device, so the next caller opens', () {
       // arrange

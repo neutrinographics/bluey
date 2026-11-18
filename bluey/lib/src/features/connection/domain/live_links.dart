@@ -34,7 +34,9 @@ enum AfterGiveBack {
 ///
 /// It is a value that answers decisions and touches no radio. It keeps no copy
 /// of a link's state: a caller asking about a device whose link came up hands
-/// that link in, and is answered from it.
+/// that link in, and is answered from it. A device whose give-back answered
+/// [AfterGiveBack.closeTheLink] stays known, used by nobody, until its owner
+/// forgets it once the close has ended the link.
 @immutable
 final class LiveLinks {
   /// No device has a link or an attempt in flight.
@@ -76,18 +78,26 @@ final class LiveLinks {
 
   /// One borrower fewer on [device]'s link, and whether the link must now
   /// close: only when no borrower is left and the app does not hold it.
+  ///
+  /// Only a borrower of a link that came up gives it back; a give-back while
+  /// the open is in flight is not part of the contract. A give-back on a
+  /// known device that no borrower uses is a [StateError], since it would
+  /// hide the next borrower and close the link under them.
   (LiveLinks, AfterGiveBack) giveBack(DeviceAddress device) {
     final entry = _entries[device];
     if (entry == null) return (this, AfterGiveBack.leaveIt);
-    final after = entry.lessOneBorrower();
+    final after = entry.lessOneBorrower(device);
     final answer =
         after.inUse ? AfterGiveBack.leaveIt : AfterGiveBack.closeTheLink;
     return (_with(device, after), answer);
   }
 
   /// One borrower fewer on [device]'s link, which the app now holds.
+  ///
+  /// As with [giveBack], a keep on a known device that no borrower uses is a
+  /// [StateError].
   LiveLinks keep(DeviceAddress device) =>
-      _changed(device, (e) => e.lessOneBorrower().heldByTheApp());
+      _changed(device, (e) => e.lessOneBorrower(device).heldByTheApp());
 
   /// Whether the app holds [device]'s link, or the attempt it started.
   bool appHolds(DeviceAddress device) => _entries[device]?.appHolds ?? false;
@@ -143,6 +153,14 @@ final class _Entry {
   _Entry heldByTheApp() =>
       _Entry(opening: opening, appHolds: true, borrowers: borrowers);
 
-  _Entry lessOneBorrower() =>
-      _Entry(opening: opening, appHolds: appHolds, borrowers: borrowers - 1);
+  _Entry lessOneBorrower(DeviceAddress device) {
+    if (borrowers == 0) {
+      throw StateError('No borrower uses the link to $device.');
+    }
+    return _Entry(
+      opening: opening,
+      appHolds: appHolds,
+      borrowers: borrowers - 1,
+    );
+  }
 }
