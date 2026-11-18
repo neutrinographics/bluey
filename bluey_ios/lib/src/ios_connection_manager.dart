@@ -85,7 +85,7 @@ class IosConnectionManager {
   // === Connection ===
 
   /// Connects to a device, opening its streams (keeping any a previous
-  /// connect opened) and closing them when the connect fails.
+  /// connect opened); a failed connect closes only the streams it opened.
   ///
   /// Failures are re-expressed as [PlatformConnectFailedException]: this
   /// call site knows positionally that no link was ever established, so
@@ -102,11 +102,11 @@ class IosConnectionManager {
   ///
   /// Adapter-unavailable errors keep their own typed form.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
-    _streams.open(deviceId);
+    final opened = _streams.open(deviceId);
     try {
       return await _connectOnHost(deviceId, config);
     } catch (_) {
-      await _streams.close(deviceId);
+      if (opened) await _streams.close(deviceId);
       rethrow;
     }
   }

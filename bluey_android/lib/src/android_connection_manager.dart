@@ -83,8 +83,8 @@ class AndroidConnectionManager {
 
   /// Connects to a device and returns the connection ID.
   ///
-  /// Opens the device's streams, keeping any a previous connect opened,
-  /// and closes them when the connect fails.
+  /// Opens the device's streams, keeping any a previous connect opened;
+  /// a failed connect closes only the streams it opened itself.
   ///
   /// Failures are re-expressed as [PlatformConnectFailedException]:
   /// the native layer reports a connect timeout as `gatt-timeout` and a
@@ -94,11 +94,11 @@ class AndroidConnectionManager {
   /// operation on a connection. Permission and adapter-unavailable
   /// errors keep their own typed forms.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
-    _streams.open(deviceId);
+    final opened = _streams.open(deviceId);
     try {
       return await _connectOnHost(deviceId, config);
     } catch (_) {
-      await _streams.close(deviceId);
+      if (opened) await _streams.close(deviceId);
       rethrow;
     }
   }

@@ -12,16 +12,19 @@ class DeviceStreams {
   final Map<String, StreamController<PlatformConnectionState>> _states = {};
   final Map<String, StreamController<PlatformNotification>> _notifications = {};
 
-  /// Makes the device's streams live, keeping any that already are.
-  void open(String deviceId) {
-    _states.putIfAbsent(
-      deviceId,
-      StreamController<PlatformConnectionState>.broadcast,
-    );
-    _notifications.putIfAbsent(
-      deviceId,
-      StreamController<PlatformNotification>.broadcast,
-    );
+  /// Makes the device's streams live, keeping any that already are, and
+  /// answers whether it created them, so a caller whose connect fails closes
+  /// only streams it opened and never those an earlier link handed out.
+  ///
+  /// A reused pair still belongs to the device, not to this caller: a
+  /// `disconnected` report that arrives while the caller is reconnecting
+  /// ends it, and the reconnected link then has no streams.
+  bool open(String deviceId) {
+    if (_states.containsKey(deviceId)) return false;
+    _states[deviceId] = StreamController<PlatformConnectionState>.broadcast();
+    _notifications[deviceId] =
+        StreamController<PlatformNotification>.broadcast();
+    return true;
   }
 
   /// Ends the device's streams and forgets them; safe when it has none.

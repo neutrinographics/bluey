@@ -261,6 +261,61 @@ void main() {
       );
     });
 
+    group('a second connect the host fails', () {
+      test('keeps the first connection\'s streams attached', () async {
+        // arrange
+        var connects = 0;
+        when(() => mockHostApi.connect(any(), any())).thenAnswer((_) async {
+          connects++;
+          if (connects > 1) {
+            throw PlatformException(code: 'gatt-timeout', message: 'x');
+          }
+          return 'dev';
+        });
+        const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+        await connectionManager.connect('dev', config);
+        final states = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+        );
+        final notifications = expectLater(
+          connectionManager.notificationStream('dev'),
+          emitsInOrder([
+            isA<PlatformNotification>().having(
+              (n) => n.characteristicHandle,
+              'characteristicHandle',
+              7,
+            ),
+            emitsDone,
+          ]),
+        );
+
+        // act
+        await expectLater(
+          connectionManager.connect('dev', config),
+          throwsA(isA<PlatformConnectFailedException>()),
+        );
+        connectionManager.onNotification(
+          NotificationEventDto(
+            deviceId: 'dev',
+            characteristicUuid: '2a37',
+            value: Uint8List.fromList([1]),
+            characteristicHandle: 7,
+          ),
+        );
+        connectionManager.onConnectionStateChanged(
+          ConnectionStateEventDto(
+            deviceId: 'dev',
+            state: ConnectionStateDto.disconnected,
+          ),
+        );
+
+        // assert
+        await notifications;
+        await states;
+      });
+    });
+
     group('a connect the host fails', () {
       test('leaves the device with no state stream', () async {
         // arrange

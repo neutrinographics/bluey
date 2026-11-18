@@ -37,6 +37,30 @@ void main() {
     });
   });
 
+  group('opening a device', () {
+    test('open answers true when it creates the pair', () {
+      // arrange
+      const deviceId = 'dev';
+
+      // act
+      final created = streams.open(deviceId);
+
+      // assert
+      expect(created, isTrue);
+    });
+
+    test('open answers false when the pair is already live', () {
+      // arrange
+      streams.open('dev');
+
+      // act
+      final created = streams.open('dev');
+
+      // assert
+      expect(created, isFalse);
+    });
+  });
+
   group('the device\'s last event', () {
     test(
       'the disconnected report is delivered, and then both streams end',
