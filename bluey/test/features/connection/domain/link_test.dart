@@ -242,12 +242,21 @@ void main() {
         const EndedOnRequest(),
       ),
       (
-        'a failed close after the radio began closing stays closing',
+        'a closing report during a requested close is its echo, so a failed '
+            'close returns to ready',
         [discovered, request, radioClosing],
         const CloseFailed(),
-        ConnectionState.disconnecting,
+        ConnectionState.ready,
         null,
-        const EndedByDrop(),
+        null,
+      ),
+      (
+        'a request leaves a link a failed close left closing',
+        [discovered, radioClosing, request, const CloseFailed()],
+        request,
+        ConnectionState.disconnecting,
+        LinkDuty.closeTheLink,
+        const EndedOnRequest(),
       ),
       (
         'a connected report while closing changes nothing',

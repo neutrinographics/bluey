@@ -15,6 +15,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 class DeviceStreams {
   final Map<String, _DeviceStreamPair> _pairs = {};
   final Set<String> _owedLastReport = {};
+  final Set<String> _echoExpected = {};
 
   /// Makes the device's streams live, keeping any that already are, and
   /// answers whether it created them, so a caller whose connect fails closes
@@ -37,11 +38,17 @@ class DeviceStreams {
   /// streams are left alone. When the answer ends streams whose
   /// `disconnected` report has not arrived, that report is still to come and
   /// is kept from the next link. A disconnect the host fails ends nothing.
+  ///
+  /// The next `disconnecting` report is not delivered: the Android plugin
+  /// echoes every disconnect request as that state, even one it then fails,
+  /// and the app already knows it asked, so the echo would only make a link
+  /// whose close failed look as if the radio were closing it.
   Future<void> disconnect(
     String deviceId,
     Future<void> Function() hostDisconnect,
   ) async {
     final asked = _pairs[deviceId];
+    _echoExpected.add(deviceId);
     await hostDisconnect();
     if (asked == null || !identical(_pairs[deviceId], asked)) return;
     _owedLastReport.add(deviceId);
@@ -66,6 +73,7 @@ class DeviceStreams {
   /// device's current link, and after one the ended link's last report is
   /// no longer expected, so a platform that never sends it costs nothing.
   void reportState(String deviceId, PlatformConnectionState state) {
+    if (_isEcho(deviceId, state)) return;
     final owed = _owedLastReport.remove(deviceId);
     if (owed && state == PlatformConnectionState.disconnected) return;
     final pair = _pairs[deviceId];
@@ -74,6 +82,16 @@ class DeviceStreams {
     if (state == PlatformConnectionState.disconnected) {
       unawaited(close(deviceId));
     }
+  }
+
+  /// Whether [state] is the echo of a disconnect request, which also stops
+  /// being expected once the link's `disconnected` report arrives.
+  bool _isEcho(String deviceId, PlatformConnectionState state) {
+    if (state == PlatformConnectionState.disconnected) {
+      _echoExpected.remove(deviceId);
+    }
+    return state == PlatformConnectionState.disconnecting &&
+        _echoExpected.remove(deviceId);
   }
 
   /// Delivers a notification to the device's listeners; dropped when the

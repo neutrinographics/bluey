@@ -563,6 +563,15 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   final Map<String, void Function()> _secondDisconnectSignals = {};
   final Set<String> _owedLastReport = {};
 
+  /// Whether [disconnect] echoes each request as a `disconnecting` report,
+  /// as Android's plugin does before it asks the radio, and after the
+  /// answer when the request fails. The fake then drops the echo as the
+  /// platform packages' `DeviceStreams` do, so a test can show that no echo
+  /// reaches the app. Off by default.
+  bool echoDisconnectRequests = false;
+
+  final Set<String> _echoExpected = {};
+
   // === Fault-rule queue (audit R2 / NT-5) ===
   //
   // The general fault-injection mechanism: scripted, ordered rules with
@@ -1466,7 +1475,20 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> disconnect(String deviceId) async {
-    _applyFaultRules(FakeOp.disconnect, deviceId: deviceId);
+    if (echoDisconnectRequests) _echoExpected.add(deviceId);
+    try {
+      _applyFaultRules(FakeOp.disconnect, deviceId: deviceId);
+    } catch (_) {
+      if (echoDisconnectRequests) {
+        Timer.run(
+          () => _reportState(deviceId, PlatformConnectionState.disconnecting),
+        );
+      }
+      rethrow;
+    }
+    if (echoDisconnectRequests) {
+      _reportState(deviceId, PlatformConnectionState.disconnecting);
+    }
     switch (disconnectSignals) {
       case FakeDisconnectSignals.together:
         final connection = _reportLastState(deviceId);
@@ -1519,10 +1541,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   /// Delivers [state] to the device's current link as the platform packages
-  /// do: a link's last report that its disconnect's answer already
-  /// accounted for is dropped, and any other report means it is no longer
-  /// coming.
+  /// do: the echo of a disconnect request is dropped, a link's last report
+  /// that its disconnect's answer already accounted for is dropped, and any
+  /// other report means that last report is no longer coming.
   void _reportState(String deviceId, PlatformConnectionState state) {
+    if (state == PlatformConnectionState.disconnecting &&
+        _echoExpected.remove(deviceId)) {
+      return;
+    }
     final owed = _owedLastReport.remove(deviceId);
     if (owed && state == PlatformConnectionState.disconnected) return;
     final states = _connectionStateControllers[deviceId];

@@ -77,7 +77,13 @@ final class Link {
   /// Whether a close was asked of the platform and has not been answered.
   final bool _closeAsked;
 
-  /// Whether the radio itself reported the link closing.
+  /// Whether the radio reported the link closing before any close was asked.
+  ///
+  /// A closing report that arrives while an asked close is in flight is the
+  /// platform echoing that request, so it leaves this unset and a failed
+  /// close then returns the link to where it was. A link the radio was
+  /// closing on its own stays closing when the close asked of it fails, with
+  /// no close in flight; a new [DisconnectRequested] is what leaves it.
   final bool _radioClosing;
 
   /// The end the link has reached, or the one a closing link is heading for;
@@ -124,11 +130,12 @@ final class Link {
 
   LinkStep _onWhileClosing(LinkInput input) => switch (input) {
     ServicesDiscovered() => LinkStep(this),
-    RadioReported(report: LinkReport.connecting || LinkReport.connected) =>
+    RadioReported(
+      report: LinkReport.connecting ||
+          LinkReport.connected ||
+          LinkReport.disconnecting,
+    ) =>
       LinkStep(this),
-    RadioReported(report: LinkReport.disconnecting) => LinkStep(
-      _closing(closeAsked: _closeAsked, radioClosing: true),
-    ),
     RadioReported(report: LinkReport.disconnected) ||
     ReportsEnded() => _ended(ConnectionState.disconnected, _headingFor),
     DisconnectRequested() when _closeAsked => LinkStep(this),

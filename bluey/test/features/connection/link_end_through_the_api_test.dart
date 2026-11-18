@@ -176,6 +176,38 @@ void main() {
         expect(await measurement.read(), [0x01]);
       },
     );
+
+    test('a failed disconnect the platform echoes as disconnecting leaves the '
+        'Connection ready, usable and the one connect() returns', () async {
+      // arrange
+      simulateSensor();
+      fake.echoDisconnectRequests = true;
+      final connection = await bluey.connect(device);
+      final measurement = await measurementOf(connection);
+      fake.enqueueFault(
+        FakeOp.disconnect,
+        const platform.GattOperationUnknownPlatformException(
+          'disconnect',
+          code: 'bluey-unknown',
+          message: 'the radio refused',
+        ),
+      );
+
+      // act
+      await expectLater(
+        connection.disconnect(),
+        throwsA(isA<BlueyException>()),
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(connection.state, ConnectionState.ready);
+      expect(await measurement.read(), [0x01]);
+      expect(
+        await bluey.connect(device).timeout(const Duration(seconds: 1)),
+        same(connection),
+      );
+    });
   });
 
   group('A connect that overlaps the end of a requested disconnect', () {

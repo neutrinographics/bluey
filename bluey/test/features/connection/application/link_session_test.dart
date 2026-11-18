@@ -268,6 +268,37 @@ void main() {
       },
     );
 
+    test('a closing report while the close is in flight, then a failed close, '
+        'leaves the link ready and usable', () {
+      fakeAsync((async) {
+        // arrange
+        links.closeDelay = const Duration(seconds: 1);
+        final session = openTimedSession(async);
+        session.servicesDiscovered();
+        links.failNextClose(timed);
+        Either<ConnectionFailure, void>? answer;
+        session.disconnect().then((value) => answer = value);
+        async.elapse(const Duration(milliseconds: 500));
+        links.report(timed, LinkReport.disconnecting);
+        async.elapse(const Duration(milliseconds: 500));
+
+        // act
+        Either<ConnectionFailure, int>? operation;
+        session
+            .whileUp(
+              () async => const Right<ConnectionFailure, int>(7),
+              orEnd: LinkEnded.new,
+            )
+            .then((value) => operation = value);
+        async.flushMicrotasks();
+
+        // assert
+        expect(answer, isA<Left<ConnectionFailure, void>>());
+        expect(session.link.state, ConnectionState.ready);
+        expect(operation, const Right<ConnectionFailure, int>(7));
+      });
+    });
+
     test('a failed close on a link that ended meanwhile answers success', () {
       fakeAsync((async) {
         // arrange
