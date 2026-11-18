@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import '../discovery/device_address.dart';
+import 'domain/device_address.dart';
 import '../gatt_server/client_address.dart';
 import '../peer/server_id.dart';
 import '../platform/bluetooth_state.dart';

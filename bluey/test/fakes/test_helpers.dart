@@ -4,7 +4,7 @@ import 'package:bluey/bluey.dart';
 // ignore: implementation_imports
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 // ignore: implementation_imports
-import 'package:bluey/src/log/bluey_logger.dart';
+import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
 /// Returns a fresh [BlueyLogger] at the default level for tests that

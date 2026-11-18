@@ -42,79 +42,10 @@ void main() {
   late FakeBlueyPlatform fake;
   late Bluey bluey;
 
-  Device device(String a) => Device(address: DeviceAddress(a));
-
   setUp(() async {
     fake = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fake;
     bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
-  });
-
-  group('H3 (I381): remote disconnect never finalises the Connection', () {
-    test('stateChanges closes after the peer drops the link', () async {
-      // arrange
-      fake.simulatePeripheral(id: address);
-      final connection = await bluey.connect(device(address));
-      var done = false;
-      connection.stateChanges.listen((_) {}, onDone: () => done = true);
-
-      // act
-      fake.simulateDisconnection(address);
-      await pumpEventQueue();
-
-      // assert
-      expect(connection.state, ConnectionState.disconnected);
-      expect(
-        done,
-        isTrue,
-        reason: 'await-for consumers of stateChanges hang forever',
-      );
-    });
-
-    test('disconnect() after a remote drop still releases resources', () async {
-      // arrange
-      fake.simulatePeripheral(id: address);
-      final connection = await bluey.connect(device(address));
-      var done = false;
-      connection.stateChanges.listen((_) {}, onDone: () => done = true);
-      fake.simulateDisconnection(address);
-      await pumpEventQueue();
-
-      // act
-      await connection.disconnect();
-      await pumpEventQueue();
-
-      // assert
-      expect(
-        done,
-        isTrue,
-        reason: 'disconnect() early-returns, so cleanup can never run',
-      );
-    });
-  });
-
-  group('H2 (I380): peer discovery probes tear down live connections', () {
-    test('discoverPeers leaves an existing peer connection intact', () async {
-      // arrange
-      fake.simulateBlueyServer(
-        address: address,
-        serverId: TestServerIds.remoteIdentity,
-      );
-      final peer = await bluey.connectAsPeer(device(address));
-      expect(fake.connectedDeviceIds, contains(address));
-
-      // act
-      await bluey.discoverPeers(timeout: const Duration(milliseconds: 300));
-      await pumpEventQueue();
-
-      // assert
-      expect(
-        fake.connectedDeviceIds,
-        contains(address),
-        reason: 'the probe disconnected the link the app was using',
-      );
-      expect(peer.connection.state, isNot(ConnectionState.disconnected));
-    });
   });
 
   group('M4 (I336): scan restart without awaiting cancel', () {

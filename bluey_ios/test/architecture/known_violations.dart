@@ -11,7 +11,7 @@ library;
 /// The Dart files longer than 300 lines.
 const oversizedDart = <String>[
   'lib/src/bluey_ios.dart -> 676 lines',
-  'lib/src/ios_connection_manager.dart -> 431 lines',
+  'lib/src/ios_connection_manager.dart -> 413 lines',
   'lib/src/ios_server.dart -> 429 lines',
 ];
 

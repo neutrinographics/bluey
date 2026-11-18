@@ -15,8 +15,9 @@ import '../fakes/test_helpers.dart';
 /// disconnected connection, instead of letting a raw `PlatformException`
 /// or other internal error escape.
 ///
-/// Pre-flight: when `_state` is not in {linked, ready}, every public
-/// op throws [DisconnectedException] with [DisconnectReason.unknown].
+/// Pre-flight: when the link is not linked or ready, every public op
+/// throws [DisconnectedException], with [DisconnectReason.requested] after
+/// the app's own disconnect and [DisconnectReason.linkLoss] after a drop.
 /// Allows callers to pattern-match on Bluey's exception hierarchy
 /// rather than the platform's.
 void main() {
@@ -199,7 +200,7 @@ void main() {
     );
 
     test(
-      'DisconnectedException carries the connection deviceId and unknown reason',
+      'DisconnectedException carries the connection deviceId and the requested reason',
       () async {
         final ctx = await establishWithChar();
         await ctx.connection.disconnect();
@@ -211,7 +212,7 @@ void main() {
           fail('expected DisconnectedException');
         } on DisconnectedException catch (e) {
           expect(e.address, ctx.connection.deviceAddress.value);
-          expect(e.reason, DisconnectReason.unknown);
+          expect(e.reason, DisconnectReason.requested);
         }
       },
     );

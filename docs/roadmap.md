@@ -30,6 +30,11 @@ are the maintainer's to adjust.
 > order the work from here; see [`ARCHITECTURE.md`](ARCHITECTURE.md) and the
 > [design](superpowers/specs/2026-11-17-architecture-foundation-design.md).
 > Each line below that a slice closes ends with its slice.
+>
+> **Health check (2026-11-18):** slice 1's first pull request (link
+> lifecycle) closed I381, I380, I391, I394 and I369, so one **High** item is
+> open: I063, which slice 4 closes. I374 moved from slice 1 to slice 5, where
+> GATT Server's knowledge of attached clients lives.
 
 ## Guardrails (design invariants)
 
@@ -63,7 +68,7 @@ Scanning and inbound advertisement data.
 Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and reconnection.
 
 - ☐ **High** — [Stop misrouting late Android GATT callbacks](backlog/I063-android-late-callback-misroute-after-timeout.md) · A callback that arrives after an app-level timeout can be delivered to the next operation. · Slice 4 (native completions)
-- ☐ **High** — [Finalise a Connection when the peer disconnects](backlog/I381-remote-disconnect-never-finalises-connection.md) · A remote drop leaves streams open and subscriptions unreleased; only an app-initiated disconnect cleans up (audit H3). · Slice 1 (link lifecycle)
+- ☑ **High** — [Finalise a Connection when the peer disconnects](backlog/I381-remote-disconnect-never-finalises-connection.md) · A remote drop leaves streams open and subscriptions unreleased; only an app-initiated disconnect cleans up (audit H3). · Slice 1 (link lifecycle), fixed in `3e6a653`
 - ☐ **Medium** — [Track platform-initiated MTU changes](backlog/I004-mtu-not-synced-with-platform-callbacks.md) · `Connection.mtu` goes stale when the peer renegotiates MTU; there's no `mtuChanges` stream.
 - ☐ **Medium** — [Handle errors during connection init](backlog/I005-async-init-without-error-handling.md) · Post-connect init futures fire unsupervised with no error handling.
 - ☐ **Medium** — [Implement Android bonding](backlog/I030-android-bonding-stub.md) · The bonding API throws `UnimplementedError`; no native create-bond / bond-state wiring.
@@ -75,7 +80,7 @@ Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and r
 - ☐ **Medium** — [Give stale-bond errors an actionable path](backlog/I321-ios-bond-mismatch-opaque-error.md) · iOS surfaces `CBError` 14 (pairing removed) as an opaque exception with no recovery guidance.
 - ☐ **Medium** — [Translate errors on domain streams + write-respond](backlog/I357-stream-errors-bypass-acl.md) · Raw `PlatformException`s leak onto `stateChanges`/`notifications` etc.; a client-gone race throws `StateError` into request streams (audit DA-08/09).
 - ☐ **Medium** — [Reject connect() during an in-flight disconnect](backlog/I363-android-connect-during-disconnect.md) · A connect in the disconnect window returns success, then STATE_DISCONNECTED tears it down (audit DA-18).
-- ☐ **Medium** — [Close per-device adapter controllers on failed/spontaneous disconnects](backlog/I369-adapter-controller-leaks.md) · Both adapters leak controllers on failed connects and remote drops (audit DA-27). · Slice 1 (link lifecycle)
+- ☑ **Medium** — [Close per-device adapter controllers on failed/spontaneous disconnects](backlog/I369-adapter-controller-leaks.md) · Both adapters leak controllers on failed connects and remote drops (audit DA-27). · Slice 1 (link lifecycle), fixed in `79c6be2`
 - ☐ **Medium** — [Add a client reconnection policy](backlog/I378-client-reconnection-policy.md) · A dropped link is terminal; no auto-reconnect/backoff or client-side re-subscription, so consumers hand-roll scan-connect-resubscribe loops (audit DA-35).
 - ☐ **Low** — [Prevent the initial connection-state guess race](backlog/I007-connection-state-init-race.md) · A connection reports a state before the platform stream confirms it.
 - ☐ **Low** — [Auto-update Android MTU on peer renegotiation](backlog/I326-android-mtu-onmtuchanged-listener.md) · `connection.android.mtu` isn't refreshed on a spontaneous MTU change.
@@ -84,8 +89,9 @@ Connecting, disconnecting, bonding, PHY, connection parameters, MTU, RSSI, and r
 - ☐ **Low** — [Apply the BLE-spec ×2 supervision-timeout floor](backlog/I361-connection-parameters-spec-floor.md) · `ConnectionParameters` admits sub-spec triples the controller will reject (audit DA-13; gated on I032 shipping).
 - ☐ **Low** — [Bind Android GATT callbacks to their gatt instance](backlog/I388-bind-android-gatt-callbacks-to-their-gatt-instance.md) · A late callback from a closed gatt can tear down a newer connection to the same device (audit L3). · Slice 4 (native completions)
 - ☐ **Low** — [Answer a pending connect when the disconnect fallback fires](backlog/I389-answer-pending-connect-when-disconnect-fallback-fires.md) · The 5 s disconnect fallback leaves a pending connect unanswered (audit L4). · Slice 4 (native completions)
-- ☐ **Low** — [Keep a disconnected Connection disconnected](backlog/I391-keep-disconnected-connection-disconnected.md) · A re-emitting platform stream can move a `disconnected` connection back to `linked` (audit L6). · Slice 1 (link lifecycle)
+- ☑ **Low** — [Keep a disconnected Connection disconnected](backlog/I391-keep-disconnected-connection-disconnected.md) · A re-emitting platform stream can move a `disconnected` connection back to `linked` (audit L6). · Slice 1 (link lifecycle), fixed in `3e6a653`
 - ☐ **Low** — [Report an app-requested iOS disconnect as done when the link is down](backlog/I395-report-app-requested-ios-disconnect-as-done-when-link-down.md) · A disconnect the app asked for reports failure when the link dropped with an error (audit L10). · Slice 4 (native completions)
+- ☐ **Low** — [Emit Android's `DISCONNECTING` only after `gatt.disconnect()` succeeds](backlog/I397-emit-android-disconnecting-only-after-gatt-disconnect-succeeds.md) · The plugin echoes a local disconnect request as `DISCONNECTING` even when the request then fails; the Dart side filters it.
 
 ## GATT Client
 
@@ -135,15 +141,15 @@ Local-as-peripheral: advertising, request/response handling, and outbound notifi
 
 The Bluey lifecycle protocol, stable peer identity, and peer discovery.
 
-- ☐ **High** — [Stop peer discovery disconnecting links in use](backlog/I380-stop-peer-discovery-disconnecting-links-in-use.md) · Probing a device the app already holds a `Connection` to drops that link (audit H2). · Slice 1 (link lifecycle)
+- ☑ **High** — [Stop peer discovery disconnecting links in use](backlog/I380-stop-peer-discovery-disconnecting-links-in-use.md) · Probing a device the app already holds a `Connection` to drops that link (audit H2). · Slice 1 (link lifecycle), fixed in `3e6a653`
 - ☐ **Medium** — [Fix the LifecycleServer activity/timer race](backlog/I072-lifecycle-server-record-activity-race.md) · `recordActivity` does a check-then-act on the heartbeat timer map (single-threaded, defensive).
 - ☐ **Medium** — [Honest peer-upgrade failure semantics](backlog/I356-peer-upgrade-failure-semantics.md) · Transient failures become "not a peer"; unreadable identity fabricates a random ServerId (audit DA-06/07).
 - ☐ **Low** — [Extract a shared peer-builder helper](backlog/I304-peer-builder-helper-extraction.md) · Two sites duplicate `PeerConnection` / `LifecycleClient` construction.
 - ☐ **Low** — [Remove the dormant silence-eviction machinery](backlog/I340-remove-dormant-silence-eviction-machinery.md) · Deferred cleanup of the reserved ATT-status eviction path — hold until Pattern B soaks in production.
 - ☐ **Low** — [Retry failed presence subscriptions](backlog/I341-presence-subscription-failure-degrades-ios-disconnect-detection.md) · A failed presence-characteristic subscription leaves an iOS-server peer's disconnect undetectable.
-- ☐ **Low** — [Consider an internal iOS same-peer connect guard](backlog/I374-ios-same-peer-connect-guard.md) · Make the shared-link-safe path the default instead of a documented pattern (audit DA-33; design decision).
+- ☐ **Low** — [Consider an internal iOS same-peer connect guard](backlog/I374-ios-same-peer-connect-guard.md) · Make the shared-link-safe path the default instead of a documented pattern (audit DA-33; design decision). · Slice 5 (server and peer)
 - ☐ **Low** — [Make `tryUpgrade` idempotent](backlog/I393-make-tryupgrade-idempotent.md) · A second call starts a second lifecycle client, doubling heartbeats (audit L8). · Slice 5 (server and peer)
-- ☐ **Low** — [Stop probing after `discoverPeers` has returned](backlog/I394-stop-probing-after-discoverpeers-has-returned.md) · A device seen as the scan closes is probed after `discover()` returns (audit L9). · Slice 1 (link lifecycle)
+- ☑ **Low** — [Stop probing after `discoverPeers` has returned](backlog/I394-stop-probing-after-discoverpeers-has-returned.md) · A device seen as the scan closes is probed after `discover()` returns (audit L9). · Slice 1 (link lifecycle), fixed in `ea46256`
 - ☐ **Low** — [Bound and validate lifecycle intervals before acknowledging them](backlog/I396-bound-and-validate-lifecycle-intervals-before-acknowledging.md) · No ceiling on `LifecycleInterval.decode`; a malformed heartbeat is acknowledged first (audit L11). · Slice 5 (server and peer)
 
 ## Platform

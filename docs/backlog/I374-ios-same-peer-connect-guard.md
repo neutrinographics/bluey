@@ -26,3 +26,7 @@ Design decision required: hard refusal vs opt-in guard vs warning
 event — a hard guard could surprise apps that hold a client link
 deliberately (the reason [I208](I208-android-dual-role-server-request-delivery.md)
 was wontfixed for auto-teardown).
+
+## Moved to slice 5 (2026-11-18)
+
+Slice 1 (link lifecycle) leaves this open: it moved to slice 5 (server and peer), as decided in the [link lifecycle design](../superpowers/specs/2026-11-18-link-lifecycle-design.md), section 6.9. The rule needs to know which clients are attached to the local server, which is GATT Server's knowledge, and today `Bluey.server()` keeps no server it builds, so doing it in slice 1 meant glue in the composition root that slice 5 would rewrite. "Roles share one link" is not a fact `Capabilities` holds either. And skipping such a device during discovery would drop it from `discoverPeers()` and make `BlueyPeer.connect()` to it fail, where slice 5 can report the peer from the identity it already sent as a client, without probing it. Until then a probe of an iOS device attached to our `Server` as a client still drops that client, as before.

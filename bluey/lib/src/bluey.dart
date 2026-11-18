@@ -4,32 +4,41 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:meta/meta.dart';
 
+import 'api/connection/borrowed_connection.dart';
+import 'api/connection/bluey_connection.dart';
+import 'api/connection/connection.dart';
+import 'api/connection/connections.dart';
+import 'api/failure_translation.dart';
 import 'connection/bluey_connection.dart';
-import 'connection/connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
-import 'event_bus.dart';
 import 'events.dart';
+import 'features/connection/application/borrow_link.dart';
+import 'features/connection/application/connect_device.dart';
+import 'features/connection/application/link_registry.dart';
+import 'features/connection/application/link_session.dart';
+import 'features/connection/infrastructure/adapters/platform_links.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
-import 'log/bluey_logger.dart';
-import 'log/log_event.dart';
-import 'log/log_level.dart';
 import 'peer/bluey_peer.dart';
 import 'peer/peer.dart';
 import 'peer/peer_discovery.dart';
 import 'peer/server_id.dart';
 import 'platform/bluetooth_state.dart';
-import 'discovery/device_address.dart';
+import 'shared/application/log_event.dart';
+import 'shared/application/log_level.dart';
+import 'shared/domain/bluey_event.dart';
+import 'shared/domain/device_address.dart';
 import 'shared/error_translation.dart';
 import 'shared/exceptions.dart';
 import 'shared/gatt_timeouts.dart';
+import 'shared/infrastructure/bluey_event_bus.dart';
+import 'shared/infrastructure/bluey_logger.dart';
 
-export 'events.dart';
 export 'discovery/scanner.dart';
 export 'platform/bluetooth_state.dart';
 
@@ -78,6 +87,17 @@ class Bluey {
   final BlueyEventBus _eventBus;
   final BlueyLogger _logger = BlueyLogger();
   final ServerId? _localIdentity;
+  late final Connections _connections = Connections(present: _present);
+  late final LinkRegistry _registry = LinkRegistry(
+    links: PlatformLinks(_platform, log: _logger),
+    events: _eventBus,
+    log: _logger,
+  );
+  late final ConnectDevice _connectDevice = ConnectDevice(_registry);
+  late final BorrowConnection _borrow = borrowingThrough(
+    borrowLink: BorrowLink(_registry),
+    connections: _connections,
+  );
 
   StreamSubscription? _stateSubscription;
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
@@ -253,22 +273,18 @@ class Bluey {
   /// receives the current [BluetoothState] as its first event, so callers
   /// never need to read [currentState] separately to seed their UI.
   /// Subsequent events are live platform transitions as usual.
-  Stream<BluetoothState> get stateStream => Stream<BluetoothState>.multi(
-    (controller) {
-      // Replay the current value to this subscriber immediately.
-      if (!_stateController.isClosed) {
-        controller.add(_currentState);
-      }
-      // Then forward all future events from the broadcast controller.
-      final sub = _stateController.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = sub.cancel;
-    },
-    isBroadcast: true,
-  );
+  Stream<BluetoothState> get stateStream =>
+      Stream<BluetoothState>.multi((controller) {
+        if (!_stateController.isClosed) {
+          controller.add(_currentState);
+        }
+        final sub = _stateController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller.onCancel = sub.cancel;
+      }, isBroadcast: true);
 
   /// Stream of diagnostic events from Bluey.
   ///
@@ -305,7 +321,7 @@ class Bluey {
     _logger.setLevel(level);
     // Fire-and-forget: native filter updates eventually-consistently;
     // events emitted in the meantime are filtered Dart-side anyway.
-    unawaited(_platform.setLogLevel(_mapLogLevelToPlatform(level)));
+    unawaited(_platform.setLogLevel(BlueyLogger.platformLevelOf(level)));
   }
 
   /// Internal logger seam for tests.
@@ -398,10 +414,7 @@ class Bluey {
     return BlueyScanner(_platform, _eventBus);
   }
 
-  /// Connect to a device.
-  ///
-  /// [device] - The device to connect to.
-  /// [timeout] - Optional connection timeout.
+  /// Connect to a device, within [timeout] when one is given.
   ///
   /// Returns a raw [Connection]. This method does **not** auto-upgrade
   /// to the Bluey peer protocol even when the device hosts the control
@@ -410,83 +423,60 @@ class Bluey {
   /// devices) or call [tryUpgrade] on the returned connection.
   ///
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(Device device, {Duration? timeout}) async {
-    _requireAdapterOn();
-    final config = platform.PlatformConnectConfig(
-      timeoutMs: timeout?.inMilliseconds,
-      mtu: null,
-    );
+  Future<Connection> connect(Device device, {Duration? timeout}) =>
+      _connecting(device, () async {
+        final answer = await _connectDevice.run(
+          ConnectDeviceRequest(device: device.address, timeout: timeout),
+        );
+        return _connections.of(valueOrThrow(answer, device: device.address));
+      });
 
+  /// Runs [attempt] with [connect]'s checks, log line and [ErrorEvent].
+  Future<T> _connecting<T>(Device device, Future<T> Function() attempt) async {
+    _requireAdapterOn();
     _logger.log(
       BlueyLogLevel.info,
       'bluey',
       'connect entered',
       data: {'address': device.address.value},
     );
-
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.connection',
-      'connect started',
-      data: {'address': device.address.value},
-    );
-
-    _emitEvent(ConnectingEvent(deviceAddress: device.address));
-
     try {
-      // Use address for the actual connection (MAC address on Android)
-      final connectionId = await withErrorTranslation(
-        () => _platform.connect(device.address.value, config),
-        operation: 'connect',
-        address: device.address.value,
-      );
-
-      _emitEvent(ConnectedEvent(deviceAddress: device.address));
-
-      final connection = BlueyConnection(
-        platformInstance: _platform,
-        connectionId: connectionId,
-        deviceAddress: device.address,
-        logger: _logger,
-        events: _eventBus,
-      );
-
-      _logger.log(
-        BlueyLogLevel.info,
-        'bluey.connection',
-        'connect succeeded',
-        data: {'address': device.address.value},
-      );
-
-      return connection;
-    } catch (e) {
-      _logger.log(
-        BlueyLogLevel.error,
-        'bluey.connection',
-        'connect failed',
-        data: {
-          'address': device.address.value,
-          'exception': e.runtimeType.toString(),
-        },
-        errorCode: e.runtimeType.toString(),
-      );
+      return await attempt();
+    } on BlueyException catch (error) {
       _emitEvent(
         ErrorEvent(
           message: 'Connection failed to ${device.address.toShortString()}',
-          error: e,
+          error: error,
         ),
       );
       rethrow;
     }
   }
 
+  /// The public Connection a link's session is shown as.
+  Connection _present(LinkSession session) => BlueyConnection(
+    session: session,
+    gatt: LinkGattClient(
+      platformInstance: _platform,
+      session: session,
+      logger: _logger,
+      events: _eventBus,
+    ),
+  );
+
+  /// The platform's name for [connection]'s link, which the lifecycle
+  /// client writes with.
+  String _connectionIdOf(Connection connection) =>
+      _connections.linkIdOf(connection)?.value ??
+      connection.deviceAddress.toString();
+
   /// Connects to [device] and returns a [PeerConnection] if the device
   /// hosts the Bluey lifecycle control service.
   ///
-  /// Internally calls [connect] to establish the raw GATT connection,
-  /// then attempts to build a peer wrapper. If the device is not a
-  /// Bluey peer (no control service), the underlying connection is
-  /// disconnected and [NotABlueyPeerException] is thrown.
+  /// The device's link is borrowed while it is checked, so a device that
+  /// is not a Bluey peer loses its link only if this call opened it and
+  /// nobody else uses it: a link the app holds stays up. A peer's link
+  /// becomes the app's, and [connect] then returns the same [Connection].
   ///
   /// Use this when the caller knows the target should be a Bluey peer
   /// and wants the peer-protocol surface (stable [ServerId], filtered
@@ -495,8 +485,8 @@ class Bluey {
   ///
   /// Throws [ConnectionException] if the underlying connect fails.
   /// Throws [NotABlueyPeerException] if the device connected but does
-  /// not host the Bluey control service. The underlying connection has
-  /// already been disconnected when this is thrown.
+  /// not host the Bluey control service. The link has already been given
+  /// back when this, or any failure while checking, is thrown.
   ///
   /// **iOS caveat (bidirectional discovery).** On iOS, Core Bluetooth
   /// represents a peer device as a single `CBPeer` regardless of GAP
@@ -520,26 +510,33 @@ class Bluey {
       'connectAsPeer entered',
       data: {'address': device.address.value},
     );
-    final connection = await connect(device, timeout: timeout);
-    final peer = await _tryBuildPeerConnection(
-      connection,
-      peerSilenceTimeout: peerSilenceTimeout,
+    final borrowed = await _connecting(
+      device,
+      () => _borrow(device.address, timeout: timeout),
     );
-    if (peer == null) {
-      // The device connected but isn't a Bluey peer — disconnect and
-      // throw so we don't leak a half-formed connection.
-      await connection.disconnect();
-      throw NotABlueyPeerException(device.address);
+    try {
+      final peer = await _tryBuildPeerConnection(
+        borrowed.connection,
+        peerSilenceTimeout: peerSilenceTimeout,
+      );
+      if (peer != null) {
+        borrowed.keep();
+        return peer;
+      }
+    } catch (_) {
+      await borrowed.giveBack();
+      rethrow;
     }
-    return peer;
+    await borrowed.giveBack();
+    throw NotABlueyPeerException(device.address);
   }
 
   /// Attempts to wrap an existing raw [Connection] in a [PeerConnection].
   ///
   /// Returns `null` if [connection] does not host the Bluey lifecycle
-  /// control service. Unlike [connectAsPeer], this does not disconnect
-  /// the connection on miss — the caller already owns it and decides
-  /// what to do next.
+  /// control service. This never closes the link on a miss: the caller
+  /// already owns the connection and decides what to do next, as with
+  /// any link it holds.
   ///
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer
@@ -725,7 +722,6 @@ class Bluey {
         return null;
       }
 
-      // Read the ServerId.
       final serverIdChar =
           controlService
               .characteristics()
@@ -747,18 +743,9 @@ class Bluey {
         }
       }
 
-      // Locate the underlying BlueyConnection for the lifecycle
-      // client's connection id. The peer wrapper does not require
-      // mutating this object; it only needs the platform connection
-      // id to drive the heartbeat writes.
-      final connectionId =
-          rawConnection is BlueyConnection
-              ? rawConnection.connectionId
-              : rawConnection.deviceAddress.toString();
-
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
-        connectionId: connectionId,
+        connectionId: _connectionIdOf(rawConnection),
         localIdentity: localIdentity,
         peerSilenceTimeout: peerSilenceTimeout,
         onServerUnreachable: () {
@@ -784,7 +771,6 @@ class Bluey {
         lifecycleClient: lifecycleClient,
       );
     } catch (_) {
-      // Service discovery failed — treat as "not a bluey peer".
       return null;
     }
   }
@@ -905,6 +891,8 @@ class Bluey {
       peerSilenceTimeout: peerSilenceTimeout,
       logger: _logger,
       events: _eventBus,
+      borrow: _borrow,
+      connectionIdOf: _connectionIdOf,
     );
   }
 
@@ -925,8 +913,8 @@ class Bluey {
     final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
       platformApi: _platform,
+      borrow: _borrow,
       logger: _logger,
-      events: _eventBus,
     );
     final ids = await discovery.discover(
       timeout: timeout,
@@ -940,6 +928,8 @@ class Bluey {
             localIdentity: identity,
             logger: _logger,
             events: _eventBus,
+            borrow: _borrow,
+            connectionIdOf: _connectionIdOf,
           ),
         )
         .toList(growable: false);
@@ -963,21 +953,6 @@ class Bluey {
     await _stateController.close();
     await _eventBus.close();
     await _logger.dispose();
-  }
-
-  platform.PlatformLogLevel _mapLogLevelToPlatform(BlueyLogLevel level) {
-    switch (level) {
-      case BlueyLogLevel.trace:
-        return platform.PlatformLogLevel.trace;
-      case BlueyLogLevel.debug:
-        return platform.PlatformLogLevel.debug;
-      case BlueyLogLevel.info:
-        return platform.PlatformLogLevel.info;
-      case BlueyLogLevel.warn:
-        return platform.PlatformLogLevel.warn;
-      case BlueyLogLevel.error:
-        return platform.PlatformLogLevel.error;
-    }
   }
 
   BluetoothState _mapState(platform.BluetoothState platformState) {

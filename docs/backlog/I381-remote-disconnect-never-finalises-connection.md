@@ -4,8 +4,9 @@ title: Finalise a Connection when the peer disconnects
 category: bug
 severity: high
 platform: domain
-status: open
-last_verified: 2026-11-17
+status: fixed
+last_verified: 2026-11-18
+fixed_in: 3e6a653
 related: [I369]
 ---
 
@@ -26,3 +27,7 @@ Teardown is only reliable on the path the app initiates. Cleanup is attached to 
 Found by finding H3 of the [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md). Closed by slice 1 (link lifecycle) of the architecture foundation ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)).
 
 Fix: run the same teardown on the platform `disconnected` event as on `disconnect()`, and make `disconnect()` on a dead connection finish the cleanup. [I369](I369-adapter-controller-leaks.md) tracks the adapter-level half; both are one change seen from different layers. Test: group `H3 (I381)` in `bluey/test/known_defects/domain_known_defects_test.dart`. One of the audit's three open Highs.
+
+## Fixed (2026-11-18)
+
+Fixed in `3e6a653` by slice 1 (link lifecycle, [design](../superpowers/specs/2026-11-18-link-lifecycle-design.md) sections 6.3 and 6.4). A link's lifecycle is one state machine, `Link`, run by one `LinkSession`: a drop and a requested disconnect reach the same end, and reaching it releases everything the link held, whatever ended it. A dropped Connection now emits `disconnected`, closes its streams and fails operations in flight with `DisconnectedException` (`linkLoss`); `disconnect()` on an ended Connection completes quietly. The two known-defect tests moved to group `H3 (I381)` in `bluey/test/features/connection/link_end_through_the_api_test.dart` and left the roster.

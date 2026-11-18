@@ -8,13 +8,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
+import '../fixtures/connection_rig.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
+  late ConnectionRig rig;
 
   setUp(() {
     fakePlatform = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fakePlatform;
+    rig = ConnectionRig(fakePlatform);
   });
 
   group('BlueyPeer', () {
@@ -29,6 +32,8 @@ void main() {
 
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
+          borrow: rig.borrow,
+          connectionIdOf: rig.connectionIdOf,
           serverId: id,
           localIdentity: TestServerIds.localIdentity,
           logger: testLogger(),
@@ -56,6 +61,8 @@ void main() {
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        borrow: rig.borrow,
+        connectionIdOf: rig.connectionIdOf,
         serverId: ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
         localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),
@@ -81,6 +88,8 @@ void main() {
         // unreachable-detection path that triggers the local disconnect.
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
+          borrow: rig.borrow,
+          connectionIdOf: rig.connectionIdOf,
           serverId: id,
           localIdentity: TestServerIds.localIdentity,
           peerSilenceTimeout: const Duration(seconds: 8),
@@ -120,6 +129,8 @@ void main() {
       final id = ServerId.generate();
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        borrow: rig.borrow,
+        connectionIdOf: rig.connectionIdOf,
         serverId: id,
         localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),
@@ -136,6 +147,8 @@ void main() {
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        borrow: rig.borrow,
+        connectionIdOf: rig.connectionIdOf,
         serverId: id,
         localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),

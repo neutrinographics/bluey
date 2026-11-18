@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import 'device_address.dart';
+import '../shared/domain/device_address.dart';
 
 /// A BLE device with a stable identity.
 ///

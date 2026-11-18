@@ -126,6 +126,88 @@ void main() {
     });
   });
 
+  group('Bluey.connectAsPeer borrows the device\'s link', () {
+    test('a device the app holds that is not a peer keeps its link', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:10';
+      fakePlatform.simulatePeripheral(id: address, name: 'Plain Device');
+      final plainDevice = deviceFromAddress(address);
+      final connection = await bluey.connect(plainDevice);
+
+      // act
+      await expectLater(
+        bluey.connectAsPeer(plainDevice),
+        throwsA(isA<NotABlueyPeerException>()),
+      );
+
+      // assert
+      expect(connection.state.isConnected, isTrue);
+      expect(await connection.readRssi(), isA<int>());
+      expect(fakePlatform.connectedDeviceIds, contains(address));
+
+      await connection.disconnect();
+    });
+
+    test('a device nobody holds that is not a peer is disconnected', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:11';
+      fakePlatform.simulatePeripheral(id: address, name: 'Plain Device');
+      final plainDevice = deviceFromAddress(address);
+
+      // act
+      await expectLater(
+        bluey.connectAsPeer(plainDevice),
+        throwsA(isA<NotABlueyPeerException>()),
+      );
+
+      // assert
+      expect(fakePlatform.connectedDeviceIds, isNot(contains(address)));
+    });
+
+    test(
+      'a peer\'s link is kept, and is the Connection connect() returns',
+      () async {
+        // arrange
+        const address = 'AA:BB:CC:DD:EE:12';
+        fakePlatform.simulateBlueyServer(
+          address: address,
+          serverId: ServerId.generate(),
+        );
+        final device = deviceFromAddress(address);
+
+        // act
+        final peer = await bluey.connectAsPeer(device);
+
+        // assert
+        expect(identical(peer.connection, await bluey.connect(device)), isTrue);
+        expect(peer.connection.state.isConnected, isTrue);
+
+        await peer.disconnect();
+      },
+    );
+
+    test('a failure while checking gives the link back', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:13';
+      fakePlatform.simulateBlueyServer(
+        address: address,
+        serverId: ServerId.generate(),
+      );
+      final device = deviceFromAddress(address);
+      final anonymous = await Bluey.create();
+      addTearDown(anonymous.dispose);
+
+      // act
+      await expectLater(
+        anonymous.connectAsPeer(device),
+        throwsA(isA<LocalIdentityRequiredException>()),
+      );
+
+      // assert
+      expect(fakePlatform.connectedDeviceIds, isNot(contains(address)));
+    });
+  });
+
   group('Bluey.tryUpgrade', () {
     test('returns a PeerConnection wrapping the input when the connection '
         'is a Bluey peer', () async {

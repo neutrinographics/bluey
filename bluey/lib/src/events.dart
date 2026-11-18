@@ -1,34 +1,7 @@
-import 'package:meta/meta.dart';
-
-import 'discovery/device_address.dart';
 import 'gatt_server/client_address.dart';
+import 'shared/domain/bluey_event.dart';
+import 'shared/domain/device_address.dart';
 import 'shared/uuid.dart';
-
-/// Base class for all Bluey diagnostic events.
-///
-/// Events provide visibility into what's happening inside Bluey,
-/// useful for debugging and monitoring BLE operations.
-@immutable
-sealed class BlueyEvent {
-  /// Timestamp when this event occurred.
-  final DateTime timestamp;
-
-  /// Optional source component that generated this event.
-  final String? source;
-
-  BlueyEvent({DateTime? timestamp, this.source})
-    : timestamp = timestamp ?? DateTime.now();
-
-  @override
-  String toString() => '[$runtimeType] ${_formatTime(timestamp)}';
-
-  String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}:'
-        '${time.second.toString().padLeft(2, '0')}.'
-        '${time.millisecond.toString().padLeft(3, '0')}';
-  }
-}
 
 /// Scan started.
 final class ScanStartedEvent extends BlueyEvent {
@@ -115,42 +88,6 @@ final class ScanStoppingEvent extends BlueyEvent {
 
   @override
   String toString() => '[Scan] Stopping';
-}
-
-/// Connection attempt started.
-final class ConnectingEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-
-  ConnectingEvent({required this.deviceAddress, super.source});
-
-  @override
-  String toString() =>
-      '[Connection] Connecting to ${deviceAddress.toShortString()}';
-}
-
-/// Connection established.
-final class ConnectedEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-
-  ConnectedEvent({required this.deviceAddress, super.source});
-
-  @override
-  String toString() =>
-      '[Connection] Connected to ${deviceAddress.toShortString()}';
-}
-
-/// Disconnection occurred.
-final class DisconnectedEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-  final String? reason;
-
-  DisconnectedEvent({required this.deviceAddress, this.reason, super.source});
-
-  @override
-  String toString() {
-    final r = reason != null ? ' ($reason)' : '';
-    return '[Connection] Disconnected from ${deviceAddress.toShortString()}$r';
-  }
 }
 
 /// Service discovery started.

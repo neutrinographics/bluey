@@ -65,7 +65,7 @@ cd bluey && flutter test --coverage
 flutter analyze
 
 # Formatting, as CI's Analyze job holds it: the guards and every root of new code that exists
-dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/shared/domain
+dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/api bluey/lib/src/features bluey/lib/src/shared/domain bluey/lib/src/shared/application bluey/lib/src/shared/infrastructure
 
 # The guards' own tests
 cd bluey_guards && dart test
@@ -116,8 +116,8 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 ### Bounded Contexts
 
 1. **Discovery** - Scanning, device discovery, advertisement data
-2. **Connection** - Device connections, bonding, PHY, connection parameters
-3. **GATT Client** - Service/characteristic read/write/notify, descriptors, MTU
+2. **Connection** - Device connections and the link lifecycle, bonding, PHY, connection parameters, MTU and the write payload limit, RSSI
+3. **GATT Client** - Service/characteristic read/write/notify, descriptors
 4. **GATT Server** - Peripheral role, advertising, request/response handling
 5. **Platform** - Bluetooth state, permissions, capabilities
 6. **Peer** - Stable peer identity on top of the lifecycle protocol. `BlueyPeer`, `ServerId`, `bluey.peer()`, `bluey.discoverPeers()`. The peer module owns the client-side protocol layer — raw `BlueyConnection` is protocol-free.
@@ -125,10 +125,11 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 ### Key Design Decisions
 
 - **No singletons** - explicit `await Bluey.create()` instance with lifecycle via `dispose()`
+- **One link per device, one Connection** - a second `bluey.connect(device)` to a device that is already linked returns the same `Connection` object and announces nothing, since no link was opened. A link ends the same way whatever ended it (the peer, the radio or the app), and an ended `Connection` never revives
 - **Streams over callbacks** - all async events use Dart Streams
 - **Immutable data, mutable connections** - Device/Advertisement are snapshots; Connection state is observable
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
-- **Sealed classes** for exceptions and domain events (exhaustive pattern matching)
+- **Sealed exceptions, open events** - exceptions are sealed families (exhaustive pattern matching); domain events share an open base, `BlueyEvent`, so a `switch` over them needs a default branch
 
 ### Handle-based attribute identity (post-I088)
 
@@ -150,6 +151,7 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 
 - `Bluey.connect(device)` returns a raw `Connection` — no peer-protocol attempt.
 - `Bluey.connectAsPeer(device)` returns `PeerConnection` (throws `NotABlueyPeerException` if the device doesn't expose the lifecycle control service).
+- Probes borrow links. `discoverPeers()`, `BlueyPeer.connect()` and `connectAsPeer` borrow the device's link from Connection's registry instead of connecting through the platform: a device the app is already linked to is read over that link and left up, and a link the borrow opened is closed when it is given back. The iOS shared-link case (I374) is left for slice 5.
 - `Bluey.tryUpgrade(connection)` returns `PeerConnection?` for the rare post-connect upgrade path.
 - `PeerConnection` is a composition wrapper: it holds a `Connection` (use `peer.connection` for raw GATT) plus a `serverId` and the lifecycle-protocol disconnect path.
 
@@ -158,6 +160,7 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - `bluey.logEvents` is a broadcast `Stream<BlueyLogEvent>` covering domain-layer **and** native (Android + iOS) events in arrival order — single subscription point for the whole stack.
 - `bluey.setLogLevel(BlueyLogLevel level)` filters Dart-side and pushes the filter down to the native side, so no Pigeon traffic is incurred for filtered events. Default level is `info`.
 - Levels: `trace`, `debug`, `info`, `warn`, `error`.
+- `bluey.connection`'s lifecycle lines (`connect started`, `connect succeeded`, `connect failed`, `state transition`, `disconnect entered`, `disconnect resolved`) now come from Connection's application layer (`LinkRegistry` and `LinkSession`), where they came from `Bluey` and the old `BlueyConnection`, so a probe's link logs them too; the GATT client's lines keep the same context.
 - Context naming convention: `bluey`, `bluey.connection`, `bluey.connection.lifecycle`, `bluey.server`, `bluey.server.lifecycle`, `bluey.peer`, `bluey.peer.discovery`, `bluey.android.{plugin,gatt_server,gatt_queue,advertiser}`, `bluey.ios.{plugin,central,peripheral,op_slot}`.
 - Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
 - Bootstrap caveat: events emitted during `Bluey.create()` construction are dropped if no listener has subscribed yet (broadcast stream semantics). Subscribe immediately after `create()` resolves to start capturing events.
