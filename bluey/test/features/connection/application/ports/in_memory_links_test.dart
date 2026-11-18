@@ -16,7 +16,8 @@ void main() {
   linksContract('InMemoryLinks', InMemoryLinks.new);
 
   group('opening', () {
-    test('links are named link-<n>, counting from 1', () async {
+    test('a link is named by its device\'s address, as the platforms name '
+        'it', () async {
       // arrange
       final links =
           InMemoryLinks()
@@ -30,9 +31,9 @@ void main() {
       // assert
       expect(
         [first, second],
-        const [
-          Right<ConnectionFailure, LinkId>(LinkId('link-1')),
-          Right<ConnectionFailure, LinkId>(LinkId('link-2')),
+        [
+          Right<ConnectionFailure, LinkId>(LinkId(device.value)),
+          Right<ConnectionFailure, LinkId>(LinkId(other.value)),
         ],
       );
     });
@@ -207,10 +208,7 @@ void main() {
         async.elapse(Duration.zero);
 
         // assert
-        expect(
-          answer,
-          const Right<ConnectionFailure, LinkId>(LinkId('link-1')),
-        );
+        expect(answer, Right<ConnectionFailure, LinkId>(LinkId(device.value)));
       });
     });
   });
@@ -319,17 +317,36 @@ void main() {
       await expectLater(links.reportsOf(id), emitsDone);
     });
 
-    test('after a drop, the next open is a new link', () async {
+    test('after a drop, the next open answers the same id, since the '
+        'platforms name a link by its device', () async {
       // arrange
       final links = InMemoryLinks()..reach(device);
-      await links.open(device);
+      final first = await links.open(device);
       links.drop(device);
 
       // act
       final answer = await links.open(device);
 
       // assert
-      expect(answer, const Right<ConnectionFailure, LinkId>(LinkId('link-2')));
+      expect(answer, first);
+    });
+
+    test('a late close of an ended link\'s id reaches its successor, which '
+        'is why the port forbids using an ended link\'s id', () async {
+      // arrange
+      final links = InMemoryLinks()..reach(device);
+      final id =
+          (await links.open(device) as Right<ConnectionFailure, LinkId>).value;
+      links.drop(device);
+      await links.open(device);
+      final successorReports = links.reportsOf(id);
+
+      // act
+      await links.close(id);
+
+      // assert
+      await expectLater(successorReports, emitsDone);
+      expect(links.closesAsked(device), 1);
     });
   });
 

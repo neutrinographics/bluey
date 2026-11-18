@@ -34,7 +34,6 @@ class InMemoryLinks implements Links, LinksHarness {
   final List<Duration?> _openTimeouts = [];
   final StreamController<RadioOutage> _outages =
       StreamController<RadioOutage>.broadcast();
-  int _minted = 0;
 
   @override
   Links get links => this;
@@ -114,8 +113,11 @@ class InMemoryLinks implements Links, LinksHarness {
   /// The timeout each open was asked with, in order.
   List<Duration?> get openTimeouts => List.unmodifiable(_openTimeouts);
 
+  /// Names the link by its device's address, the hardest naming the port
+  /// allows: a link opened after an ended one answers the same id and
+  /// replaces the ended link's entry, as on the platforms.
   LinkId _mint(DeviceAddress device) {
-    final link = LinkId('link-${++_minted}');
+    final link = LinkId(device.value);
     _live[device] = link;
     _devices[link] = device;
     _reports[link] = StreamController<LinkReport>();

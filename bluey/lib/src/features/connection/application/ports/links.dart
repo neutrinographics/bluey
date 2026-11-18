@@ -8,6 +8,10 @@ import '../../domain/link_input.dart';
 /// The one way Connection's application layer reaches the radio's links, so
 /// a session and the registry can be run over a double and over the platform
 /// alike, and never learn the platform's words.
+///
+/// A link's id is not used once its reports have ended: the next link to the
+/// same device may answer the same id, and a late [close] or [reportsOf]
+/// would then reach that link instead.
 abstract interface class Links {
   /// Opens a link. [timeout] bounds the attempt; null leaves the bound to the platform.
   ///

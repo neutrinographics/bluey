@@ -149,6 +149,30 @@ void linksContract(String name, LinksHarness Function() create) {
       );
     });
 
+    test('an open after a link ended answers a link whose reports are its '
+        'own', () async {
+      // arrange
+      final first = await openLink();
+      h.drop(_device);
+      await expectLater(
+        h.links.reportsOf(first),
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
+
+      // act
+      final second = (await h.links.open(
+        _device,
+      )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+      final reports = h.links.reportsOf(second);
+      h.drop(_device);
+
+      // assert
+      await expectLater(
+        reports,
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
+    });
+
     test(
       'a failed close answers a failure and leaves the reports going',
       () async {

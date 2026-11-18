@@ -1,7 +1,11 @@
 import 'package:meta/meta.dart';
 
-/// Names one link, so that two links to the same device, one after the
-/// other, are never mistaken for each other.
+/// Names one link as the platform names it, and is what the platform is
+/// addressed with for that link.
+///
+/// A platform may name a later link to the same device by the same id, so an
+/// id must not be used once its link has ended: it may already name the
+/// link that came after.
 @immutable
 final class LinkId {
   const LinkId(this.value);
