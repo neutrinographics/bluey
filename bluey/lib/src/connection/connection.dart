@@ -2,11 +2,11 @@ import '../shared/domain/device_address.dart';
 import '../gatt_client/gatt.dart';
 import '../shared/uuid.dart';
 import 'android_connection_extensions.dart';
-import 'connection_state.dart';
+import '../features/connection/domain/connection_state.dart';
 import 'ios_connection_extensions.dart';
 import 'value_objects/write_payload_limit.dart';
 
-export 'connection_state.dart';
+export '../features/connection/domain/connection_state.dart';
 export 'value_objects/connection_interval.dart';
 export 'value_objects/mtu.dart';
 export 'value_objects/peripheral_latency.dart';

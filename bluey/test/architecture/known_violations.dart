@@ -15,7 +15,6 @@ const unplaced = <String>[
   'lib/src/connection/bluey_connection.dart -> unplaced',
   'lib/src/connection/connection.dart -> unplaced',
   'lib/src/connection/connection_parameters_mapper.dart -> unplaced',
-  'lib/src/connection/connection_state.dart -> unplaced',
   'lib/src/connection/ios_connection_extensions.dart -> unplaced',
   'lib/src/connection/lifecycle_client.dart -> unplaced',
   'lib/src/connection/peer_silence_monitor.dart -> unplaced',
