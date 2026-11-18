@@ -12,6 +12,7 @@ import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
 import 'events.dart';
+import 'features/connection/domain/connection_event.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
@@ -30,7 +31,6 @@ import 'shared/gatt_timeouts.dart';
 import 'shared/infrastructure/bluey_event_bus.dart';
 import 'shared/infrastructure/bluey_logger.dart';
 
-export 'events.dart';
 export 'discovery/scanner.dart';
 export 'platform/bluetooth_state.dart';
 

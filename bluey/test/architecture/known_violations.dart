@@ -131,7 +131,7 @@ const oversized = <String>[
   'lib/src/connection/bluey_connection.dart -> 1657 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
   'lib/src/discovery/bluey_scanner.dart -> 410 lines',
-  'lib/src/events.dart -> 513 lines',
+  'lib/src/events.dart -> 477 lines',
   'lib/src/gatt_server/bluey_server.dart -> 1180 lines',
   'lib/src/gatt_server/lifecycle_server.dart -> 413 lines',
   'lib/src/lifecycle.dart -> 364 lines',

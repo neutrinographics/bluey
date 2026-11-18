@@ -90,42 +90,6 @@ final class ScanStoppingEvent extends BlueyEvent {
   String toString() => '[Scan] Stopping';
 }
 
-/// Connection attempt started.
-final class ConnectingEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-
-  ConnectingEvent({required this.deviceAddress, super.source});
-
-  @override
-  String toString() =>
-      '[Connection] Connecting to ${deviceAddress.toShortString()}';
-}
-
-/// Connection established.
-final class ConnectedEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-
-  ConnectedEvent({required this.deviceAddress, super.source});
-
-  @override
-  String toString() =>
-      '[Connection] Connected to ${deviceAddress.toShortString()}';
-}
-
-/// Disconnection occurred.
-final class DisconnectedEvent extends BlueyEvent {
-  final DeviceAddress deviceAddress;
-  final String? reason;
-
-  DisconnectedEvent({required this.deviceAddress, this.reason, super.source});
-
-  @override
-  String toString() {
-    final r = reason != null ? ' ($reason)' : '';
-    return '[Connection] Disconnected from ${deviceAddress.toShortString()}$r';
-  }
-}
-
 /// Service discovery started.
 final class DiscoveringServicesEvent extends BlueyEvent {
   final DeviceAddress deviceAddress;

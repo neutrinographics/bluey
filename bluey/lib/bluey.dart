@@ -65,6 +65,7 @@ export 'src/lifecycle.dart' show LifecycleInterval;
 
 // Domain events
 export 'src/events.dart';
+export 'src/features/connection/domain/connection_event.dart';
 
 // Structured logging
 export 'src/shared/application/log_event.dart' show BlueyLogEvent;
