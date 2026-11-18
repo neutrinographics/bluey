@@ -380,6 +380,36 @@ void main() {
       });
     });
 
+    test('a candidate queued inside the window whose probe has not started '
+        'when it closes is not probed', () {
+      fakeAsync((async) {
+        // arrange
+        final fake = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = fake;
+        final earlyServerId = ServerId.generate();
+        const queued = 'AA:BB:CC:DD:EE:03';
+        fake.connectDelays[early] = const Duration(seconds: 2);
+        final discovery = PeerDiscovery(
+          platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
+          logger: testLogger(),
+        );
+
+        // act
+        List<ServerId>? result;
+        discovery.discover(timeout: window).then((ids) => result = ids);
+        async.elapse(const Duration(milliseconds: 1000));
+        fake.advertise(early, earlyServerId);
+        async.elapse(const Duration(milliseconds: 500));
+        fake.advertise(queued, ServerId.generate());
+        async.elapse(const Duration(seconds: 10));
+
+        // assert
+        expect(fake.connectsTo(queued), 0);
+        expect(result, [earlyServerId]);
+      });
+    });
+
     test('discover waits for the probe in flight before it returns', () {
       fakeAsync((async) {
         // arrange
@@ -522,34 +552,37 @@ void main() {
   group('A probe borrows the link', () {
     const address = 'AA:BB:CC:DD:EE:01';
 
-    test("a probe of a device the app holds reads over the app's link and leaves it", () async {
-      // arrange
-      final serverId = ServerId.generate();
-      final counting = _ScheduledScanPlatform();
-      platform.BlueyPlatform.instance = counting;
-      counting.simulateBlueyServer(address: address, serverId: serverId);
-      final rig = ConnectionRig(counting);
-      final held = await rig.connect(const DeviceAddress(address));
-      await held.services();
-      final discovery = PeerDiscovery(
-        platformApi: counting,
-        borrow: rig.borrow,
-        logger: testLogger(),
-      );
+    test(
+      "a probe of a device the app holds reads over the app's link and leaves it",
+      () async {
+        // arrange
+        final serverId = ServerId.generate();
+        final counting = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = counting;
+        counting.simulateBlueyServer(address: address, serverId: serverId);
+        final rig = ConnectionRig(counting);
+        final held = await rig.connect(const DeviceAddress(address));
+        await held.services();
+        final discovery = PeerDiscovery(
+          platformApi: counting,
+          borrow: rig.borrow,
+          logger: testLogger(),
+        );
 
-      // act
-      final ids = await discovery.discover(
-        timeout: const Duration(milliseconds: 300),
-      );
-      await pumpEventQueue();
+        // act
+        final ids = await discovery.discover(
+          timeout: const Duration(milliseconds: 300),
+        );
+        await pumpEventQueue();
 
-      // assert
-      expect(ids, [serverId]);
-      expect(counting.connectsTo(address), 1);
-      expect(held.state, ConnectionState.ready);
-      expect(counting.connectedDeviceIds, contains(address));
-      await held.disconnect();
-    });
+        // assert
+        expect(ids, [serverId]);
+        expect(counting.connectsTo(address), 1);
+        expect(held.state, ConnectionState.ready);
+        expect(counting.connectedDeviceIds, contains(address));
+        await held.disconnect();
+      },
+    );
 
     test('a probe gives back the link it opened', () async {
       // arrange

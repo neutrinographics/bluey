@@ -68,6 +68,7 @@ class PeerDiscovery {
     final windowClosed = Completer<void>();
 
     Future<void> probe(String address) async {
+      if (windowClosed.isCompleted) return;
       _logger.log(
         BlueyLogLevel.debug,
         'bluey.peer.discovery',
@@ -117,7 +118,7 @@ class PeerDiscovery {
 
     try {
       await windowClosed.future;
-      // Let any probe already in flight finish before reporting.
+      // Queued probes return at once; only the one in flight is awaited.
       await probeChain;
     } finally {
       deadline.cancel();
