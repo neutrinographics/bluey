@@ -5,6 +5,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
+
 import 'fixtures/connection_rig.dart';
 
 /// Mock platform for testing BlueyConnection.
@@ -46,8 +48,11 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   final _notificationControllers =
       <String, StreamController<platform.PlatformNotification>>{};
 
+  /// What the platform says it can do; every connection reads it once.
+  platform.Capabilities mockCapabilities = platform.Capabilities.android;
+
   @override
-  platform.Capabilities get capabilities => platform.Capabilities.android;
+  platform.Capabilities get capabilities => mockCapabilities;
 
   @override
   Future<void> configure(platform.BlueyConfig config) async {}
@@ -250,9 +255,16 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   }
 
   // Bonding operations - stub implementations
+  /// When set, the matching first read fails with it.
+  Object? bondStateReadError;
+  Object? phyReadError;
+  Object? connectionParametersReadError;
+
   @override
-  Future<platform.PlatformBondState> getBondState(String deviceId) async =>
-      platform.PlatformBondState.none;
+  Future<platform.PlatformBondState> getBondState(String deviceId) async {
+    if (bondStateReadError case final error?) throw error;
+    return platform.PlatformBondState.none;
+  }
 
   @override
   Stream<platform.PlatformBondState> bondStateStream(String deviceId) =>
@@ -271,7 +283,10 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<({platform.PlatformPhy tx, platform.PlatformPhy rx})> getPhy(
     String deviceId,
-  ) async => (tx: platform.PlatformPhy.le1m, rx: platform.PlatformPhy.le1m);
+  ) async {
+    if (phyReadError case final error?) throw error;
+    return (tx: platform.PlatformPhy.le1m, rx: platform.PlatformPhy.le1m);
+  }
 
   @override
   Stream<({platform.PlatformPhy tx, platform.PlatformPhy rx})> phyStream(
@@ -289,11 +304,14 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   @override
   Future<platform.PlatformConnectionParameters> getConnectionParameters(
     String deviceId,
-  ) async => const platform.PlatformConnectionParameters(
-    intervalMs: 30.0,
-    latency: 0,
-    timeoutMs: 4000,
-  );
+  ) async {
+    if (connectionParametersReadError case final error?) throw error;
+    return const platform.PlatformConnectionParameters(
+      intervalMs: 30.0,
+      latency: 0,
+      timeoutMs: 4000,
+    );
+  }
 
   @override
   Future<void> requestConnectionParameters(
@@ -840,6 +858,91 @@ void main() {
           throwsA(isA<OperationNotSupportedException>()),
         );
       });
+    });
+
+    group('A first read the platform fails', () {
+      final readFailure = StateError('the radio refused');
+      final defaults = ConnectionParameters(
+        interval: ConnectionInterval(30),
+        latency: PeripheralLatency(0),
+        timeout: SupervisionTimeout(4000),
+      );
+
+      Future<(Connection, List<BlueyLogEvent>)> connectWith(
+        void Function(MockBlueyPlatform) failing,
+      ) async {
+        final failingPlatform =
+            MockBlueyPlatform()
+              ..mockCapabilities = const platform.Capabilities(
+                platformKind: platform.PlatformKind.android,
+                canConnect: true,
+                canBond: true,
+                canRequestPhy: true,
+                canRequestConnectionParameters: true,
+              );
+        failing(failingPlatform);
+        final logger = BlueyLogger();
+        final logs = <BlueyLogEvent>[];
+        logger.events.listen(logs.add);
+        final failed = await ConnectionRig(
+          failingPlatform,
+          logger: logger,
+        ).connect(DeviceAddress(deviceId.toString()));
+        addTearDown(failed.disconnect);
+        await pumpEventQueue();
+        return (failed, logs);
+      }
+
+      Matcher warning(String message) => isA<BlueyLogEvent>()
+          .having((e) => e.level, 'level', BlueyLogLevel.warn)
+          .having((e) => e.context, 'context', 'bluey.connection')
+          .having((e) => e.message, 'message', message)
+          .having((e) => e.data, 'data', {
+            'deviceId': deviceId.toString(),
+            'exception': 'StateError',
+          });
+
+      test(
+        'a failed bond state read is logged and the bond state stays none',
+        () async {
+          // act
+          final (failed, logs) = await connectWith(
+            (p) => p.bondStateReadError = readFailure,
+          );
+
+          // assert
+          expect(logs, contains(warning('bond state read failed')));
+          expect(failed.android!.bondState, BondState.none);
+        },
+      );
+
+      test('a failed PHY read is logged and the PHY stays LE 1M', () async {
+        // act
+        final (failed, logs) = await connectWith(
+          (p) => p.phyReadError = readFailure,
+        );
+
+        // assert
+        expect(logs, contains(warning('phy read failed')));
+        expect(
+          (failed.android!.txPhy, failed.android!.rxPhy),
+          (Phy.le1m, Phy.le1m),
+        );
+      });
+
+      test(
+        'a failed connection parameters read is logged and the defaults stay',
+        () async {
+          // act
+          final (failed, logs) = await connectWith(
+            (p) => p.connectionParametersReadError = readFailure,
+          );
+
+          // assert
+          expect(logs, contains(warning('connection parameters read failed')));
+          expect(failed.android!.connectionParameters, defaults);
+        },
+      );
     });
 
     group('MTU', () {

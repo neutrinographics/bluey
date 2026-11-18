@@ -124,8 +124,7 @@ class LinkGattClient {
   final LinkSession _session;
   final BlueyLogger _logger;
 
-  // The platform addresses a link by this id; it is read only while the
-  // link is up, since an ended link's id may already name the next link.
+  // Read only while the link is up: an ended link's id may name the next.
   String get _connectionId => _session.link.id.value;
 
   DeviceAddress get _device => _session.link.device;
@@ -157,17 +156,10 @@ class LinkGattClient {
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
-  // In-flight GATT-op aborters. Each call to a public GATT op on the
-  // connection / characteristic / descriptor surface registers a
-  // completer here for the lifetime of the underlying platform call.
-  // On Service Changed, every entry is failed with
-  // [AttributeHandleInvalidatedException] so callers stop waiting on
-  // futures whose handles are now stale and re-discover instead.
+  // Failed on Service Changed, so no caller waits on a stale handle.
   final Set<Completer<Object?>> _pendingGattOpAborters = {};
 
-  /// Domain port for emitting GATT-op events. Optional so internal call
-  /// sites that build a client without an event-bus context (e.g.
-  /// some tests) keep working — emission is a no-op when null.
+  /// Where GATT-op events go; none are emitted without it.
   final EventPublisher? _events;
 
   /// Starts following Service Changed, bond and PHY reports for the
@@ -183,25 +175,15 @@ class LinkGattClient {
        _events = events {
     final connectionId = _connectionId;
 
-    // Service Changed invalidates the entire discovered attribute tree.
-    // Native sides have already cleared their handle tables by the time
-    // this event fires. Here we mirror that on the Dart side: drop the
-    // cached services so the next `services()` call re-discovers, and
-    // abort every in-flight GATT op with a typed exception so callers
-    // stop waiting on futures whose handles are now stale.
+    // The native side has already dropped its handles: so must we.
     _platformServiceChangesSubscription = _platform.serviceChanges
         .where((id) => id == connectionId)
         .listen((_) {
           _onServiceChanged();
         });
 
-    // Bond / PHY / connection-parameter subscriptions and initial fetches
-    // are guarded by [Capabilities]. Platforms that don't support an
-    // operation throw `UnimplementedError` from the corresponding stub;
-    // calling them unconditionally would crash every connect on those
-    // platforms. The default field values seeded above (BondState.none,
-    // le1m PHY, 30 ms / 0 / 4 s connection parameters) stand in when
-    // the capability is absent.
+    // A platform without a capability throws from its calls, so only
+    // those it has are made; the defaults above stand for the rest.
     final caps = _platform.capabilities;
 
     if (caps.canBond) {
@@ -217,8 +199,8 @@ class LinkGattClient {
             },
           );
 
-      _platform.getBondState(connectionId).then((platformBondState) {
-        _bondState = _mapBondState(platformBondState);
+      _readFirst('bond state', _platform.getBondState(connectionId), (bond) {
+        _bondState = _mapBondState(bond);
       });
     }
 
@@ -236,19 +218,42 @@ class LinkGattClient {
             },
           );
 
-      _platform.getPhy(connectionId).then((platformPhy) {
-        _txPhy = _mapPhy(platformPhy.tx);
-        _rxPhy = _mapPhy(platformPhy.rx);
+      _readFirst('phy', _platform.getPhy(connectionId), (phy) {
+        _txPhy = _mapPhy(phy.tx);
+        _rxPhy = _mapPhy(phy.rx);
       });
     }
 
     if (caps.canRequestConnectionParameters) {
-      _platform.getConnectionParameters(connectionId).then((params) {
-        _connectionParameters = connectionParametersFromPlatform(params);
-      });
+      _readFirst(
+        'connection parameters',
+        _platform.getConnectionParameters(connectionId),
+        (params) =>
+            _connectionParameters = connectionParametersFromPlatform(params),
+      );
     }
 
     _session.onEnd(_release);
+  }
+
+  /// A first read that fails is logged and the default kept: a probe link
+  /// must not raise an error nobody can catch.
+  void _readFirst<T>(String what, Future<T> read, void Function(T) take) {
+    unawaited(
+      read.then(
+        take,
+        onError:
+            (Object error) => _logger.log(
+              BlueyLogLevel.warn,
+              'bluey.connection',
+              '$what read failed',
+              data: {
+                'deviceId': _device.toString(),
+                'exception': error.runtimeType.toString(),
+              },
+            ),
+      ),
+    );
   }
 
   /// Everything that lives as long as the link, let go when it ends.
@@ -410,30 +415,27 @@ class LinkGattClient {
 
   /// Each re-discovered service tree; see [Connection.servicesChanges].
   Stream<List<RemoteService>> get servicesChanges =>
-      Stream<List<RemoteService>>.multi(
-        (controller) {
-          // Convention 3 (non-enum terminal): late subscribers after
-          // an outage see addError(StaleHandleException) + close so
-          // their `onError` mirrors what the corresponding sync getter
-          // would throw (Convention 6).
-          final stale = _staleness;
-          if (stale != null) {
-            controller.addError(stale);
-            controller.close();
-            return;
-          }
-          // Replay the currently-discovered services (or the empty list
-          // if discovery hasn't run yet) before forwarding live events.
-          controller.add(_cachedServices ?? const <RemoteService>[]);
-          final sub = _servicesChangesController.stream.listen(
-            controller.add,
-            onError: controller.addError,
-            onDone: controller.close,
-          );
-          controller.onCancel = sub.cancel;
-        },
-        isBroadcast: true,
-      );
+      Stream<List<RemoteService>>.multi((controller) {
+        // Convention 3 (non-enum terminal): late subscribers after
+        // an outage see addError(StaleHandleException) + close so
+        // their `onError` mirrors what the corresponding sync getter
+        // would throw (Convention 6).
+        final stale = _staleness;
+        if (stale != null) {
+          controller.addError(stale);
+          controller.close();
+          return;
+        }
+        // Replay the currently-discovered services (or the empty list
+        // if discovery hasn't run yet) before forwarding live events.
+        controller.add(_cachedServices ?? const <RemoteService>[]);
+        final sub = _servicesChangesController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller.onCancel = sub.cancel;
+      }, isBroadcast: true);
 
   // I325 — relocated to AndroidConnectionExtensions; private accessor
   // is used by _AndroidConnectionExtensionsImpl.
@@ -553,7 +555,9 @@ class LinkGattClient {
         deviceAddress: _device,
         op: 'requestMtu',
         startDetail: 'requested=$requested',
-        body: () => _overLink(() => _platform.requestMtu(connectionId, requested)),
+        body:
+            () =>
+                _overLink(() => _platform.requestMtu(connectionId, requested)),
         completeDetail:
             (negotiated) => 'requested=$requested, negotiated=$negotiated',
         logger: _logger,
@@ -626,29 +630,27 @@ class LinkGattClient {
 
   BondState get _bondStateValue => _bondState;
 
-  Stream<BondState> get _bondStateChanges => Stream<BondState>.multi(
-    (controller) {
-      // Convention 3 (non-enum terminal): late subscribers after an
-      // outage see addError(StaleHandleException) + close so their
-      // `onError` mirrors what the corresponding sync getter would
-      // throw (Convention 6).
-      final stale = _staleness;
-      if (stale != null) {
-        controller.addError(stale);
-        controller.close();
-        return;
-      }
-      // Replay the cached bond state before bridging live events.
-      controller.add(_bondState);
-      final sub = _bondStateController.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = sub.cancel;
-    },
-    isBroadcast: true,
-  );
+  Stream<BondState> get _bondStateChanges =>
+      Stream<BondState>.multi((controller) {
+        // Convention 3 (non-enum terminal): late subscribers after an
+        // outage see addError(StaleHandleException) + close so their
+        // `onError` mirrors what the corresponding sync getter would
+        // throw (Convention 6).
+        final stale = _staleness;
+        if (stale != null) {
+          controller.addError(stale);
+          controller.close();
+          return;
+        }
+        // Replay the cached bond state before bridging live events.
+        controller.add(_bondState);
+        final sub = _bondStateController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller.onCancel = sub.cancel;
+      }, isBroadcast: true);
 
   Future<void> _bondImpl() async {
     _ensureValid();
@@ -676,29 +678,27 @@ class LinkGattClient {
 
   Phy get _rxPhyValue => _rxPhy;
 
-  Stream<({Phy tx, Phy rx})> get _phyChanges => Stream<({Phy tx, Phy rx})>.multi(
-    (controller) {
-      // Convention 3 (non-enum terminal): late subscribers after an
-      // outage see addError(StaleHandleException) + close so their
-      // `onError` mirrors what the corresponding sync getters throw
-      // (Convention 6).
-      final stale = _staleness;
-      if (stale != null) {
-        controller.addError(stale);
-        controller.close();
-        return;
-      }
-      // Replay the cached (tx, rx) PHY pair before bridging live events.
-      controller.add((tx: _txPhy, rx: _rxPhy));
-      final sub = _phyController.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = sub.cancel;
-    },
-    isBroadcast: true,
-  );
+  Stream<({Phy tx, Phy rx})> get _phyChanges =>
+      Stream<({Phy tx, Phy rx})>.multi((controller) {
+        // Convention 3 (non-enum terminal): late subscribers after an
+        // outage see addError(StaleHandleException) + close so their
+        // `onError` mirrors what the corresponding sync getters throw
+        // (Convention 6).
+        final stale = _staleness;
+        if (stale != null) {
+          controller.addError(stale);
+          controller.close();
+          return;
+        }
+        // Replay the cached (tx, rx) PHY pair before bridging live events.
+        controller.add((tx: _txPhy, rx: _rxPhy));
+        final sub = _phyController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller.onCancel = sub.cancel;
+      }, isBroadcast: true);
 
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureValid();

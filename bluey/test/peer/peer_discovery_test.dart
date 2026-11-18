@@ -528,9 +528,11 @@ void main() {
       final bluey = await Bluey.create(
         localIdentity: TestServerIds.localIdentity,
       );
+      addTearDown(bluey.dispose);
       final peer = await bluey.connectAsPeer(
         Device(address: const DeviceAddress(address)),
       );
+      addTearDown(peer.disconnect);
       expect(fakePlatform.connectedDeviceIds, contains(address));
 
       // act
@@ -544,8 +546,6 @@ void main() {
         reason: 'the probe disconnected the link the app was using',
       );
       expect(peer.connection.state, isNot(ConnectionState.disconnected));
-      await peer.disconnect();
-      await bluey.dispose();
     });
   });
 
