@@ -268,7 +268,7 @@ void main() {
       },
     );
 
-    test('a failed close on a link that dropped meanwhile answers success', () {
+    test('a failed close on a link that ended meanwhile answers success', () {
       fakeAsync((async) {
         // arrange
         links.closeDelay = const Duration(seconds: 1);
@@ -289,6 +289,34 @@ void main() {
         expect(links.closesAsked(timed), 1);
       });
     });
+
+    test(
+      'a disconnect after the link ended with a close in flight joins that close',
+      () {
+        fakeAsync((async) {
+          // arrange
+          links.closeDelay = const Duration(seconds: 1);
+          final session = openTimedSession(async);
+          Either<ConnectionFailure, void>? first;
+          Either<ConnectionFailure, void>? second;
+          session.disconnect().then((answer) => first = answer);
+          async.elapse(const Duration(milliseconds: 500));
+          links.outage(RadioOutage.off);
+          async.flushMicrotasks();
+
+          // act
+          session.disconnect().then((answer) => second = answer);
+          async.elapse(const Duration(milliseconds: 400));
+
+          // assert
+          expect(session.link.end, const EndedByRadioOutage(RadioOutage.off));
+          expect((first, second), (null, null));
+          async.elapse(const Duration(milliseconds: 100));
+          expect((first, second), (success, success));
+          expect(links.closesAsked(timed), 1);
+        });
+      },
+    );
 
     test(
       'logs disconnect entered, the transitions and disconnect resolved',
@@ -336,6 +364,35 @@ void main() {
   });
 
   group('releases', () {
+    test(
+      'one registered during the teardown runs before disconnect answers',
+      () async {
+        // arrange
+        final releasing = Completer<void>();
+        final lateGate = Completer<void>();
+        final order = <String>[];
+        session.onEnd((_) => releasing.future);
+        links.drop(device);
+        await pumpEventQueue();
+        session.onEnd((_) async {
+          await lateGate.future;
+          order.add('late release');
+        });
+        final answer = session.disconnect().whenComplete(
+          () => order.add('answered'),
+        );
+
+        // act
+        releasing.complete();
+        await pumpEventQueue();
+        lateGate.complete();
+        await answer;
+
+        // assert
+        expect(order, ['late release', 'answered']);
+      },
+    );
+
     test('run in the order they were registered, once', () async {
       // arrange
       final order = <String>[];
@@ -433,6 +490,10 @@ void main() {
         );
         operation.complete(const Right(7));
         await pumpEventQueue();
+        expect(
+          log.records.where((r) => r.level == BlueyLogLevel.warn),
+          isEmpty,
+        );
       },
     );
 
@@ -462,6 +523,35 @@ void main() {
           const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
         ),
       );
+    });
+
+    test('an orEnd that throws does not stop the teardown', () async {
+      // arrange
+      final operation = Completer<Either<ConnectionFailure, int>>();
+      final answer = session.whileUp<ConnectionFailure, int>(
+        () => operation.future,
+        orEnd: (_) => throw StateError('boom'),
+      );
+      final states = <ConnectionState>[];
+      session.states.listen(states.add);
+
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+
+      // assert
+      expect(disconnects().single.reason, 'linkLoss');
+      expect(released, [const EndedByDrop()]);
+      expect(await session.disconnect(), success);
+      final failure = log.records.singleWhere(
+        (r) => r.level == BlueyLogLevel.warn,
+      );
+      expect(
+        (failure.context, failure.message),
+        ('bluey.connection', 'end answer failed'),
+      );
+      operation.complete(const Right(7));
+      expect(await answer, const Right<ConnectionFailure, int>(7));
     });
 
     test('hands on an error the operation raises', () async {

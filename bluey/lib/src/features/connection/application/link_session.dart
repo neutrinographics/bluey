@@ -65,13 +65,15 @@ final class LinkSession {
   Stream<ConnectionState> get states => _states.stream;
 
   /// Registers something that lives as long as the link. Runs once when the
-  /// link ends, whatever ended it; at once if it already has.
+  /// link ends, whatever ended it; at once if the teardown has finished.
+  ///
+  /// A release must not wait on this session's [disconnect], which answers
+  /// only once every release has run, so the two would wait on each other.
   void onEnd(FutureOr<void> Function(LinkEnd end) release) {
-    final end = _link.end;
-    if (end == null) {
-      _releases.add(release);
+    if (_released.isCompleted) {
+      unawaited(_runRelease(release, _link.end!));
     } else {
-      unawaited(_runRelease(release, end));
+      _releases.add(release);
     }
   }
 
@@ -106,9 +108,9 @@ final class LinkSession {
   /// an ended link answers success without asking the platform. A failed
   /// close leaves the link as it was, unless the link ended anyway.
   Future<Either<ConnectionFailure, void>> disconnect() {
-    if (_link.hasEnded) return _afterRelease();
     final inFlight = _closeInFlight;
     if (inFlight != null) return inFlight;
+    if (_link.hasEnded) return _afterRelease();
     _logDevice('disconnect entered');
     _feed(const DisconnectRequested());
     return _closeInFlight!;
@@ -158,7 +160,7 @@ final class LinkSession {
   Future<void> _release(LinkEnd end) async {
     unawaited(_states.close());
     for (final answerEnd in List.of(_operationsUp)) {
-      answerEnd(end);
+      _guarded('end answer failed', () => answerEnd(end));
     }
     _operationsUp.clear();
     _events.emit(
@@ -166,8 +168,8 @@ final class LinkSession {
     );
     unawaited(_reports.cancel());
     unawaited(_outages.cancel());
-    for (final release in _releases) {
-      await _runRelease(release, end);
+    for (var next = 0; next < _releases.length; next++) {
+      await _runRelease(_releases[next], end);
     }
     _releases.clear();
     _released.complete();
@@ -180,15 +182,27 @@ final class LinkSession {
     try {
       await release(end);
     } catch (error) {
-      _log.log(
-        BlueyLogLevel.warn,
-        _context,
-        'release failed',
-        data: {'deviceId': '${_link.device}', 'error': '$error'},
-        errorCode: error.runtimeType.toString(),
-      );
+      _warn('release failed', error);
     }
   }
+
+  /// Runs a caller's callback during the teardown, so one that throws is
+  /// logged and the teardown goes on.
+  void _guarded(String message, void Function() callback) {
+    try {
+      callback();
+    } catch (error) {
+      _warn(message, error);
+    }
+  }
+
+  void _warn(String message, Object error) => _log.log(
+    BlueyLogLevel.warn,
+    _context,
+    message,
+    data: {'deviceId': '${_link.device}', 'error': '$error'},
+    errorCode: error.runtimeType.toString(),
+  );
 
   static String _reasonOf(LinkEnd end) => switch (end) {
     EndedOnRequest() => 'requested',
