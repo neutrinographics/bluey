@@ -233,20 +233,17 @@ void main() {
       );
 
       // act
-      Object? thrown;
-      try {
-        valueOrThrow(answer, device: _device);
-      } on Object catch (error) {
-        thrown = error;
-      }
+      void read() => valueOrThrow(answer, device: _device);
 
       // assert
       expect(
-        thrown,
-        isA<GattTimeoutException>().having(
-          (e) => e.operation,
-          'operation',
-          'readRssi',
+        read,
+        throwsA(
+          isA<GattTimeoutException>().having(
+            (e) => e.operation,
+            'operation',
+            'readRssi',
+          ),
         ),
       );
     });

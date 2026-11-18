@@ -9,6 +9,35 @@ import 'package:flutter_test/flutter_test.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 
+/// The fields an app reads from [exception] beyond its text, so the parity
+/// check sees an address, a code or a reason that `toString()` leaves out.
+/// An exception type with no projection fails the test rather than passing
+/// unseen.
+Map<String, Object?> fieldsOf(BlueyException exception) => {
+  'action': exception.action,
+  ...switch (exception) {
+    DisconnectedException(:final address, :final reason) => {
+      'address': address,
+      'reason': reason,
+    },
+    ConnectionException(:final deviceAddress, :final reason) => {
+      'deviceAddress': deviceAddress,
+      'reason': reason,
+    },
+    BlueyPlatformException(:final code) => {'code': code},
+    GattTimeoutException(:final operation) => {'operation': operation},
+    GattOperationFailedException(:final operation, :final status) => {
+      'operation': operation,
+      'status': status,
+    },
+    PermissionDeniedException(:final permissions) => {
+      'permissions': permissions,
+    },
+    BluetoothUnavailableException() => const <String, Object?>{},
+    _ => fail('No field projection for ${exception.runtimeType}.'),
+  },
+};
+
 void main() {
   group('a platform error read through Connection reads as it does today', () {
     final platformErrors = <Object>[
@@ -34,6 +63,7 @@ void main() {
       PlatformException(code: 'x', message: 'y'),
       PlatformException(code: 'x'),
       StateError('anything else'),
+      Exception('Not connected to device: ${device.value}'),
     ];
     for (final error in platformErrors) {
       test('${error.runtimeType} ($error) translates as it does today', () {
@@ -53,6 +83,8 @@ void main() {
         // assert
         expect(now.runtimeType, today.runtimeType);
         expect(now.toString(), today.toString());
+        expect(fieldsOf(now), fieldsOf(today));
+        expect(now.cause, same(today.cause));
       });
     }
   });
