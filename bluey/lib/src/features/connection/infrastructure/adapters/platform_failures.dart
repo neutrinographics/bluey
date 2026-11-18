@@ -45,6 +45,10 @@ ConnectionFailure connectionFailureFrom(
 
 /// Runs one platform call and answers what it threw as a failure, so an
 /// adapter's every call reads the same way and none forgets to translate.
+///
+/// A programming error under the call is answered too, as an
+/// [UnexpectedPlatformFailure], because the caller is promised a value for
+/// anything the call throws.
 Future<Either<ConnectionFailure, T>> answering<T>(
   String operation,
   Future<T> Function() call,

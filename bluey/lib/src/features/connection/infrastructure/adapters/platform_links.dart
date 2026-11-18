@@ -17,8 +17,13 @@ import 'platform_failures.dart';
 /// phone exactly as it runs over the in-memory double.
 ///
 /// A link's id is the connection id the platform answers, which the GATT
-/// calls that follow are made with. A platform stream that fails is logged
-/// and ended, never passed on, which the lifecycle reads as a drop.
+/// calls that follow are made with. The adapter cannot tell an ended link's
+/// id from its successor's, so it trusts the port's rule that an ended
+/// link's id is not used again.
+///
+/// A platform stream that fails is logged and ended, never passed on, which
+/// the lifecycle reads as a drop; the adapter then asks the platform to
+/// close the link, since nobody else will.
 final class PlatformLinks implements Links {
   PlatformLinks(BlueyPlatform platform, {required Log log})
     : _platform = platform,
@@ -87,22 +92,45 @@ final class PlatformLinks implements Links {
     if (live == null || live.ended) {
       _reports[link] = _CarriedReports(
         _platform.connectionStateStream(connectionId),
-        onFailure:
-            (error) => _log.log(
-              BlueyLogLevel.warn,
-              'bluey.connection',
-              'link reports failed',
-              data: {'link': connectionId},
-              errorCode: error.runtimeType.toString(),
-            ),
+        onFailure: (error) => _closeAfterFailedReports(connectionId, error),
       );
     }
     return link;
+  }
+
+  /// The lifecycle reads failed reports as a drop and will not ask for a
+  /// close, so the adapter asks, or the radio link could stay up with
+  /// nothing left able to close it.
+  void _closeAfterFailedReports(String connectionId, Object error) {
+    _log.log(
+      BlueyLogLevel.warn,
+      'bluey.connection',
+      'link reports failed',
+      data: {'link': connectionId},
+      errorCode: error.runtimeType.toString(),
+    );
+    unawaited(
+      answering('disconnect', () => _platform.disconnect(connectionId)).then(
+        (answer) => answer.fold(
+          (failure) => _log.log(
+            BlueyLogLevel.warn,
+            'bluey.connection',
+            'link left open',
+            data: {'device': connectionId},
+            errorCode: failure.runtimeType.toString(),
+          ),
+          (_) {},
+        ),
+      ),
+    );
   }
 }
 
 /// One link's reports, buffered until its one listener arrives and ended
 /// for good once the platform stops, fails or the link is closed.
+///
+/// Its listener cancelling does not stop the carrying: the platform's stream
+/// ends with the link, so nothing is carried for longer than the link lives.
 final class _CarriedReports {
   _CarriedReports(
     Stream<PlatformConnectionState> states, {
@@ -111,8 +139,8 @@ final class _CarriedReports {
     _subscription = states.listen(
       (state) => _controller.add(_reportOf(state)),
       onError: (Object error) {
-        onFailure(error);
         end();
+        onFailure(error);
       },
       onDone: end,
     );

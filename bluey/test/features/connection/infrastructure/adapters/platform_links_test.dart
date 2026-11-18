@@ -67,9 +67,43 @@ void main() {
 
       // assert
       await expectLater(reports, emitsDone);
+      await pumpEventQueue();
       expect(log.records.single.message, 'link reports failed');
       expect(log.records.single.level, BlueyLogLevel.warn);
       expect(log.records.single.context, 'bluey.connection');
+      expect(fake.connectedDeviceIds, isEmpty);
+    });
+
+    test('a link the platform will not close after its reports failed is '
+        'logged as left open, and its reports still end', () async {
+      // arrange
+      final id = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      final reports = links.reportsOf(id);
+      fake.enqueueFault(
+        FakeOp.disconnect,
+        PlatformException(code: 'E1'),
+        deviceId: device.value,
+      );
+
+      // act
+      fake.simulateConnectionStateError(device.value, StateError('boom'));
+
+      // assert
+      await expectLater(reports, emitsDone);
+      await pumpEventQueue();
+      expect(
+        [
+          for (final record in log.records)
+            (record.level, record.context, record.message),
+        ],
+        [
+          (BlueyLogLevel.warn, 'bluey.connection', 'link reports failed'),
+          (BlueyLogLevel.warn, 'bluey.connection', 'link left open'),
+        ],
+      );
+      expect(log.records.last.data, {'device': device.value});
     });
   });
 
@@ -111,6 +145,10 @@ void main() {
 
       // assert
       expect(answer.fold((failure) => failure, (_) => null), isNull);
+      await expectLater(
+        fake.disconnect(device.value),
+        throwsA(isA<PlatformException>()),
+      );
     });
   });
 
