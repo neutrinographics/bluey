@@ -127,10 +127,12 @@ final class PlatformLinks implements Links {
 }
 
 /// One link's reports, buffered until its one listener arrives and ended
-/// for good once the platform stops, fails or the link is closed.
+/// for good once the platform stops, fails, the link is closed or its
+/// listener leaves.
 ///
-/// Its listener cancelling does not stop the carrying: the platform's stream
-/// ends with the link, so nothing is carried for longer than the link lives.
+/// A listener leaves only when its link has ended for Connection, as after
+/// a radio outage, while the platform may still hold the link; the next open
+/// of that device then carries its reports afresh for its new reader.
 final class _CarriedReports {
   _CarriedReports(
     Stream<PlatformConnectionState> states, {
@@ -146,7 +148,9 @@ final class _CarriedReports {
     );
   }
 
-  final StreamController<LinkReport> _controller = StreamController();
+  late final StreamController<LinkReport> _controller = StreamController(
+    onCancel: end,
+  );
   late final StreamSubscription<PlatformConnectionState> _subscription;
 
   Stream<LinkReport> get stream => _controller.stream;

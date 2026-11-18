@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import '../connection/bluey_connection.dart';
+import '../api/connection/borrowed_connection.dart';
+import '../api/connection/connection.dart';
 import '../connection/lifecycle_client.dart';
 import '../shared/application/event_publisher.dart';
 import '../lifecycle.dart' as lifecycle;
@@ -15,6 +16,10 @@ import 'peer_discovery.dart';
 import 'server_id.dart';
 
 /// Package-private factory for constructing a [BlueyPeer].
+///
+/// [borrow] is how the peer reaches candidates while it looks for itself,
+/// and [connectionIdOf] names the link of the Connection it found, which
+/// the lifecycle client writes with.
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
   required ServerId serverId,
@@ -22,6 +27,8 @@ BlueyPeer createBlueyPeer({
   required BlueyLogger logger,
   Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   EventPublisher? events,
+  required BorrowConnection borrow,
+  required String Function(Connection) connectionIdOf,
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
@@ -30,6 +37,8 @@ BlueyPeer createBlueyPeer({
     peerSilenceTimeout: peerSilenceTimeout,
     logger: logger,
     events: events,
+    borrow: borrow,
+    connectionIdOf: connectionIdOf,
   );
 }
 
@@ -39,6 +48,8 @@ class _BlueyPeer implements BlueyPeer {
   final Duration _peerSilenceTimeout;
   final BlueyLogger _logger;
   final EventPublisher? _events;
+  final BorrowConnection _borrow;
+  final String Function(Connection) _connectionIdOf;
 
   @override
   final ServerId serverId;
@@ -52,11 +63,15 @@ class _BlueyPeer implements BlueyPeer {
     required Duration peerSilenceTimeout,
     required BlueyLogger logger,
     EventPublisher? events,
+    required BorrowConnection borrow,
+    required String Function(Connection) connectionIdOf,
   }) : _platform = platformApi,
        _localIdentity = localIdentity,
        _peerSilenceTimeout = peerSilenceTimeout,
        _logger = logger,
-       _events = events;
+       _events = events,
+       _borrow = borrow,
+       _connectionIdOf = connectionIdOf;
 
   @override
   Future<PeerConnection> connect({
@@ -81,17 +96,16 @@ class _BlueyPeer implements BlueyPeer {
 
       final discovery = PeerDiscovery(
         platformApi: _platform,
+        borrow: _borrow,
         logger: _logger,
-        events: _events,
       );
-      final BlueyConnection blueyConnection;
+      final Connection connection;
       try {
-        final rawConnection = await discovery.connectTo(
+        connection = await discovery.connectTo(
           serverId,
           scanTimeout: effectiveScanTimeout,
           probeTimeout: effectiveProbeTimeout,
         );
-        blueyConnection = rawConnection as BlueyConnection;
       } catch (e) {
         _logger.log(
           BlueyLogLevel.error,
@@ -108,25 +122,25 @@ class _BlueyPeer implements BlueyPeer {
 
       // Discover services on the raw connection (includes control service)
       // so the LifecycleClient can locate its characteristics.
-      final allServices = await blueyConnection.services();
+      final allServices = await connection.services();
 
       // Start lifecycle heartbeat. Drives the unreachable-detection path
       // that triggers a local disconnect when the peer goes silent.
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
-        connectionId: blueyConnection.connectionId,
+        connectionId: _connectionIdOf(connection),
         localIdentity: _localIdentity,
         peerSilenceTimeout: _peerSilenceTimeout,
         onServerUnreachable: () {
-          blueyConnection.disconnect().catchError((_) {});
+          connection.disconnect().catchError((_) {});
         },
         logger: _logger,
-        servicesChanges: blueyConnection.servicesChanges,
+        servicesChanges: connection.servicesChanges,
         events: _events,
-        deviceAddress: blueyConnection.deviceAddress,
+        deviceAddress: connection.deviceAddress,
         expectedServerId: serverId,
         onIdentityMismatch: (_) {
-          blueyConnection.disconnect().catchError((_) {});
+          connection.disconnect().catchError((_) {});
         },
       );
       lifecycleClient.start(allServices: allServices);
@@ -137,12 +151,12 @@ class _BlueyPeer implements BlueyPeer {
         'peer connect resolved',
         data: {
           'serverId': serverId.toString(),
-          'deviceId': blueyConnection.deviceAddress.toString(),
+          'deviceId': connection.deviceAddress.toString(),
         },
       );
 
       return PeerConnection.create(
-        connection: blueyConnection,
+        connection: connection,
         serverId: serverId,
         lifecycleClient: lifecycleClient,
       );

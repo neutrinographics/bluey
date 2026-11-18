@@ -9,7 +9,10 @@ import '../events.dart';
 import '../gatt_client/gatt.dart';
 import '../shared/infrastructure/bluey_logger.dart';
 import '../shared/application/log_level.dart';
-import '../platform/bluetooth_state.dart';
+import '../shared/domain/either.dart';
+import '../api/failure_translation.dart';
+import '../features/connection/application/link_session.dart';
+import '../features/connection/domain/link_end.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
@@ -22,7 +25,7 @@ import 'lifecycle_client.dart';
 import 'value_objects/attribute_handle.dart';
 
 /// Thin wrapper over [withErrorTranslation] preserved for call-site
-/// readability — every public GATT op on [BlueyConnection] /
+/// readability — every public GATT op on [LinkGattClient] /
 /// [BlueyRemoteCharacteristic] / [BlueyRemoteDescriptor] flows through
 /// this so the lifecycle accounting and exception translation stay in
 /// one place. See [withErrorTranslation] for the full hook contract.
@@ -108,36 +111,25 @@ Future<T> _loggedGattOp<T>({
   }
 }
 
-/// Internal implementation of [Connection] that wraps platform calls.
+/// One link's GATT client: discovery and its cache, the Service Changed
+/// handler, the readings and the Android extensions, over the link a
+/// [LinkSession] runs.
 ///
-/// This class is created by [Bluey.connect] and should not be instantiated
-/// directly by users.
-///
-/// `BlueyConnection` is a *pure GATT connection*. It carries no
-/// peer-protocol state (no `serverId`, no [LifecycleClient]); the
-/// peer-protocol surface lives entirely in `PeerConnection` /
-/// `_BlueyPeerConnection`, which composes a `BlueyConnection`
-/// underneath.
-class BlueyConnection implements Connection {
+/// It keeps no copy of the link's state. It asks the session whether the
+/// link is usable, runs every platform call that needs the link through
+/// [LinkSession.whileUp], so the link's end answers a call at once, and
+/// releases its caches and streams when the session says the link ended.
+class LinkGattClient {
   final platform.BlueyPlatform _platform;
-  final String _connectionId;
+  final LinkSession _session;
   final BlueyLogger _logger;
 
-  /// The platform-level connection identifier.
-  ///
-  /// Exposed for internal use by peer orchestration (the
-  /// [LifecycleClient] that lives inside `_BlueyPeerConnection` reads
-  /// this to drive heartbeat writes). Not part of the public
-  /// [Connection] interface.
-  String get connectionId => _connectionId;
+  // The platform addresses a link by this id; it is read only while the
+  // link is up, since an ended link's id may already name the next link.
+  String get _connectionId => _session.link.id.value;
 
-  @override
-  final DeviceAddress deviceAddress;
+  DeviceAddress get _device => _session.link.device;
 
-  // Start as `linked` since we're constructed after a successful platform
-  // connect — the link is up but services have not yet been discovered.
-  // The first `services()` call promotes us to `ready`.
-  ConnectionState _state = ConnectionState.linked;
   int _mtu = 23; // Default BLE MTU
   BondState _bondState = BondState.none;
   Phy _txPhy = Phy.le1m;
@@ -151,8 +143,6 @@ class BlueyConnection implements Connection {
         timeout: SupervisionTimeout(4000), // Default 4s timeout
       );
 
-  final StreamController<ConnectionState> _stateController =
-      StreamController<ConnectionState>.broadcast();
   final StreamController<BondState> _bondStateController =
       StreamController<BondState>.broadcast();
   final StreamController<({Phy tx, Phy rx})> _phyController =
@@ -160,17 +150,9 @@ class BlueyConnection implements Connection {
   final StreamController<List<RemoteService>> _servicesChangesController =
       StreamController<List<RemoteService>>.broadcast();
 
-  StreamSubscription? _platformStateSubscription;
   StreamSubscription? _platformBondStateSubscription;
   StreamSubscription? _platformPhySubscription;
   StreamSubscription? _platformServiceChangesSubscription;
-
-  // I333: adapter-state invalidation. The connection subscribes to
-  // platform.stateStream at construction; any non-`on` emission flips
-  // [_invalidation] and tears down owned streams + caches.
-  // Subsequent public calls throw [StaleHandleException].
-  InvalidationCause? _invalidation;
-  StreamSubscription<platform.BluetoothState>? _adapterStateSubscription;
 
   // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
@@ -184,42 +166,22 @@ class BlueyConnection implements Connection {
   final Set<Completer<Object?>> _pendingGattOpAborters = {};
 
   /// Domain port for emitting GATT-op events. Optional so internal call
-  /// sites that build a connection without an event-bus context (e.g.
+  /// sites that build a client without an event-bus context (e.g.
   /// some tests) keep working — emission is a no-op when null.
   final EventPublisher? _events;
 
-  /// Creates a new connection instance.
-  ///
-  /// This is called internally by Bluey and should not be used directly.
-  BlueyConnection({
+  /// Starts following Service Changed, bond and PHY reports for the
+  /// session's link at once; all of it is released when the link ends.
+  LinkGattClient({
     required platform.BlueyPlatform platformInstance,
-    required String connectionId,
-    required this.deviceAddress,
+    required LinkSession session,
     required BlueyLogger logger,
     EventPublisher? events,
   }) : _platform = platformInstance,
-       _connectionId = connectionId,
+       _session = session,
        _logger = logger,
        _events = events {
-    // Subscribe to platform connection state changes.
-    //
-    // The platform reports four states (connecting / connected /
-    // disconnecting / disconnected); we map them onto our five-state
-    // domain enum, with the platform's `connected` becoming `linked`
-    // (the link is up; services not yet discovered). Promotion to
-    // `ready` is driven from `services()` once GATT discovery
-    // completes — see [_setState] for the idempotent / non-regressing
-    // transition logic.
-    _platformStateSubscription = _platform
-        .connectionStateStream(_connectionId)
-        .listen(
-          (platformState) {
-            _setState(_mapConnectionState(platformState));
-          },
-          onError: (error) {
-            _stateController.addError(error);
-          },
-        );
+    final connectionId = _connectionId;
 
     // Service Changed invalidates the entire discovered attribute tree.
     // Native sides have already cleared their handle tables by the time
@@ -228,7 +190,7 @@ class BlueyConnection implements Connection {
     // abort every in-flight GATT op with a typed exception so callers
     // stop waiting on futures whose handles are now stale.
     _platformServiceChangesSubscription = _platform.serviceChanges
-        .where((id) => id == _connectionId)
+        .where((id) => id == connectionId)
         .listen((_) {
           _onServiceChanged();
         });
@@ -244,7 +206,7 @@ class BlueyConnection implements Connection {
 
     if (caps.canBond) {
       _platformBondStateSubscription = _platform
-          .bondStateStream(_connectionId)
+          .bondStateStream(connectionId)
           .listen(
             (platformBondState) {
               _bondState = _mapBondState(platformBondState);
@@ -255,14 +217,14 @@ class BlueyConnection implements Connection {
             },
           );
 
-      _platform.getBondState(_connectionId).then((platformBondState) {
+      _platform.getBondState(connectionId).then((platformBondState) {
         _bondState = _mapBondState(platformBondState);
       });
     }
 
     if (caps.canRequestPhy) {
       _platformPhySubscription = _platform
-          .phyStream(_connectionId)
+          .phyStream(connectionId)
           .listen(
             (platformPhy) {
               _txPhy = _mapPhy(platformPhy.tx);
@@ -274,176 +236,105 @@ class BlueyConnection implements Connection {
             },
           );
 
-      _platform.getPhy(_connectionId).then((platformPhy) {
+      _platform.getPhy(connectionId).then((platformPhy) {
         _txPhy = _mapPhy(platformPhy.tx);
         _rxPhy = _mapPhy(platformPhy.rx);
       });
     }
 
     if (caps.canRequestConnectionParameters) {
-      _platform.getConnectionParameters(_connectionId).then((params) {
+      _platform.getConnectionParameters(connectionId).then((params) {
         _connectionParameters = connectionParametersFromPlatform(params);
       });
     }
 
-    // I333: invalidate on any non-`on` adapter state. The platform
-    // stream emits the platform-interface enum; map to the domain enum
-    // before deciding so the carried [triggeringState] surfaces as the
-    // domain type. Errors surfaced by the platform stream are treated
-    // as invalidation with `unknown` as the triggering state — we
-    // don't know the real adapter state, so the conservative choice
-    // is to kill the connection and force the consumer to reconnect.
-    _adapterStateSubscription = _platform.stateStream.listen(
-      (platformState) {
-        final domainState = _mapPlatformState(platformState);
-        if (domainState != BluetoothState.on) {
-          _invalidate(domainState);
-        }
-      },
-      onError: (_) => _invalidate(BluetoothState.unknown),
-    );
+    _session.onEnd(_release);
   }
 
-  /// Maps the platform-interface [platform.BluetoothState] to the
-  /// domain [BluetoothState]. Mirrors [BlueyServer._mapPlatformState];
-  /// kept local so the connection doesn't reach across bounded contexts.
-  BluetoothState _mapPlatformState(platform.BluetoothState s) {
-    switch (s) {
-      case platform.BluetoothState.unknown:
-        return BluetoothState.unknown;
-      case platform.BluetoothState.unsupported:
-        return BluetoothState.unsupported;
-      case platform.BluetoothState.unauthorized:
-        return BluetoothState.unauthorized;
-      case platform.BluetoothState.off:
-        return BluetoothState.off;
-      case platform.BluetoothState.on:
-        return BluetoothState.on;
-    }
-  }
-
-  /// Marks this connection as terminal-failed. Idempotent — re-entry is
-  /// a no-op. Cancels every owned platform subscription, closes every
-  /// owned StreamController, aborts in-flight GATT ops, and clears the
-  /// services cache. Subsequent public calls throw
-  /// [StaleHandleException].
-  void _invalidate(BluetoothState triggeringState) {
-    if (_invalidation != null) return;
-    _invalidation = AdapterTransitionInvalidation(triggeringState);
-
-    // Cancel every owned platform subscription so post-invalidation
-    // emissions can't call .add(...) on a closed controller. Android's
-    // STATE_TURNING_OFF is followed by a flurry of disconnect /
-    // bond / phy callbacks; missing any one risks a StateError.
-    _adapterStateSubscription?.cancel();
-    _adapterStateSubscription = null;
-    _platformStateSubscription?.cancel();
-    _platformStateSubscription = null;
-    _platformBondStateSubscription?.cancel();
-    _platformBondStateSubscription = null;
-    _platformPhySubscription?.cancel();
-    _platformPhySubscription = null;
-    _platformServiceChangesSubscription?.cancel();
+  /// Everything that lives as long as the link, let go when it ends.
+  ///
+  /// Nothing here is awaited: the session runs releases one after another,
+  /// and a cancel awaited here would hold the next one up for nothing.
+  void _release(LinkEnd end) {
+    unawaited(_platformServiceChangesSubscription?.cancel());
+    unawaited(_platformBondStateSubscription?.cancel());
+    unawaited(_platformPhySubscription?.cancel());
     _platformServiceChangesSubscription = null;
+    _platformBondStateSubscription = null;
+    _platformPhySubscription = null;
 
-    // Abort every in-flight GATT op so callers stop awaiting futures
-    // backed by a dead adapter.
-    if (_pendingGattOpAborters.isNotEmpty) {
-      final aborters = _pendingGattOpAborters.toList(growable: false);
-      _pendingGattOpAborters.clear();
-      for (final aborter in aborters) {
-        if (!aborter.isCompleted) {
-          aborter.completeError(
-            StaleHandleException(
-              cause: AdapterTransitionInvalidation(triggeringState),
-              instanceType: InvalidatedInstance.connection,
-            ),
-          );
-        }
-      }
+    // An outage makes the connection stale: the streams whose values are
+    // not a state of ours say so before they close (Convention 3).
+    final stale =
+        end is EndedByRadioOutage
+            ? linkEndAsException(end, device: _device)
+            : null;
+    final controllers = <StreamController<Object?>>[
+      _servicesChangesController,
+      _bondStateController,
+      _phyController,
+    ];
+    for (final controller in controllers) {
+      if (stale != null) controller.addError(stale);
+      unawaited(controller.close());
     }
 
-    // Convention 3 — emit terminal enum value before closing so
-    // subscribers observe the transition cleanly. Set _state first so
-    // the sync getter (Convention 6) agrees with the last signal.
-    _state = ConnectionState.invalidated;
-    if (!_stateController.isClosed) {
-      _stateController.add(ConnectionState.invalidated);
-      _stateController.close();
-    }
-
-    // Convention 3 (non-enum path) — for streams whose value type isn't
-    // an enum we own, the terminal signal is addError(StaleHandleException)
-    // then close. Subscribers receive the typed error via onError, which
-    // mirrors what the corresponding sync getters throw (Convention 6 —
-    // see I333).
-    final stale = StaleHandleException(
-      cause: AdapterTransitionInvalidation(triggeringState),
-      instanceType: InvalidatedInstance.connection,
-    );
-
-    if (!_servicesChangesController.isClosed) {
-      _servicesChangesController.addError(stale);
-      _servicesChangesController.close();
-    }
-    if (!_bondStateController.isClosed) {
-      _bondStateController.addError(stale);
-      _bondStateController.close();
-    }
-    if (!_phyController.isClosed) {
-      _phyController.addError(stale);
-      _phyController.close();
-    }
-
-    // Clear cached state. Per-characteristic notification controllers
-    // are torn down via service.dispose(); fire-and-forget because
-    // _invalidate is synchronous (called from a stream listener).
     final cached = _cachedServices;
     _cachedServices = null;
-    if (cached != null) {
-      for (final service in cached) {
-        // ignore: discarded_futures
-        service.dispose();
-      }
+    for (final service in cached ?? const <BlueyRemoteService>[]) {
+      unawaited(service.dispose());
     }
   }
 
-  /// Throws [StaleHandleException] if this connection has been
-  /// invalidated by a prior adapter-state transition.
+  /// The exception a radio outage left, or null when the link ended any
+  /// other way or is still up.
+  BlueyException? get _staleness {
+    final end = _session.link.end;
+    return end is EndedByRadioOutage
+        ? linkEndAsException(end, device: _device)
+        : null;
+  }
+
+  /// Throws [StaleHandleException] once a radio outage has ended the link.
   void _ensureValid() {
-    if (_invalidation != null) {
-      throw StaleHandleException(
-        cause: _invalidation!,
-        instanceType: InvalidatedInstance.connection,
-      );
-    }
+    final stale = _staleness;
+    if (stale != null) throw stale;
   }
 
-  /// Throws [DisconnectedException] if the connection is not in a
-  /// state that can carry GATT operations. The "live" states are
-  /// [ConnectionState.linked] (link up, services not yet discovered)
-  /// and [ConnectionState.ready] (link up, services discovered or
-  /// upgraded). Every other state — `connecting`, `disconnecting`,
-  /// `disconnected` — fails the gate.
+  /// Throws the link's end, as the exception an app catches, unless the
+  /// link is up: [StaleHandleException] after an outage and
+  /// [DisconnectedException] otherwise.
   ///
-  /// Also runs the I333 invalidity gate first: an invalidated
-  /// connection (adapter off / unauthorized / etc.) throws
-  /// [StaleHandleException] before this method's connection-state
-  /// check fires. The order matters — invalidation is the stronger
-  /// failure mode and should surface to the caller verbatim.
-  ///
-  /// Called at the top of every public GATT-op method on the connection
-  /// itself, and from `BlueyRemoteCharacteristic` /
-  /// `BlueyRemoteDescriptor` via the closure threaded through their
-  /// constructors. Without this gate, calling read/write/etc. on a
-  /// dead connection lets a raw [PlatformException] escape from the
-  /// platform layer.
+  /// Called at the top of every public GATT-op method, and from
+  /// `BlueyRemoteCharacteristic` / `BlueyRemoteDescriptor` via the closure
+  /// threaded through their constructors, so a dead link never lets a raw
+  /// platform exception escape.
   void _ensureConnected() {
-    _ensureValid();
-    if (_state == ConnectionState.linked || _state == ConnectionState.ready) {
-      return;
-    }
-    throw DisconnectedException(deviceAddress.value, DisconnectReason.unknown);
+    final link = _session.link;
+    if (link.isUp) return;
+    throw linkEndAsException(link.endInSight!, device: _device);
+  }
+
+  /// Runs one throwing platform call so that the link's end answers it at once.
+  Future<T> _overLink<T>(Future<T> Function() call) async {
+    final answer = await _session.whileUp<_Raised, T>(
+      () async {
+        try {
+          return Right(await call());
+        } catch (error, stack) {
+          return Left(_Raised(error, stack));
+        }
+      },
+      orEnd:
+          (end) => _Raised(
+            linkEndAsException(end, device: _session.link.device),
+            StackTrace.current,
+          ),
+    );
+    return answer.fold(
+      (raised) => Error.throwWithStackTrace(raised.error, raised.stack),
+      (value) => value,
+    );
   }
 
   /// Wraps [body] so that a Service Changed event fired while the call
@@ -481,7 +372,7 @@ class BlueyConnection implements Connection {
       'bluey.connection',
       'Service Changed received',
       data: {
-        'deviceId': deviceAddress.toString(),
+        'deviceId': _device.toString(),
         'inFlight': _pendingGattOpAborters.length,
       },
     );
@@ -490,7 +381,7 @@ class BlueyConnection implements Connection {
       BlueyLogLevel.warn,
       'bluey.connection',
       'service cache cleared, re-discovery pending',
-      data: {'deviceId': deviceAddress.toString()},
+      data: {'deviceId': _device.toString()},
     );
     if (_pendingGattOpAborters.isNotEmpty) {
       final aborters = _pendingGattOpAborters.toList(growable: false);
@@ -517,73 +408,17 @@ class BlueyConnection implements Connection {
         });
   }
 
-  /// Idempotent, non-regressing state transition. Skips the emit if the
-  /// new state matches the current one. Also refuses to walk backwards
-  /// from `ready` to `linked` if the platform happens to re-emit a
-  /// CONNECTED event after services have already been discovered (the
-  /// platform doesn't model the linked → ready distinction, so its
-  /// repeats would otherwise downgrade us).
-  void _setState(ConnectionState newState) {
-    if (_state == newState) return;
-    if (_state == ConnectionState.ready && newState == ConnectionState.linked) {
-      return;
-    }
-    _state = newState;
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.connection',
-      'state transition',
-      data: {'deviceId': deviceAddress.toString(), 'state': _state.toString()},
-    );
-    _stateController.add(_state);
-  }
-
-  @override
-  ConnectionState get state => _state;
-
-  @override
-  Stream<ConnectionState> get stateChanges => Stream<ConnectionState>.multi(
-    (controller) {
-      // Convention 2 (replay-on-subscribe): inject the current cached
-      // value before bridging live events. Mirrors the pattern in
-      // `Bluey.stateStream`. `StreamController.broadcast(onListen: ...)`
-      // would only fire on the 0→1 transition; `Stream.multi` runs the
-      // factory per subscriber, so every late subscriber gets the replay.
-      //
-      // Convention 6 (sync getter agrees with last emitted signal):
-      // always replay `_state` — including the terminal
-      // `ConnectionState.invalidated` value set by `_invalidate`. On
-      // the invalidated path the underlying controller is already
-      // closed, so we close the per-subscriber controller directly
-      // without trying to bridge.
-      controller.add(_state);
-      if (_invalidation != null) {
-        controller.close();
-        return;
-      }
-      final sub = _stateController.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = sub.cancel;
-    },
-    isBroadcast: true,
-  );
-
-  @override
+  /// Each re-discovered service tree; see [Connection.servicesChanges].
   Stream<List<RemoteService>> get servicesChanges =>
       Stream<List<RemoteService>>.multi(
         (controller) {
           // Convention 3 (non-enum terminal): late subscribers after
-          // invalidation see addError(StaleHandleException) + close so
+          // an outage see addError(StaleHandleException) + close so
           // their `onError` mirrors what the corresponding sync getter
           // would throw (Convention 6).
-          if (_invalidation != null) {
-            controller.addError(StaleHandleException(
-              cause: _invalidation!,
-              instanceType: InvalidatedInstance.connection,
-            ));
+          final stale = _staleness;
+          if (stale != null) {
+            controller.addError(stale);
             controller.close();
             return;
           }
@@ -604,7 +439,7 @@ class BlueyConnection implements Connection {
   // is used by _AndroidConnectionExtensionsImpl.
   Mtu get _mtuValue => Mtu.fromPlatform(_mtu);
 
-  @override
+  /// The one discovered service with [uuid]; see [Connection.service].
   RemoteService service(UUID uuid) {
     _ensureValid();
     if (_cachedServices == null) {
@@ -628,7 +463,8 @@ class BlueyConnection implements Connection {
     return matches.single;
   }
 
-  @override
+  /// Discovers the link's services, which makes the link ready; see
+  /// [Connection.services].
   Future<List<RemoteService>> services({bool cache = false}) async {
     _ensureValid();
     _ensureConnected();
@@ -640,20 +476,21 @@ class BlueyConnection implements Connection {
       BlueyLogLevel.info,
       'bluey.connection',
       'services discovery started',
-      data: {'deviceId': deviceAddress.toString()},
+      data: {'deviceId': _device.toString()},
     );
     _events?.emit(
       DiscoveringServicesEvent(
-        deviceAddress: deviceAddress,
+        deviceAddress: _device,
         source: 'BlueyConnection',
       ),
     );
     final stopwatch = Stopwatch()..start();
+    final connectionId = _connectionId;
     final platformServices = await _trackInFlight(
       () => _runGattOp(
-        deviceAddress,
+        _device,
         'discoverServices',
-        () => _platform.discoverServices(_connectionId),
+        () => _overLink(() => _platform.discoverServices(connectionId)),
       ),
     );
     _cachedServices = platformServices.map((ps) => _mapService(ps)).toList();
@@ -663,14 +500,14 @@ class BlueyConnection implements Connection {
       'bluey.connection',
       'services discovery resolved',
       data: {
-        'deviceId': deviceAddress.toString(),
+        'deviceId': _device.toString(),
         'count': _cachedServices!.length,
         'durationMs': stopwatch.elapsedMilliseconds,
       },
     );
     _events?.emit(
       ServicesDiscoveredEvent(
-        deviceAddress: deviceAddress,
+        deviceAddress: _device,
         serviceCount: _cachedServices!.length,
         source: 'BlueyConnection',
       ),
@@ -686,19 +523,18 @@ class BlueyConnection implements Connection {
         'bluey.connection',
         'services discovered',
         data: {
-          'deviceId': deviceAddress.toString(),
+          'deviceId': _device.toString(),
           'uuids': _cachedServices!.map((s) => s.uuid.toString()).toList(),
         },
       );
     }
 
-    // Services discovered → promote linked → ready.
-    _setState(ConnectionState.ready);
+    _session.servicesDiscovered();
 
     return _cachedServices!;
   }
 
-  @override
+  /// Whether the link has a service with [uuid]; see [Connection.hasService].
   Future<bool> hasService(UUID uuid) async {
     _ensureValid();
     final svcs = await services(cache: true);
@@ -711,12 +547,13 @@ class BlueyConnection implements Connection {
     _ensureValid();
     _ensureConnected();
     final requested = mtu.value;
+    final connectionId = _connectionId;
     _mtu = await _trackInFlight(
       () => _loggedGattOp(
-        deviceAddress: deviceAddress,
+        deviceAddress: _device,
         op: 'requestMtu',
         startDetail: 'requested=$requested',
-        body: () => _platform.requestMtu(_connectionId, requested),
+        body: () => _overLink(() => _platform.requestMtu(connectionId, requested)),
         completeDetail:
             (negotiated) => 'requested=$requested, negotiated=$negotiated',
         logger: _logger,
@@ -725,21 +562,24 @@ class BlueyConnection implements Connection {
     return Mtu.fromPlatform(_mtu);
   }
 
-  @override
+  /// The largest write the link carries; see [Connection.maxWritePayload].
   Future<WritePayloadLimit> maxWritePayload({
     required bool withResponse,
   }) async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     return _trackInFlight(
       () => _loggedGattOp(
-        deviceAddress: deviceAddress,
+        deviceAddress: _device,
         op: 'getMaximumWriteLength',
         startDetail: 'withResponse=$withResponse',
         body: () async {
-          final value = await _platform.getMaximumWriteLength(
-            _connectionId,
-            withResponse: withResponse,
+          final value = await _overLink(
+            () => _platform.getMaximumWriteLength(
+              connectionId,
+              withResponse: withResponse,
+            ),
           );
           return WritePayloadLimit.fromPlatform(value);
         },
@@ -750,15 +590,16 @@ class BlueyConnection implements Connection {
     );
   }
 
-  @override
+  /// The link's signal strength; see [Connection.readRssi].
   Future<int> readRssi() async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     return _trackInFlight(
       () => _loggedGattOp(
-        deviceAddress: deviceAddress,
+        deviceAddress: _device,
         op: 'readRssi',
-        body: () => _platform.readRssi(_connectionId),
+        body: () => _overLink(() => _platform.readRssi(connectionId)),
         completeDetail: (rssi) => 'rssi=${rssi}dBm',
         logger: _logger,
       ),
@@ -767,7 +608,7 @@ class BlueyConnection implements Connection {
 
   AndroidConnectionExtensions? _androidExtensions;
 
-  @override
+  /// The Android-only surface, or null elsewhere; see [Connection.android].
   AndroidConnectionExtensions? get android {
     if (_platform.capabilities.platformKind != platform.PlatformKind.android) {
       return null;
@@ -775,7 +616,7 @@ class BlueyConnection implements Connection {
     return _androidExtensions ??= _AndroidConnectionExtensionsImpl(this);
   }
 
-  @override
+  /// The iOS-only surface, or null elsewhere; see [Connection.ios].
   IosConnectionExtensions? get ios {
     if (_platform.capabilities.platformKind != platform.PlatformKind.ios) {
       return null;
@@ -783,58 +624,17 @@ class BlueyConnection implements Connection {
     return _iosExtensions;
   }
 
-  @override
-  Future<void> disconnect() async {
-    // I333: an invalidated connection is effectively dead from the
-    // user's perspective — the adapter is off / unauthorised. Treat
-    // disconnect() as a graceful no-op rather than throwing.
-    if (_invalidation != null) return;
-    // Idempotent: if already disconnected or disconnecting, do nothing
-    if (_state == ConnectionState.disconnected ||
-        _state == ConnectionState.disconnecting) {
-      return;
-    }
-
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.connection',
-      'disconnect entered',
-      data: {'deviceId': deviceAddress.toString()},
-    );
-
-    _setState(ConnectionState.disconnecting);
-
-    await withErrorTranslation(
-      () => _platform.disconnect(_connectionId),
-      operation: 'disconnect',
-      address: deviceAddress.value,
-    );
-
-    _setState(ConnectionState.disconnected);
-
-    await _cleanup();
-
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.connection',
-      'disconnect resolved',
-      data: {'deviceId': deviceAddress.toString()},
-    );
-  }
-
   BondState get _bondStateValue => _bondState;
 
   Stream<BondState> get _bondStateChanges => Stream<BondState>.multi(
     (controller) {
-      // Convention 3 (non-enum terminal): late subscribers post-
-      // invalidation see addError(StaleHandleException) + close so
-      // their `onError` mirrors what the corresponding sync getter
-      // would throw (Convention 6).
-      if (_invalidation != null) {
-        controller.addError(StaleHandleException(
-          cause: _invalidation!,
-          instanceType: InvalidatedInstance.connection,
-        ));
+      // Convention 3 (non-enum terminal): late subscribers after an
+      // outage see addError(StaleHandleException) + close so their
+      // `onError` mirrors what the corresponding sync getter would
+      // throw (Convention 6).
+      final stale = _staleness;
+      if (stale != null) {
+        controller.addError(stale);
         controller.close();
         return;
       }
@@ -853,20 +653,22 @@ class BlueyConnection implements Connection {
   Future<void> _bondImpl() async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     await withErrorTranslation(
-      () => _platform.bond(_connectionId),
+      () => _overLink(() => _platform.bond(connectionId)),
       operation: 'bond',
-      address: deviceAddress.value,
+      address: _device.value,
     );
   }
 
   Future<void> _removeBondImpl() async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     await withErrorTranslation(
-      () => _platform.removeBond(_connectionId),
+      () => _overLink(() => _platform.removeBond(connectionId)),
       operation: 'removeBond',
-      address: deviceAddress.value,
+      address: _device.value,
     );
   }
 
@@ -876,15 +678,13 @@ class BlueyConnection implements Connection {
 
   Stream<({Phy tx, Phy rx})> get _phyChanges => Stream<({Phy tx, Phy rx})>.multi(
     (controller) {
-      // Convention 3 (non-enum terminal): late subscribers post-
-      // invalidation see addError(StaleHandleException) + close so
-      // their `onError` mirrors what the corresponding sync getter
-      // would throw (Convention 6).
-      if (_invalidation != null) {
-        controller.addError(StaleHandleException(
-          cause: _invalidation!,
-          instanceType: InvalidatedInstance.connection,
-        ));
+      // Convention 3 (non-enum terminal): late subscribers after an
+      // outage see addError(StaleHandleException) + close so their
+      // `onError` mirrors what the corresponding sync getters throw
+      // (Convention 6).
+      final stale = _staleness;
+      if (stale != null) {
+        controller.addError(stale);
         controller.close();
         return;
       }
@@ -903,14 +703,17 @@ class BlueyConnection implements Connection {
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     await withErrorTranslation(
-      () => _platform.requestPhy(
-        _connectionId,
-        txPhy != null ? _mapPhyToPlatform(txPhy) : null,
-        rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
+      () => _overLink(
+        () => _platform.requestPhy(
+          connectionId,
+          txPhy != null ? _mapPhyToPlatform(txPhy) : null,
+          rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
+        ),
       ),
       operation: 'requestPhy',
-      address: deviceAddress.value,
+      address: _device.value,
     );
   }
 
@@ -921,58 +724,18 @@ class BlueyConnection implements Connection {
   ) async {
     _ensureValid();
     _ensureConnected();
+    final connectionId = _connectionId;
     await withErrorTranslation(
-      () => _platform.requestConnectionParameters(
-        _connectionId,
-        connectionParametersToPlatform(params),
+      () => _overLink(
+        () => _platform.requestConnectionParameters(
+          connectionId,
+          connectionParametersToPlatform(params),
+        ),
       ),
       operation: 'requestConnectionParameters',
-      address: deviceAddress.value,
+      address: _device.value,
     );
     _connectionParameters = params;
-  }
-
-  /// Clean up resources.
-  Future<void> _cleanup() async {
-    await _platformStateSubscription?.cancel();
-    await _platformBondStateSubscription?.cancel();
-    await _platformPhySubscription?.cancel();
-    await _platformServiceChangesSubscription?.cancel();
-    await _adapterStateSubscription?.cancel();
-    await _stateController.close();
-    await _bondStateController.close();
-    await _phyController.close();
-    await _servicesChangesController.close();
-
-    // Dispose every cached service before nulling the cache so each
-    // BlueyRemoteCharacteristic's lazily-built notification controller
-    // is closed and its platform subscription cancelled. Without this
-    // walk, controllers persist across connect/disconnect cycles and
-    // memory grows monotonically.
-    final cached = _cachedServices;
-    _cachedServices = null;
-    if (cached != null) {
-      for (final service in cached) {
-        await service.dispose();
-      }
-    }
-  }
-
-  ConnectionState _mapConnectionState(
-    platform.PlatformConnectionState platformState,
-  ) {
-    switch (platformState) {
-      case platform.PlatformConnectionState.disconnected:
-        return ConnectionState.disconnected;
-      case platform.PlatformConnectionState.connecting:
-        return ConnectionState.connecting;
-      case platform.PlatformConnectionState.connected:
-        // Platform doesn't model the linked → ready distinction; the
-        // promotion to ready is driven domain-side from `services()`.
-        return ConnectionState.linked;
-      case platform.PlatformConnectionState.disconnecting:
-        return ConnectionState.disconnecting;
-    }
   }
 
   BondState _mapBondState(platform.PlatformBondState platformBondState) {
@@ -1024,7 +787,7 @@ class BlueyConnection implements Connection {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
-    // BlueyConnection itself carries no lifecycle (post-C.6 the
+    // The GATT client itself carries no lifecycle (post-C.6 the
     // peer-protocol surface lives entirely in `PeerConnection`).
     // Characteristics are constructed without a lifecycleClient — the
     // getter remains on `BlueyRemoteCharacteristic` for tests / future
@@ -1033,7 +796,7 @@ class BlueyConnection implements Connection {
     return BlueyRemoteCharacteristic(
       platform: _platform,
       connectionId: _connectionId,
-      deviceAddress: deviceAddress,
+      deviceAddress: _device,
       uuid: UUID(pc.uuid),
       handle: characteristicHandle,
       properties: CharacteristicProperties(
@@ -1049,6 +812,7 @@ class BlueyConnection implements Connection {
               .toList(),
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
+      overLink: _overLink,
       logger: _logger,
       events: _events,
     );
@@ -1061,15 +825,25 @@ class BlueyConnection implements Connection {
     return BlueyRemoteDescriptor(
       platform: _platform,
       connectionId: _connectionId,
-      deviceAddress: deviceAddress,
+      deviceAddress: _device,
       uuid: UUID(pd.uuid),
       handle: AttributeHandle(pd.handle),
       characteristicHandle: characteristicHandle,
       ensureConnected: _ensureConnected,
       trackInFlight: _trackInFlight,
+      overLink: _overLink,
       logger: _logger,
     );
   }
+}
+
+/// What a platform call raised, carried across [LinkSession.whileUp] as a
+/// value so it is raised again, with its own stack, at the caller.
+final class _Raised {
+  const _Raised(this.error, this.stack);
+
+  final Object error;
+  final StackTrace stack;
 }
 
 /// Internal implementation of [RemoteService].
@@ -1121,7 +895,7 @@ class BlueyRemoteService implements RemoteService {
 
   /// Releases per-characteristic resources (notification subscriptions
   /// and broadcast controllers) for every characteristic in this
-  /// service. Called by [BlueyConnection._cleanup] on disconnect so
+  /// service. Called by [LinkGattClient] when its link ends so
   /// controllers don't persist across connect/disconnect cycles.
   /// Included services are disposed recursively. Idempotent.
   Future<void> dispose() async {
@@ -1139,7 +913,7 @@ class BlueyRemoteService implements RemoteService {
 }
 
 /// Type signature of the in-flight aborter wrapper threaded from
-/// [BlueyConnection] into characteristics and descriptors. Wraps a
+/// [LinkGattClient] into characteristics and descriptors. Wraps a
 /// platform-call body so a Service Changed event fired mid-flight
 /// causes the returned future to fail with
 /// [AttributeHandleInvalidatedException].
@@ -1155,6 +929,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
   final _TrackInFlight _trackInFlight;
+  final _TrackInFlight _overLink;
   final BlueyLogger? _logger;
   final EventPublisher? _events;
 
@@ -1187,6 +962,9 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
   /// [DisconnectedException] if the owning connection is no longer
   /// in `linked` or `ready`. Defaults to a no-op for tests that
   /// build a characteristic without a parent connection.
+  ///
+  /// [overLink] runs each platform call over the parent's link, so the
+  /// link's end answers it at once; a pass-through by default.
   BlueyRemoteCharacteristic({
     required platform.BlueyPlatform platform,
     required String connectionId,
@@ -1198,6 +976,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
     _TrackInFlight? trackInFlight,
+    _TrackInFlight? overLink,
     BlueyLogger? logger,
     EventPublisher? events,
   }) : _platform = platform,
@@ -1207,6 +986,7 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {}),
        _trackInFlight = trackInFlight ?? _passthroughInFlight,
+       _overLink = overLink ?? _passthroughInFlight,
        _logger = logger,
        _events = events;
 
@@ -1221,7 +1001,10 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         deviceAddress: _deviceAddress,
         op: 'readCharacteristic',
         startDetail: 'char=$uuid',
-        body: () => _platform.readCharacteristic(_connectionId, handle.value),
+        body:
+            () => _overLink(
+              () => _platform.readCharacteristic(_connectionId, handle.value),
+            ),
         completeDetail: (value) => 'char=$uuid, bytes=${value.length}',
         lifecycleClient: _lifecycle(),
         logger: _logger,
@@ -1253,11 +1036,13 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
         op: 'writeCharacteristic',
         startDetail: 'char=$uuid, bytes=${value.length}',
         body:
-            () => _platform.writeCharacteristic(
-              _connectionId,
-              handle.value,
-              value,
-              withResponse,
+            () => _overLink<void>(
+              () => _platform.writeCharacteristic(
+                _connectionId,
+                handle.value,
+                value,
+                withResponse,
+              ),
             ),
         completeDetail: (_) => 'char=$uuid',
         lifecycleClient: _lifecycle(),
@@ -1302,7 +1087,9 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     _runGattOp(
           _deviceAddress,
           'setNotification',
-          () => _platform.setNotification(_connectionId, handle.value, true),
+          () => _overLink<void>(
+            () => _platform.setNotification(_connectionId, handle.value, true),
+          ),
           lifecycleClient: _lifecycle(),
         )
         .then((_) {
@@ -1364,7 +1151,9 @@ class BlueyRemoteCharacteristic implements RemoteCharacteristic {
     _runGattOp(
           _deviceAddress,
           'setNotification',
-          () => _platform.setNotification(_connectionId, handle.value, false),
+          () => _overLink<void>(
+            () => _platform.setNotification(_connectionId, handle.value, false),
+          ),
           lifecycleClient: _lifecycle(),
         )
         .then((_) {
@@ -1430,6 +1219,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   final LifecycleClient? Function() _lifecycle;
   final void Function() _ensureConnected;
   final _TrackInFlight _trackInFlight;
+  final _TrackInFlight _overLink;
   // ignore: unused_field
   final BlueyLogger? _logger;
 
@@ -1456,6 +1246,9 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   /// [characteristicHandle] is the parent characteristic's handle; it
   /// rides on every descriptor op so native receivers can prefer
   /// handle-keyed lookup over UUID-keyed lookup.
+  ///
+  /// [overLink] runs each platform call over the parent's link, as for
+  /// [BlueyRemoteCharacteristic].
   BlueyRemoteDescriptor({
     required platform.BlueyPlatform platform,
     required String connectionId,
@@ -1466,6 +1259,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     LifecycleClient? Function()? lifecycleClient,
     void Function()? ensureConnected,
     _TrackInFlight? trackInFlight,
+    _TrackInFlight? overLink,
     BlueyLogger? logger,
   }) : _platform = platform,
        _connectionId = connectionId,
@@ -1474,6 +1268,7 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
        _lifecycle = lifecycleClient ?? (() => null),
        _ensureConnected = ensureConnected ?? (() {}),
        _trackInFlight = trackInFlight ?? _passthroughInFlight,
+       _overLink = overLink ?? _passthroughInFlight,
        _logger = logger;
 
   @override
@@ -1483,10 +1278,12 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       () => _runGattOp(
         _deviceAddress,
         'readDescriptor',
-        () => _platform.readDescriptor(
-          _connectionId,
-          _characteristicHandle.value,
-          handle.value,
+        () => _overLink(
+          () => _platform.readDescriptor(
+            _connectionId,
+            _characteristicHandle.value,
+            handle.value,
+          ),
         ),
         lifecycleClient: _lifecycle(),
       ),
@@ -1500,11 +1297,13 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
       () => _runGattOp(
         _deviceAddress,
         'writeDescriptor',
-        () => _platform.writeDescriptor(
-          _connectionId,
-          _characteristicHandle.value,
-          handle.value,
-          value,
+        () => _overLink<void>(
+          () => _platform.writeDescriptor(
+            _connectionId,
+            _characteristicHandle.value,
+            handle.value,
+            value,
+          ),
         ),
         lifecycleClient: _lifecycle(),
       ),
@@ -1512,19 +1311,19 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
   }
 }
 
-/// Thin facade over a [BlueyConnection] that exposes the Android-only
+/// Thin facade over a [LinkGattClient] that exposes the Android-only
 /// surface (bonding, PHY, connection parameters) without duplicating
-/// logic. Returned from `BlueyConnection.android` when the platform
+/// logic. Returned from `LinkGattClient.android` when the platform
 /// reports any of the Android-only capability flags. Created at most
 /// once per connection and lazy-cached.
 ///
 /// Each member delegates straight back to the corresponding private
-/// member on the wrapping [BlueyConnection]. The bond/PHY/conn-params
-/// members are private on [BlueyConnection] (since B.3 removed them
+/// member on the wrapping [LinkGattClient]. The bond/PHY/conn-params
+/// members are private on [LinkGattClient] (since B.3 removed them
 /// from the [Connection] interface) and only reachable via this
 /// facade.
 class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
-  final BlueyConnection _conn;
+  final LinkGattClient _conn;
 
   _AndroidConnectionExtensionsImpl(this._conn);
 

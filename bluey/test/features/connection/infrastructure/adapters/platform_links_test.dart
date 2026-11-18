@@ -1,6 +1,7 @@
 import 'package:bluey/src/features/connection/application/ports/links.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
@@ -104,6 +105,31 @@ void main() {
         ],
       );
       expect(log.records.last.data, {'device': device.value});
+    });
+  });
+
+  group('a link the platform keeps after its reader left', () {
+    test('an open after the reports\' listener left carries the reports '
+        'afresh', () async {
+      // arrange
+      final first = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      links.reportsOf(first).listen((_) {}).cancel().ignore();
+      await pumpEventQueue();
+
+      // act
+      final again = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      final reports = links.reportsOf(again);
+      fake.simulateDisconnection(device.value);
+
+      // assert
+      await expectLater(
+        reports,
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
     });
   });
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
+import 'package:bluey/src/peer/bluey_peer.dart';
 import 'package:bluey/src/peer/peer_discovery.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
@@ -10,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
+import '../fixtures/connection_rig.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -23,6 +25,7 @@ void main() {
     test('returns empty when no Bluey servers advertising', () async {
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -45,6 +48,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -66,6 +70,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -85,6 +90,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
@@ -92,10 +98,9 @@ void main() {
         scanTimeout: const Duration(milliseconds: 500),
       );
       expect(connection, isNotNull);
-      // PeerDiscovery returns the BlueyConnection bare — services have
-      // not been discovered yet, so it sits at `linked`. The caller
-      // (BlueyPeer) then runs services() and upgrade() to promote.
-      expect(connection.state, ConnectionState.linked);
+      // The probe read the server id over this very link, which
+      // discovered its services, so it is already `ready`.
+      expect(connection.state, ConnectionState.ready);
       await connection.disconnect();
     });
 
@@ -106,6 +111,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final target = ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
@@ -133,16 +139,16 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
         target,
         scanTimeout: const Duration(milliseconds: 500),
       );
-      // PeerDiscovery returns the BlueyConnection bare — services have
-      // not been discovered yet, so it sits at `linked`. The caller
-      // (BlueyPeer) then runs services() and upgrade() to promote.
-      expect(connection.state, ConnectionState.linked);
+      // The probe read the server id over this very link, which
+      // discovered its services, so it is already `ready`.
+      expect(connection.state, ConnectionState.ready);
       await connection.disconnect();
     });
   });
@@ -217,6 +223,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -239,6 +246,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       await discovery.discover(timeout: const Duration(milliseconds: 200));
@@ -257,6 +265,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
@@ -282,6 +291,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       await discovery.discover(timeout: const Duration(milliseconds: 200));
@@ -298,6 +308,7 @@ void main() {
         );
         final discovery = PeerDiscovery(
           platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
         await discovery.discover(
@@ -319,6 +330,7 @@ void main() {
         );
         final discovery = PeerDiscovery(
           platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
         final connection = await discovery.connectTo(
@@ -349,6 +361,7 @@ void main() {
         fake.connectDelays[early] = const Duration(seconds: 1);
         final discovery = PeerDiscovery(
           platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
 
@@ -376,6 +389,7 @@ void main() {
         fake.connectDelays[early] = const Duration(seconds: 1);
         final discovery = PeerDiscovery(
           platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
 
@@ -407,6 +421,7 @@ void main() {
           logger.events.listen(records.add);
           final discovery = PeerDiscovery(
             platformApi: fakePlatform,
+            borrow: ConnectionRig(fakePlatform).borrow,
             logger: logger,
           );
 
@@ -443,6 +458,7 @@ void main() {
         logger.events.listen(records.add);
         final discovery = PeerDiscovery(
           platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
           logger: logger,
         );
 
@@ -469,6 +485,119 @@ void main() {
         connection?.disconnect();
         async.flushMicrotasks();
       });
+    });
+  });
+  group('H2 (I380): peer discovery probes tear down live connections', () {
+    test('discoverPeers leaves an existing peer connection intact', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:01';
+      fakePlatform.simulateBlueyServer(
+        address: address,
+        serverId: TestServerIds.remoteIdentity,
+      );
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
+      final peer = await bluey.connectAsPeer(
+        Device(address: const DeviceAddress(address)),
+      );
+      expect(fakePlatform.connectedDeviceIds, contains(address));
+
+      // act
+      await bluey.discoverPeers(timeout: const Duration(milliseconds: 300));
+      await pumpEventQueue();
+
+      // assert
+      expect(
+        fakePlatform.connectedDeviceIds,
+        contains(address),
+        reason: 'the probe disconnected the link the app was using',
+      );
+      expect(peer.connection.state, isNot(ConnectionState.disconnected));
+      await peer.disconnect();
+      await bluey.dispose();
+    });
+  });
+
+  group('A probe borrows the link', () {
+    const address = 'AA:BB:CC:DD:EE:01';
+
+    test("a probe of a device the app holds reads over the app's link and leaves it", () async {
+      // arrange
+      final serverId = ServerId.generate();
+      final counting = _ScheduledScanPlatform();
+      platform.BlueyPlatform.instance = counting;
+      counting.simulateBlueyServer(address: address, serverId: serverId);
+      final rig = ConnectionRig(counting);
+      final held = await rig.connect(const DeviceAddress(address));
+      await held.services();
+      final discovery = PeerDiscovery(
+        platformApi: counting,
+        borrow: rig.borrow,
+        logger: testLogger(),
+      );
+
+      // act
+      final ids = await discovery.discover(
+        timeout: const Duration(milliseconds: 300),
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(ids, [serverId]);
+      expect(counting.connectsTo(address), 1);
+      expect(held.state, ConnectionState.ready);
+      expect(counting.connectedDeviceIds, contains(address));
+      await held.disconnect();
+    });
+
+    test('a probe gives back the link it opened', () async {
+      // arrange
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(address: address, serverId: serverId);
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
+        logger: testLogger(),
+      );
+
+      // act
+      final ids = await discovery.discover(
+        timeout: const Duration(milliseconds: 300),
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(ids, [serverId]);
+      expect(fakePlatform.connectedDeviceIds, isNot(contains(address)));
+    });
+
+    test('BlueyPeer.connect keeps the link of the peer it found', () async {
+      // arrange
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(address: address, serverId: serverId);
+      final rig = ConnectionRig(fakePlatform);
+      final peer = createBlueyPeer(
+        platformApi: fakePlatform,
+        serverId: serverId,
+        localIdentity: TestServerIds.localIdentity,
+        logger: testLogger(),
+        borrow: rig.borrow,
+        connectionIdOf: rig.connectionIdOf,
+      );
+
+      // act
+      final peerConnection = await peer.connect(
+        scanTimeout: const Duration(milliseconds: 500),
+      );
+      await pumpEventQueue();
+      final appConnection = await rig.connect(const DeviceAddress(address));
+
+      // assert
+      expect(peerConnection.connection.state, ConnectionState.ready);
+      expect(fakePlatform.connectedDeviceIds, contains(address));
+      expect(identical(appConnection, peerConnection.connection), isTrue);
+      await peerConnection.disconnect();
     });
   });
 }

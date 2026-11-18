@@ -399,7 +399,7 @@ void main() {
         expect(connection.deviceAddress, equals(device.address));
       });
 
-      test('connection emits state changes', () async {
+      test('a connecting or connected report leaves a live connection as it is', () async {
         final device = Device(
           address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
         );
@@ -420,11 +420,11 @@ void main() {
         await pumpEventQueue();
         await subscription.cancel();
 
-        expect(states, contains(ConnectionState.connecting));
-        // Platform-CONNECTED maps to `linked` (link up, services not yet
-        // discovered). After Bluey.connect() completes its post-connect
-        // services() call, the connection is in `ready`.
-        expect(states, contains(ConnectionState.linked));
+        // The link is already up, so the radio saying it is connecting or
+        // connected changes nothing (design 6.3): the listener sees only the
+        // state replayed to it.
+        expect(states, [ConnectionState.linked]);
+        expect(connection.state, ConnectionState.linked);
       });
     });
 

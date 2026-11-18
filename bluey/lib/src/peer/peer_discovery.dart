@@ -3,23 +3,19 @@ import 'dart:async';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import '../connection/bluey_connection.dart';
+import '../api/connection/borrowed_connection.dart';
 import '../api/connection/connection.dart';
 import '../shared/domain/device_address.dart';
-import '../shared/application/event_publisher.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../shared/infrastructure/bluey_logger.dart';
 import '../shared/application/log_level.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
 
-/// Stateless helper that orchestrates scan + connect + serverId read
-/// for discovering Bluey peers and connecting to a specific one.
-///
-/// `PeerDiscovery` operates at the platform layer, creating lightweight
-/// platform connections to probe each scan candidate for its [ServerId].
-/// It is used internally by the `Bluey` facade and is not part of the
-/// public API.
+/// Finds Bluey peers by borrowing each scan candidate's link to read its
+/// [ServerId], so a device the app is already linked to is read over the
+/// app's link and left as it was, and a link opened for the probe is given
+/// back. Internal to the `Bluey` facade.
 class PeerDiscovery {
   /// Default probe-connect timeout. A single unresponsive candidate
   /// shouldn't stall the whole discovery session, so each probe is
@@ -30,24 +26,20 @@ class PeerDiscovery {
   static const Duration defaultProbeTimeout = Duration(seconds: 3);
 
   final platform.BlueyPlatform _platform;
+  final BorrowConnection _borrow;
   final BlueyLogger _logger;
-  final EventPublisher? _events;
 
-  /// Creates a [PeerDiscovery] backed by the given platform API.
-  ///
-  /// [events] is forwarded into the [BlueyConnection] returned by
-  /// [connectTo] so GATT-op events fire on the parent `Bluey`'s
-  /// stream. Optional — null in test contexts that don't need
-  /// emissions.
+  /// Creates a [PeerDiscovery] that scans through [platformApi] and reaches
+  /// each candidate through [borrow].
   PeerDiscovery({
     required platform.BlueyPlatform platformApi,
+    required BorrowConnection borrow,
     required BlueyLogger logger,
-    EventPublisher? events,
   }) : _platform = platformApi,
-       _logger = logger,
-       _events = events;
+       _borrow = borrow,
+       _logger = logger;
 
-  /// Scans for Bluey servers, briefly connects to each to read its
+  /// Scans for Bluey servers, briefly borrows each one's link to read its
   /// [ServerId], and returns a deduplicated list.
   ///
   /// [timeout] bounds the scan window: only candidates seen inside it are
@@ -70,7 +62,7 @@ class PeerDiscovery {
     // I349 — probe-as-you-scan: candidates are probed while the scan
     // window is still open, so results are ready at window close
     // instead of window-close-plus-N-sequential-probes. Probes stay
-    // serialized (one throw-away connection at a time): overlapping
+    // serialized (one borrowed link at a time): overlapping
     // connect attempts are where mobile BLE stacks get flaky.
     var probeChain = Future<void>.value();
     final windowClosed = Completer<void>();
@@ -164,31 +156,26 @@ class PeerDiscovery {
 
     Future<void> probe(String address) async {
       if (completer.isCompleted) return;
+      final BorrowedConnection borrowed;
       try {
-        final id = await _readServerIdRaw(address, probeTimeout);
+        borrowed = await _borrow(DeviceAddress(address), timeout: probeTimeout);
+      } catch (_) {
+        // Skip candidates that fail to connect.
+        return;
+      }
+      try {
+        final id = await _readServerId(borrowed.connection);
         if (!completer.isCompleted && id == expected) {
-          // The probe left the device connected. Build a full
-          // BlueyConnection for the caller.
-          completer.complete(
-            BlueyConnection(
-              platformInstance: _platform,
-              connectionId: address,
-              deviceAddress: DeviceAddress(address),
-              logger: _logger,
-              events: _events,
-            ),
-          );
+          // The caller takes this link over, so the borrow ends by
+          // handing it to the app rather than closing it.
+          borrowed.keep();
+          completer.complete(borrowed.connection);
           return;
         }
-        // Not a match (or a match raced a completed future) — the
-        // probe connection is not needed.
-        await _platform.disconnect(address);
       } catch (_) {
-        // Skip candidates that fail to connect or read.
-        try {
-          await _platform.disconnect(address);
-        } catch (_) {}
+        // Skip candidates that fail to read.
       }
+      await _giveBack(borrowed);
     }
 
     final scanConfig = platform.PlatformScanConfig(
@@ -245,53 +232,68 @@ class PeerDiscovery {
     }
   }
 
-  /// Connects to a peripheral via the raw platform API, discovers
-  /// services, reads the serverId characteristic, disconnects, and
-  /// returns the decoded [ServerId].
-  ///
-  /// Uses platform calls directly (not [BlueyConnection]) to avoid
-  /// starting lifecycle heartbeats on throw-away probe connections.
+  /// Borrows the link to [address], reads its [ServerId] over it and gives
+  /// the link back, so a link the app holds stays exactly as it was.
   Future<ServerId> _probeServerId(String address, Duration probeTimeout) async {
-    final id = await _readServerIdRaw(address, probeTimeout);
-    await _platform.disconnect(address);
-    return id;
+    final borrowed = await _borrow(
+      DeviceAddress(address),
+      timeout: probeTimeout,
+    );
+    try {
+      return await _readServerId(borrowed.connection);
+    } finally {
+      await _giveBack(borrowed);
+    }
   }
 
-  /// Connects, discovers services, reads the serverId characteristic,
-  /// and returns the decoded [ServerId]. Leaves the connection open.
-  Future<ServerId> _readServerIdRaw(
-    String address,
-    Duration probeTimeout,
-  ) async {
-    final config = platform.PlatformConnectConfig(
-      timeoutMs: probeTimeout.inMilliseconds,
-      mtu: null,
-    );
-    await _platform.connect(address, config);
-    final services = await _platform.discoverServices(address);
-    // Find the serverId characteristic in the control service tree —
-    // platform reads are now keyed by handle (D.13), so we resolve
-    // here from the discovery output rather than passing UUID.
+  /// Ends a borrow, logging a close that failed rather than raising it: the
+  /// probe's answer does not depend on the link closing, and the link stays
+  /// up for whoever needs it next.
+  Future<void> _giveBack(BorrowedConnection borrowed) async {
+    try {
+      await borrowed.giveBack();
+    } catch (e) {
+      _logger.log(
+        BlueyLogLevel.warn,
+        'bluey.peer.discovery',
+        'probe give-back failed',
+        data: {
+          'deviceId': borrowed.connection.deviceAddress.toString(),
+          'exception': e.runtimeType.toString(),
+        },
+      );
+    }
+  }
+
+  /// Reads the serverId characteristic of [connection]'s control service,
+  /// the way the app would, so services already discovered are reused.
+  Future<ServerId> _readServerId(Connection connection) async {
+    final services = await connection.services(cache: true);
     final controlService =
         services
-            .where((s) => s.uuid.toLowerCase() == lifecycle.controlServiceUuid)
+            .where((s) => lifecycle.isControlService(s.uuid.toString()))
             .firstOrNull;
     if (controlService == null) {
-      throw StateError('peer probe: control service not present on $address');
+      throw StateError(
+        'peer probe: control service not present on '
+        '${connection.deviceAddress}',
+      );
     }
     final serverIdChar =
-        controlService.characteristics
-            .where((c) => c.uuid.toLowerCase() == lifecycle.serverIdCharUuid)
+        controlService
+            .characteristics()
+            .where(
+              (c) =>
+                  c.uuid.toString().toLowerCase() == lifecycle.serverIdCharUuid,
+            )
             .firstOrNull;
     if (serverIdChar == null) {
       throw StateError(
-        'peer probe: serverId characteristic not present on $address',
+        'peer probe: serverId characteristic not present on '
+        '${connection.deviceAddress}',
       );
     }
-    final bytes = await _platform.readCharacteristic(
-      address,
-      serverIdChar.handle,
-    );
+    final bytes = await serverIdChar.read();
     return lifecycle.lifecycleCodec.decodeAdvertisedIdentity(bytes);
   }
 }

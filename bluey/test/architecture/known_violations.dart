@@ -60,7 +60,6 @@ const unplaced = <String>[
 /// kernel to a context.
 const boundaries = <String>[
   'lib/src/connection/bluey_connection.dart -> lib/src/gatt_client/gatt.dart',
-  'lib/src/connection/bluey_connection.dart -> lib/src/platform/bluetooth_state.dart',
   'lib/src/connection/lifecycle_client.dart -> lib/src/gatt_client/gatt.dart',
   'lib/src/connection/lifecycle_client.dart -> lib/src/peer/server_id.dart',
   'lib/src/discovery/bluey_scanner.dart -> lib/src/platform/bluetooth_state.dart',
@@ -71,12 +70,10 @@ const boundaries = <String>[
   'lib/src/gatt_server/lifecycle_server.dart -> lib/src/peer/server_id.dart',
   'lib/src/gatt_server/server.dart -> lib/src/peer/peer_client.dart',
   'lib/src/gatt_server/server.dart -> lib/src/peer/server_id.dart',
-  'lib/src/peer/bluey_peer.dart -> lib/src/connection/bluey_connection.dart',
   'lib/src/peer/bluey_peer.dart -> lib/src/connection/lifecycle_client.dart',
   'lib/src/peer/peer_client.dart -> lib/src/gatt_server/server.dart',
   'lib/src/peer/peer_connection.dart -> lib/src/connection/lifecycle_client.dart',
   'lib/src/peer/peer_connection.dart -> lib/src/gatt_client/gatt.dart',
-  'lib/src/peer/peer_discovery.dart -> lib/src/connection/bluey_connection.dart',
   'lib/src/peer/peer_remote_service_view.dart -> lib/src/gatt_client/gatt.dart',
   'lib/src/shared/error_translation.dart -> lib/src/connection/lifecycle_client.dart',
   'lib/src/shared/exceptions.dart -> lib/src/gatt_server/client_address.dart',
@@ -120,8 +117,8 @@ const lintOptions = <String>[];
 
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
-  'lib/src/bluey.dart -> 988 lines',
-  'lib/src/connection/bluey_connection.dart -> 1657 lines',
+  'lib/src/bluey.dart -> 977 lines',
+  'lib/src/connection/bluey_connection.dart -> 1456 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
   'lib/src/discovery/bluey_scanner.dart -> 410 lines',
   'lib/src/events.dart -> 477 lines',

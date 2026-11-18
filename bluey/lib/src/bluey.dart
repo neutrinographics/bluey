@@ -4,15 +4,23 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:meta/meta.dart';
 
-import 'connection/bluey_connection.dart';
+import 'api/connection/borrowed_connection.dart';
+import 'api/connection/bluey_connection.dart';
 import 'api/connection/connection.dart';
+import 'api/connection/connections.dart';
+import 'api/failure_translation.dart';
+import 'connection/bluey_connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
 import 'events.dart';
-import 'features/connection/domain/connection_event.dart';
+import 'features/connection/application/borrow_link.dart';
+import 'features/connection/application/connect_device.dart';
+import 'features/connection/application/link_registry.dart';
+import 'features/connection/application/link_session.dart';
+import 'features/connection/infrastructure/adapters/platform_links.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
@@ -79,6 +87,17 @@ class Bluey {
   final BlueyEventBus _eventBus;
   final BlueyLogger _logger = BlueyLogger();
   final ServerId? _localIdentity;
+  late final Connections _connections = Connections(present: _present);
+  late final LinkRegistry _registry = LinkRegistry(
+    links: PlatformLinks(_platform, log: _logger),
+    events: _eventBus,
+    log: _logger,
+  );
+  late final ConnectDevice _connectDevice = ConnectDevice(_registry);
+  late final BorrowConnection _borrow = borrowingThrough(
+    borrowLink: BorrowLink(_registry),
+    connections: _connections,
+  );
 
   StreamSubscription? _stateSubscription;
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
@@ -413,73 +432,48 @@ class Bluey {
   /// Throws [ConnectionException] if connection fails.
   Future<Connection> connect(Device device, {Duration? timeout}) async {
     _requireAdapterOn();
-    final config = platform.PlatformConnectConfig(
-      timeoutMs: timeout?.inMilliseconds,
-      mtu: null,
-    );
-
     _logger.log(
       BlueyLogLevel.info,
       'bluey',
       'connect entered',
       data: {'address': device.address.value},
     );
-
-    _logger.log(
-      BlueyLogLevel.info,
-      'bluey.connection',
-      'connect started',
-      data: {'address': device.address.value},
+    final request = ConnectDeviceRequest(
+      device: device.address,
+      timeout: timeout,
     );
-
-    _emitEvent(ConnectingEvent(deviceAddress: device.address));
-
-    try {
-      // Use address for the actual connection (MAC address on Android)
-      final connectionId = await withErrorTranslation(
-        () => _platform.connect(device.address.value, config),
-        operation: 'connect',
-        address: device.address.value,
-      );
-
-      _emitEvent(ConnectedEvent(deviceAddress: device.address));
-
-      final connection = BlueyConnection(
-        platformInstance: _platform,
-        connectionId: connectionId,
-        deviceAddress: device.address,
-        logger: _logger,
-        events: _eventBus,
-      );
-
-      _logger.log(
-        BlueyLogLevel.info,
-        'bluey.connection',
-        'connect succeeded',
-        data: {'address': device.address.value},
-      );
-
-      return connection;
-    } catch (e) {
-      _logger.log(
-        BlueyLogLevel.error,
-        'bluey.connection',
-        'connect failed',
-        data: {
-          'address': device.address.value,
-          'exception': e.runtimeType.toString(),
-        },
-        errorCode: e.runtimeType.toString(),
+    final answer = await _connectDevice.run(request);
+    return answer.fold((failure) {
+      final error = connectionFailureAsException(
+        failure,
+        device: device.address,
       );
       _emitEvent(
         ErrorEvent(
           message: 'Connection failed to ${device.address.toShortString()}',
-          error: e,
+          error: error,
         ),
       );
-      rethrow;
-    }
+      throw error;
+    }, _connections.of);
   }
+
+  /// The public Connection a link's session is shown as.
+  Connection _present(LinkSession session) => BlueyConnection(
+    session: session,
+    gatt: LinkGattClient(
+      platformInstance: _platform,
+      session: session,
+      logger: _logger,
+      events: _eventBus,
+    ),
+  );
+
+  /// The platform's name for [connection]'s link, which the lifecycle
+  /// client writes with.
+  String _connectionIdOf(Connection connection) =>
+      _connections.linkIdOf(connection)?.value ??
+      connection.deviceAddress.toString();
 
   /// Connects to [device] and returns a [PeerConnection] if the device
   /// hosts the Bluey lifecycle control service.
@@ -748,18 +742,9 @@ class Bluey {
         }
       }
 
-      // Locate the underlying BlueyConnection for the lifecycle
-      // client's connection id. The peer wrapper does not require
-      // mutating this object; it only needs the platform connection
-      // id to drive the heartbeat writes.
-      final connectionId =
-          rawConnection is BlueyConnection
-              ? rawConnection.connectionId
-              : rawConnection.deviceAddress.toString();
-
       final lifecycleClient = LifecycleClient(
         platformApi: _platform,
-        connectionId: connectionId,
+        connectionId: _connectionIdOf(rawConnection),
         localIdentity: localIdentity,
         peerSilenceTimeout: peerSilenceTimeout,
         onServerUnreachable: () {
@@ -906,6 +891,8 @@ class Bluey {
       peerSilenceTimeout: peerSilenceTimeout,
       logger: _logger,
       events: _eventBus,
+      borrow: _borrow,
+      connectionIdOf: _connectionIdOf,
     );
   }
 
@@ -926,8 +913,8 @@ class Bluey {
     final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
       platformApi: _platform,
+      borrow: _borrow,
       logger: _logger,
-      events: _eventBus,
     );
     final ids = await discovery.discover(
       timeout: timeout,
@@ -941,6 +928,8 @@ class Bluey {
             localIdentity: identity,
             logger: _logger,
             events: _eventBus,
+            borrow: _borrow,
+            connectionIdOf: _connectionIdOf,
           ),
         )
         .toList(growable: false);

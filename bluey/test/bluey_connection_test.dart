@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey/bluey.dart';
-import 'package:bluey/src/connection/bluey_connection.dart';
-// ignore: implementation_imports
-import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fixtures/connection_rig.dart';
 
 /// Mock platform for testing BlueyConnection.
 final class MockBlueyPlatform extends platform.BlueyPlatform {
@@ -441,21 +440,14 @@ class SetNotificationCall {
 void main() {
   group('BlueyConnection', () {
     late MockBlueyPlatform mockPlatform;
-    late BlueyConnection connection;
+    late Connection connection;
     final deviceId = UUID('00000000-0000-0000-0000-aabbccddeeff');
 
     setUp(() async {
       mockPlatform = MockBlueyPlatform();
-      await mockPlatform.connect(
-        deviceId.toString(),
-        const platform.PlatformConnectConfig(timeoutMs: null, mtu: null),
-      );
-      connection = BlueyConnection(
-        platformInstance: mockPlatform,
-        connectionId: deviceId.toString(),
-        deviceAddress: DeviceAddress(deviceId.toString()),
-        logger: BlueyLogger(),
-      );
+      connection = await ConnectionRig(
+        mockPlatform,
+      ).connect(DeviceAddress(deviceId.toString()));
     });
 
     tearDown(() async {

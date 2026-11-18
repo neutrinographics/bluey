@@ -121,6 +121,115 @@ void main() {
       expect(connection.state, equals(ConnectionState.disconnected));
     });
   });
+
+  group('Bluey.connect gives every link one owner', () {
+    late MockBlueyPlatform mockPlatform;
+    late Bluey bluey;
+    late List<BlueyEvent> events;
+    final device = Device(
+      address: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+    );
+
+    setUp(() async {
+      mockPlatform = MockBlueyPlatform();
+      platform.BlueyPlatform.instance = mockPlatform;
+      bluey = await Bluey.create();
+      events = [];
+      bluey.events.listen(events.add);
+    });
+
+    tearDown(() async {
+      await bluey.dispose();
+      mockPlatform.dispose();
+    });
+
+    test('a second connect returns the same Connection and announces nothing', () async {
+      // arrange
+      final first = await bluey.connect(device);
+
+      // act
+      final second = await bluey.connect(device);
+      await pumpEventQueue();
+
+      // assert
+      expect(identical(first, second), isTrue);
+      expect(events.whereType<ConnectedEvent>(), hasLength(1));
+    });
+
+    test('two connects at once start one platform connect', () async {
+      // act
+      final both = await Future.wait([
+        bluey.connect(device),
+        bluey.connect(device),
+      ]);
+
+      // assert
+      expect(mockPlatform.connects, [device.address.value]);
+      expect(identical(both.first, both.last), isTrue);
+    });
+
+    test('connect after a drop opens a new Connection', () async {
+      // arrange
+      final dropped = await bluey.connect(device);
+      mockPlatform.simulateDrop(device.address.value);
+      await pumpEventQueue();
+
+      // act
+      final again = await bluey.connect(device);
+
+      // assert
+      expect(identical(dropped, again), isFalse);
+      expect(dropped.state, ConnectionState.disconnected);
+      expect(again.state, ConnectionState.linked);
+      expect(mockPlatform.connects, hasLength(2));
+    });
+
+    test('a drop publishes DisconnectedEvent with linkLoss', () async {
+      // arrange
+      await bluey.connect(device);
+
+      // act
+      mockPlatform.simulateDrop(device.address.value);
+      await pumpEventQueue();
+
+      // assert
+      final disconnected = events.whereType<DisconnectedEvent>().single;
+      expect(disconnected.deviceAddress, device.address);
+      expect(disconnected.reason, 'linkLoss');
+    });
+
+    test('a failed connect publishes the ErrorEvent with the exception it throws', () async {
+      // arrange
+      mockPlatform.connectError = const platform.PlatformConnectFailedException(
+        platform.PlatformConnectFailureReason.timeout,
+      );
+
+      // act
+      Object? thrown;
+      try {
+        await bluey.connect(device);
+      } catch (error) {
+        thrown = error;
+      }
+      await pumpEventQueue();
+
+      // assert
+      expect(
+        thrown,
+        isA<ConnectionException>().having(
+          (e) => e.reason,
+          'reason',
+          ConnectionFailureReason.timeout,
+        ),
+      );
+      final error = events.whereType<ErrorEvent>().single;
+      expect(error.error, same(thrown));
+      expect(
+        error.message,
+        'Connection failed to ${device.address.toShortString()}',
+      );
+    });
+  });
 }
 
 /// Mock platform for testing
@@ -131,6 +240,12 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   _connectionControllers = {};
   final _stateController =
       StreamController<platform.BluetoothState>.broadcast();
+
+  /// Every device a connect was asked for, in order.
+  final List<String> connects = [];
+
+  /// When set, every connect fails with it.
+  Object? connectError;
 
   @override
   platform.Capabilities get capabilities => platform.Capabilities.android;
@@ -168,6 +283,9 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     String deviceId,
     platform.PlatformConnectConfig config,
   ) async {
+    connects.add(deviceId);
+    final error = connectError;
+    if (error != null) throw error;
     _connectionControllers[deviceId] =
         StreamController<platform.PlatformConnectionState>.broadcast();
     // Emit connecting state immediately
@@ -202,6 +320,14 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
     platform.PlatformConnectionState state,
   ) {
     _connectionControllers[deviceId]?.add(state);
+  }
+
+  /// Drops the link as the real platforms do: `disconnected` is the
+  /// device's last report, and its stream then ends (I369).
+  void simulateDrop(String deviceId) {
+    final states = _connectionControllers.remove(deviceId);
+    states?.add(platform.PlatformConnectionState.disconnected);
+    states?.close();
   }
 
   // GATT operations - stub implementations for tests that don't use them
