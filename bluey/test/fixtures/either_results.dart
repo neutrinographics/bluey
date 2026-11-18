@@ -40,11 +40,18 @@ T resultOf<T>(Future<T> future) {
   }
   late T value;
   var completed = false;
-  future.then((answer) {
-    value = answer;
-    completed = true;
-  });
+  Object? error;
+  future.then(
+    (answer) {
+      value = answer;
+      completed = true;
+    },
+    onError: (Object failure) {
+      error = failure;
+    },
+  );
   driver.flushMicrotasks();
+  if (error != null) fail('The future failed with $error.');
   if (!completed) fail('The future has not completed yet.');
   return value;
 }

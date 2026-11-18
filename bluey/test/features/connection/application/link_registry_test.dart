@@ -216,6 +216,74 @@ void main() {
         expect(links.opensAsked(device), 2);
       });
     });
+
+    test('a waiter whose wait ends as its budget does answers the timeout', () {
+      fakeAsync((async) {
+        // arrange
+        build();
+        links.openDelay = const Duration(seconds: 3);
+        links.failNextOpen(device, ConnectFailureReason.deviceNotFound);
+
+        // act
+        registry.acquire(device, by: LinkUser.app);
+        final borrower = registry.acquire(
+          device,
+          by: LinkUser.borrower,
+          timeout: const Duration(seconds: 3),
+        );
+        async.elapse(const Duration(seconds: 3));
+
+        // assert
+        expect(resultOf(borrower), timedOut);
+        expect(links.opensAsked(device), 1);
+      });
+    });
+
+    test('a waiter wakes when a close the app started fails, and reuses the '
+        'link', () {
+      fakeAsync((async) {
+        // arrange
+        build();
+        final app = registry.acquire(device, by: LinkUser.app);
+        async.elapse(Duration.zero);
+        final session = rightOf(resultOf(app));
+        links.closeDelay = const Duration(seconds: 1);
+        links.failNextClose(device);
+        session.disconnect();
+
+        // act
+        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        async.elapse(const Duration(seconds: 1));
+
+        // assert
+        expect(identical(rightOf(resultOf(borrower)), session), isTrue);
+        expect(session.link.isUp, isTrue);
+        expect(links.opensAsked(device), 1);
+      });
+    });
+
+    test('a waiter wakes when a give-back\'s close fails, and reuses the '
+        'link', () {
+      fakeAsync((async) {
+        // arrange
+        build();
+        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        async.elapse(Duration.zero);
+        final session = rightOf(resultOf(borrower));
+        links.closeDelay = const Duration(seconds: 1);
+        links.failNextClose(device);
+        registry.giveBack(session);
+
+        // act
+        final app = registry.acquire(device, by: LinkUser.app);
+        async.elapse(const Duration(seconds: 1));
+
+        // assert
+        expect(identical(rightOf(resultOf(app)), session), isTrue);
+        expect(session.link.isUp, isTrue);
+        expect(links.opensAsked(device), 1);
+      });
+    });
   });
 
   group('ending', () {

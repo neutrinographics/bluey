@@ -57,6 +57,28 @@ void main() {
       });
     });
 
+    test('fails the test naming the error of a future that failed', () {
+      fakeAsync((async) {
+        // arrange
+        final future = Future<int>.error(StateError('broken'));
+
+        // act
+        int read() => resultOf(future);
+
+        // assert
+        expect(
+          read,
+          throwsA(
+            isA<TestFailure>().having(
+              (failure) => failure.message,
+              'message',
+              contains('broken'),
+            ),
+          ),
+        );
+      });
+    });
+
     test('fails the test outside this file\'s fakeAsync', () {
       // arrange
       final future = Future<int>.value(3);

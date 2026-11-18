@@ -70,6 +70,9 @@ final class LinkRegistry {
         case Admission.wait:
           if (!await _changed(device, deadline)) return const Left(_timedOut);
           budget = _timeLeft(deadline);
+          if (budget != null && budget <= Duration.zero) {
+            return const Left(_timedOut);
+          }
       }
     }
   }
@@ -85,7 +88,7 @@ final class LinkRegistry {
     final (table, after) = _table.giveBack(device);
     _table = table;
     if (after == AfterGiveBack.leaveIt) return Future.value(const Right(null));
-    return session.disconnect().whenComplete(() => _announceChange(device));
+    return session.disconnect();
   }
 
   /// Hands a borrower's hold on [session]'s link to the app, which then holds
@@ -126,6 +129,7 @@ final class LinkRegistry {
     );
     _sessions[device] = session;
     _table = _table.opened(device);
+    session.states.listen((_) => _announceChange(device));
     session.onEnd((_) => _forget(session));
     return session;
   }
@@ -141,8 +145,10 @@ final class LinkRegistry {
   bool _isLive(LinkSession session) =>
       identical(_sessions[session.link.device], session);
 
-  /// Waits for [device]'s next change, an open settling or a link forgotten,
-  /// and answers false when [deadline] comes first.
+  /// Waits for [device]'s next change, an open settling, a live link's state
+  /// moving or a link forgotten, and answers false when [deadline] comes
+  /// first. Every state move counts, so a close that fails wakes the waiter
+  /// whoever asked for it.
   Future<bool> _changed(DeviceAddress device, DateTime? deadline) async {
     final change = (_changes[device] ??= Completer<void>()).future;
     if (deadline == null) {
@@ -150,7 +156,7 @@ final class LinkRegistry {
       return true;
     }
     return change
-        .then((_) => clock.now().isBefore(deadline))
+        .then((_) => true)
         .timeout(deadline.difference(clock.now()), onTimeout: () => false);
   }
 
