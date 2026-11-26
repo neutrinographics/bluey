@@ -13,7 +13,9 @@ final class ReservedLibraryRule implements ArchitectureRule {
   const ReservedLibraryRule({required this.libraries});
 
   /// The libraries, by the exact URI a file names them with, that no file of
-  /// the package may name.
+  /// the package may name. An entry that ends in `/` is a folder, reserving
+  /// every library under it, so a file cannot reach past the public library
+  /// to the sources it exports.
   final Set<String> libraries;
 
   @override
@@ -23,6 +25,10 @@ final class ReservedLibraryRule implements ArchitectureRule {
   List<Violation> check(SourceTree tree) => [
     for (final source in tree.dartSources)
       for (final uri in source.uris)
-        if (libraries.contains(uri)) Violation(source.path, uri),
+        if (libraries.any((reserved) => _reserves(reserved, uri)))
+          Violation(source.path, uri),
   ];
+
+  bool _reserves(String reserved, String uri) =>
+      reserved.endsWith('/') ? uri.startsWith(reserved) : uri == reserved;
 }

@@ -435,6 +435,33 @@ void main() {
         await closing;
       });
 
+      test('an echo that comes after the answer leaves the ended link\'s '
+          'last report owed, so it never reaches the next link', () async {
+        // arrange
+        await connectionManager.connect('dev', config);
+        when(() => mockHostApi.disconnect(any())).thenAnswer((_) async {});
+        await connectionManager.disconnect('dev');
+        await connectionManager.connect('dev', config);
+        final next = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([
+            PlatformConnectionState.connected,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+
+        // act
+        report(ConnectionStateDto.disconnecting);
+        report(ConnectionStateDto.disconnected);
+        await pumpEventQueue();
+        report(ConnectionStateDto.connected);
+        report(ConnectionStateDto.disconnected);
+
+        // assert
+        await next;
+      });
+
       test('the echo of a disconnect the host fails does not reach the '
           'listeners, and the link\'s own disconnecting report does', () async {
         // arrange

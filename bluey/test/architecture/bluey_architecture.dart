@@ -49,6 +49,7 @@ final Map<String, ArchitectureRule> blueyRules = {
   'reservedLibraries': const ReservedLibraryRule(
     libraries: {
       'package:bluey_platform_interface/platform_implementation.dart',
+      'package:bluey_platform_interface/src/implementation/',
     },
   ),
   'layers': LayerRule(

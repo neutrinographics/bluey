@@ -34,6 +34,29 @@ void main() {
     });
   });
 
+  group('a reserved folder', () {
+    test('a file that names a library under a reserved folder is a '
+        'violation', () {
+      // arrange
+      const folder = 'package:bluey_platform_interface/src/implementation/';
+      const rule = ReservedLibraryRule(libraries: {_reserved, folder});
+      final files = tree({
+        'lib/src/connection/a.dart': naming(['${folder}device_streams.dart']),
+        'lib/src/connection/b.dart': naming([
+          'package:bluey_platform_interface/src/platform_interface.dart',
+        ]),
+      });
+
+      // act
+      final found = entries(rule, files);
+
+      // assert
+      expect(found, [
+        'lib/src/connection/a.dart -> ${folder}device_streams.dart',
+      ]);
+    });
+  });
+
   group('what the rule leaves alone', () {
     test("the package's other libraries are not reserved", () {
       // arrange
