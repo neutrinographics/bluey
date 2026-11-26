@@ -177,7 +177,8 @@ void main() {
     expect(negotiation.requests, isEmpty);
   });
 
-  test('a link that ends during a request answers the end', () {
+  test('a link that ends during a request answers the end, and logs the '
+      'failure at once', () {
     fakeAsync((async) {
       // arrange
       const timed = DeviceAddress('AA:BB:CC:DD:EE:02');
@@ -200,9 +201,21 @@ void main() {
       links.drop(timed);
       async.elapse(Duration.zero);
       final atDrop = answer;
+      final logged = [...log.records];
       async.elapse(const Duration(seconds: 1));
 
       // assert
+
+      expect(
+        logged.map(
+          (r) => (r.level, r.message, r.errorCode, r.data['exception']),
+        ),
+        [
+          (BlueyLogLevel.debug, 'requestMtu start', null, null),
+          (BlueyLogLevel.error, 'requestMtu failed', 'LinkEnded', 'LinkEnded'),
+        ],
+      );
+      expect(log.records.length, 2);
       expect(
         atDrop,
         const Left<ConnectionFailure, Mtu>(LinkHadEnded(EndedByDrop())),

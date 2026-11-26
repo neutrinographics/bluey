@@ -28,21 +28,18 @@ final class ReadWritePayloadLimit {
   Future<Either<ConnectionFailure, WritePayloadLimit>> run(
     LinkSession session, {
     required bool withResponse,
-  }) => session.whileUp(
-    () => loggedLinkOperation(
-      _log,
-      now: _now,
-      device: session.link.device,
-      operation: LinkOperation.readWritePayloadLimit,
-      startDetail: 'withResponse=$withResponse',
-      completeDetail:
-          (limit) => 'withResponse=$withResponse, limit=${limit.value}',
-      run:
-          () => _negotiation.writePayloadLimit(
-            session.link.id,
-            withResponse: withResponse,
-          ),
-    ),
-    orEnd: LinkHadEnded.new,
+  }) => loggedWhileUp(
+    _log,
+    now: _now,
+    session: session,
+    operation: LinkOperation.readWritePayloadLimit,
+    startDetail: 'withResponse=$withResponse',
+    completeDetail:
+        (limit) => 'withResponse=$withResponse, limit=${limit.value}',
+    run:
+        () => _negotiation.writePayloadLimit(
+          session.link.id,
+          withResponse: withResponse,
+        ),
   );
 }

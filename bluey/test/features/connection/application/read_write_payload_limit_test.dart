@@ -7,6 +7,7 @@ import 'package:bluey/src/features/connection/domain/value_objects/write_payload
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
@@ -123,5 +124,43 @@ void main() {
     );
     expect(log.records.last.errorCode, 'OperationRejected');
     expect(log.records.last.data['status'], 8);
+  });
+
+  test('a link that drops during a reading logs the failure at once, and '
+      'nothing when the radio answers late', () {
+    fakeAsync((async) {
+      // arrange
+      const timed = DeviceAddress('AA:BB:CC:DD:EE:02');
+      late LinkSession timedSession;
+      upSession(links, timed).then((value) => timedSession = value);
+      async.elapse(Duration.zero);
+      negotiation.delay = const Duration(seconds: 1);
+      read.run(timedSession, withResponse: true);
+      async.elapse(const Duration(milliseconds: 500));
+
+      // act
+      links.drop(timed);
+      async.elapse(Duration.zero);
+      final logged = [...log.records];
+      async.elapse(const Duration(seconds: 1));
+
+      // assert
+
+      expect(
+        logged.map(
+          (r) => (r.level, r.message, r.errorCode, r.data['exception']),
+        ),
+        [
+          (BlueyLogLevel.debug, 'getMaximumWriteLength start', null, null),
+          (
+            BlueyLogLevel.error,
+            'getMaximumWriteLength failed',
+            'LinkEnded',
+            'LinkEnded',
+          ),
+        ],
+      );
+      expect(log.records.length, 2);
+    });
   });
 }

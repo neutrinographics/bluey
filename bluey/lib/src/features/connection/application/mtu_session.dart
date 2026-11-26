@@ -58,18 +58,15 @@ final class MtuSession {
       checkLinkFeature(_session.link, operation: LinkOperation.negotiateMtu);
 
   Future<Either<ConnectionFailure, Mtu>> _negotiate(Mtu desired) =>
-      _session.whileUp(
-        () => loggedLinkOperation(
-          _log,
-          now: _now,
-          device: _session.link.device,
-          operation: LinkOperation.negotiateMtu,
-          startDetail: 'requested=${desired.value}',
-          completeDetail:
-              (negotiated) =>
-                  'requested=${desired.value}, negotiated=${negotiated.value}',
-          run: () => _negotiation.request(_session.link.id, desired),
-        ),
-        orEnd: LinkHadEnded.new,
+      loggedWhileUp(
+        _log,
+        now: _now,
+        session: _session,
+        operation: LinkOperation.negotiateMtu,
+        startDetail: 'requested=${desired.value}',
+        completeDetail:
+            (negotiated) =>
+                'requested=${desired.value}, negotiated=${negotiated.value}',
+        run: () => _negotiation.request(_session.link.id, desired),
       );
 }

@@ -6,6 +6,7 @@ import '../../../shared/domain/either.dart';
 import '../domain/connection_failure.dart';
 import '../domain/link_operation.dart';
 import 'connection_log_words.dart';
+import 'link_session.dart';
 
 /// Runs one operation on a link and logs its start and its answer, as the
 /// GATT log always has, so an app's filters on those lines hold.
@@ -66,4 +67,29 @@ Future<Either<ConnectionFailure, T>> loggedLinkOperation<T>(
     },
   );
   return answer;
+}
+
+/// Runs one operation over [session]'s link as the GATT log always has: a
+/// link that is not up is answered its end and logs nothing, and a link that
+/// ends while the operation is in flight logs the failure as soon as the
+/// caller is answered, never the platform's late answer.
+Future<Either<ConnectionFailure, T>> loggedWhileUp<T>(
+  Log log, {
+  required Now now,
+  required LinkSession session,
+  required LinkOperation operation,
+  String startDetail = '',
+  required String Function(T value) completeDetail,
+  required Future<Either<ConnectionFailure, T>> Function() run,
+}) async {
+  if (session.link.endInSight case final end?) return Left(LinkHadEnded(end));
+  return loggedLinkOperation(
+    log,
+    now: now,
+    device: session.link.device,
+    operation: operation,
+    startDetail: startDetail,
+    completeDetail: completeDetail,
+    run: () => session.whileUp(run, orEnd: LinkHadEnded.new),
+  );
 }

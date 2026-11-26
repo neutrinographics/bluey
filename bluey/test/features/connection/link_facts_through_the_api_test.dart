@@ -132,6 +132,7 @@ void main() {
           // arrange
           unawaited(connectOn(AskedFake(capabilities: android)));
           async.flushMicrotasks();
+          bluey.setLogLevel(BlueyLogLevel.trace);
           fake.operationLatency = const Duration(seconds: 1);
           Object? failure;
           connection.readRssi().catchError((Object error) {
@@ -155,7 +156,19 @@ void main() {
             ),
           );
           expect(connection.state, ConnectionState.disconnected);
+          final failedAtOnce = logs.where(
+            (e) => e.message == 'readRssi failed',
+          );
+          expect(failedAtOnce.map((e) => (e.errorCode, e.data['exception'])), [
+            ('LinkEnded', 'LinkEnded'),
+          ]);
           async.elapse(const Duration(seconds: 1));
+          expect(
+            logs
+                .where((e) => e.message.startsWith('readRssi '))
+                .map((e) => e.message),
+            ['readRssi start', 'readRssi failed'],
+          );
         });
       });
     });

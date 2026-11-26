@@ -24,15 +24,12 @@ final class ReadRssi {
 
   /// The RSSI of [session]'s link in dBm; the link's end when it is not up.
   Future<Either<ConnectionFailure, int>> run(LinkSession session) =>
-      session.whileUp(
-        () => loggedLinkOperation(
-          _log,
-          now: _now,
-          device: session.link.device,
-          operation: LinkOperation.readSignalStrength,
-          completeDetail: (rssi) => 'rssi=${rssi}dBm',
-          run: () => _strength.read(session.link.id),
-        ),
-        orEnd: LinkHadEnded.new,
+      loggedWhileUp(
+        _log,
+        now: _now,
+        session: session,
+        operation: LinkOperation.readSignalStrength,
+        completeDetail: (rssi) => 'rssi=${rssi}dBm',
+        run: () => _strength.read(session.link.id),
       );
 }
