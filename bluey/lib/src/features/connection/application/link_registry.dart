@@ -12,10 +12,10 @@ import '../domain/connection_failure.dart';
 import '../domain/link.dart';
 import '../domain/link_id.dart';
 import '../domain/live_links.dart';
+import 'connection_log_words.dart';
 import 'link_session.dart';
 import 'ports/links.dart';
 
-const _context = 'bluey.connection';
 const _timedOut = ConnectFailed(ConnectFailureReason.timeout);
 
 /// The one place that knows which device has a live link and who is using
@@ -129,7 +129,7 @@ final class LinkRegistry {
     );
     _sessions[device] = session;
     _table = _table.opened(device);
-    session.states.listen((_) => _announceChange(device));
+    session.phases.listen((_) => _announceChange(device));
     session.onEnd((_) => _forget(session));
     return session;
   }
@@ -170,7 +170,7 @@ final class LinkRegistry {
     final type = failure.runtimeType.toString();
     _log.log(
       BlueyLogLevel.error,
-      _context,
+      connectionLogContext,
       'connect failed',
       data: {'address': device.value, 'exception': type},
       errorCode: type,
@@ -179,7 +179,7 @@ final class LinkRegistry {
 
   void _logDevice(DeviceAddress device, String message) => _log.log(
     BlueyLogLevel.info,
-    _context,
+    connectionLogContext,
     message,
     data: {'address': device.value},
   );

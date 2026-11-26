@@ -1,8 +1,8 @@
-import 'package:bluey/src/features/connection/domain/connection_state.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
+import 'package:bluey/src/features/connection/domain/link_phase.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,25 +19,68 @@ const request = DisconnectRequested();
 const radioClosing = RadioReported(LinkReport.disconnecting);
 const radioGone = RadioReported(LinkReport.disconnected);
 
+const linked = Linked();
+const ready = Ready();
+const onRequest = Ended(EndedOnRequest());
+const dropped = Ended(EndedByDrop());
+
+Closing closing(UpPhase returnTo, ClosingBy by) =>
+    Closing(returnTo: returnTo, by: by);
+
+/// The end a link in [phase] must report: the one an ended phase holds.
+LinkEnd? endOf(LinkPhase phase) => switch (phase) {
+  Ended(:final end) => end,
+  _ => null,
+};
+
+typedef Row =
+    (
+      String name,
+      List<LinkInput> before,
+      LinkInput input,
+      LinkPhase phase,
+      LinkDuty? duty,
+      LinkPhase? entered,
+      LinkEnd? endInSight,
+    );
+
+void checkEach(List<Row> rows) {
+  for (final (name, before, input, phase, duty, entered, endInSight) in rows) {
+    test(name, () {
+      // arrange
+      final link = after(before);
+
+      // act
+      final step = link.on(input);
+
+      // assert
+      expect(step.link.phase, phase);
+      expect(step.duty, duty);
+      expect(step.entered, entered);
+      expect(step.link.end, endOf(phase));
+      expect(step.link.endInSight, endInSight);
+    });
+  }
+}
+
 void main() {
   group('the lifecycle table', () {
-    // (name, inputs so far, input, state after, duty, end after)
-    final rows = <
-      (String, List<LinkInput>, LinkInput, ConnectionState, LinkDuty?, LinkEnd?)
-    >[
+    checkEach([
       (
         'discovery makes a linked link ready',
         [],
         discovered,
-        ConnectionState.ready,
+        ready,
         null,
+        ready,
         null,
       ),
       (
         'a repeated connected report never takes ready back to linked',
         [discovered],
         const RadioReported(LinkReport.connected),
-        ConnectionState.ready,
+        ready,
+        null,
         null,
         null,
       ),
@@ -45,7 +88,8 @@ void main() {
         'a connecting report changes nothing',
         [],
         const RadioReported(LinkReport.connecting),
-        ConnectionState.linked,
+        linked,
+        null,
         null,
         null,
       ),
@@ -53,119 +97,135 @@ void main() {
         'the radio closing the link',
         [discovered],
         radioClosing,
-        ConnectionState.disconnecting,
+        closing(ready, ClosingBy.radio),
         null,
-        null,
+        closing(ready, ClosingBy.radio),
+        const EndedByDrop(),
       ),
       (
         'a request asks for the close',
         [discovered],
         request,
-        ConnectionState.disconnecting,
+        closing(ready, ClosingBy.request),
         LinkDuty.closeTheLink,
-        null,
+        closing(ready, ClosingBy.request),
+        const EndedOnRequest(),
       ),
       (
         'a second request joins the close in flight',
         [request],
         request,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.request),
         null,
         null,
+        const EndedOnRequest(),
       ),
       (
-        'a request while the radio is closing asks for the close',
+        'a request while the radio is closing asks for the close, and has '
+            'not entered closing again',
         [radioClosing],
         request,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.both),
         LinkDuty.closeTheLink,
         null,
+        const EndedOnRequest(),
       ),
       (
         'a confirmed close ends on request',
         [request],
         const CloseConfirmed(),
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        onRequest,
+        LinkDuty.release,
+        onRequest,
         const EndedOnRequest(),
       ),
       (
         'a disconnected report ends a requested close on request',
         [request],
         radioGone,
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        onRequest,
+        LinkDuty.release,
+        onRequest,
         const EndedOnRequest(),
       ),
       (
         'reports ending ends a requested close on request',
         [request],
         const ReportsEnded(),
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        onRequest,
+        LinkDuty.release,
+        onRequest,
         const EndedOnRequest(),
       ),
       (
         'the radio finishing its own close is a drop',
         [radioClosing],
         radioGone,
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        dropped,
+        LinkDuty.release,
+        dropped,
         const EndedByDrop(),
       ),
       (
         'a failed close returns to ready',
         [discovered, request],
         const CloseFailed(),
-        ConnectionState.ready,
+        ready,
         null,
+        ready,
         null,
       ),
       (
         'a failed close returns to linked',
         [request],
         const CloseFailed(),
-        ConnectionState.linked,
+        linked,
         null,
+        linked,
         null,
       ),
       (
         'a drop ends a linked link',
         [],
         radioGone,
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        dropped,
+        LinkDuty.release,
+        dropped,
         const EndedByDrop(),
       ),
       (
         'reports ending is a drop',
         [discovered],
         const ReportsEnded(),
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        dropped,
+        LinkDuty.release,
+        dropped,
         const EndedByDrop(),
       ),
       (
         'an outage invalidates an up link',
         [discovered],
         const RadioOutageBegan(RadioOutage.off),
-        ConnectionState.invalidated,
-        LinkDuty.releaseAndAnnounce,
+        const Ended(EndedByRadioOutage(RadioOutage.off)),
+        LinkDuty.release,
+        const Ended(EndedByRadioOutage(RadioOutage.off)),
         const EndedByRadioOutage(RadioOutage.off),
       ),
       (
         'an outage invalidates a closing link',
         [request],
         const RadioOutageBegan(RadioOutage.unknown),
-        ConnectionState.invalidated,
-        LinkDuty.releaseAndAnnounce,
+        const Ended(EndedByRadioOutage(RadioOutage.unknown)),
+        LinkDuty.release,
+        const Ended(EndedByRadioOutage(RadioOutage.unknown)),
         const EndedByRadioOutage(RadioOutage.unknown),
       ),
       (
         'a stray close answer changes nothing',
         [discovered],
         const CloseConfirmed(),
-        ConnectionState.ready,
+        ready,
+        null,
         null,
         null,
       ),
@@ -173,38 +233,22 @@ void main() {
         'discovery while closing changes nothing',
         [request],
         discovered,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.request),
         null,
         null,
+        const EndedOnRequest(),
       ),
-    ];
-
-    for (final (name, before, input, state, duty, end) in rows) {
-      test(name, () {
-        // arrange
-        final link = after(before);
-
-        // act
-        final step = link.on(input);
-
-        // assert
-        expect(step.link.state, state);
-        expect(step.duty, duty);
-        expect(step.link.end, end);
-      });
-    }
+    ]);
   });
 
   group('the cases the table leaves to the builder', () {
-    // (name, inputs so far, input, state after, duty, end in sight after)
-    final rows = <
-      (String, List<LinkInput>, LinkInput, ConnectionState, LinkDuty?, LinkEnd?)
-    >[
+    checkEach([
       (
         'a stray close failure on an up link changes nothing',
         [discovered],
         const CloseFailed(),
-        ConnectionState.ready,
+        ready,
+        null,
         null,
         null,
       ),
@@ -212,7 +256,8 @@ void main() {
         'a close the radio ends before it is asked is not answered',
         [radioClosing],
         const CloseConfirmed(),
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.radio),
+        null,
         null,
         const EndedByDrop(),
       ),
@@ -220,7 +265,8 @@ void main() {
         'a close failure the radio was not asked for changes nothing',
         [radioClosing],
         const CloseFailed(),
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.radio),
+        null,
         null,
         const EndedByDrop(),
       ),
@@ -229,7 +275,8 @@ void main() {
             'heading for a drop',
         [discovered, radioClosing, request],
         const CloseFailed(),
-        ConnectionState.disconnecting,
+        closing(ready, ClosingBy.radio),
+        null,
         null,
         const EndedByDrop(),
       ),
@@ -237,7 +284,8 @@ void main() {
         'the radio closing a requested close changes nothing',
         [request],
         radioClosing,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.request),
+        null,
         null,
         const EndedOnRequest(),
       ),
@@ -246,23 +294,26 @@ void main() {
             'close returns to ready',
         [discovered, request, radioClosing],
         const CloseFailed(),
-        ConnectionState.ready,
+        ready,
         null,
+        ready,
         null,
       ),
       (
         'a request leaves a link a failed close left closing',
         [discovered, radioClosing, request, const CloseFailed()],
         request,
-        ConnectionState.disconnecting,
+        closing(ready, ClosingBy.both),
         LinkDuty.closeTheLink,
+        null,
         const EndedOnRequest(),
       ),
       (
         'a connected report while closing changes nothing',
         [request],
         const RadioReported(LinkReport.connected),
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.request),
+        null,
         null,
         const EndedOnRequest(),
       ),
@@ -270,7 +321,8 @@ void main() {
         'a radio close repeated changes nothing',
         [radioClosing],
         radioClosing,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.radio),
+        null,
         null,
         const EndedByDrop(),
       ),
@@ -278,38 +330,44 @@ void main() {
         'reports ending while the radio closes is a drop',
         [radioClosing],
         const ReportsEnded(),
-        ConnectionState.disconnected,
-        LinkDuty.releaseAndAnnounce,
+        dropped,
+        LinkDuty.release,
+        dropped,
         const EndedByDrop(),
       ),
       (
         'a closing report on a linked link closes it',
         [],
         radioClosing,
-        ConnectionState.disconnecting,
+        closing(linked, ClosingBy.radio),
         null,
+        closing(linked, ClosingBy.radio),
         const EndedByDrop(),
       ),
-    ];
-
-    for (final (name, before, input, state, duty, endInSight) in rows) {
-      test(name, () {
-        // arrange
-        final link = after(before);
-
-        // act
-        final step = link.on(input);
-
-        // assert
-        expect(step.link.state, state);
-        expect(step.duty, duty);
-        expect(step.link.endInSight, endInSight);
-      });
-    }
+      (
+        'a request and the radio both closing end on request',
+        [radioClosing, request],
+        radioGone,
+        onRequest,
+        LinkDuty.release,
+        onRequest,
+        const EndedOnRequest(),
+      ),
+      (
+        'a confirmed close while the radio also closes ends on request',
+        [radioClosing, request],
+        const CloseConfirmed(),
+        onRequest,
+        LinkDuty.release,
+        onRequest,
+        const EndedOnRequest(),
+      ),
+    ]);
   });
 
   group('an ended link', () {
-    test('ignores every input', () {
+    test('answers every input with the same link, no duty and no phase '
+        'entered', () {
       // arrange
       const every = <LinkInput>[
         discovered,
@@ -323,6 +381,7 @@ void main() {
         RadioOutageBegan(RadioOutage.off),
       ];
       final ended = [
+        after([request, const CloseConfirmed()]),
         after([radioGone]),
         after([const RadioOutageBegan(RadioOutage.off)]),
       ];
@@ -333,38 +392,11 @@ void main() {
           final step = link.on(input);
 
           // assert
-          expect(step.link.state, link.state);
-          expect(step.link.end, link.end);
+          expect(step.link, same(link));
           expect(step.duty, isNull);
+          expect(step.entered, isNull);
         }
       }
-    });
-  });
-
-  group('endInSight', () {
-    test('names where a closing link is heading', () {
-      // arrange
-      final links = {
-        'up': after([]),
-        'requested': after([request]),
-        'radio closing': after([radioClosing]),
-        'radio closing, then requested': after([radioClosing, request]),
-        'dropped': after([radioGone]),
-      };
-
-      // act
-      final inSight = links.map(
-        (name, link) => MapEntry(name, link.endInSight),
-      );
-
-      // assert
-      expect(inSight, {
-        'up': null,
-        'requested': const EndedOnRequest(),
-        'radio closing': const EndedByDrop(),
-        'radio closing, then requested': const EndedOnRequest(),
-        'dropped': const EndedByDrop(),
-      });
     });
   });
 
@@ -381,15 +413,15 @@ void main() {
     });
   });
 
-  group('the flags of each state', () {
-    // (state, inputs that reach it, isUp, isClosing, hasEnded)
-    final rows = <(ConnectionState, List<LinkInput>, bool, bool, bool)>[
-      (ConnectionState.linked, [], true, false, false),
-      (ConnectionState.ready, [discovered], true, false, false),
-      (ConnectionState.disconnecting, [request], false, true, false),
-      (ConnectionState.disconnected, [radioGone], false, false, true),
+  group('the flags of each phase', () {
+    // (name, inputs that reach it, isUp, isClosing, hasEnded)
+    final rows = <(String, List<LinkInput>, bool, bool, bool)>[
+      ('linked', [], true, false, false),
+      ('ready', [discovered], true, false, false),
+      ('closing', [request], false, true, false),
+      ('ended by a drop', [radioGone], false, false, true),
       (
-        ConnectionState.invalidated,
+        'ended by an outage',
         [const RadioOutageBegan(RadioOutage.unauthorized)],
         false,
         false,
@@ -397,16 +429,12 @@ void main() {
       ),
     ];
 
-    for (final (state, inputs, isUp, isClosing, hasEnded) in rows) {
-      test('a link that is ${state.name}', () {
-        // arrange
-        final reached = inputs;
-
+    for (final (name, inputs, isUp, isClosing, hasEnded) in rows) {
+      test('a link that is $name', () {
         // act
-        final link = after(reached);
+        final link = after(inputs);
 
         // assert
-        expect(link.state, state);
         expect(link.isUp, isUp);
         expect(link.isClosing, isClosing);
         expect(link.hasEnded, hasEnded);

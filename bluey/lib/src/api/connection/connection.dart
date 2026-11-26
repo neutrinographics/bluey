@@ -1,5 +1,5 @@
 import '../../connection/value_objects/write_payload_limit.dart';
-import '../../features/connection/domain/connection_state.dart';
+import 'connection_state.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/uuid.dart';
@@ -13,7 +13,7 @@ export '../../connection/value_objects/mtu.dart';
 export '../../connection/value_objects/peripheral_latency.dart';
 export '../../connection/value_objects/supervision_timeout.dart';
 export '../../connection/value_objects/write_payload_limit.dart';
-export '../../features/connection/domain/connection_state.dart';
+export 'connection_state.dart';
 
 /// Bonding state of a device.
 ///

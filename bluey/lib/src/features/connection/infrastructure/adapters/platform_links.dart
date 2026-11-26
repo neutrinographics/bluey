@@ -7,6 +7,7 @@ import '../../../../shared/application/log.dart';
 import '../../../../shared/application/log_level.dart';
 import '../../../../shared/domain/device_address.dart';
 import '../../../../shared/domain/either.dart';
+import '../../application/connection_log_words.dart';
 import '../../application/ports/links.dart';
 import '../../domain/connection_failure.dart';
 import '../../domain/link_end.dart';
@@ -120,7 +121,7 @@ final class PlatformLinks implements Links {
   void _closeAfterFailedReports(String connectionId, Object error) {
     _log.log(
       BlueyLogLevel.warn,
-      'bluey.connection',
+      connectionLogContext,
       'link reports failed',
       data: {'link': connectionId},
       errorCode: error.runtimeType.toString(),
@@ -130,7 +131,7 @@ final class PlatformLinks implements Links {
         (answer) => answer.fold(
           (failure) => _log.log(
             BlueyLogLevel.warn,
-            'bluey.connection',
+            connectionLogContext,
             'link left open',
             data: {'link': connectionId},
             errorCode: failure.runtimeType.toString(),

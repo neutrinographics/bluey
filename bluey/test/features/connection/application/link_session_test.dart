@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/domain/connection_event.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
-import 'package:bluey/src/features/connection/domain/connection_state.dart';
+import 'package:bluey/src/api/connection/connection_state.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
+import 'package:bluey/src/features/connection/domain/link_phase.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -74,10 +75,10 @@ void main() {
     return opened!;
   }
 
-  List<ConnectionState> statesOf(LinkSession session) {
-    final states = <ConnectionState>[];
-    session.states.listen(states.add);
-    return states;
+  List<LinkPhase> phasesOf(LinkSession session) {
+    final phases = <LinkPhase>[];
+    session.phases.listen(phases.add);
+    return phases;
   }
 
   Iterable<DisconnectedEvent> disconnects() =>
@@ -85,12 +86,12 @@ void main() {
 
   group('a drop', () {
     test(
-      'emits disconnected, closes the states and runs the releases',
+      'enters the ended phase, closes the phases and runs the releases',
       () async {
         // arrange
-        final states = <ConnectionState>[];
+        final phases = <LinkPhase>[];
         var closed = false;
-        session.states.listen(states.add, onDone: () => closed = true);
+        session.phases.listen(phases.add, onDone: () => closed = true);
 
         // act
         links.drop(device);
@@ -98,7 +99,7 @@ void main() {
 
         // assert
         expect(session.link.end, const EndedByDrop());
-        expect(states, [ConnectionState.disconnected]);
+        expect(phases, [const Ended(EndedByDrop())]);
         expect(closed, isTrue);
         expect(released, [const EndedByDrop()]);
         expect(disconnects().single.reason, 'linkLoss');
@@ -154,7 +155,7 @@ void main() {
       await pumpEventQueue();
 
       // assert
-      expect(session.link.state, ConnectionState.disconnected);
+      expect(session.phase, const Ended(EndedByDrop()));
       expect(session.link.hasEnded, isTrue);
     });
 
@@ -247,7 +248,7 @@ void main() {
         // arrange
         session.servicesDiscovered();
         await pumpEventQueue();
-        final states = statesOf(session);
+        final phases = phasesOf(session);
         links.failNextClose(device);
 
         // act
@@ -261,8 +262,11 @@ void main() {
             UnexpectedPlatformFailure('the close was told to fail'),
           ),
         );
-        expect(session.link.state, ConnectionState.ready);
-        expect(states, [ConnectionState.disconnecting, ConnectionState.ready]);
+        expect(session.phase, const Ready());
+        expect(phases, [
+          const Closing(returnTo: Ready(), by: ClosingBy.request),
+          const Ready(),
+        ]);
         expect(released, isEmpty);
         expect(disconnects(), isEmpty);
       },
@@ -294,7 +298,7 @@ void main() {
 
         // assert
         expect(answer, isA<Left<ConnectionFailure, void>>());
-        expect(session.link.state, ConnectionState.ready);
+        expect(session.phase, const Ready());
         expect(operation, const Right<ConnectionFailure, int>(7));
       });
     });
@@ -563,8 +567,8 @@ void main() {
         () => operation.future,
         orEnd: (_) => throw StateError('boom'),
       );
-      final states = <ConnectionState>[];
-      session.states.listen(states.add);
+      final phases = <LinkPhase>[];
+      session.phases.listen(phases.add);
 
       // act
       links.drop(device);
@@ -594,9 +598,66 @@ void main() {
     });
   });
 
+  group('state transition lines', () {
+    List<String?> loggedStates() => [
+      for (final r in log.records)
+        if (r.context == 'bluey.connection' && r.message == 'state transition')
+          r.data['state'] as String?,
+    ];
+
+    test('name each phase entered as logs named it before', () async {
+      // arrange
+      links.failNextClose(device);
+      await session.disconnect();
+      session.servicesDiscovered();
+      await pumpEventQueue();
+      links.failNextClose(device);
+      await session.disconnect();
+
+      // act
+      links.outage(RadioOutage.off);
+      await pumpEventQueue();
+
+      // assert
+      expect(loggedStates(), [
+        'ConnectionState.disconnecting',
+        'ConnectionState.linked',
+        'ConnectionState.ready',
+        'ConnectionState.disconnecting',
+        'ConnectionState.ready',
+        'ConnectionState.invalidated',
+      ]);
+    });
+
+    test('name a drop as disconnected', () async {
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+
+      // assert
+      expect(loggedStates(), ['ConnectionState.disconnected']);
+    });
+
+    test('log no second closing when a request joins the radio closing the '
+        'link', () async {
+      // arrange
+      links.report(device, LinkReport.disconnecting);
+      await pumpEventQueue();
+
+      // act
+      await session.disconnect();
+
+      // assert
+      expect(loggedStates(), [
+        'ConnectionState.disconnecting',
+        'ConnectionState.disconnected',
+      ]);
+    });
+  });
+
   test('an outage invalidates the link and reports radioOutage', () async {
     // arrange
-    final states = statesOf(session);
+    final phases = phasesOf(session);
 
     // act
     links.outage(RadioOutage.off);
@@ -604,14 +665,14 @@ void main() {
 
     // assert
     expect(session.link.end, const EndedByRadioOutage(RadioOutage.off));
-    expect(states, [ConnectionState.invalidated]);
+    expect(phases, [const Ended(EndedByRadioOutage(RadioOutage.off))]);
     expect(released, [const EndedByRadioOutage(RadioOutage.off)]);
     expect(disconnects().single.reason, 'radioOutage');
   });
 
   test('servicesDiscovered makes the link ready, once', () async {
     // arrange
-    final states = statesOf(session);
+    final phases = phasesOf(session);
 
     // act
     session.servicesDiscovered();
@@ -619,7 +680,7 @@ void main() {
     await pumpEventQueue();
 
     // assert
-    expect(states, [ConnectionState.ready]);
-    expect(session.link.state, ConnectionState.ready);
+    expect(phases, [const Ready()]);
+    expect(session.phase, const Ready());
   });
 }

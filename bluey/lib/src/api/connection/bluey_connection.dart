@@ -6,6 +6,7 @@ import '../../shared/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'connection.dart';
 import 'connection_failure_translation.dart';
+import 'connection_state_translation.dart';
 import 'ios_connection_extensions.dart';
 
 /// One link's session presented as the public Connection.
@@ -26,7 +27,7 @@ final class BlueyConnection implements Connection {
   DeviceAddress get deviceAddress => _session.link.device;
 
   @override
-  ConnectionState get state => _session.link.state;
+  ConnectionState get state => connectionStateOf(_session.phase);
 
   /// Gives each listener the current state first, since a listener that
   /// arrives late must still see where the link stands, and closes once the
@@ -34,16 +35,16 @@ final class BlueyConnection implements Connection {
   @override
   Stream<ConnectionState> get stateChanges =>
       Stream<ConnectionState>.multi((controller) {
-        controller.add(_session.link.state);
+        controller.add(state);
         if (_session.link.hasEnded) {
           controller.closeSync();
           return;
         }
-        final states = _session.states.listen(
-          controller.add,
+        final phases = _session.phases.listen(
+          (phase) => controller.add(connectionStateOf(phase)),
           onDone: controller.closeSync,
         );
-        controller.onCancel = states.cancel;
+        controller.onCancel = phases.cancel;
       }, isBroadcast: true);
 
   @override

@@ -39,8 +39,8 @@ final class CloseConfirmed extends LinkInput {
 }
 
 /// The platform failed the close that was asked for, so the link returns to
-/// the state it had before the request: up, or still closing when the radio
-/// had begun closing it before the request was made.
+/// where it was before the request, unless the radio is closing the link
+/// itself: then the link stays closing and only the request is dropped.
 final class CloseFailed extends LinkInput {
   const CloseFailed();
 }
