@@ -1,8 +1,9 @@
-/// The words of Connection's log lines that an app can read, in one place.
+/// The words an app can read in Connection's log lines and exception
+/// messages, in one place.
 ///
-/// They are the words logs had before the lifecycle had words of its own,
-/// kept so an app's log filters hold. The change that revises the log
-/// wording deletes this file.
+/// They are the words these had before the lifecycle had words of its own,
+/// kept so an app's log filters and error handling hold. The change that
+/// revises the log wording deletes this file.
 library;
 
 import '../domain/connection_failure.dart';

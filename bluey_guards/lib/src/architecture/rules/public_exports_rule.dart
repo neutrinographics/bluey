@@ -6,7 +6,8 @@ import 'rule_support.dart';
 
 /// Holds each public library to exporting the package's own code, so the
 /// public API is only what the package declares and never a whole other
-/// package or another public library.
+/// package or another public library, and a bounded context reaches apps
+/// only through its edge in `api/`, never by a file of its own being exported.
 final class PublicExportsRule implements ArchitectureRule {
   /// The rule for [package].
   const PublicExportsRule({required this.package});
@@ -22,12 +23,14 @@ final class PublicExportsRule implements ArchitectureRule {
     for (final source in tree.dartSources)
       if (libraryPlacement(source.path) is PublicLibrary)
         for (final uri in source.exports)
-          if (!_isOwnSource(
+          if (!_isExportable(
             Dependency.resolve(from: source.path, uri: uri, package: package),
           ))
             Violation(source.path, uri),
   ];
 
-  bool _isOwnSource(Dependency dependency) =>
-      dependency is Internal && dependency.path.startsWith('lib/src/');
+  bool _isExportable(Dependency dependency) =>
+      dependency is Internal &&
+      dependency.path.startsWith('lib/src/') &&
+      Placement.of(dependency.path) is! InFeature;
 }
