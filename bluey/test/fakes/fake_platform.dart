@@ -2106,6 +2106,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId, {
     required bool withResponse,
   }) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
     _applyFaultRules(FakeOp.getMaximumWriteLength, deviceId: deviceId);
     final override = _maxWriteOverrides[deviceId];
     if (override != null) {

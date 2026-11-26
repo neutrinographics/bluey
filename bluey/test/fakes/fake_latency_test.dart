@@ -103,6 +103,32 @@ void main() {
       });
     });
 
+    test('the write payload limit honors the latency too', () {
+      fakeAsync((async) {
+        final env = boot(async);
+        late Connection connection;
+        env.bluey
+            .connect(Device(address: const DeviceAddress(deviceId)))
+            .then((c) => connection = c);
+        async.flushMicrotasks();
+        env.fake.operationLatency = const Duration(milliseconds: 50);
+
+        WritePayloadLimit? limit;
+        connection
+            .maxWritePayload(withResponse: true)
+            .then((value) => limit = value);
+        async.elapse(const Duration(milliseconds: 49));
+        expect(limit, isNull);
+
+        async.elapse(const Duration(milliseconds: 2));
+        expect(limit, isNotNull);
+
+        env.bluey.dispose();
+        env.fake.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
     test('two operations started together genuinely overlap in flight',
         () {
       fakeAsync((async) {
