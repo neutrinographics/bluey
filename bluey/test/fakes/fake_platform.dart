@@ -1473,6 +1473,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     return deviceId;
   }
 
+  /// Orders the two signals of the link it ends as [disconnectSignals]
+  /// says; a device with no link and no streams is owed neither, so its
+  /// disconnect answers at once and leaves nothing for the next connect.
   @override
   Future<void> disconnect(String deviceId) async {
     if (echoDisconnectRequests) _echoExpected.add(deviceId);
@@ -1499,6 +1502,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         final connection = _reportLastState(deviceId);
         unawaited(_closeDeviceStreams(deviceId));
         _tearDownLink(deviceId, connection);
+        if (connection == null && asked == null) return;
         final answer = Completer<void>();
         _secondDisconnectSignals[deviceId] = answer.complete;
         await answer.future;
@@ -1508,11 +1512,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         }
       case FakeDisconnectSignals.answerThenReport:
         final connection = _connections.remove(deviceId);
-        if (_connectionStateControllers.containsKey(deviceId)) {
-          _owedLastReport.add(deviceId);
-        }
+        final hadStreams = _connectionStateControllers.containsKey(deviceId);
+        if (hadStreams) _owedLastReport.add(deviceId);
         await _closeDeviceStreams(deviceId);
         _tearDownLink(deviceId, connection);
+        if (connection == null && !hadStreams) return;
         _secondDisconnectSignals[deviceId] = () =>
             _reportState(deviceId, PlatformConnectionState.disconnected);
     }
