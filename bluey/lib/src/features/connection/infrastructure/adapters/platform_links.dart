@@ -13,6 +13,7 @@ import '../../domain/connection_failure.dart';
 import '../../domain/link_end.dart';
 import '../../domain/link_id.dart';
 import '../../domain/link_input.dart';
+import '../../domain/link_operation.dart';
 import 'platform_failures.dart';
 
 /// Connection's [Links] over [BlueyPlatform], so the lifecycle runs on a
@@ -46,7 +47,7 @@ final class PlatformLinks implements Links {
     Duration? timeout,
   }) async {
     final answer = await answering(
-      'connect',
+      LinkOperation.open,
       () => _platform.connect(
         device.value,
         PlatformConnectConfig(timeoutMs: timeout?.inMilliseconds, mtu: null),
@@ -60,7 +61,7 @@ final class PlatformLinks implements Links {
     final reports = _reports[link];
     if (reports == null || reports.ended) return const Right(null);
     final answer = await answering(
-      'disconnect',
+      LinkOperation.close,
       () => _platform.disconnect(link.value),
     );
     return answer.fold(
@@ -127,14 +128,17 @@ final class PlatformLinks implements Links {
       errorCode: error.runtimeType.toString(),
     );
     unawaited(
-      answering('disconnect', () => _platform.disconnect(connectionId)).then(
+      answering(
+        LinkOperation.close,
+        () => _platform.disconnect(connectionId),
+      ).then(
         (answer) => answer.fold(
           (failure) => _log.log(
             BlueyLogLevel.warn,
             connectionLogContext,
             'link left open',
             data: {'link': connectionId},
-            errorCode: failure.runtimeType.toString(),
+            errorCode: failureCodeOf(failure),
           ),
           (_) {},
         ),

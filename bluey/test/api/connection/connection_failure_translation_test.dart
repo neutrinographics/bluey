@@ -1,6 +1,7 @@
 import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/platform/bluetooth_state.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -126,9 +127,10 @@ void main() {
       );
     });
 
-    test('an operation that timed out is a GATT timeout of that operation', () {
+    test('an open that timed out is a GATT timeout of "connect", in the '
+        'words it has today', () {
       // arrange
-      const failure = OperationTimedOut('readRssi');
+      const failure = OperationTimedOut(LinkOperation.open);
 
       // act
       final exception = connectionFailureAsException(failure, device: _device);
@@ -139,14 +141,16 @@ void main() {
         isA<GattTimeoutException>().having(
           (e) => e.operation,
           'operation',
-          'readRssi',
+          'connect',
         ),
       );
+      expect(exception.message, 'GATT operation "connect" timed out');
     });
 
-    test('a rejected operation is a failed GATT operation with its status', () {
+    test('a rejected close is a failed GATT operation of "disconnect" with '
+        'its status', () {
       // arrange
-      const failure = OperationRejected('requestMtu', 133);
+      const failure = OperationRejected(LinkOperation.close, 133);
 
       // act
       final exception = connectionFailureAsException(failure, device: _device);
@@ -155,8 +159,12 @@ void main() {
       expect(
         exception,
         isA<GattOperationFailedException>()
-            .having((e) => e.operation, 'operation', 'requestMtu')
+            .having((e) => e.operation, 'operation', 'disconnect')
             .having((e) => e.status, 'status', 133),
+      );
+      expect(
+        exception.message,
+        'GATT operation "disconnect" failed with status 133',
       );
     });
 
@@ -229,7 +237,7 @@ void main() {
     test('throws a failure as the exception an app gets for it', () {
       // arrange
       const answer = Left<ConnectionFailure, int>(
-        OperationTimedOut('readRssi'),
+        OperationTimedOut(LinkOperation.open),
       );
 
       // act
@@ -242,7 +250,7 @@ void main() {
           isA<GattTimeoutException>().having(
             (e) => e.operation,
             'operation',
-            'readRssi',
+            'connect',
           ),
         ),
       );

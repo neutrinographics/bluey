@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 
 import '../../../shared/domain/failure.dart';
 import 'link_end.dart';
+import 'link_operation.dart';
 
 /// Why a connect did not open a link, in Connection's words, so the edge can
 /// tell an app that the device was out of reach from one that refused.
@@ -22,9 +23,6 @@ enum ConnectFailureReason {
 @immutable
 sealed class ConnectionFailure implements Failure {
   const ConnectionFailure();
-
-  @override
-  String toString() => message;
 }
 
 /// A connect ended without a link.
@@ -35,7 +33,20 @@ final class ConnectFailed extends ConnectionFailure {
   final ConnectFailureReason reason;
 
   @override
-  String get message => 'The connect failed: ${reason.name}.';
+  String get message => switch (reason) {
+    ConnectFailureReason.timeout =>
+      'The connect failed: the device did not answer in time.',
+    ConnectFailureReason.deviceNotFound =>
+      'The connect failed: the device was not found.',
+    ConnectFailureReason.deviceNotConnectable =>
+      'The connect failed: the device does not accept connections.',
+    ConnectFailureReason.pairingFailed =>
+      'The connect failed: pairing with the device failed.',
+    ConnectFailureReason.connectionLimitReached =>
+      'The connect failed: the platform holds as many links as it can.',
+    ConnectFailureReason.unknown =>
+      'The connect failed for a reason the platform did not give.',
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -104,11 +115,11 @@ final class PermissionMissing extends ConnectionFailure {
 final class OperationTimedOut extends ConnectionFailure {
   const OperationTimedOut(this.operation);
 
-  /// The operation that timed out, named for a log.
-  final String operation;
+  /// The operation that timed out.
+  final LinkOperation operation;
 
   @override
-  String get message => 'The operation $operation timed out.';
+  String get message => '${_attemptOf(operation)} timed out.';
 
   @override
   bool operator ==(Object other) =>
@@ -122,15 +133,15 @@ final class OperationTimedOut extends ConnectionFailure {
 final class OperationRejected extends ConnectionFailure {
   const OperationRejected(this.operation, this.status);
 
-  /// The operation that was rejected, named for a log.
-  final String operation;
+  /// The operation that was rejected.
+  final LinkOperation operation;
 
   /// The platform's status code, which an app receives unchanged.
   final int status;
 
   @override
   String get message =>
-      'The operation $operation was rejected with status $status.';
+      '${_attemptOf(operation)} was rejected with status $status.';
 
   @override
   bool operator ==(Object other) =>
@@ -144,6 +155,9 @@ final class OperationRejected extends ConnectionFailure {
 
 /// The platform failed in a way Connection does not recognise; the [cause]
 /// is kept so the edge can hand it on rather than lose it.
+///
+/// Two failures are equal when they say the same thing: a cause is rarely
+/// equal by value, so counting it would make every such failure unique.
 final class UnexpectedPlatformFailure extends ConnectionFailure {
   const UnexpectedPlatformFailure(this.detail, {this.code, this.cause});
 
@@ -166,10 +180,15 @@ final class UnexpectedPlatformFailure extends ConnectionFailure {
   bool operator ==(Object other) =>
       other is UnexpectedPlatformFailure &&
       other.detail == detail &&
-      other.code == code &&
-      other.cause == cause;
+      other.code == code;
 
   @override
-  int get hashCode =>
-      Object.hash(UnexpectedPlatformFailure, detail, code, cause);
+  int get hashCode => Object.hash(UnexpectedPlatformFailure, detail, code);
 }
+
+/// The attempt at [operation] as a message opens it, for a person reading
+/// the failure rather than an app matching it.
+String _attemptOf(LinkOperation operation) => switch (operation) {
+  LinkOperation.open => 'Opening the link',
+  LinkOperation.close => 'Closing the link',
+};

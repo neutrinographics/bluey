@@ -1,3 +1,4 @@
+import '../../features/connection/application/connection_log_words.dart';
 import '../../features/connection/domain/connection_failure.dart';
 import '../../features/connection/domain/link_end.dart';
 import '../../platform/bluetooth_state.dart';
@@ -25,9 +26,11 @@ BlueyException connectionFailureAsException(
   PermissionMissing(:final permission) => PermissionDeniedException([
     permission,
   ]),
-  OperationTimedOut(:final operation) => GattTimeoutException(operation),
+  OperationTimedOut(:final operation) => GattTimeoutException(
+    operationWordOf(operation),
+  ),
   OperationRejected(:final operation, :final status) =>
-    GattOperationFailedException(operation, status),
+    GattOperationFailedException(operationWordOf(operation), status),
   UnexpectedPlatformFailure(:final detail, :final code, :final cause) =>
     BlueyPlatformException(detail, code: code, cause: cause),
 };

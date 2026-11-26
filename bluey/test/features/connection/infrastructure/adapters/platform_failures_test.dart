@@ -1,5 +1,6 @@
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_failures.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
@@ -13,10 +14,13 @@ void main() {
       const error = GattOperationTimeoutException('readRssi');
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'rssi');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.close,
+      );
 
       // assert
-      expect(failure, const OperationTimedOut('rssi'));
+      expect(failure, const OperationTimedOut(LinkOperation.close));
     });
 
     test('a GATT disconnect is the link ended by a drop', () {
@@ -24,7 +28,10 @@ void main() {
       const error = GattOperationDisconnectedException('readRssi');
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'rssi');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.close,
+      );
 
       // assert
       expect(failure, const LinkHadEnded(EndedByDrop()));
@@ -35,10 +42,13 @@ void main() {
       const error = GattOperationStatusFailedException('requestMtu', 0x80);
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'mtu');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.open,
+      );
 
       // assert
-      expect(failure, const OperationRejected('mtu', 0x80));
+      expect(failure, const OperationRejected(LinkOperation.open, 0x80));
     });
 
     test('an unknown GATT platform error keeps its code, its message and '
@@ -56,8 +66,8 @@ void main() {
 
       // act
       final failures = [
-        connectionFailureFrom(withMessage, operation: 'connect'),
-        connectionFailureFrom(withoutMessage, operation: 'connect'),
+        connectionFailureFrom(withMessage, operation: LinkOperation.open),
+        connectionFailureFrom(withoutMessage, operation: LinkOperation.open),
       ];
 
       // assert
@@ -85,7 +95,7 @@ void main() {
         for (final reason in reasons)
           connectionFailureFrom(
             PlatformConnectFailedException(reason, status: 133),
-            operation: 'connect',
+            operation: LinkOperation.open,
           ),
       ];
 
@@ -108,7 +118,10 @@ void main() {
       );
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'connect');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.open,
+      );
 
       // assert
       expect(failure, const PermissionMissing('BLUETOOTH_CONNECT'));
@@ -119,7 +132,10 @@ void main() {
       const error = PlatformBluetoothUnavailableException(message: 'off');
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'connect');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.open,
+      );
 
       // assert
       expect(failure, const RadioUnavailable());
@@ -133,8 +149,8 @@ void main() {
 
       // act
       final failures = [
-        connectionFailureFrom(withMessage, operation: 'disconnect'),
-        connectionFailureFrom(withoutMessage, operation: 'disconnect'),
+        connectionFailureFrom(withMessage, operation: LinkOperation.close),
+        connectionFailureFrom(withoutMessage, operation: LinkOperation.close),
       ];
 
       // assert
@@ -153,7 +169,10 @@ void main() {
       final error = StateError('boom');
 
       // act
-      final failure = connectionFailureFrom(error, operation: 'connect');
+      final failure = connectionFailureFrom(
+        error,
+        operation: LinkOperation.open,
+      );
 
       // assert
       expect(
@@ -166,7 +185,7 @@ void main() {
   group('answering', () {
     test('a call that returns answers its value', () async {
       // act
-      final answer = await answering('connect', () async => 'AA');
+      final answer = await answering(LinkOperation.open, () async => 'AA');
 
       // assert
       expect(answer, const Right<ConnectionFailure, String>('AA'));
@@ -175,14 +194,16 @@ void main() {
     test('a call that throws answers what it threw as a failure', () async {
       // act
       final answer = await answering<String>(
-        'connect',
+        LinkOperation.open,
         () async => throw const GattOperationTimeoutException('connect'),
       );
 
       // assert
       expect(
         answer,
-        const Left<ConnectionFailure, String>(OperationTimedOut('connect')),
+        const Left<ConnectionFailure, String>(
+          OperationTimedOut(LinkOperation.open),
+        ),
       );
     });
   });

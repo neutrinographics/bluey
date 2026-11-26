@@ -107,6 +107,7 @@ void main() {
         ],
       );
       expect(log.records.last.data, {'link': device.value});
+      expect(log.records.last.errorCode, 'UnexpectedPlatformFailure');
     });
   });
 

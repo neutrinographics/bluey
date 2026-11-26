@@ -183,7 +183,7 @@ final class LinkRegistry {
   Duration? _timeLeft(DateTime? deadline) => deadline?.difference(_now());
 
   void _logFailure(DeviceAddress device, ConnectionFailure failure) {
-    final type = failure.runtimeType.toString();
+    final type = failureCodeOf(failure);
     _log.log(
       BlueyLogLevel.error,
       connectionLogContext,

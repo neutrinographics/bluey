@@ -1,4 +1,5 @@
 import 'package:bluey/src/api/connection/connection_failure_translation.dart';
+import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_failures.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/error_translation.dart';
@@ -70,13 +71,13 @@ void main() {
         // arrange
         final today = translatePlatformException(
           error,
-          operation: 'op',
+          operation: 'connect',
           address: device.value,
         );
 
         // act
         final now = connectionFailureAsException(
-          connectionFailureFrom(error, operation: 'op'),
+          connectionFailureFrom(error, operation: LinkOperation.open),
           device: device,
         );
 
@@ -96,7 +97,7 @@ void main() {
 
       // act
       final now = connectionFailureAsException(
-        connectionFailureFrom(error, operation: 'requestMtu'),
+        connectionFailureFrom(error, operation: LinkOperation.open),
         device: device,
       );
 

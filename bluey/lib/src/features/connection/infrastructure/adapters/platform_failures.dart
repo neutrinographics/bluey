@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import '../../../../shared/domain/either.dart';
 import '../../domain/connection_failure.dart';
 import '../../domain/link_end.dart';
+import '../../domain/link_operation.dart';
 
 /// Everything BlueyPlatform can throw at a Connection operation, in
 /// Connection's words, so no platform exception climbs above the adapters.
@@ -14,7 +15,7 @@ import '../../domain/link_end.dart';
 /// that keeps what was thrown.
 ConnectionFailure connectionFailureFrom(
   Object error, {
-  required String operation,
+  required LinkOperation operation,
 }) => switch (error) {
   GattOperationTimeoutException() => OperationTimedOut(operation),
   GattOperationDisconnectedException() => const LinkHadEnded(EndedByDrop()),
@@ -50,7 +51,7 @@ ConnectionFailure connectionFailureFrom(
 /// [UnexpectedPlatformFailure], because the caller is promised a value for
 /// anything the call throws.
 Future<Either<ConnectionFailure, T>> answering<T>(
-  String operation,
+  LinkOperation operation,
   Future<T> Function() call,
 ) async {
   try {

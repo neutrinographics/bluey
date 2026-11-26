@@ -1,0 +1,3 @@
+/// What can be attempted on a link, in Connection's words, so a failure
+/// names the operation it answers without borrowing the platform's names.
+enum LinkOperation { open, close }
