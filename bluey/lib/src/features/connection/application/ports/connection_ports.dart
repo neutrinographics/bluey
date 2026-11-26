@@ -2,6 +2,7 @@ import '../../domain/link_features.dart';
 import 'bonding.dart';
 import 'links.dart';
 import 'mtu_negotiation.dart';
+import 'parameter_control.dart';
 import 'phy_control.dart';
 import 'signal_strength.dart';
 
@@ -16,6 +17,7 @@ final class ConnectionPorts {
     required this.signal,
     required this.bonding,
     required this.phy,
+    required this.parameters,
   });
 
   /// The radio's links.
@@ -35,4 +37,7 @@ final class ConnectionPorts {
 
   /// How a link's PHY is asked for, and followed.
   final PhyControl phy;
+
+  /// How a link's connection parameters are read, and asked for.
+  final ParameterControl parameters;
 }

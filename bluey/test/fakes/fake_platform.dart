@@ -2287,11 +2287,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'canRequestConnectionParameters=false platform',
       );
     }
-    return const PlatformConnectionParameters(
-      intervalMs: 30.0,
-      latency: 0,
-      timeoutMs: 4000,
-    );
+    _applyFaultRules(FakeOp.getConnectionParameters, deviceId: deviceId);
+    return _connectionParameters[deviceId] ??
+        const PlatformConnectionParameters(
+          intervalMs: 30.0,
+          latency: 0,
+          timeoutMs: 4000,
+        );
   }
 
   @override
@@ -2305,7 +2307,17 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'canRequestConnectionParameters=false platform',
       );
     }
+    _applyFaultRules(FakeOp.requestConnectionParameters, deviceId: deviceId);
   }
+
+  final Map<String, PlatformConnectionParameters> _connectionParameters = {};
+
+  /// The radio times [deviceId]'s link by [parameters], which
+  /// [getConnectionParameters] then reads.
+  void simulateConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters parameters,
+  ) => _connectionParameters[deviceId] = parameters;
 
   // === Server Operations ===
 
@@ -2803,6 +2815,8 @@ enum FakeOp {
   removeBond,
   getPhy,
   requestPhy,
+  getConnectionParameters,
+  requestConnectionParameters,
 }
 
 /// A scripted fault: fires [error] for matching calls to [op] until its

@@ -1,12 +1,17 @@
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/bond_state.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/connection_interval.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/connection_parameters.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/peripheral_latency.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/supervision_timeout.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/phy.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_bonding.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_link_features.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_mtu_negotiation.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_parameter_control.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_phy_control.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_signal_strength.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
@@ -105,6 +110,39 @@ void main() {
     expect(
       pair,
       const Right<ConnectionFailure, PhyPair>((tx: Phy.le2m, rx: Phy.le2m)),
+    );
+  });
+
+  test('its parameter control is over the platform it was given', () async {
+    // arrange
+    final fake = FakeBlueyPlatform()..simulatePeripheral(id: device.value);
+    final ports = platformConnectionPorts(fake, log: RecordingLog());
+    final link = (await ports.links.open(
+      device,
+    )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+    fake.simulateConnectionParameters(
+      device.value,
+      const PlatformConnectionParameters(
+        intervalMs: 15.0,
+        latency: 4,
+        timeoutMs: 2000,
+      ),
+    );
+
+    // act
+    final parameters = await ports.parameters.parametersOf(link);
+
+    // assert
+    expect(ports.parameters, isA<PlatformParameterControl>());
+    expect(
+      parameters,
+      Right<ConnectionFailure, ConnectionParameters>(
+        ConnectionParameters(
+          interval: ConnectionInterval(15.0),
+          latency: PeripheralLatency(4),
+          timeout: SupervisionTimeout(2000),
+        ),
+      ),
     );
   });
 }
