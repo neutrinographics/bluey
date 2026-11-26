@@ -17,12 +17,11 @@ class DisconnectEcho {
   }
 
   /// Whether [state] is the echo of a disconnect asked of [deviceId]. An echo
-  /// is recognised once, and a `disconnected` report means none is coming.
+  /// is recognised once. Any other report means none is coming: a request
+  /// that produced no echo must not swallow a later link's own
+  /// `disconnecting`.
   bool isEcho(String deviceId, PlatformConnectionState state) {
-    if (state == PlatformConnectionState.disconnected) {
-      _expected.remove(deviceId);
-    }
-    return state == PlatformConnectionState.disconnecting &&
-        _expected.remove(deviceId);
+    final wasExpected = _expected.remove(deviceId);
+    return state == PlatformConnectionState.disconnecting && wasExpected;
   }
 }

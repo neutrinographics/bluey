@@ -87,23 +87,54 @@ void main() {
       expect(fromA, isTrue);
     });
 
-    test('connecting and connected reports are never the echo and leave it '
-        'expected', () {
+    test('a mark is forgotten when the device reports connecting', () {
       // arrange
       echo.expectFor('dev');
 
       // act
-      final connecting = echo.isEcho('dev', PlatformConnectionState.connecting);
-      final connected = echo.isEcho('dev', PlatformConnectionState.connected);
-      final disconnecting = echo.isEcho(
+      final connectingIsEcho = echo.isEcho(
+        'dev',
+        PlatformConnectionState.connecting,
+      );
+      final laterIsEcho = echo.isEcho(
         'dev',
         PlatformConnectionState.disconnecting,
       );
 
       // assert
-      expect(connecting, isFalse);
-      expect(connected, isFalse);
-      expect(disconnecting, isTrue);
+      expect(connectingIsEcho, isFalse);
+      expect(laterIsEcho, isFalse);
+    });
+
+    test('a mark is forgotten when the device reports connected', () {
+      // arrange
+      echo.expectFor('dev');
+
+      // act
+      final connectedIsEcho = echo.isEcho(
+        'dev',
+        PlatformConnectionState.connected,
+      );
+      final laterIsEcho = echo.isEcho(
+        'dev',
+        PlatformConnectionState.disconnecting,
+      );
+
+      // assert
+      expect(connectedIsEcho, isFalse);
+      expect(laterIsEcho, isFalse);
+    });
+
+    test('a mark for one device survives another device linking', () {
+      // arrange
+      echo.expectFor('a');
+
+      // act
+      echo.isEcho('b', PlatformConnectionState.connected);
+      final fromA = echo.isEcho('a', PlatformConnectionState.disconnecting);
+
+      // assert
+      expect(fromA, isTrue);
     });
   });
 }
