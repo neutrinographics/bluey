@@ -214,7 +214,7 @@ On the list, but what it names changed:
 
 A slice that moves a file usually sees both parts at once, under several rules: the old path's entries are stale, and anything the moved file still does wrong is new. Fix the new, delete the stale, and the lists end the slice shorter than they began.
 
-Two groups of entries can only be cleared by a named slice. The first is `bluey_platform_interface`'s `lib/src/platform_interface.dart -> 854 lines`, nearly all of it the one `BlueyPlatform` class, is cleared by slice 3, which splits it into one interface per role. The second is the six `edgeFromBelow` entries, Peer's imports of the public `Connection` and of `BorrowConnection`, which leave with slice 5. A third, `lib/bluey.dart`'s re-export of the platform interface's `Capabilities`, left `public exports` with slice 1, which gave Bluey its own; that list is now empty.
+Two groups of entries can only be cleared by a named slice. The first is `bluey_platform_interface`'s `lib/src/platform_interface.dart -> 854 lines`, nearly all of it the one `BlueyPlatform` class, cleared by slice 3, which splits it into one interface per role. The second is the six `edgeFromBelow` entries, Peer's imports of the public `Connection` and of `BorrowConnection`, which leave with slice 5. A third, `lib/bluey.dart`'s re-export of the platform interface's `Capabilities`, left `public exports` with slice 1, which gave Bluey its own; that list is now empty.
 
 ## 6. Failures as values
 

@@ -96,16 +96,18 @@
   `StaleHandleException`, where the getter threw
   `UnsupportedOperationException`: the outage is reported before the missing
   feature, as every other member of the extension reports it.
-- **A granted connection-parameters request is kept.** A first read of the
-  link's connection parameters that answers after a request was granted no
-  longer overwrites the granted value.
+- **A late first read no longer overwrites newer state.** A first read of the
+  bond state, the PHY or the connection parameters that answers after a
+  report, after a granted request, or after the link ended is ignored, where
+  it replaced the newer value.
 - **A platform error on the bond or PHY stream no longer reaches the app.**
   `bondStateChanges` and `phyChanges` carry no errors; such an error is
   logged (below) and the stream goes on.
-- **No bond, PHY or parameter reads on other platforms.** On a platform that
-  is neither Android nor iOS (`PlatformKind.fake` or `other`), connecting no
-  longer reads the bond state, the PHY or the connection parameters, which
-  nothing on such a platform could see.
+- **No bond, PHY or parameter reads on any platform but Android.** Connecting
+  reads the bond state, the PHY and the connection parameters only on
+  Android, where `connection.android` shows them. Before, the reads followed
+  the capability flags alone; no shipped iOS capability set has those flags,
+  so no app sees a difference on iOS.
 - **Dispose is terminal for `Scanner` and `Server` (I368).** Calling
   `scan()`, `addService()`, `startAdvertising()` etc. on a disposed instance
   now throws `StaleHandleException` instead of partially restarting over

@@ -10,8 +10,8 @@ import 'connection.dart';
 /// whether or not the app still holds it, and nothing here outlives that.
 final class Connections {
   /// Builds over [present], which assembles the Connection a session shows
-  /// the app; the composition root hands it in, since what a Connection is
-  /// built from is infrastructure the edge may not name.
+  /// the app; `ConnectionAssembly` hands it in, since it alone knows what a
+  /// Connection is built from.
   Connections({required Connection Function(LinkSession session) present})
     : _present = present;
 

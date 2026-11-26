@@ -308,7 +308,7 @@ class LinkGattClient {
         });
   }
 
-  /// Each re-discovered service tree; which every Connection's `servicesChanges` follows.
+  /// Each re-discovered service tree, as `servicesChanges` gives it.
   Stream<List<RemoteService>> get servicesChanges =>
       Stream<List<RemoteService>>.multi((controller) {
         // Convention 3 (non-enum terminal): late subscribers after
