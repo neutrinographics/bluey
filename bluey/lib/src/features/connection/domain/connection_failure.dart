@@ -250,4 +250,7 @@ String _attemptOf(LinkOperation operation) => switch (operation) {
   LinkOperation.readReceivePhy => 'Reading the receive PHY',
   LinkOperation.followPhy => 'Following the PHY',
   LinkOperation.requestPhy => 'Requesting a PHY',
+  LinkOperation.readConnectionParameters => 'Reading the connection parameters',
+  LinkOperation.requestConnectionParameters =>
+    'Requesting connection parameters',
 };

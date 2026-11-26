@@ -44,6 +44,8 @@ String operationWordOf(LinkOperation operation) => switch (operation) {
   LinkOperation.readReceivePhy => 'rxPhy',
   LinkOperation.followPhy => 'phyChanges',
   LinkOperation.requestPhy => 'requestPhy',
+  LinkOperation.readConnectionParameters => 'connectionParameters',
+  LinkOperation.requestConnectionParameters => 'requestConnectionParameters',
 };
 
 /// The code a log line names [failure] by, the class name an app has always

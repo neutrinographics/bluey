@@ -72,6 +72,11 @@ void main() {
       (LinkOperation.readReceivePhy, 'rxPhy'),
       (LinkOperation.followPhy, 'phyChanges'),
       (LinkOperation.requestPhy, 'requestPhy'),
+      (LinkOperation.readConnectionParameters, 'connectionParameters'),
+      (
+        LinkOperation.requestConnectionParameters,
+        'requestConnectionParameters',
+      ),
     ];
 
     for (final (operation, word) in rows) {

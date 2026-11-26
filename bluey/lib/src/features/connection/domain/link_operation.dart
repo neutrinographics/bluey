@@ -15,4 +15,6 @@ enum LinkOperation {
   readReceivePhy,
   followPhy,
   requestPhy,
+  readConnectionParameters,
+  requestConnectionParameters,
 }

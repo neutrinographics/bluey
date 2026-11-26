@@ -204,6 +204,10 @@ void main() {
           'Following the PHY is not supported on this platform.',
       const OperationRejected(LinkOperation.requestPhy, 133):
           'Requesting a PHY was rejected with status 133.',
+      const OperationTimedOut(LinkOperation.readConnectionParameters):
+          'Reading the connection parameters timed out.',
+      const OperationRejected(LinkOperation.requestConnectionParameters, 133):
+          'Requesting connection parameters was rejected with status 133.',
       MtuAboveMaximum(requested: Mtu(248), maximum: 247):
           "An MTU of 248 is above this platform's maximum of 247.",
     };
