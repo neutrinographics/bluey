@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Internal: `DeviceStreams` now comes from `bluey_platform_interface`, and the plugin's echo of a disconnect request is dropped by `DisconnectEcho`. No behaviour change.
+
 ## 0.4.0
 
 **Breaking changes:**

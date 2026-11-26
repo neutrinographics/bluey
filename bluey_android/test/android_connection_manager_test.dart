@@ -397,6 +397,74 @@ void main() {
       );
     });
 
+    group('the plugin\'s echo of a disconnect request', () {
+      const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+
+      void report(ConnectionStateDto state) =>
+          connectionManager.onConnectionStateChanged(
+            ConnectionStateEventDto(deviceId: 'dev', state: state),
+          );
+
+      setUp(() {
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenAnswer((_) async => 'dev');
+      });
+
+      test('the echo of a disconnect request does not reach the device\'s '
+          'listeners', () async {
+        // arrange
+        await connectionManager.connect('dev', config);
+        final answer = Completer<void>();
+        when(
+          () => mockHostApi.disconnect(any()),
+        ).thenAnswer((_) => answer.future);
+        final states = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+        );
+
+        // act
+        final closing = connectionManager.disconnect('dev');
+        report(ConnectionStateDto.disconnecting);
+        report(ConnectionStateDto.disconnected);
+
+        // assert
+        await states;
+        answer.complete();
+        await closing;
+      });
+
+      test('the echo of a disconnect the host fails does not reach the '
+          'listeners, and the link\'s own disconnecting report does', () async {
+        // arrange
+        await connectionManager.connect('dev', config);
+        when(
+          () => mockHostApi.disconnect(any()),
+        ).thenThrow(PlatformException(code: 'x'));
+        final states = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([
+            PlatformConnectionState.disconnecting,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+        await expectLater(
+          connectionManager.disconnect('dev'),
+          throwsA(isA<PlatformException>()),
+        );
+
+        // act
+        report(ConnectionStateDto.disconnecting);
+        report(ConnectionStateDto.disconnecting);
+        report(ConnectionStateDto.disconnected);
+
+        // assert
+        await states;
+      });
+    });
+
     group('onConnectionStateChanged', () {
       test('routes to correct device stream', () async {
         when(
