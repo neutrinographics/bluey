@@ -39,17 +39,22 @@ final class PublicLibrary extends Placement {
 
 /// The edge, `lib/src/api/**`: the public types, which may reach any layer.
 final class InApi extends Placement {
-  /// The one placement every file of the edge shares.
-  const InApi() : super._();
+  /// An edge file of [context], or of none for a file directly in `api/`.
+  const InApi({this.context}) : super._();
+
+  /// The first folder under `lib/src/api/`, the context whose public interface
+  /// the file is, so a rule can hold the file to that context; null for a
+  /// file directly in `api/`, which is the edge of no one context.
+  final String? context;
 
   @override
-  bool operator ==(Object other) => other is InApi;
+  bool operator ==(Object other) => other is InApi && other.context == context;
 
   @override
-  int get hashCode => (InApi).hashCode;
+  int get hashCode => Object.hash(InApi, context);
 
   @override
-  String toString() => 'InApi';
+  String toString() => 'InApi(${context ?? 'api'})';
 }
 
 /// The shared kernel, `lib/src/shared/<layer>/**`, which names no context.
@@ -130,7 +135,7 @@ Placement _placeInSrc(List<String> segments) {
   final folder = segments.first;
   switch (folder) {
     case 'api':
-      return const InApi();
+      return InApi(context: segments.length > 2 ? segments[1] : null);
     case 'shared' when segments.length > 2:
       final layer = _layerNamed(segments[1]);
       if (layer != null) return InShared(layer: layer);

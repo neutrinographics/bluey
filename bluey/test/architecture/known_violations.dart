@@ -130,3 +130,21 @@ const oversized = <String>[
   'lib/src/lifecycle.dart -> 364 lines',
   'lib/src/shared/exceptions.dart -> 578 lines',
 ];
+
+/// The edge files of a context that name another context's code, and the
+/// files directly in the edge, but for the composition roots, that name any.
+const edgeContexts = <String>[];
+
+/// The files not yet in the target layout that name the edge.
+const edgeFromBelow = <String>[
+  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/android_connection_extensions.dart',
+  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/connection_failure_translation.dart',
+  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/ios_connection_extensions.dart',
+  'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/borrowed_connection.dart',
+  'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_connection.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_discovery.dart -> lib/src/api/connection/borrowed_connection.dart',
+  'lib/src/peer/peer_discovery.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_remote_service_view.dart -> lib/src/api/connection/connection.dart',
+];

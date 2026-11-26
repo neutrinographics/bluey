@@ -14,19 +14,35 @@ import 'list_growth.dart';
 /// composition root knows its rules and how it is run; a gate that ran with
 /// no weights would fail a rewritten entry that holds.
 ///
+/// Each `--first-statement=<list>` among [arguments], which may be repeated,
+/// lets a list the base lacks hold whatever it lists, though its file is at
+/// the base (see [ListGrowth.between]); it is for the one change that adds a
+/// rule whose list states today's debt, and is printed as stale once the base
+/// has the list.
+///
 /// Answers the exit code: 0 when every list held, 1 when one grew, a list
-/// file at the base or the head cannot be read, or the base cannot be found,
+/// file at the base or the head cannot be read, the base cannot be found, or
+/// a first-statement flag names a list no list file at the head declares,
 /// and 64 with [usage] when no list file is named.
 Future<int> holdListsToShrinking(
   List<String> arguments, {
   required Map<String, EntryWeight> weights,
   required String usage,
 }) async {
-  if (arguments.length < 2) {
+  const flag = '--first-statement=';
+  final firstStatements = {
+    for (final argument in arguments)
+      if (argument.startsWith(flag)) argument.substring(flag.length),
+  };
+  final positional = [
+    for (final argument in arguments)
+      if (!argument.startsWith(flag)) argument,
+  ];
+  if (positional.length < 2) {
     stderr.writeln(usage);
     return 64;
   }
-  final [base, ...paths] = arguments;
+  final [base, ...paths] = positional;
   final mergeBase = await _git(['merge-base', base, 'HEAD']);
   if (mergeBase.exitCode != 0) {
     stderr.writeln('Cannot find where HEAD left $base: ${mergeBase.stderr}');
@@ -34,6 +50,7 @@ Future<int> holdListsToShrinking(
   }
   final commit = (mergeBase.stdout as String).trim();
   var allHold = true;
+  final declared = <String>{};
   for (final path in paths) {
     final Map<String, List<String>>? base;
     final Map<String, List<String>>? head;
@@ -52,14 +69,21 @@ Future<int> holdListsToShrinking(
       allHold = false;
       continue;
     }
+    final lists = head?.keys ?? const <String>[];
+    declared.addAll(lists);
     final growth = ListGrowth.between(
       path: path,
       base: base,
       head: head,
       weights: weights,
+      firstStatements: firstStatements.intersection(lists.toSet()),
     );
     stdout.write(growth.describe());
     allHold = allHold && growth.holds;
+  }
+  for (final list in firstStatements.difference(declared)) {
+    stderr.writeln('$flag$list names a list no list file at the head declares');
+    allHold = false;
   }
   return allHold ? 0 : 1;
 }

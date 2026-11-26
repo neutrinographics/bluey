@@ -9,6 +9,8 @@ final class ListGrowth {
     required this.added,
     required this.raised,
     this.gone = const [],
+    this.firstStated = const {},
+    this.notes = const [],
   });
 
   /// Compares the lists of the file at [path] as the [base] held them, null
@@ -28,12 +30,30 @@ final class ListGrowth {
   /// holds while the debt is owed no more, a debt the base did not owe is an
   /// entry added, and one owed more is a count raised. Every other list is
   /// judged entry by entry.
+  ///
+  /// A list named in [firstStatements] that the base lacks holds whatever it
+  /// lists, as a new file does, so a rule added to a file that already exists
+  /// can state what it finds today; one the base has is judged as ever, and
+  /// the result carries a note that the flag no longer applies. Naming a list
+  /// the head lacks throws an [ArgumentError], since a flag that judges
+  /// nothing is a mistake the caller would otherwise never see.
   factory ListGrowth.between({
     required String path,
     required Map<String, List<String>>? base,
     required Map<String, List<String>>? head,
     Map<String, EntryWeight> weights = const {},
+    Set<String> firstStatements = const {},
   }) {
+    final undeclared = firstStatements.where(
+      (list) => !(head?.containsKey(list) ?? false),
+    );
+    if (undeclared.isNotEmpty) {
+      throw ArgumentError.value(
+        undeclared.join(', '),
+        'firstStatements',
+        'names a list $path does not declare at the head',
+      );
+    }
     if (base == null) {
       return ListGrowth._(path: path, isNew: true, added: [], raised: []);
     }
@@ -42,7 +62,19 @@ final class ListGrowth {
     }
     final added = <String>[];
     final raised = <String>[];
+    final firstStated = <String, int>{};
+    final notes = <String>[];
     head.forEach((list, listed) {
+      if (firstStatements.contains(list)) {
+        if (!base.containsKey(list)) {
+          firstStated[list] = listed.toSet().length;
+          return;
+        }
+        notes.add(
+          '--first-statement=$list no longer applies: the base has this '
+          'list; remove the flag',
+        );
+      }
       final before = (base[list] ?? const []).toSet();
       final weigh = weights[list] ?? _itself;
       final owed = _owed(before, weigh);
@@ -68,6 +100,8 @@ final class ListGrowth {
       gone: List.unmodifiable(
         base.keys.where((list) => !head.containsKey(list)),
       ),
+      firstStated: Map.unmodifiable(firstStated),
+      notes: List.unmodifiable(notes),
     );
   }
 
@@ -89,6 +123,14 @@ final class ListGrowth {
   /// Each list the base had that the head file lacks.
   final List<String> gone;
 
+  /// Each list the base lacked that a first-statement flag let hold whatever
+  /// it lists, with how many entries it holds.
+  final Map<String, int> firstStated;
+
+  /// What the caller should change though every list held: a first-statement
+  /// flag for a list the base already has.
+  final List<String> notes;
+
   /// Whether no list of the file grew.
   bool get holds => added.isEmpty && raised.isEmpty && gone.isEmpty;
 
@@ -99,7 +141,7 @@ final class ListGrowth {
       return '$path: not at the base, so its lists are the first statement '
           'of what they hold.\n';
     }
-    if (holds) return '$path: no list grew.\n';
+    if (holds) return '$path: no list grew.\n${_aside()}';
     final grew = added.isNotEmpty || raised.isNotEmpty;
     final text =
         StringBuffer('$path: ')
@@ -125,8 +167,19 @@ final class ListGrowth {
     _part(text, 'Added:', added);
     _part(text, 'Raised:', raised);
     _part(text, 'Gone:', gone);
+    text.write(_aside());
     return text.toString();
   }
+
+  /// The lists taken as their first statement and the notes, a line each.
+  String _aside() =>
+      [
+        for (final MapEntry(key: list, value: count) in firstStated.entries)
+          '  $list: not at the base, so its '
+              '${_count(count, 'entry is', 'entries are')} '
+              'the first statement of what it holds.\n',
+        for (final note in notes) '  $note\n',
+      ].join();
 }
 
 /// How a rule weighs one entry of its list: the debt the entry records and

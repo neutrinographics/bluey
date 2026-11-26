@@ -73,8 +73,9 @@ cd bluey_guards && dart test
 # The architecture rules; each package keeps its lists in test/architecture/known_violations.dart
 cd bluey && flutter test test/architecture
 
-# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package)
-cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart
+# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package).
+# The flag lets bluey's new edgeFromBelow list state today's debt; remove it in the first change after the one that adds it merges
+cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart --first-statement=edgeFromBelow
 
 # The public API dump: check it, or rewrite it after a change that was meant
 cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api

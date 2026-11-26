@@ -6,6 +6,11 @@ import 'package:bluey_guards/gates.dart';
 const _package = 'bluey';
 const _compositionRoot = 'lib/src/api/bluey.dart';
 
+/// The files that assemble the package and so may name every context's edge
+/// and code: the one composition root and today's `lib/src/bluey.dart`, which
+/// becomes it.
+const _compositionRoots = {'lib/src/bluey.dart', _compositionRoot};
+
 /// The six bounded contexts, each a folder under `lib/src/features/` in the
 /// target layout and, until it moves, under `lib/src/` today.
 const _contexts = {
@@ -88,4 +93,12 @@ final Map<String, ArchitectureRule> blueyRules = {
     lints: const {'unawaited_futures', 'discarded_futures'},
   ),
   'oversized': SizeRule(limit: 300, extension: '.dart'),
+  'edgeContexts': EdgeContextRule(
+    package: _package,
+    compositionRoots: _compositionRoots,
+  ),
+  'edgeFromBelow': EdgeFromBelowRule(
+    package: _package,
+    compositionRoots: _compositionRoots,
+  ),
 };
