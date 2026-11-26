@@ -76,8 +76,9 @@
   they now fail only when the link ends, where a Service Changed event failed
   them with `AttributeHandleInvalidatedException`.
 - **A link request rejected with status `0x80` reads as rejected.**
-  `requestMtu`, `readRssi`, `bond`, `removeBond`, `requestPhy` and
-  `requestConnectionParameters` rejected by the platform with GATT status
+  `requestMtu`, `maxWritePayload`, `readRssi`, `bond`, `removeBond`,
+  `requestPhy` and `requestConnectionParameters` rejected by the platform
+  with GATT status
   `0x80` throw `GattOperationFailedException` with that status and leave the
   Connection connected, where they threw `DisconnectedException` with
   `evictedByServer`. On Android `0x80` is also the stack's own "out of
