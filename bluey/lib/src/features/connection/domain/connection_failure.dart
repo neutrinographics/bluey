@@ -46,8 +46,8 @@ final class ConnectFailed extends ConnectionFailure {
 }
 
 /// The link an operation needed has ended, so the operation cannot run on it.
-final class LinkEnded extends ConnectionFailure {
-  const LinkEnded(this.end);
+final class LinkHadEnded extends ConnectionFailure {
+  const LinkHadEnded(this.end);
 
   /// How the link ended, which decides whether the app is told it asked for
   /// the disconnect or lost the link.
@@ -62,10 +62,10 @@ final class LinkEnded extends ConnectionFailure {
   };
 
   @override
-  bool operator ==(Object other) => other is LinkEnded && other.end == end;
+  bool operator ==(Object other) => other is LinkHadEnded && other.end == end;
 
   @override
-  int get hashCode => Object.hash(LinkEnded, end);
+  int get hashCode => Object.hash(LinkHadEnded, end);
 }
 
 /// The radio cannot be used right now, so nothing was asked of it.

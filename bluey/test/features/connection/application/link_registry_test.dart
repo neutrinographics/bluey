@@ -1,8 +1,7 @@
 import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
 import 'package:bluey/src/features/connection/application/link_session.dart';
-import 'package:bluey/src/features/connection/domain/connection_failure.dart'
-    hide LinkEnded;
+import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/live_links.dart';

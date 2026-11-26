@@ -27,7 +27,7 @@ void main() {
       final failure = connectionFailureFrom(error, operation: 'rssi');
 
       // assert
-      expect(failure, const LinkEnded(EndedByDrop()));
+      expect(failure, const LinkHadEnded(EndedByDrop()));
     });
 
     test('a GATT status is the operation rejected with that status', () {

@@ -5,8 +5,7 @@ import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/api/connection/connection_state.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
-import 'package:bluey/src/features/connection/domain/link_event.dart'
-    as link_event;
+import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
@@ -84,8 +83,7 @@ void main() {
     return phases;
   }
 
-  Iterable<link_event.LinkEnded> ends() =>
-      events.raised.whereType<link_event.LinkEnded>();
+  Iterable<LinkEnded> ends() => events.raised.whereType<LinkEnded>();
 
   group('a drop', () {
     test(
@@ -106,11 +104,7 @@ void main() {
         expect(closed, isTrue);
         expect(released, [const EndedByDrop()]);
         expect(events.raised, [
-          link_event.LinkEnded(
-            device: device,
-            at: now,
-            end: const EndedByDrop(),
-          ),
+          LinkEnded(device: device, at: now, end: const EndedByDrop()),
         ]);
       },
     );
@@ -300,7 +294,7 @@ void main() {
         session
             .whileUp(
               () async => const Right<ConnectionFailure, int>(7),
-              orEnd: LinkEnded.new,
+              orEnd: LinkHadEnded.new,
             )
             .then((value) => operation = value);
         async.flushMicrotasks();
@@ -504,7 +498,7 @@ void main() {
   group('whileUp', () {
     Future<Either<ConnectionFailure, T>> whileUp<T>(
       Future<Either<ConnectionFailure, T>> Function() operation,
-    ) => session.whileUp(operation, orEnd: LinkEnded.new);
+    ) => session.whileUp(operation, orEnd: LinkHadEnded.new);
 
     test('answers the operation\'s value while the link is up', () async {
       // act
@@ -530,7 +524,7 @@ void main() {
         // assert
         expect(
           await answer,
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
         );
         operation.complete(const Right(7));
         await pumpEventQueue();
@@ -563,8 +557,8 @@ void main() {
       expect(
         (whileClosing, whileEnded),
         (
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
         ),
       );
     });

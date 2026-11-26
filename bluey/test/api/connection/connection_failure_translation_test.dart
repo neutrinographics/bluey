@@ -35,7 +35,7 @@ void main() {
 
     test('a link ended on request is a requested disconnect', () {
       // arrange
-      const failure = LinkEnded(EndedOnRequest());
+      const failure = LinkHadEnded(EndedOnRequest());
 
       // act
       final exception = connectionFailureAsException(failure, device: _device);
@@ -51,7 +51,7 @@ void main() {
 
     test('a link ended by a drop is a link-loss disconnect', () {
       // arrange
-      const failure = LinkEnded(EndedByDrop());
+      const failure = LinkHadEnded(EndedByDrop());
 
       // act
       final exception = connectionFailureAsException(failure, device: _device);
@@ -69,7 +69,7 @@ void main() {
       test('a link ended by a radio outage (${outage.name}) is a stale '
           'connection invalidated by the adapter state of the same name', () {
         // arrange
-        final failure = LinkEnded(EndedByRadioOutage(outage));
+        final failure = LinkHadEnded(EndedByRadioOutage(outage));
 
         // act
         final exception = connectionFailureAsException(
@@ -202,7 +202,7 @@ void main() {
       expect(exceptions.map((e) => e.toString()), [
         for (final end in ends)
           connectionFailureAsException(
-            LinkEnded(end),
+            LinkHadEnded(end),
             device: _device,
           ).toString(),
       ]);

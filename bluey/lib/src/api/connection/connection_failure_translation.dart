@@ -20,7 +20,7 @@ BlueyException connectionFailureAsException(
     device,
     _connectionFailureReasonOf(reason),
   ),
-  LinkEnded(:final end) => linkEndAsException(end, device: device),
+  LinkHadEnded(:final end) => linkEndAsException(end, device: device),
   RadioUnavailable() => const BluetoothUnavailableException(),
   PermissionMissing(:final permission) => PermissionDeniedException([
     permission,

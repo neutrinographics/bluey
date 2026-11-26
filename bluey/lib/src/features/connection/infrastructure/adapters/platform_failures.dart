@@ -17,7 +17,7 @@ ConnectionFailure connectionFailureFrom(
   required String operation,
 }) => switch (error) {
   GattOperationTimeoutException() => OperationTimedOut(operation),
-  GattOperationDisconnectedException() => const LinkEnded(EndedByDrop()),
+  GattOperationDisconnectedException() => const LinkHadEnded(EndedByDrop()),
   GattOperationStatusFailedException(:final status) => OperationRejected(
     operation,
     status,

@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// member this list does not name.
 String _kindOf(ConnectionFailure failure) => switch (failure) {
   ConnectFailed() => 'connect failed',
-  LinkEnded() => 'link ended',
+  LinkHadEnded() => 'link ended',
   RadioUnavailable() => 'radio unavailable',
   PermissionMissing() => 'permission missing',
   OperationTimedOut() => 'operation timed out',
@@ -23,9 +23,9 @@ void main() {
       const ConnectFailed(ConnectFailureReason.timeout),
       const ConnectFailed(ConnectFailureReason.timeout),
     ),
-    'LinkEnded': (
-      const LinkEnded(EndedByDrop()),
-      const LinkEnded(EndedByDrop()),
+    'LinkHadEnded': (
+      const LinkHadEnded(EndedByDrop()),
+      const LinkHadEnded(EndedByDrop()),
     ),
     'RadioUnavailable': (const RadioUnavailable(), const RadioUnavailable()),
     'PermissionMissing': (
@@ -51,9 +51,9 @@ void main() {
       const ConnectFailed(ConnectFailureReason.timeout),
       const ConnectFailed(ConnectFailureReason.deviceNotFound),
     ),
-    'LinkEnded': (
-      const LinkEnded(EndedByDrop()),
-      const LinkEnded(EndedOnRequest()),
+    'LinkHadEnded': (
+      const LinkHadEnded(EndedByDrop()),
+      const LinkHadEnded(EndedOnRequest()),
     ),
     'RadioUnavailable': (
       const RadioUnavailable(),
@@ -124,9 +124,9 @@ void main() {
     final named = <ConnectionFailure, String>{
       for (final reason in ConnectFailureReason.values)
         ConnectFailed(reason): reason.name,
-      const LinkEnded(EndedOnRequest()): 'requested',
-      const LinkEnded(EndedByDrop()): 'lost',
-      const LinkEnded(EndedByRadioOutage(RadioOutage.off)): 'off',
+      const LinkHadEnded(EndedOnRequest()): 'requested',
+      const LinkHadEnded(EndedByDrop()): 'lost',
+      const LinkHadEnded(EndedByRadioOutage(RadioOutage.off)): 'off',
       const RadioUnavailable(): 'radio',
       const PermissionMissing('bluetoothConnect'): 'bluetoothConnect',
       const OperationTimedOut('requestMtu'): 'requestMtu',
