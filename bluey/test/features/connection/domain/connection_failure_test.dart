@@ -194,6 +194,16 @@ void main() {
           'Bonding was rejected with status 133.',
       const OperationTimedOut(LinkOperation.removeBond):
           'Removing the bond timed out.',
+      const OperationTimedOut(LinkOperation.readPhy):
+          'Reading the PHY timed out.',
+      const FeatureUnsupported(LinkOperation.readTransmitPhy):
+          'Reading the transmit PHY is not supported on this platform.',
+      const FeatureUnsupported(LinkOperation.readReceivePhy):
+          'Reading the receive PHY is not supported on this platform.',
+      const FeatureUnsupported(LinkOperation.followPhy):
+          'Following the PHY is not supported on this platform.',
+      const OperationRejected(LinkOperation.requestPhy, 133):
+          'Requesting a PHY was rejected with status 133.',
       MtuAboveMaximum(requested: Mtu(248), maximum: 247):
           "An MTU of 248 is above this platform's maximum of 247.",
     };

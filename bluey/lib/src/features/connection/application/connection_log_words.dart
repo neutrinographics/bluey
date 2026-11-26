@@ -39,6 +39,11 @@ String operationWordOf(LinkOperation operation) => switch (operation) {
   LinkOperation.followBondState => 'bondStateChanges',
   LinkOperation.bond => 'bond',
   LinkOperation.removeBond => 'removeBond',
+  LinkOperation.readPhy => 'getPhy',
+  LinkOperation.readTransmitPhy => 'txPhy',
+  LinkOperation.readReceivePhy => 'rxPhy',
+  LinkOperation.followPhy => 'phyChanges',
+  LinkOperation.requestPhy => 'requestPhy',
 };
 
 /// The code a log line names [failure] by, the class name an app has always

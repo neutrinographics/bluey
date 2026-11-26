@@ -67,6 +67,11 @@ void main() {
       (LinkOperation.followBondState, 'bondStateChanges'),
       (LinkOperation.bond, 'bond'),
       (LinkOperation.removeBond, 'removeBond'),
+      (LinkOperation.readPhy, 'getPhy'),
+      (LinkOperation.readTransmitPhy, 'txPhy'),
+      (LinkOperation.readReceivePhy, 'rxPhy'),
+      (LinkOperation.followPhy, 'phyChanges'),
+      (LinkOperation.requestPhy, 'requestPhy'),
     ];
 
     for (final (operation, word) in rows) {

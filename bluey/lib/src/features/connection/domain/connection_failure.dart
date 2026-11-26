@@ -245,4 +245,9 @@ String _attemptOf(LinkOperation operation) => switch (operation) {
   LinkOperation.followBondState => 'Following the bond state',
   LinkOperation.bond => 'Bonding',
   LinkOperation.removeBond => 'Removing the bond',
+  LinkOperation.readPhy => 'Reading the PHY',
+  LinkOperation.readTransmitPhy => 'Reading the transmit PHY',
+  LinkOperation.readReceivePhy => 'Reading the receive PHY',
+  LinkOperation.followPhy => 'Following the PHY',
+  LinkOperation.requestPhy => 'Requesting a PHY',
 };

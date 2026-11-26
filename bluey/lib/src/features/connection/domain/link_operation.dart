@@ -10,4 +10,9 @@ enum LinkOperation {
   followBondState,
   bond,
   removeBond,
+  readPhy,
+  readTransmitPhy,
+  readReceivePhy,
+  followPhy,
+  requestPhy,
 }
