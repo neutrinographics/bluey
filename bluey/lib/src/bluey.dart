@@ -5,12 +5,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:clock/clock.dart';
 import 'package:meta/meta.dart';
 
-import 'api/connection/borrowed_connection.dart';
-import 'api/connection/bluey_connection.dart';
 import 'api/connection/connection.dart';
-import 'api/connection/connection_event_translation.dart';
-import 'api/connection/connection_failure_translation.dart';
-import 'api/connection/connections.dart';
+import 'api/connection/connection_assembly.dart';
 import 'connection/bluey_connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
@@ -18,11 +14,7 @@ import 'discovery/bluey_scanner.dart';
 import 'discovery/device.dart';
 import 'discovery/scanner.dart';
 import 'events.dart';
-import 'features/connection/application/borrow_link.dart';
-import 'features/connection/application/connect_device.dart';
-import 'features/connection/application/link_registry.dart';
-import 'features/connection/application/link_session.dart';
-import 'features/connection/infrastructure/adapters/platform_links.dart';
+import 'features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
@@ -86,25 +78,34 @@ export 'platform/bluetooth_state.dart';
 /// ```
 class Bluey {
   final platform.BlueyPlatform _platform;
+
   final BlueyEventBus _eventBus;
+
   final BlueyLogger _logger = BlueyLogger();
+
   final ServerId? _localIdentity;
-  late final Connections _connections = Connections(present: _present);
-  late final LinkRegistry _registry = LinkRegistry(
-    links: PlatformLinks(_platform, log: _logger),
-    events: PublishedLinkEvents(_eventBus),
+
+  late final ConnectionAssembly _connection = ConnectionAssembly(
+    ports: platformConnectionPorts(_platform, log: _logger),
+    publisher: _eventBus,
     log: _logger,
     now: clock.now,
+    gattFor:
+        (session) => LinkGattClient(
+          platformInstance: _platform,
+          session: session,
+          logger: _logger,
+          events: _eventBus,
+        ),
   );
-  late final ConnectDevice _connectDevice = ConnectDevice(_registry);
-  late final BorrowConnection _borrow = borrowingThrough(
-    borrowLink: BorrowLink(_registry),
-    connections: _connections,
-  );
+
   StreamSubscription? _stateSubscription;
+
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
+
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
+
   BluetoothState _currentState = BluetoothState.unknown;
 
   /// Private synchronous constructor. Use [Bluey.create] instead.
@@ -166,23 +167,17 @@ class Bluey {
     Duration initialStateTimeout = const Duration(seconds: 2),
   }) async {
     final bluey = Bluey._(localIdentity: localIdentity);
-    // If the platform already reported a meaningful state synchronously
-    // via `currentState` (the constructor seeds `_currentState` from
-    // that), there's nothing to await. This is the common case on real
-    // platforms after the plugin has been initialised once during the
-    // app's lifetime — the OS-cached state is available immediately.
-    if (bluey._currentState != BluetoothState.unknown) return bluey;
+    // Once the plugin has started in the app's lifetime, the OS-cached
+    // state the constructor seeded is usually real already.
+    if (bluey._currentState != BluetoothState.unknown) {
+      return bluey;
+    }
     try {
-      // Await the first meaningful state event so the sync cache is
-      // fresh. `firstWhere` keeps waiting if the platform emits
-      // `unknown` first (rare), waiting for a more meaningful state.
       await bluey.stateStream
           .firstWhere((s) => s != BluetoothState.unknown)
           .timeout(initialStateTimeout);
     } on TimeoutException {
-      // Fall through: bluey is returned with whatever cache state
-      // exists (typically still BluetoothState.unknown). Documented
-      // behavior; consumers can retry.
+      // The documented fallback: the cache may still read unknown.
     }
     return bluey;
   }
@@ -422,13 +417,10 @@ class Bluey {
   /// devices) or call [tryUpgrade] on the returned connection.
   ///
   /// Throws [ConnectionException] if connection fails.
-  Future<Connection> connect(Device device, {Duration? timeout}) =>
-      _connecting(device, () async {
-        final answer = await _connectDevice.run(
-          ConnectDeviceRequest(device: device.address, timeout: timeout),
-        );
-        return _connections.of(valueOrThrow(answer, device: device.address));
-      });
+  Future<Connection> connect(Device device, {Duration? timeout}) => _connecting(
+    device,
+    () => _connection.connect(device.address, timeout: timeout),
+  );
 
   /// Runs [attempt] with [connect]'s checks, log line and [ErrorEvent].
   Future<T> _connecting<T>(Device device, Future<T> Function() attempt) async {
@@ -452,22 +444,11 @@ class Bluey {
     }
   }
 
-  /// The public Connection a link's session is shown as.
-  Connection _present(LinkSession session) => BlueyConnection(
-    session: session,
-    gatt: LinkGattClient(
-      platformInstance: _platform,
-      session: session,
-      logger: _logger,
-      events: _eventBus,
-    ),
-  );
-
   /// The platform's name for [connection]'s link, which the lifecycle
-  /// client writes with.
+  /// client writes with; a Connection this Bluey did not present has none.
   String _connectionIdOf(Connection connection) =>
-      _connections.linkIdOf(connection)?.value ??
-      connection.deviceAddress.toString();
+      _connection.linkIdOf(connection)?.value ??
+      (throw StateError('No link id: ${connection.deviceAddress}'));
 
   /// Connects to [device] and returns a [PeerConnection] if the device
   /// hosts the Bluey lifecycle control service.
@@ -511,7 +492,7 @@ class Bluey {
     );
     final borrowed = await _connecting(
       device,
-      () => _borrow(device.address, timeout: timeout),
+      () => _connection.borrow(device.address, timeout: timeout),
     );
     try {
       final peer = await _tryBuildPeerConnection(
@@ -522,8 +503,17 @@ class Bluey {
         borrowed.keep();
         return peer;
       }
-    } catch (_) {
-      await borrowed.giveBack();
+    } catch (failure) {
+      // A failed give-back's exception replaces the check's, so log that first.
+      await borrowed.giveBack().onError<BlueyException>((lost, trace) {
+        _logger.log(
+          BlueyLogLevel.warn,
+          'bluey',
+          'connectAsPeer check failed',
+          data: {'address': device.address.value, 'error': '$failure'},
+        );
+        Error.throwWithStackTrace(lost, trace);
+      });
       rethrow;
     }
     await borrowed.giveBack();
@@ -533,9 +523,10 @@ class Bluey {
   /// Attempts to wrap an existing raw [Connection] in a [PeerConnection].
   ///
   /// Returns `null` if [connection] does not host the Bluey lifecycle
-  /// control service. This never closes the link on a miss: the caller
-  /// already owns the connection and decides what to do next, as with
-  /// any link it holds.
+  /// control service. It borrows no link: unlike [connectAsPeer], it reads
+  /// over [connection] as the caller holds it, so it never closes the link
+  /// on a miss and the caller decides what to do next. A [Connection] this
+  /// Bluey did not present, an app's own or another Bluey's, answers `null`.
   ///
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer
@@ -890,7 +881,7 @@ class Bluey {
       peerSilenceTimeout: peerSilenceTimeout,
       logger: _logger,
       events: _eventBus,
-      borrow: _borrow,
+      borrow: _connection.borrow,
       connectionIdOf: _connectionIdOf,
     );
   }
@@ -912,7 +903,7 @@ class Bluey {
     final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
       platformApi: _platform,
-      borrow: _borrow,
+      borrow: _connection.borrow,
       logger: _logger,
     );
     final ids = await discovery.discover(
@@ -927,7 +918,7 @@ class Bluey {
             localIdentity: identity,
             logger: _logger,
             events: _eventBus,
-            borrow: _borrow,
+            borrow: _connection.borrow,
             connectionIdOf: _connectionIdOf,
           ),
         )

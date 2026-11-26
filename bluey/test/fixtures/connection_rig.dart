@@ -1,15 +1,9 @@
 import 'package:clock/clock.dart';
-import 'package:bluey/src/api/connection/bluey_connection.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connection.dart';
-import 'package:bluey/src/api/connection/connections.dart';
-import 'package:bluey/src/api/connection/connection_event_translation.dart';
-import 'package:bluey/src/api/connection/connection_failure_translation.dart';
+import 'package:bluey/src/api/connection/connection_assembly.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
-import 'package:bluey/src/features/connection/application/borrow_link.dart';
-import 'package:bluey/src/features/connection/application/connect_device.dart';
-import 'package:bluey/src/features/connection/application/link_registry.dart';
-import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/infrastructure/bluey_event_bus.dart';
 import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
@@ -29,47 +23,32 @@ class ConnectionRig {
   }) {
     final log = logger ?? BlueyLogger();
     final bus = events ?? BlueyEventBus();
-    final registry = LinkRegistry(
-      links: PlatformLinks(platform, log: log),
-      events: PublishedLinkEvents(bus),
+    _assembly = ConnectionAssembly(
+      ports: platformConnectionPorts(platform, log: log),
+      publisher: bus,
       log: log,
       now: clock.now,
-    );
-    _connectDevice = ConnectDevice(registry);
-    _connections = Connections(
-      present:
-          (session) => BlueyConnection(
+      gattFor:
+          (session) => LinkGattClient(
+            platformInstance: platform,
             session: session,
-            gatt: LinkGattClient(
-              platformInstance: platform,
-              session: session,
-              logger: log,
-              events: bus,
-            ),
+            logger: log,
+            events: bus,
           ),
     );
-    borrow = borrowingThrough(
-      borrowLink: BorrowLink(registry),
-      connections: _connections,
-    );
   }
 
-  late final ConnectDevice _connectDevice;
-  late final Connections _connections;
+  late final ConnectionAssembly _assembly;
 
   /// How a borrower reaches a device's link through this rig's registry.
-  late final BorrowConnection borrow;
+  BorrowConnection get borrow => _assembly.borrow;
 
   /// The app's connect, throwing as Bluey.connect does.
-  Future<Connection> connect(DeviceAddress device, {Duration? timeout}) async {
-    final answer = await _connectDevice.run(
-      ConnectDeviceRequest(device: device, timeout: timeout),
-    );
-    return _connections.of(valueOrThrow(answer, device: device));
-  }
+  Future<Connection> connect(DeviceAddress device, {Duration? timeout}) =>
+      _assembly.connect(device, timeout: timeout);
 
   /// The platform's name for [connection]'s link, as Bluey reads it.
   String connectionIdOf(Connection connection) =>
-      _connections.linkIdOf(connection)?.value ??
-      connection.deviceAddress.toString();
+      _assembly.linkIdOf(connection)?.value ??
+      (throw StateError('No link id: ${connection.deviceAddress}'));
 }

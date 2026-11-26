@@ -208,6 +208,87 @@ void main() {
     });
   });
 
+  group('Bluey.connectAsPeer when something fails', () {
+    test('a failed connect puts one ErrorEvent on bluey.events', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:20';
+      fakePlatform.simulateBlueyServer(
+        address: address,
+        serverId: ServerId.generate(),
+      );
+      fakePlatform.enqueueFault(
+        FakeOp.connect,
+        const platform.PlatformConnectFailedException(
+          platform.PlatformConnectFailureReason.timeout,
+        ),
+        deviceId: address,
+      );
+      final events = <BlueyEvent>[];
+      final listening = bluey.events.listen(events.add);
+      addTearDown(listening.cancel);
+
+      // act
+      Object? thrown;
+      try {
+        await bluey.connectAsPeer(deviceFromAddress(address));
+      } catch (error) {
+        thrown = error;
+      }
+      await pumpEventQueue();
+
+      // assert
+      expect(thrown, isA<ConnectionException>());
+      expect(events.whereType<ErrorEvent>().single.error, same(thrown));
+    });
+
+    test(
+      'a give-back that fails after a failed check logs the check\'s failure, which its exception replaces',
+      () async {
+        // arrange
+        const address = 'AA:BB:CC:DD:EE:21';
+        fakePlatform.simulateBlueyServer(
+          address: address,
+          serverId: ServerId.generate(),
+        );
+        final anonymous = await Bluey.create();
+        addTearDown(anonymous.dispose);
+        final lines = <BlueyLogEvent>[];
+        final listening = anonymous.logEvents.listen(lines.add);
+        addTearDown(listening.cancel);
+        fakePlatform.enqueueFault(
+          FakeOp.disconnect,
+          const platform.GattOperationUnknownPlatformException(
+            'disconnect',
+            code: 'bluey-unknown',
+            message: 'the radio refused',
+          ),
+          deviceId: address,
+        );
+
+        // act
+        Object? thrown;
+        try {
+          await anonymous.connectAsPeer(deviceFromAddress(address));
+        } catch (error) {
+          thrown = error;
+        }
+        await pumpEventQueue();
+
+        // assert
+        expect(thrown, isA<BlueyException>());
+        expect(thrown, isNot(isA<LocalIdentityRequiredException>()));
+        final checkFailed = lines.where(
+          (line) => line.message == 'connectAsPeer check failed',
+        );
+        expect(checkFailed.single.level, BlueyLogLevel.warn);
+        expect(checkFailed.single.data, {
+          'address': address,
+          'error': contains('requires one'),
+        });
+      },
+    );
+  });
+
   group('Bluey.tryUpgrade', () {
     test('returns a PeerConnection wrapping the input when the connection '
         'is a Bluey peer', () async {
@@ -228,6 +309,30 @@ void main() {
 
       await peerConn.disconnect();
     });
+
+    test(
+      'returns null for a Connection another Bluey presented, whose link it cannot name',
+      () async {
+        // arrange
+        const address = 'AA:BB:CC:DD:EE:06';
+        fakePlatform.simulateBlueyServer(
+          address: address,
+          serverId: ServerId.generate(),
+        );
+        final other = await Bluey.create(
+          localIdentity: TestServerIds.localIdentity,
+        );
+        addTearDown(other.dispose);
+        final theirs = await other.connect(deviceFromAddress(address));
+        addTearDown(theirs.disconnect);
+
+        // act
+        final peer = await bluey.tryUpgrade(theirs);
+
+        // assert
+        expect(peer, isNull);
+      },
+    );
 
     test('returns null when the connection is not a Bluey peer', () async {
       const address = 'AA:BB:CC:DD:EE:05';
