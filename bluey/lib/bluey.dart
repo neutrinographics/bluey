@@ -42,14 +42,7 @@ export 'src/gatt_server/advertising_state.dart';
 
 // Platform bounded context
 export 'src/platform/bluetooth_state.dart';
-
-// Re-export [Capabilities] from the platform interface so consumers can
-// describe / inspect platform support (e.g. constructing custom matrices
-// for tests, validating MTU bounds via `Capabilities.maxMtu`) without
-// taking a direct dependency on `bluey_platform_interface`. Per the A.5
-// review, this keeps the example app's import surface clean.
-export 'package:bluey_platform_interface/bluey_platform_interface.dart'
-    show Capabilities;
+export 'src/api/platform/platform.dart';
 
 // Peer bounded context
 export 'src/peer/peer.dart' show BlueyPeer;

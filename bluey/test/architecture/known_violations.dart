@@ -93,9 +93,7 @@ const frameworkPlacement = <String>[
 ];
 
 /// The public libraries' exports of anything but the package's own sources.
-const publicExports = <String>[
-  'lib/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-];
+const publicExports = <String>[];
 
 /// The files that name a library reserved for the platform packages.
 const reservedLibraries = <String>[];

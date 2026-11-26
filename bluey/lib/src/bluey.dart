@@ -15,6 +15,8 @@ import 'discovery/device.dart';
 import 'discovery/scanner.dart';
 import 'events.dart';
 import 'features/connection/infrastructure/adapters/platform_connection_ports.dart';
+import 'features/platform/domain/capabilities.dart';
+import 'features/platform/infrastructure/adapters/platform_capabilities.dart';
 import 'gatt_server/bluey_server.dart';
 import 'gatt_server/server.dart';
 import 'lifecycle.dart' as lifecycle;
@@ -182,8 +184,9 @@ class Bluey {
     return bluey;
   }
 
-  /// Platform capabilities.
-  platform.Capabilities get capabilities => _platform.capabilities;
+  /// What the platform this Bluey runs on can do, to check before asking
+  /// for something it would refuse.
+  Capabilities get capabilities => capabilitiesFrom(_platform.capabilities);
 
   /// Configure the Bluey plugin behavior.
   ///
@@ -789,11 +792,8 @@ class Bluey {
     );
   }
 
-  /// Throws [UnsupportedOperationException] when [flag] is false.
-  ///
-  /// Used to gate methods on [Bluey] whose underlying platform call may
-  /// not be supported on the current platform. Mirrors the helper of the
-  /// same name on [BlueyConnection] / [BlueyServer].
+  /// Throws [UnsupportedOperationException], naming the platform, when
+  /// [flag] says the platform cannot do [op].
   void _requireCapability(bool flag, String op) {
     if (!flag) {
       throw UnsupportedOperationException(

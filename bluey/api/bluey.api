@@ -559,6 +559,11 @@ enum Phy
   Phy le1m
   Phy le2m
   Phy leCoded
+enum PlatformKind
+  PlatformKind android
+  PlatformKind fake
+  PlatformKind ios
+  PlatformKind other
 class ReadRequest
   const ReadRequest({required Client client, required UUID characteristicId, required int offset, required int internalRequestId})
   final Client client
