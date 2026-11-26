@@ -418,6 +418,7 @@ Each task is built as the slice plan writes it, with these changes. Names from R
 - Design addendum "Rulings of 2026-11-26" in `docs/superpowers/specs/2026-11-18-link-lifecycle-design.md`: the five rulings and rulings 42 to 54, and section 6.13's table with rows for the GATT client and the assembly. `docs/ARCHITECTURE.md`: published language (events, phases and failures translated; values shared), the two new rules, the clock, and that an aggregate raises its events. `CLAUDE.md`: Key Design Decisions and the logging section where names changed, and the glossary gains Connection's inner words: Link, phase, end, operation, borrow.
 - `connectAsPeer`'s borrow rule is noted in the root for slice 5, not moved.
 - `bluey/CHANGELOG.md`: one line, the three events accept an optional `timestamp`.
+- The three known compromises of the design review each get a `docs/backlog/` entry and a row in `docs/roadmap.md` (the `roadmap` skill's conventions), with the slice proposed to end it: the opening phase of `Link` (a follow-up pull request straight after this one, before slice 2), the frozen log words (one pass over every context's logs after the last context has moved), and values published from the domain (decided as a standing rule or changed in Task 18, as Joel rules).
 - The pull request description lists: what changed for apps (that one line), ruling 37 still open, the native gates Joel runs on his Mac, and that `--first-statement=edgeFromBelow` is removed in the next change.
 
 ---
