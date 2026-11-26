@@ -17,7 +17,7 @@ The repository is a Dart workspace of five packages and the example app. The roo
 ```
 bluey/                       The library apps depend on: the domain, the application units and the public API
 bluey/example/               The demo app (scanner, connection, GATT, server), a workspace member
-bluey_platform_interface/    BlueyPlatform, the federated plugin interface, its DTOs and Capabilities
+bluey_platform_interface/    BlueyPlatform, the federated plugin interface, its DTOs and Capabilities; and platform_implementation.dart, code the platform packages share, which no app and nothing in bluey imports
 bluey_android/               BlueyPlatform on Android: Dart over Pigeon, Kotlin under android/src/main/kotlin
 bluey_ios/                   BlueyPlatform on iOS: Dart over Pigeon, Swift under ios/Classes
 bluey_guards/                The guards the build runs: architecture rules, the public API dump, the CI gate tools
@@ -229,7 +229,7 @@ Three rules answer the audit's three structural causes, and every slice's design
 | Completion by identity | An operation that crosses to native code and completes later carries an id its caller minted. A completion names that id, and one that names an unknown id is logged and dropped | H1, M1, I063, I359 |
 | Teardown is a transition | Reaching a terminal state releases every resource, whatever caused it. `disconnect()` and `dispose()` request the same transition a remote disconnect causes | H3, I369, L4, L5 |
 
-A `LinkId` is not such an id. It is the platform's name for a link, and on today's platforms successive links to one device carry equal ids, so nothing keyed by a `LinkId` may outlive its link: once the link has ended, its id may already name the next one. Below the platform interface the same holds by device: `DeviceStreams`, in each platform package, keeps a signal about an ended link (its disconnect's answer, its last report) from touching the device's next link.
+A `LinkId` is not such an id. It is the platform's name for a link, and on today's platforms successive links to one device carry equal ids, so nothing keyed by a `LinkId` may outlive its link: once the link has ended, its id may already name the next one. Below the platform interface the same holds by device: `DeviceStreams`, which both platform packages take from `bluey_platform_interface`'s library for them (`platform_implementation.dart`), keeps a signal about an ended link (its disconnect's answer, its last report) from touching the device's next link.
 
 A domain state machine is synchronous and holds no timer, so it can be driven by random input sequences in a test. The application session around it owns the timers and the streams.
 

@@ -11,7 +11,7 @@ related: [I395]
 
 ## Symptom
 
-None an app sees today. A local disconnect request that the plugin then fails still sends a `DISCONNECTING` connection state, so Dart is told the link is closing although it stays up. The Dart side filters it: `DeviceStreams` (`bluey_android/lib/src/device_streams.dart`) drops the next `disconnecting` report after a disconnect is asked, so a failed `disconnect()` leaves the Connection usable.
+None an app sees today. A local disconnect request that the plugin then fails still sends a `DISCONNECTING` connection state, so Dart is told the link is closing although it stays up. The Dart side filters it: `DisconnectEcho` (`bluey_android/lib/src/disconnect_echo.dart`), which the Android connection manager asks before it passes a report on, drops the next `disconnecting` report after a disconnect is asked, so a failed `disconnect()` leaves the Connection usable.
 
 ## Location
 
@@ -23,4 +23,4 @@ The plugin reports the request as a state: it emits `DISCONNECTING` before it ca
 
 ## Notes
 
-Move the emit after a successful `gatt.disconnect()`. Once it moves, the echo filter in `DeviceStreams` can stay (it is inert when no echo comes) or go. Found by the whole-branch review of slice 1's first pull request (link lifecycle, [design](../superpowers/specs/2026-11-18-link-lifecycle-design.md)).
+Move the emit after a successful `gatt.disconnect()`. Once it moves, `DisconnectEcho` and its two call sites in `AndroidConnectionManager` can stay (they are inert when no echo comes) or go. Found by the whole-branch review of slice 1's first pull request (link lifecycle, [design](../superpowers/specs/2026-11-18-link-lifecycle-design.md)).

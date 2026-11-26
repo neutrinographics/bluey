@@ -557,7 +557,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// [connect] has opened its streams, the point at which a late signal can
   /// meet the device's next link on a phone; a disconnect held for its
   /// answer completes only then. The fake then keeps each signal with the
-  /// link it is about, as the platform packages' `DeviceStreams` do.
+  /// link it is about, as the platform interface's `DeviceStreams` does.
   FakeDisconnectSignals disconnectSignals = FakeDisconnectSignals.together;
 
   final Map<String, void Function()> _secondDisconnectSignals = {};
@@ -565,8 +565,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   /// Whether [disconnect] echoes each request as a `disconnecting` report,
   /// as Android's plugin does before it asks the radio, and after the
-  /// answer when the request fails. The fake then drops the echo as the
-  /// platform packages' `DeviceStreams` do, so a test can show that no echo
+  /// answer when the request fails. The fake then drops the echo as
+  /// `bluey_android`'s `DisconnectEcho` does, so a test can show that no echo
   /// reaches the app. Off by default.
   bool echoDisconnectRequests = false;
 

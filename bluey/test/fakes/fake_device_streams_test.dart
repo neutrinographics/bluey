@@ -6,8 +6,8 @@ import 'fake_platform.dart';
 import 'test_helpers.dart';
 
 /// The fake keeps the stream promises the real platform packages keep
-/// (their `DeviceStreams`, I369), so a unit tested over the fake meets the
-/// same stream lifetimes it meets on a phone.
+/// (the platform interface's `DeviceStreams`, I369), so a unit tested over
+/// the fake meets the same stream lifetimes it meets on a phone.
 void main() {
   const deviceId = TestDeviceIds.device1;
   const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
