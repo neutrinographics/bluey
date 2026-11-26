@@ -182,6 +182,10 @@ void main() {
           'Negotiating the MTU timed out.',
       const FeatureUnsupported(LinkOperation.negotiateMtu):
           'Negotiating the MTU is not supported on this platform.',
+      const OperationTimedOut(LinkOperation.readWritePayloadLimit):
+          'Reading the write payload limit timed out.',
+      const OperationRejected(LinkOperation.readSignalStrength, 133):
+          'Reading the signal strength was rejected with status 133.',
       MtuAboveMaximum(requested: Mtu(248), maximum: 247):
           "An MTU of 248 is above this platform's maximum of 247.",
     };

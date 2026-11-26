@@ -12,6 +12,11 @@ void main() {
     expect(connectionLogContext, 'bluey.connection');
   });
 
+  test('the GATT context is the one apps filter on', () {
+    // assert
+    expect(gattLogContext, 'bluey.gatt');
+  });
+
   group('stateWordOf', () {
     // (name, phase, the word logs have always written)
     final rows = <(String, LinkPhase, String)>[
@@ -56,6 +61,8 @@ void main() {
       (LinkOperation.open, 'connect'),
       (LinkOperation.close, 'disconnect'),
       (LinkOperation.negotiateMtu, 'requestMtu'),
+      (LinkOperation.readWritePayloadLimit, 'getMaximumWriteLength'),
+      (LinkOperation.readSignalStrength, 'readRssi'),
     ];
 
     for (final (operation, word) in rows) {

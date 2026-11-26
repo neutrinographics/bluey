@@ -14,6 +14,10 @@ import '../domain/link_phase.dart';
 /// The context every line of Connection's lifecycle is logged under.
 const connectionLogContext = 'bluey.connection';
 
+/// The context the MTU request and the link's readings are logged under,
+/// the one GATT operations have always shared.
+const gattLogContext = 'bluey.gatt';
+
 /// The word a `state transition` line names for a link entering [phase].
 String stateWordOf(LinkPhase phase) => switch (phase) {
   Linked() => 'ConnectionState.linked',
@@ -29,6 +33,8 @@ String operationWordOf(LinkOperation operation) => switch (operation) {
   LinkOperation.open => 'connect',
   LinkOperation.close => 'disconnect',
   LinkOperation.negotiateMtu => 'requestMtu',
+  LinkOperation.readWritePayloadLimit => 'getMaximumWriteLength',
+  LinkOperation.readSignalStrength => 'readRssi',
 };
 
 /// The code a log line names [failure] by, the class name an app has always
