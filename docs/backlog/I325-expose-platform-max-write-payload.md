@@ -17,7 +17,8 @@ and plan at
 `docs/superpowers/plans/2026-05-05-mtu-platform-extension-relocation.md`.
 
 - New `WritePayloadLimit` value object
-  (`bluey/lib/src/connection/value_objects/write_payload_limit.dart`).
+  (then `bluey/lib/src/connection/value_objects/write_payload_limit.dart`;
+  since slice 1, `bluey/lib/src/features/connection/domain/value_objects/write_payload_limit.dart`).
 - New `Connection.maxWritePayload({required bool withResponse})` returning
   `WritePayloadLimit`.
 - New `BlueyPlatform.getMaximumWriteLength` on the platform interface;
@@ -81,7 +82,7 @@ In a `gossip_bluey`-style consumer on iOS, log the chunk size it derives from `c
 ```dart
 final caps = bluey.capabilities;
 try {
-  final desired = bluey.Mtu(caps.maxMtu, capabilities: caps);
+  final desired = bluey.Mtu(caps.maxMtu); // `capabilities:` until slice 1
   final negotiated = await peerConnection.connection.requestMtu(desired);
   print('iOS: requested ${desired.value}, negotiated ${negotiated.value}');
 } on UnsupportedCapabilityException {

@@ -52,6 +52,59 @@
   now appear on `bluey.events` like any other.
 - **`BlueyEvent` is no longer sealed.** **API change:** a `switch` over every
   `BlueyEvent` needs a default branch.
+- **`Mtu(value)` checks the specification's range and no longer takes
+  `capabilities`.** **API change:** `Mtu(value, capabilities: caps)` is now
+  `Mtu(value)`, which throws `ArgumentError` outside 23 to 517. Whether the
+  platform can ask for that value is checked when the request is made:
+  `connection.android?.requestMtu(mtu)` above the platform's maximum fails
+  with `UnsupportedOperationException` (`requestMtu above <maximum>`). On a
+  platform that cannot request an MTU at all it fails with
+  `UnsupportedOperationException` (`requestMtu`) whatever the value.
+- **`PlatformKind` is exported, and `Capabilities` is Bluey's own.**
+  `Capabilities(platformKind: PlatformKind.android, ...)` can be written with
+  `package:bluey` alone. `Capabilities` keeps its members and constants, but
+  it is no longer the platform interface's class: an app that imports both
+  packages now sees two types of that name, and `bluey.capabilities` answers
+  Bluey's.
+- **The three connection events take an optional `timestamp`.**
+  `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent` accept
+  `timestamp:`, which defaults to now as before. Bluey stamps each with the
+  instant the link changed, read from the clock it runs on, so under
+  `fakeAsync` it is the fake clock's.
+- **A Service Changed event no longer fails a link request in flight.**
+  `requestMtu`, `maxWritePayload` and `readRssi` use no attribute handle, so
+  they now fail only when the link ends, where a Service Changed event failed
+  them with `AttributeHandleInvalidatedException`.
+- **A link request rejected with status `0x80` reads as rejected.**
+  `requestMtu`, `readRssi`, `bond`, `removeBond`, `requestPhy` and
+  `requestConnectionParameters` rejected by the platform with GATT status
+  `0x80` throw `GattOperationFailedException` with that status and leave the
+  Connection connected, where they threw `DisconnectedException` with
+  `evictedByServer`. On Android `0x80` is also the stack's own "out of
+  resources" status, so the old reading could be wrong. GATT reads and writes
+  keep today's reading.
+- **The Android extension refuses through its future.** A call on
+  `connection.android` refused because the radio is unavailable, because the
+  platform lacks the feature, or because the MTU is above the maximum now
+  answers a failed future, where it threw before returning one. Code that
+  awaits the call, or tests it with `expect(() => ..., throwsA(...))`, sees no
+  difference.
+- **`bondStateChanges` and `phyChanges` after a radio outage answer the
+  outage.** On a platform without bonding or PHY support, reading either
+  stream after a radio outage answers a stream that fails with
+  `StaleHandleException`, where the getter threw
+  `UnsupportedOperationException`: the outage is reported before the missing
+  feature, as every other member of the extension reports it.
+- **A granted connection-parameters request is kept.** A first read of the
+  link's connection parameters that answers after a request was granted no
+  longer overwrites the granted value.
+- **A platform error on the bond or PHY stream no longer reaches the app.**
+  `bondStateChanges` and `phyChanges` carry no errors; such an error is
+  logged (below) and the stream goes on.
+- **No bond, PHY or parameter reads on other platforms.** On a platform that
+  is neither Android nor iOS (`PlatformKind.fake` or `other`), connecting no
+  longer reads the bond state, the PHY or the connection parameters, which
+  nothing on such a platform could see.
 - **Dispose is terminal for `Scanner` and `Server` (I368).** Calling
   `scan()`, `addService()`, `startAdvertising()` etc. on a disposed instance
   now throws `StaleHandleException` instead of partially restarting over
@@ -82,6 +135,18 @@
   first read of a link's bond state, PHY or connection parameters logs a
   `warn` line under `bluey.connection` (`bond state read failed`, `phy read
   failed`, `connection parameters read failed`) and the default is kept.
+- **Failures are named by their code.** The `failed` lines of `requestMtu`,
+  `getMaximumWriteLength` and `readRssi` under `bluey.gatt` now carry a
+  failure code as `errorCode` and as the data's `exception`
+  (`OperationTimedOut`, `OperationRejected`, `LinkEnded`,
+  `UnexpectedPlatformFailure`, ...), where they carried the thrown
+  exception's type. The same goes for `exception` on a failed first read of
+  the bond state, PHY or connection parameters: `StateError`, for one, is now
+  `UnexpectedPlatformFailure`. A filter on the old type names misses these
+  lines.
+- **Bond and PHY stream errors.** An error on the platform's bond-state or
+  PHY stream logs a `warn` line under `bluey.connection`, `bond state reports
+  failed` or `phy reports failed`, in place of reaching the app's stream.
 
 ## 0.5.0
 

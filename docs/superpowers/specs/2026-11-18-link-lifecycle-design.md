@@ -292,6 +292,10 @@ Apart from `Mtu`'s constructor and those last two points, this pull request chan
 | --- | --- | --- |
 | The GATT client holds Connection's `LinkSession` and tells it when services are discovered | Its port is GATT Client's to declare, when that context moves | Slice 6 |
 | Peer names the public `Connection` at the edge and is handed a borrow function | `PeerLink`, Peer's own port, is settled when Peer moves. Placed code cannot name the edge, so the `layers` rule forces the port then | Slice 5 |
+| The GATT client is handed, by the assembly, a function that turns a `LinkEnd` into the exception it throws, and `ConnectionAssembly` builds it through `gattFor`, naming the unplaced `connection/bluey_connection.dart` for the `LinkGattClient` type | The GATT client no longer imports the edge (section 13, ruling 53); the edge may name unplaced code, so this is on no list | Slice 6 |
+| Connection's application logs the MTU request and the two readings under `bluey.gatt`, and every app-readable word of its logs is frozen in `connection_log_words.dart` | An app filters on those words, so renaming them is a public change (ruling 46) | One pass over every context's logs after slice 6 (proposed, `docs/backlog/I399-revise-the-log-wording-of-every-context.md`) |
+| `LinkOpenBegan` is raised by the registry, not by `Link`, since a `Link` exists only once the radio has answered | Giving `Link` an opening phase changes when a session exists, which this slice does not do | A follow-up pull request straight after this slice's second, before slice 2 (proposed, `docs/backlog/I398-give-a-link-its-opening-phase.md`) |
+| `connectAsPeer`'s rule (keep the borrow for a peer, give it back otherwise) is written in the composition root, `lib/src/bluey.dart` | It is Peer's rule, and Peer is not placed | Slice 5 |
 | The lifecycle client and the silence monitor read and write through the platform with a link's id | They are Peer's protocol, still in the old `connection/` folder | Slice 5 |
 | Peer discovery scans through the platform, not through Discovery | Scanning moves first | Slices 2 and 5 |
 | `shared/error_translation.dart` knows the lifecycle protocol's eviction status and its accounting hooks, on the GATT paths | GATT Client's failures move with GATT Client | Slices 5 and 6 |
@@ -307,7 +311,7 @@ Apart from `Mtu`'s constructor and those last two points, this pull request chan
 | `discoverPeers()` and `BlueyPeer.connect()` leave the app's links alone | Fix (H2) |
 | `disconnect()` that fails leaves the Connection usable instead of stuck in `disconnecting` | Fix |
 | A `connecting` or `connected` report from the platform about a live Connection no longer changes its state (section 6.3's table) | Refinement (added during the build) |
-| `connectAsPeer` on a device the app is already linked to leaves that link up when the device turns out not to be a peer, and a link it opened is closed when the peer check itself fails | Fix (section 6.5, plan ruling 3; added during the build) |
+| `connectAsPeer` on a device the app is already linked to leaves that link up when the device turns out not to be a peer, and a link it opened is closed when the peer check itself fails | Fix (section 6.5; added during the build) |
 | A Connection the app holds in `linked` becomes `ready`, and reports it on `stateChanges`, when a probe reads over its link, because the probe discovers services (section 6.9) | Refinement (added during the build) |
 | A second `disconnect()` made while one is in flight waits for it and answers as it does, a failure included, where it returned at once | Refinement (added during the build) |
 | An error on the platform's connection-state stream no longer reaches `Connection.stateChanges`; the Connection ends as a drop, and the platform is asked to close the link | Refinement (added during the build) |
@@ -318,8 +322,14 @@ Apart from `Mtu`'s constructor and those last two points, this pull request chan
 | `requestMtu`, `maxWritePayload` and `readRssi` in flight are no longer failed by a Service Changed event | Refinement (call 2) |
 | A request about a link (an MTU, a PHY, parameters, a bond, a reading) that the platform rejects with status `0x80` throws `GattOperationFailedException`, where it threw `DisconnectedException` with `evictedByServer` | Refinement (call 10), second pull request |
 | `PlatformKind` is exported, so `Capabilities(platformKind: ...)` can be written with `bluey` alone | Addition (call 6) |
+| `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent` take an optional `timestamp`, which Bluey sets to the instant the domain stamped | Addition (section 13, ruling 48), second pull request |
+| A failed `requestMtu`, `maxWritePayload` or `readRssi` logs a failure code as `errorCode` and `exception`, and a failed first read of the bond state, PHY or parameters logs one as `exception`, where each named an exception class | Refinement (section 13), second pull request |
+| A refusal by the Android extension (radio outage, missing feature, MTU above the maximum) answers a failed future, where it threw synchronously | Refinement (added during the build), second pull request |
+| `bondStateChanges` and `phyChanges` on a platform without the feature, after a radio outage, answer a stream failing with `StaleHandleException`, where the getter threw `UnsupportedOperationException` | Refinement (added during the build), second pull request |
+| A late first read of connection parameters no longer overwrites a value a request was granted, and a platform error on the bond or PHY stream no longer reaches the app's stream | Fix (ruling 20 of the slice plan), second pull request |
+| On a platform that is neither Android nor iOS, connecting reads no bond state, PHY or parameters | Refinement (added during the build), second pull request |
 
-The API dump changes for `BlueyEvent`, `Mtu` and `PlatformKind`, and for nothing else.
+The API dump changes for `BlueyEvent`, `Mtu`, `PlatformKind` and the three events' `timestamp`, and for nothing else.
 
 ## 8. Findings closed
 
@@ -437,3 +447,59 @@ Every list in `known_violations.dart` only shrinks in both. After the slice the 
 A second review, against DDD, cohesion, the boundaries between contexts and Clean Code, found nine more, all fixed here. The model of a link had no class of its name, and its identity lived in the application layer; it is `Link` now. `LiveLinks` kept its own copy of whether a link is closing, with no event to keep it true. Connection's rules spoke of probes, which is Peer's word. Two ports were not one kind of fact each: parameters shared one with the MTU, and one held two unrelated readings. The log's vocabulary was placed in `shared/domain` against the kernel's bar. Connection's failure translation would have known the lifecycle protocol's eviction status. `LinkFeatures` held a fact about the public surface. How Peer gets a link id was left to the builder, and this section called Peer a client of Connection's application when section 6.9 hands it a function. And no unit was named as the publisher of `ConnectingEvent`. The review also added section 6.13, so that what still reaches across contexts after this slice is written down. The one decision that was open (I374) is made: it moves to slice 5 (section 6.9).
 
 Verdict: ready.
+
+## 13. Rulings of 2026-11-26 (addendum)
+
+Written after the second pull request was built. It is the decision record of that pull request: what Joel ruled on the two architecture reviews of the first pull request, the calls the second pull request's plan (`docs/superpowers/plans/2026-11-26-link-lifecycle-pr2.md`) made from them, and the calls made while it was built. Where this section and an earlier one differ, this one is what was built.
+
+### Joel's five rulings
+
+1. **The edge by context.** No Connection file sits at the root of `api/`. Connection's translator is `api/connection/connection_failure_translation.dart`; `api/` keeps only the composition root and files that belong to no single context.
+2. **Shared device streams.** `DeviceStreams` is shared by the two platform packages through the platform interface's library for them. Done in pull request 44.
+3. **Published language.** The domain raises internal events; `api/<context>/` translates them into the public ones; the unit that raises an event stamps its time with an injected clock.
+4. **Edge isolation.** An edge file names only its own context's domain and application, and may name any context's public interfaces.
+5. **Phase.** `ConnectionState` stays public, at `api/connection/`; `Link` has its own sealed phase, and the edge maps one to the other.
+
+### The plan's rulings, 42 to 54
+
+- **42.** One pull request: the ten tasks that bring rulings 1 to 5 in run before Tasks 17 to 26, so every later task is written against the final names.
+- **43.** The translator's home is ruling 1's.
+- **44.** Two guard rules: `edge contexts`, born empty and kept empty, and `edge from below`, which lists the imports of `lib/src/api/` from unplaced files and only shrinks. It was born with ten; the GATT client's four left in Task 25, and Peer's six leave with slice 5. The list-growth command learned `--first-statement=<list>`, which lets a list be born with entries in the change that introduces it. The change after this pull request removes the flag from `CLAUDE.md` and CI.
+- **45.** `LinkPhase` is sealed: `Linked` and `Ready` (both `UpPhase`), `Closing(returnTo, by)` and `Ended(end)`, and `ClosingBy` is `request`, `radio` or `both`. The domain decides when a phase was entered.
+- **46.** What an app can read in a log line is frozen in this slice: contexts, messages, data keys (`address` and `deviceId`, inconsistent as they are) and values, including `ConnectionState.<name>` for a state. Renaming any is a public change for a later slice, with a changelog line. The build's own calls below changed values in two places, each written in the changelog.
+- **47.** The clock is `typedef Now = DateTime Function()` in `shared/application/now.dart`, handed in by the composition root as `clock.now`; `package:clock` left the application's allowance.
+- **48.** Internal events are a sealed `LinkEvent` (`LinkOpenBegan`, `LinkOpened`, `LinkEnded`). `Link` returns `LinkOpened` and `LinkEnded` in its step, stamped with the instant it is handed; the registry raises `LinkOpenBegan`, since no `Link` exists yet. They leave the application through the port `LinkEvents`, which `PublishedLinkEvents` at the edge implements by publishing `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`. Those three moved to `api/connection/connection_events.dart` and gained an optional `timestamp`.
+- **49.** `LiveLinks` holds the links it tabulates, so the registry keeps one map, and `Admission` is sealed (`Open`, `Wait`, `Reuse`). What the table reads of a link is the domain interface `LiveLink`.
+- **50.** A failure names what was attempted with `LinkOperation`, in Connection's words (`open`, `negotiateMtu`, `readSignalStrength`, ...). The domain carries no log word and no failure code: the frozen strings live in one application file, `connection_log_words.dart`, as exhaustive mappings.
+- **51.** Values are shared, not translated. A value object an app builds and hands in (`Mtu`, `Phy`, `PhyPair`, `ConnectionParameters`, `BondState`) is published as it stands and re-exported by its context's edge library. A public library exports nothing under `lib/src/features/`, which `public exports` holds. Events, phases and failures are translated. Joel confirmed this as the standing rule.
+- **52.** `ConnectionAssembly` is told the platform by an edge enum, `ConnectionExtension { android, ios, none }`, and by the platform's name as a string, both mapped by the composition root from Platform's `PlatformKind`. Connection's edge never names `features/platform/`.
+- **53.** `LinkGattClient` is handed a `BlueyException Function(LinkEnd)` by the assembly and no longer imports `lib/src/api/`.
+- **54.** Ruling 37 of the first pull request, the log level of a probe's failed connect (`error` today, where it was a `debug` line under `bluey.peer.discovery`), is Joel's and still open. The build left the level as merged.
+
+### Calls made during the build
+
+Each was the builder's, recorded in the build's ledger, and is Joel's to overrule.
+
+- The failure for an ended link is `LinkHadEnded`; the event keeps the name `LinkEnded`, so one name has one meaning in the context. Its log code stays `LinkEnded` (ruling 46).
+- No public `ConnectionEvent` base was added: none existed, and the API dump was to grow only by the three `timestamp` parameters.
+- `LiveLinks` gained `notOpened(device)`, beyond the plan's interface, since a failed open has no link to end. A give-back takes no `LinkUser`, since only a borrower gives back.
+- A failure's `message` may name the operation in prose for a person; only words an app reads come from `connection_log_words.dart`. Message endings, data keys and detail templates stay beside the line that logs them; the pass that revises log wording gathers them.
+- `ConnectionPorts` holds the six ports and `LinkFeatures`, so a host wires Connection in one line. `ConnectionAssembly` takes the `EventPublisher` and `Now` and builds `PublishedLinkEvents` itself, since infrastructure cannot build an edge type.
+- The link id behind a `Connection` falls back to the device address for a Connection this `Bluey` did not present, so `tryUpgrade` keeps working on such a Connection.
+- `LinkOperation.negotiateMtu` is what `LinkFeatures.admit` refuses with; the refusal above the maximum reads `requestMtu above <maximum>`, built from the operation's word. The capability is checked before the maximum.
+- The MTU has no first read (the platform offers none), so the session holds 23 until a request answers. A failed first read of the bond state, PHY or parameters is logged once, also after the link ended, as before.
+- A session takes `Now` only when it reads time (`BondingSession` does not). `BondingSession` and `PhySession` share one unit for a held, reported value, `ReportedValue`.
+- The `failed` lines of the MTU request and the two readings, and a failed first read's `exception`, carry a failure code where they named an exception class: no thrown error exists below the edge to name. Slice ruling 5 decided it; the changelog says so.
+- A reading's `failed` line is logged when the link's end answers it, as before, and a link already down logs nothing, as before.
+- Two changes no ruling had named were accepted and written in the changelog: the Android extension refuses through a failed future, and on a platform without bonding or PHY a change stream after a radio outage answers the outage before the missing feature.
+- `lib/src/bluey.dart`'s size entry went from 968 to 974 lines in Task 25, for the `PlatformKind` to `ConnectionExtension` switch that ruling 52 puts in the composition root. It stays under the 977 lines at the base, so no list grew.
+
+### Small things left, and where they go
+
+- `DisconnectedEvent` now reaches `bluey.events` before the operations a drop fails have answered (one microtask earlier than in the first pull request). Nothing in the library depends on the order; an app that does sees the event first.
+- `LinkSession.disconnect` keeps two lines no test reaches: the types cannot say that a request on an up link always yields a close. Answering the request's future for every duty would remove them.
+- `ConnectionAssembly` imports the unplaced `connection/bluey_connection.dart`, for the `LinkGattClient` type `gattFor` answers. The edge may, and slice 6 replaces it with GATT Client's port (section 6.13).
+- `LinkHadEnded`'s message names the outage by its enum value (`off`, for one). It is a sentence for a person and no app parses it; the log-wording pass words it.
+- `public exports` lets a public library export an unplaced file whose path is under `lib/src/features/`; `placement` already flags such a file, so the gap costs nothing today.
+- `test/fixtures/connection_rig.dart` maps the platform interface's `PlatformKind` to `ConnectionExtension` with its own switch, beside the composition root's over Platform's.
+- `lib/src/bluey.dart` was held at its size entry partly by removing blank lines; moving the registry's wiring into the assembly gave it back most of that room, and the rest returns when `Bluey` moves to `api/`.
