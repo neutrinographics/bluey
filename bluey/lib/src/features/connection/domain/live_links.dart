@@ -72,36 +72,42 @@ final class LiveLinks<L extends LiveLink> {
     if (_entries[device]?.link == null) _entries.remove(device);
   }
 
-  /// One user fewer on [device]'s link, and whether the link must now close:
-  /// only when no borrower is left and the app does not hold it.
+  /// One borrower fewer on [device]'s [link], and whether the link must now
+  /// close: only when no borrower is left and the app does not hold it.
   ///
-  /// Only a user of a link that came up gives it back; a give-back while the
-  /// open is in flight is not part of the contract. A give-back by a user who
-  /// does not use a known device's link is a [StateError], since it would
-  /// hide the next user and close the link under them.
-  AfterGiveBack givenBack(DeviceAddress device, LinkUser user) {
-    final entry = _entries[device];
+  /// The app never gives a link back here: it lets go by closing the link.
+  /// A give-back of a link that is no longer [device]'s, an old one whose
+  /// successor came up, changes nothing. A give-back on [device]'s link
+  /// that no borrower uses is a [StateError], since it would hide the next
+  /// borrower and close the link under them.
+  AfterGiveBack givenBack(DeviceAddress device, L link) {
+    final entry = _liveEntryOf(device, link);
     if (entry == null) return AfterGiveBack.leaveIt;
-    entry.leftBy(user, device);
+    entry.lessOneBorrower(device);
     return entry.inUse ? AfterGiveBack.leaveIt : AfterGiveBack.closeTheLink;
   }
 
-  /// One borrower fewer on [device]'s link, which the app now holds.
+  /// One borrower fewer on [device]'s [link], which the app now holds.
   ///
-  /// As with [givenBack], a keep on a known device that no borrower uses is a
-  /// [StateError].
-  void kept(DeviceAddress device) {
-    final entry = _entries[device];
-    if (entry == null) return;
-    entry
-      ..leftBy(LinkUser.borrower, device)
+  /// As with [givenBack], a keep of an old link changes nothing, and a keep
+  /// on a link that no borrower uses is a [StateError].
+  void kept(DeviceAddress device, L link) {
+    _liveEntryOf(device, link)
+      ?..lessOneBorrower(device)
       ..joinedBy(LinkUser.app);
   }
 
   /// [link] to [device] has ended, so the next caller opens. Matched by
   /// identity, so an old link's end never drops the link that followed it.
   void ended(DeviceAddress device, L link) {
-    if (identical(_entries[device]?.link, link)) _entries.remove(device);
+    if (_liveEntryOf(device, link) != null) _entries.remove(device);
+  }
+
+  /// [device]'s entry when [link] is the link it holds, matched by identity
+  /// so an old holder never touches its successor.
+  _Entry<L>? _liveEntryOf(DeviceAddress device, L link) {
+    final entry = _entries[device];
+    return identical(entry?.link, link) ? entry : null;
   }
 }
 
@@ -120,18 +126,10 @@ final class _Entry<L extends LiveLink> {
     LinkUser.borrower => _borrowers++,
   };
 
-  void leftBy(LinkUser user, DeviceAddress device) {
-    switch (user) {
-      case LinkUser.app:
-        if (!_appHolds) {
-          throw StateError('The app does not hold the link to $device.');
-        }
-        _appHolds = false;
-      case LinkUser.borrower:
-        if (_borrowers == 0) {
-          throw StateError('No borrower uses the link to $device.');
-        }
-        _borrowers--;
+  void lessOneBorrower(DeviceAddress device) {
+    if (_borrowers == 0) {
+      throw StateError('No borrower uses the link to $device.');
     }
+    _borrowers--;
   }
 }

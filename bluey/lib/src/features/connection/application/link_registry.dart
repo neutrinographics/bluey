@@ -103,20 +103,18 @@ final class LinkRegistry {
   /// One borrower fewer on [session]'s link, closing it when nobody is left.
   ///
   /// Answers the close's failure when it fails, which leaves the link up for
-  /// the next caller to reuse. A session whose link has ended is no longer
-  /// the device's, so its give-back changes nothing.
+  /// the next caller to reuse. A session that is no longer the device's
+  /// changes nothing.
   Future<Either<ConnectionFailure, void>> _giveBack(LinkSession session) {
-    if (session.link.hasEnded) return Future.value(const Right(null));
-    final after = _table.givenBack(session.link.device, LinkUser.borrower);
+    final after = _table.givenBack(session.link.device, session);
     if (after == AfterGiveBack.leaveIt) return Future.value(const Right(null));
     return session.disconnect();
   }
 
   /// Hands a borrower's hold on [session]'s link to the app, which then holds
-  /// it until it lets it go. A session whose link has ended changes nothing.
-  void _keep(LinkSession session) {
-    if (!session.link.hasEnded) _table.kept(session.link.device);
-  }
+  /// it until it lets it go. A session that is no longer the device's
+  /// changes nothing.
+  void _keep(LinkSession session) => _table.kept(session.link.device, session);
 
   Future<Either<ConnectionFailure, LinkSession>> _open(
     DeviceAddress device,

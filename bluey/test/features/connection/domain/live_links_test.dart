@@ -16,6 +16,13 @@ LiveLinks<TestLink> heldBy(LinkUser user, TestLink link) {
   return links..opened(device, user, link);
 }
 
+/// Whether the app holds [link], read as a borrower joining and giving back
+/// without closing it.
+bool appHolds(LiveLinks<TestLink> links, TestLink link) {
+  links.admit(device, LinkUser.borrower);
+  return links.givenBack(device, link) == AfterGiveBack.leaveIt;
+}
+
 void main() {
   group('a device with no link', () {
     test('the app opens a link to a device that has none', () {
@@ -31,36 +38,32 @@ void main() {
 
     test('a borrower opens a link with one borrower', () {
       // arrange
+      final link = TestLink();
       final links = LiveLinks<TestLink>();
 
       // act
       final admission = links.admit(device, LinkUser.borrower);
-      links.opened(device, LinkUser.borrower, TestLink());
+      links.opened(device, LinkUser.borrower, link);
 
       // assert
       expect(admission, isA<Open<TestLink>>());
-      expect(
-        links.givenBack(device, LinkUser.borrower),
-        AfterGiveBack.closeTheLink,
-      );
+      expect(links.givenBack(device, link), AfterGiveBack.closeTheLink);
     });
   });
 
   group('an open in flight, or a link closing', () {
     test('a second caller waits while an open is in flight', () {
       // arrange
+      final link = TestLink();
       final links = LiveLinks<TestLink>()..admit(device, LinkUser.borrower);
 
       // act
       final admission = links.admit(device, LinkUser.app);
-      links.opened(device, LinkUser.borrower, TestLink());
+      links.opened(device, LinkUser.borrower, link);
 
       // assert
       expect(admission, isA<Wait<TestLink>>());
-      expect(
-        links.givenBack(device, LinkUser.borrower),
-        AfterGiveBack.closeTheLink,
-      );
+      expect(links.givenBack(device, link), AfterGiveBack.closeTheLink);
     });
 
     test('a caller waits while the link is closing', () {
@@ -71,6 +74,18 @@ void main() {
 
       // act
       final admission = links.admit(device, LinkUser.borrower);
+
+      // assert
+      expect(admission, isA<Wait<TestLink>>());
+    });
+
+    test('a caller waits on a link that ended and is not yet forgotten', () {
+      // arrange
+      final ended = TestLink()..isClosing = true;
+      final links = heldBy(LinkUser.app, ended);
+
+      // act
+      final admission = links.admit(device, LinkUser.app);
 
       // assert
       expect(admission, isA<Wait<TestLink>>());
@@ -127,8 +142,8 @@ void main() {
 
       // assert
       expect(identical((admission as Reuse<TestLink>).link, link), isTrue);
-      expect(links.givenBack(device, LinkUser.borrower), AfterGiveBack.leaveIt);
-      expect(links.givenBack(device, LinkUser.app), AfterGiveBack.closeTheLink);
+      expect(links.givenBack(device, link), AfterGiveBack.leaveIt);
+      expect(appHolds(links, link), isTrue);
     });
 
     test('a borrower reuses the app\'s link as one more borrower', () {
@@ -141,18 +156,19 @@ void main() {
 
       // assert
       expect(identical((admission as Reuse<TestLink>).link, link), isTrue);
-      expect(links.givenBack(device, LinkUser.borrower), AfterGiveBack.leaveIt);
-      expect(links.givenBack(device, LinkUser.app), AfterGiveBack.closeTheLink);
+      expect(links.givenBack(device, link), AfterGiveBack.leaveIt);
+      expect(appHolds(links, link), isTrue);
     });
   });
 
   group('giving back and keeping', () {
     test('a give-back by the only user closes the link', () {
       // arrange
-      final links = heldBy(LinkUser.borrower, TestLink());
+      final link = TestLink();
+      final links = heldBy(LinkUser.borrower, link);
 
       // act
-      final answer = links.givenBack(device, LinkUser.borrower);
+      final answer = links.givenBack(device, link);
 
       // assert
       expect(answer, AfterGiveBack.closeTheLink);
@@ -160,12 +176,13 @@ void main() {
 
     test('a give-back leaves a link another borrower still uses', () {
       // arrange
-      final links = heldBy(LinkUser.borrower, TestLink())
+      final link = TestLink();
+      final links = heldBy(LinkUser.borrower, link)
         ..admit(device, LinkUser.borrower);
 
       // act
-      final first = links.givenBack(device, LinkUser.borrower);
-      final second = links.givenBack(device, LinkUser.borrower);
+      final first = links.givenBack(device, link);
+      final second = links.givenBack(device, link);
 
       // assert
       expect(first, AfterGiveBack.leaveIt);
@@ -174,33 +191,29 @@ void main() {
 
     test('a give-back after the app took hold leaves the link', () {
       // arrange
-      final links = heldBy(LinkUser.borrower, TestLink())
+      final link = TestLink();
+      final links = heldBy(LinkUser.borrower, link)
         ..admit(device, LinkUser.app);
 
       // act
-      final answer = links.givenBack(device, LinkUser.borrower);
+      final answer = links.givenBack(device, link);
 
       // assert
       expect(answer, AfterGiveBack.leaveIt);
-      expect(
-        () => links.givenBack(device, LinkUser.borrower),
-        throwsStateError,
-      );
+      expect(() => links.givenBack(device, link), throwsStateError);
     });
 
     test('keep hands the link to the app', () {
       // arrange
-      final links = heldBy(LinkUser.borrower, TestLink());
+      final link = TestLink();
+      final links = heldBy(LinkUser.borrower, link);
 
       // act
-      links.kept(device);
+      links.kept(device, link);
 
       // assert
-      expect(
-        () => links.givenBack(device, LinkUser.borrower),
-        throwsStateError,
-      );
-      expect(links.givenBack(device, LinkUser.app), AfterGiveBack.closeTheLink);
+      expect(() => links.givenBack(device, link), throwsStateError);
+      expect(appHolds(links, link), isTrue);
     });
 
     test('giving back or keeping an unknown device changes nothing', () {
@@ -208,22 +221,42 @@ void main() {
       final links = LiveLinks<TestLink>();
 
       // act
-      final answer = links.givenBack(device, LinkUser.borrower);
-      links.kept(device);
+      final answer = links.givenBack(device, TestLink());
+      links.kept(device, TestLink());
 
       // assert
       expect(answer, AfterGiveBack.leaveIt);
       expect(links.admit(device, LinkUser.app), isA<Open<TestLink>>());
+    });
+
+    test('an old link\'s give-back or keep leaves its successor alone', () {
+      // arrange
+      final old = TestLink();
+      final successor = TestLink();
+      final links =
+          heldBy(LinkUser.borrower, old)
+            ..ended(device, old)
+            ..admit(device, LinkUser.borrower)
+            ..opened(device, LinkUser.borrower, successor);
+
+      // act
+      final answer = links.givenBack(device, old);
+      links.kept(device, old);
+
+      // assert
+      expect(answer, AfterGiveBack.leaveIt);
+      expect(links.givenBack(device, successor), AfterGiveBack.closeTheLink);
     });
   });
 
   group('a give-back or keep with no borrower', () {
     test('giving back a link no borrower uses is a programming error', () {
       // arrange
-      final links = heldBy(LinkUser.app, TestLink());
+      final link = TestLink();
+      final links = heldBy(LinkUser.app, link);
 
       // act
-      void giveBackUnborrowed() => links.givenBack(device, LinkUser.borrower);
+      void giveBackUnborrowed() => links.givenBack(device, link);
 
       // assert
       expect(giveBackUnborrowed, throwsStateError);
@@ -231,25 +264,14 @@ void main() {
 
     test('keeping a link no borrower uses is a programming error', () {
       // arrange
-      final links = heldBy(LinkUser.app, TestLink());
+      final link = TestLink();
+      final links = heldBy(LinkUser.app, link);
 
       // act
-      void keepUnborrowed() => links.kept(device);
+      void keepUnborrowed() => links.kept(device, link);
 
       // assert
       expect(keepUnborrowed, throwsStateError);
-    });
-
-    test('the app letting go of a link it does not hold is a programming '
-        'error', () {
-      // arrange
-      final links = heldBy(LinkUser.borrower, TestLink());
-
-      // act
-      void letGoUnheld() => links.givenBack(device, LinkUser.app);
-
-      // assert
-      expect(letGoUnheld, throwsStateError);
     });
   });
 

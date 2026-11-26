@@ -99,6 +99,15 @@ void main() {
       // assert
       expect((before, whileClosing, session.isClosing), (false, true, true));
     });
+
+    test('is closing once its link has dropped', () async {
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+
+      // assert
+      expect((session.link.hasEnded, session.isClosing), (true, true));
+    });
   });
 
   group('a drop', () {

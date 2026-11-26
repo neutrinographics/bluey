@@ -5,7 +5,8 @@ import 'link_session.dart';
 /// A borrower's hold on a link. The first of [giveBack] and [keep] takes
 /// effect; later calls do nothing.
 final class BorrowedLink {
-  /// A hold on [session] that ends through [giveBack] or [keep].
+  /// A hold on [session] that ends through [giveBack] or [keep]. Only
+  /// `LinkRegistry.borrow` makes one, so every hold is one the table counts.
   BorrowedLink({
     required this.session,
     required Future<Either<ConnectionFailure, void>> Function() giveBack,
