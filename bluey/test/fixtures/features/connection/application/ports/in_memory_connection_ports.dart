@@ -4,6 +4,7 @@ import 'package:bluey/src/features/connection/domain/link_features.dart';
 import 'in_memory_bonding.dart';
 import 'in_memory_links.dart';
 import 'in_memory_mtu_negotiation.dart';
+import 'in_memory_phy_control.dart';
 import 'in_memory_signal_strength.dart';
 
 /// Links that can do everything the specification allows, so a test of the
@@ -24,10 +25,12 @@ ConnectionPorts inMemoryConnectionPorts({
   InMemoryMtuNegotiation? mtu,
   InMemorySignalStrength? signal,
   InMemoryBonding? bonding,
+  InMemoryPhyControl? phy,
 }) => ConnectionPorts(
   links: links ?? InMemoryLinks(),
   features: features,
   mtu: mtu ?? InMemoryMtuNegotiation(),
   signal: signal ?? InMemorySignalStrength(),
   bonding: bonding ?? InMemoryBonding(),
+  phy: phy ?? InMemoryPhyControl(),
 );

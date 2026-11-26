@@ -6,6 +6,7 @@ import 'platform_bonding.dart';
 import 'platform_link_features.dart';
 import 'platform_links.dart';
 import 'platform_mtu_negotiation.dart';
+import 'platform_phy_control.dart';
 import 'platform_signal_strength.dart';
 
 /// Connection's ports over [platform], what a phone runs on.
@@ -18,4 +19,5 @@ ConnectionPorts platformConnectionPorts(
   mtu: PlatformMtuNegotiation(platform),
   signal: PlatformSignalStrength(platform),
   bonding: PlatformBonding(platform, log: log),
+  phy: PlatformPhyControl(platform, log: log),
 );

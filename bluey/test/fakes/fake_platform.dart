@@ -2220,7 +2220,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: getPhy called on a canRequestPhy=false platform',
       );
     }
-    return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
+    _applyFaultRules(FakeOp.getPhy, deviceId: deviceId);
+    return _phys[deviceId] ?? (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
   }
 
   @override
@@ -2230,7 +2231,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: phyStream called on a canRequestPhy=false platform',
       );
     }
-    return Stream.empty();
+    return _phyReportsOf(deviceId).stream;
   }
 
   @override
@@ -2244,7 +2245,35 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: requestPhy called on a canRequestPhy=false platform',
       );
     }
+    _applyFaultRules(FakeOp.requestPhy, deviceId: deviceId);
   }
+
+  final Map<String, ({PlatformPhy tx, PlatformPhy rx})> _phys = {};
+  final Map<String, StreamController<({PlatformPhy tx, PlatformPhy rx})>>
+  _phyReports = {};
+
+  /// The radio reports that [deviceId]'s PHY pair is now [tx] and [rx],
+  /// which [getPhy] then reads too.
+  void simulatePhy(
+    String deviceId, {
+    required PlatformPhy tx,
+    required PlatformPhy rx,
+  }) {
+    _phys[deviceId] = (tx: tx, rx: rx);
+    _phyReportsOf(deviceId).add((tx: tx, rx: rx));
+  }
+
+  /// [deviceId]'s PHY stream fails with [error] and stays open, as a
+  /// platform channel's stream does after one bad event.
+  void simulatePhyError(String deviceId, Object error) =>
+      _phyReportsOf(deviceId).addError(error);
+
+  StreamController<({PlatformPhy tx, PlatformPhy rx})> _phyReportsOf(
+    String deviceId,
+  ) => _phyReports.putIfAbsent(
+    deviceId,
+    StreamController<({PlatformPhy tx, PlatformPhy rx})>.broadcast,
+  );
 
   // === Connection Parameters ===
 
@@ -2622,6 +2651,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     for (final controller in _bondReports.values) {
       await controller.close();
     }
+    for (final controller in _phyReports.values) {
+      await controller.close();
+    }
   }
 }
 
@@ -2769,6 +2801,8 @@ enum FakeOp {
   getBondState,
   bond,
   removeBond,
+  getPhy,
+  requestPhy,
 }
 
 /// A scripted fault: fires [error] for matching calls to [op] until its
