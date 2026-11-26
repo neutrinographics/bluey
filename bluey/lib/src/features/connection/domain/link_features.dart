@@ -19,9 +19,17 @@ final class LinkFeatures {
     required this.maxMtu,
   });
 
+  /// Whether a link can be bonded, and its bond state read and followed.
   final bool canBond;
+
+  /// Whether a link's PHY can be read, followed and asked for.
   final bool canRequestPhy;
+
+  /// Whether a link's connection parameters can be read and asked for.
   final bool canRequestParameters;
+
+  /// Whether a link can be asked for a larger MTU; where it cannot, the
+  /// platform negotiates the MTU by itself.
   final bool canRequestMtu;
 
   /// The largest MTU this platform will ask a link for.

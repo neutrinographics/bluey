@@ -221,6 +221,7 @@ void main() {
             .having((e) => e.cause, 'cause', same(cause)),
       );
     });
+
     test('a feature the platform lacks is an unsupported operation naming '
         'the platform', () {
       // arrange

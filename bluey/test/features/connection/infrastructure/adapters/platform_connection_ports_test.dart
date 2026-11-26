@@ -23,6 +23,7 @@ void main() {
     expect(ports.links, isA<PlatformLinks>());
     expect(fake.connectedDeviceIds, contains(device.value));
   });
+
   test('its features are what the platform says its links can do', () {
     // arrange
     const capabilities = Capabilities(

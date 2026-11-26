@@ -3,6 +3,8 @@ import 'package:bluey/src/api/connection/connection_assembly.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
+import 'package:bluey/src/features/connection/domain/link_operation.dart';
+import 'package:bluey/src/shared/domain/either.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/exceptions.dart';
 import 'package:bluey/src/shared/infrastructure/bluey_event_bus.dart';
@@ -88,6 +90,45 @@ void main() {
     });
   });
 
+  group('the platform', () {
+    test('a presented Connection names the platform it was assembled '
+        'for', () async {
+      // arrange
+      final unsupported = _CloseUnsupported()..reach(device);
+      final logger = BlueyLogger();
+      final platform = FakeBlueyPlatform();
+      final named = ConnectionAssembly(
+        ports: inMemoryConnectionPorts(links: unsupported),
+        publisher: BlueyEventBus(),
+        log: logger,
+        now: clock.now,
+        platformName: 'nameOfThisPlatform',
+        gattFor:
+            (session) => LinkGattClient(
+              platformInstance: platform,
+              session: session,
+              logger: logger,
+            ),
+      );
+      final connection = await named.connect(device);
+
+      // act
+      final disconnecting = connection.disconnect();
+
+      // assert
+      await expectLater(
+        disconnecting,
+        throwsA(
+          isA<UnsupportedOperationException>().having(
+            (e) => e.platform,
+            'platform',
+            'nameOfThisPlatform',
+          ),
+        ),
+      );
+    });
+  });
+
   group('link ids', () {
     test(
       'answers the link id behind a Connection it presented, and null for any other',
@@ -105,6 +146,14 @@ void main() {
       },
     );
   });
+}
+
+/// A radio whose links cannot be closed on this platform, so the one
+/// failure that names the platform is reachable through a Connection.
+final class _CloseUnsupported extends InMemoryLinks {
+  @override
+  Future<Either<ConnectionFailure, void>> close(LinkId link) async =>
+      const Left(FeatureUnsupported(LinkOperation.close));
 }
 
 /// A Connection the assembly never presented, as an app's own one would be.
