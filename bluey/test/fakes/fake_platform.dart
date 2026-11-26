@@ -2106,6 +2106,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId, {
     required bool withResponse,
   }) async {
+    _applyFaultRules(FakeOp.getMaximumWriteLength, deviceId: deviceId);
     final override = _maxWriteOverrides[deviceId];
     if (override != null) {
       return withResponse ? override.withResponse : override.withoutResponse;
@@ -2736,6 +2737,7 @@ enum FakeOp {
   readDescriptor,
   writeDescriptor,
   requestMtu,
+  getMaximumWriteLength,
   readRssi,
 }
 

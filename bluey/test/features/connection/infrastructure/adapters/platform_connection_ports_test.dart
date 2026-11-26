@@ -1,7 +1,12 @@
+import 'package:bluey/src/features/connection/domain/connection_failure.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_link_features.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_mtu_negotiation.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_signal_strength.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
+import 'package:bluey/src/shared/domain/either.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,5 +44,26 @@ void main() {
 
     // assert
     expect(ports.features, linkFeaturesFrom(capabilities));
+  });
+
+  test('its MTU negotiation and signal strength are over the platform it was '
+      'given', () async {
+    // arrange
+    final fake =
+        FakeBlueyPlatform()..simulatePeripheral(id: device.value, rssi: -42);
+    final ports = platformConnectionPorts(fake, log: RecordingLog());
+    final link = (await ports.links.open(
+      device,
+    )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+
+    // act
+    final mtu = await ports.mtu.request(link, Mtu(185));
+    final rssi = await ports.signal.read(link);
+
+    // assert
+    expect(ports.mtu, isA<PlatformMtuNegotiation>());
+    expect(ports.signal, isA<PlatformSignalStrength>());
+    expect(mtu, Right<ConnectionFailure, Mtu>(Mtu.fromPlatform(185)));
+    expect(rssi, const Right<ConnectionFailure, int>(-42));
   });
 }
