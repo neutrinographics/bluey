@@ -7,9 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 const other = DeviceAddress('AA:BB:CC:DD:EE:02');
-const up = Link.opened(id: LinkId('L1'), device: device);
-final closing = up.on(const DisconnectRequested()).link;
-final ended = up.on(const RadioReported(LinkReport.disconnected)).link;
+final at = DateTime.utc(2026, 11, 26, 10);
+final up = Link.open(id: const LinkId('L1'), device: device, at: at).link;
+final closing = up.on(const DisconnectRequested(), at: at).link;
+final ended = up.on(const RadioReported(LinkReport.disconnected), at: at).link;
 
 LiveLinks heldBy(LinkUser user) =>
     const LiveLinks.empty().admit(device, user, link: null).$1.opened(device);

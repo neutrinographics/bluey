@@ -2,24 +2,49 @@ import 'package:meta/meta.dart';
 
 import '../../../shared/domain/device_address.dart';
 import 'link_end.dart';
+import 'link_event.dart';
 import 'link_id.dart';
 import 'link_input.dart';
 import 'link_phase.dart';
 
 /// What the owner of a link must now do because of a step, which the link
 /// cannot do itself: it touches no radio and holds nothing to release.
-enum LinkDuty {
-  /// Ask the platform to close the link, and feed its answer back.
-  closeTheLink,
+@immutable
+sealed class LinkDuty {
+  const LinkDuty();
+}
 
-  /// The link has ended: release what lives as long as it.
-  release,
+/// Ask the platform to close the link, and feed its answer back.
+final class CloseTheLink extends LinkDuty {
+  const CloseTheLink();
+
+  @override
+  bool operator ==(Object other) => other is CloseTheLink;
+
+  @override
+  int get hashCode => (CloseTheLink).hashCode;
+}
+
+/// The link has ended: release what lives as long as it. It carries the
+/// end, so a release can never be due on a link that has not ended.
+final class ReleaseTheLink extends LinkDuty {
+  const ReleaseTheLink(this.end);
+
+  /// Why the link ended.
+  final LinkEnd end;
+
+  @override
+  bool operator ==(Object other) => other is ReleaseTheLink && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(ReleaseTheLink, end);
 }
 
 /// The answer to one input: the link as it now stands, the duty, if any,
-/// that the input left its owner, and the phase it entered, if any.
+/// that the input left its owner, the phase it entered, if any, and what it
+/// raised for others to hear of.
 final class LinkStep {
-  const LinkStep(this.link, {this.duty, this.entered});
+  const LinkStep(this.link, {this.duty, this.entered, this.events = const []});
 
   /// The link after the input.
   final Link link;
@@ -31,6 +56,10 @@ final class LinkStep {
   /// kind of phase, so an owner tells others of a move only when there was
   /// one: a closing link whose closer changed has not begun closing again.
   final LinkPhase? entered;
+
+  /// What the step raised, in order; empty unless it opened or ended the
+  /// link, so each is raised once in the link's life.
+  final List<LinkEvent> events;
 }
 
 /// One link to a device and its lifecycle, which decides what every event
@@ -48,11 +77,21 @@ final class LinkStep {
 /// again.
 @immutable
 final class Link {
-  /// A link the platform has just connected; the lifecycle starts at
-  /// [Linked]. It is the only way to build a link, so every link has walked
-  /// the lifecycle from its start.
-  const Link.opened({required this.id, required this.device})
-    : phase = const Linked();
+  /// A link the platform has just connected at [at]; the lifecycle starts
+  /// at [Linked]. It is the only way to build a link, so every link has
+  /// walked the lifecycle from its start and was told of as opened.
+  static LinkStep open({
+    required LinkId id,
+    required DeviceAddress device,
+    required DateTime at,
+  }) {
+    const linked = Linked();
+    return LinkStep(
+      Link._(id: id, device: device, phase: linked),
+      entered: linked,
+      events: [LinkOpened(device: device, at: at)],
+    );
+  }
 
   const Link._({required this.id, required this.device, required this.phase});
 
@@ -88,10 +127,16 @@ final class Link {
   /// Whether the link has ended, for good.
   bool get hasEnded => phase is Ended;
 
-  /// Answers what [input] does to this link.
-  LinkStep on(LinkInput input) => switch ((phase, input)) {
+  /// Answers what [input], which came at [at], does to this link.
+  LinkStep on(LinkInput input, {required DateTime at}) => switch ((
+    phase,
+    input,
+  )) {
     (Ended(), _) => LinkStep(this),
-    (_, RadioOutageBegan(:final outage)) => _end(EndedByRadioOutage(outage)),
+    (_, RadioOutageBegan(:final outage)) => _end(
+      EndedByRadioOutage(outage),
+      at,
+    ),
     (Linked(), ServicesDiscovered()) => _enter(const Ready()),
     (Ready(), ServicesDiscovered()) => LinkStep(this),
     (
@@ -105,10 +150,10 @@ final class Link {
       UpPhase(),
       RadioReported(report: LinkReport.disconnected) || ReportsEnded(),
     ) =>
-      _end(const EndedByDrop()),
+      _end(const EndedByDrop(), at),
     (final UpPhase up, DisconnectRequested()) => _enter(
       Closing(returnTo: up, by: ClosingBy.request),
-      duty: LinkDuty.closeTheLink,
+      duty: const CloseTheLink(),
     ),
     (UpPhase(), CloseConfirmed() || CloseFailed()) => LinkStep(this),
     (Closing(), ServicesDiscovered()) => LinkStep(this),
@@ -125,16 +170,16 @@ final class Link {
       Closing(:final by),
       RadioReported(report: LinkReport.disconnected) || ReportsEnded(),
     ) =>
-      _end(_endOfClosingBy(by)),
+      _end(_endOfClosingBy(by), at),
     (Closing(by: ClosingBy.request || ClosingBy.both), DisconnectRequested()) =>
       LinkStep(this),
     (Closing(:final returnTo, by: ClosingBy.radio), DisconnectRequested()) =>
       _stay(
         Closing(returnTo: returnTo, by: ClosingBy.both),
-        duty: LinkDuty.closeTheLink,
+        duty: const CloseTheLink(),
       ),
     (Closing(by: ClosingBy.request || ClosingBy.both), CloseConfirmed()) =>
-      _end(const EndedOnRequest()),
+      _end(const EndedOnRequest(), at),
     (Closing(:final returnTo, by: ClosingBy.request), CloseFailed()) => _enter(
       returnTo,
     ),
@@ -156,7 +201,12 @@ final class Link {
   LinkStep _stay(Closing next, {LinkDuty? duty}) =>
       LinkStep(_in(next), duty: duty);
 
-  LinkStep _end(LinkEnd end) => _enter(Ended(end), duty: LinkDuty.release);
+  LinkStep _end(LinkEnd end, DateTime at) => LinkStep(
+    _in(Ended(end)),
+    duty: ReleaseTheLink(end),
+    entered: Ended(end),
+    events: [LinkEnded(device: device, at: at, end: end)],
+  );
 
   Link _in(LinkPhase next) => Link._(id: id, device: device, phase: next);
 }

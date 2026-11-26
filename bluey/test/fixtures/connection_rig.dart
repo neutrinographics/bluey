@@ -3,6 +3,7 @@ import 'package:bluey/src/api/connection/bluey_connection.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connection.dart';
 import 'package:bluey/src/api/connection/connections.dart';
+import 'package:bluey/src/api/connection/connection_event_translation.dart';
 import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
@@ -30,7 +31,7 @@ class ConnectionRig {
     final bus = events ?? BlueyEventBus();
     final registry = LinkRegistry(
       links: PlatformLinks(platform, log: log),
-      events: bus,
+      events: PublishedLinkEvents(bus),
       log: log,
       now: clock.now,
     );

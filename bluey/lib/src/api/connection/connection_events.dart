@@ -1,12 +1,12 @@
-import '../../../shared/domain/bluey_event.dart';
-import '../../../shared/domain/device_address.dart';
+import '../../shared/domain/bluey_event.dart';
+import '../../shared/domain/device_address.dart';
 
 /// A connect to [deviceAddress] began, so an app watching `bluey.events` can
 /// show the attempt before it succeeds or fails.
 final class ConnectingEvent extends BlueyEvent {
   final DeviceAddress deviceAddress;
 
-  ConnectingEvent({required this.deviceAddress, super.source});
+  ConnectingEvent({required this.deviceAddress, super.source, super.timestamp});
 
   @override
   String toString() =>
@@ -18,7 +18,7 @@ final class ConnectingEvent extends BlueyEvent {
 final class ConnectedEvent extends BlueyEvent {
   final DeviceAddress deviceAddress;
 
-  ConnectedEvent({required this.deviceAddress, super.source});
+  ConnectedEvent({required this.deviceAddress, super.source, super.timestamp});
 
   @override
   String toString() =>
@@ -31,7 +31,12 @@ final class DisconnectedEvent extends BlueyEvent {
   final DeviceAddress deviceAddress;
   final String? reason;
 
-  DisconnectedEvent({required this.deviceAddress, this.reason, super.source});
+  DisconnectedEvent({
+    required this.deviceAddress,
+    this.reason,
+    super.source,
+    super.timestamp,
+  });
 
   @override
   String toString() {

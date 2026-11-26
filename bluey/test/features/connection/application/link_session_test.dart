@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:bluey/src/features/connection/application/link_session.dart';
-import 'package:bluey/src/features/connection/domain/connection_event.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/api/connection/connection_state.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_event.dart'
+    as link_event;
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
@@ -16,7 +17,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
-import '../../../fixtures/shared/application/recording_event_publisher.dart';
+import '../../../fixtures/features/connection/recording_link_events.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
@@ -26,6 +27,7 @@ const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 /// builds.
 const timed = DeviceAddress('AA:BB:CC:DD:EE:02');
 const success = Right<ConnectionFailure, void>(null);
+final now = DateTime.utc(2026, 11, 26, 10);
 
 /// Radio whose reports a test can end by hand while the link is up, which
 /// [InMemoryLinks] only does after a disconnected report or a close.
@@ -38,7 +40,7 @@ class EndingReports extends InMemoryLinks {
 
 void main() {
   late InMemoryLinks links;
-  late RecordingEventPublisher events;
+  late RecordingLinkEvents events;
   late RecordingLog log;
   late LinkSession session;
   late List<LinkEnd> released;
@@ -48,10 +50,11 @@ void main() {
       at,
     )).fold((failure) => fail('the open failed: $failure'), (id) => id);
     final opened = LinkSession(
-      link: Link.opened(id: id, device: at),
+      link: Link.open(id: id, device: at, at: now).link,
       links: links,
       events: events,
       log: log,
+      now: () => now,
     );
     opened.onEnd(released.add);
     return opened;
@@ -62,7 +65,7 @@ void main() {
         InMemoryLinks()
           ..reach(device)
           ..reach(timed);
-    events = RecordingEventPublisher();
+    events = RecordingLinkEvents();
     log = RecordingLog();
     released = [];
     session = await openSession(device);
@@ -81,8 +84,8 @@ void main() {
     return phases;
   }
 
-  Iterable<DisconnectedEvent> disconnects() =>
-      events.events.whereType<DisconnectedEvent>();
+  Iterable<link_event.LinkEnded> ends() =>
+      events.raised.whereType<link_event.LinkEnded>();
 
   group('a drop', () {
     test(
@@ -102,8 +105,13 @@ void main() {
         expect(phases, [const Ended(EndedByDrop())]);
         expect(closed, isTrue);
         expect(released, [const EndedByDrop()]);
-        expect(disconnects().single.reason, 'linkLoss');
-        expect(disconnects().single.deviceAddress, device);
+        expect(events.raised, [
+          link_event.LinkEnded(
+            device: device,
+            at: now,
+            end: const EndedByDrop(),
+          ),
+        ]);
       },
     );
 
@@ -120,7 +128,7 @@ void main() {
         await pumpEventQueue();
 
         // assert
-        expect(disconnects(), hasLength(1));
+        expect(ends(), hasLength(1));
         expect(released, [const EndedByDrop()]);
         expect(session.link.end, const EndedByDrop());
       },
@@ -130,10 +138,11 @@ void main() {
       // arrange
       final radio = EndingReports()..reach(device);
       final ended = LinkSession(
-        link: const Link.opened(id: LinkId('L1'), device: device),
+        link: Link.open(id: const LinkId('L1'), device: device, at: now).link,
         links: radio,
         events: events,
         log: log,
+        now: () => now,
       );
 
       // act
@@ -142,7 +151,7 @@ void main() {
 
       // assert
       expect(ended.link.end, const EndedByDrop());
-      expect(disconnects().single.reason, 'linkLoss');
+      expect(ends().single.end, const EndedByDrop());
     });
 
     test('a late connected report does not revive the link', () async {
@@ -196,7 +205,7 @@ void main() {
         expect(done, isFalse);
         releasing.complete();
         expect(await answer, success);
-        expect(disconnects().single.reason, 'requested');
+        expect(ends().single.end, const EndedOnRequest());
       },
     );
 
@@ -268,7 +277,7 @@ void main() {
           const Ready(),
         ]);
         expect(released, isEmpty);
-        expect(disconnects(), isEmpty);
+        expect(ends(), isEmpty);
       },
     );
 
@@ -575,7 +584,7 @@ void main() {
       await pumpEventQueue();
 
       // assert
-      expect(disconnects().single.reason, 'linkLoss');
+      expect(ends().single.end, const EndedByDrop());
       expect(released, [const EndedByDrop()]);
       expect(await session.disconnect(), success);
       final failure = log.records.singleWhere(
@@ -667,7 +676,7 @@ void main() {
     expect(session.link.end, const EndedByRadioOutage(RadioOutage.off));
     expect(phases, [const Ended(EndedByRadioOutage(RadioOutage.off))]);
     expect(released, [const EndedByRadioOutage(RadioOutage.off)]);
-    expect(disconnects().single.reason, 'radioOutage');
+    expect(ends().single.end, const EndedByRadioOutage(RadioOutage.off));
   });
 
   test('servicesDiscovered makes the link ready, once', () async {

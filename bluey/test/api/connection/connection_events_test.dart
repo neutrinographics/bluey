@@ -1,4 +1,4 @@
-import 'package:bluey/src/features/connection/domain/connection_event.dart';
+import 'package:bluey/src/api/connection/connection_events.dart';
 import 'package:bluey/src/shared/domain/bluey_event.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -72,5 +72,22 @@ void main() {
       expect(event.reason, isNull);
       expect(event.toString(), '[Connection] Disconnected from AA:BB:CC');
     });
+  });
+
+  test('each event keeps the time it is handed', () {
+    // arrange
+    final at = DateTime.utc(2026, 11, 26, 10);
+
+    // act
+    final events = <BlueyEvent>[
+      ConnectingEvent(deviceAddress: address, timestamp: at),
+      ConnectedEvent(deviceAddress: address, timestamp: at),
+      DisconnectedEvent(deviceAddress: address, timestamp: at),
+    ];
+
+    // assert
+    for (final event in events) {
+      expect(event.timestamp, at);
+    }
   });
 }

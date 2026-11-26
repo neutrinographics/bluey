@@ -1,8 +1,10 @@
 import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
 import 'package:bluey/src/features/connection/application/link_session.dart';
-import 'package:bluey/src/features/connection/domain/connection_event.dart';
-import 'package:bluey/src/features/connection/domain/connection_failure.dart';
+import 'package:bluey/src/features/connection/domain/connection_failure.dart'
+    hide LinkEnded;
+import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/live_links.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
@@ -11,17 +13,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/either_results.dart';
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
-import '../../../fixtures/shared/application/recording_event_publisher.dart';
+import '../../../fixtures/features/connection/recording_link_events.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
+final at = DateTime.utc(2026, 11, 26, 10);
 const timedOut = Left<ConnectionFailure, LinkSession>(
   ConnectFailed(ConnectFailureReason.timeout),
 );
 
 void main() {
   late InMemoryLinks links;
-  late RecordingEventPublisher events;
+  late RecordingLinkEvents events;
   late RecordingLog log;
   late LinkRegistry registry;
   DateTime? handedNow;
@@ -29,7 +32,7 @@ void main() {
   void build() {
     handedNow = null;
     links = InMemoryLinks()..reach(device);
-    events = RecordingEventPublisher();
+    events = RecordingLinkEvents();
     log = RecordingLog();
     registry = LinkRegistry(
       links: links,
@@ -49,17 +52,39 @@ void main() {
   bool? isUp(Either<ConnectionFailure, LinkSession> answer) =>
       answer.fold((_) => null, (session) => session.link.isUp);
 
+  group('ending', () {
+    test('a link that ends raises one end at the handed time, also when a '
+        'late outage follows', () async {
+      // arrange
+      await acquired(LinkUser.app);
+      handedNow = at;
+
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+      links.outage(RadioOutage.off);
+      await pumpEventQueue();
+
+      // assert
+      expect(events.raised.whereType<LinkEnded>(), [
+        LinkEnded(device: device, at: at, end: const EndedByDrop()),
+      ]);
+    });
+  });
+
   group('opening', () {
-    test('an open is announced: connecting, then connected', () async {
+    test('an open raises that it began, then that the link opened', () async {
+      // arrange
+      handedNow = at;
+
       // act
       await acquired(LinkUser.app);
 
       // assert
-      expect(events.events, [isA<ConnectingEvent>(), isA<ConnectedEvent>()]);
-      expect(
-        events.events.whereType<ConnectedEvent>().single.deviceAddress,
-        device,
-      );
+      expect(events.raised, [
+        LinkOpenBegan(device: device, at: at),
+        LinkOpened(device: device, at: at),
+      ]);
       expect(messages(), ['connect started', 'connect succeeded']);
       for (final line in log.records) {
         expect(line.context, 'bluey.connection');
@@ -78,7 +103,7 @@ void main() {
       // assert
       expect(identical(first, second), isTrue);
       expect(links.opensAsked(device), 1);
-      expect(events.events, hasLength(2));
+      expect(events.raised, hasLength(2));
     });
 
     test('two acquires at once start one open and answer the same session', () {
@@ -103,6 +128,7 @@ void main() {
 
     test('a failed open answers the failure and forgets the device', () async {
       // arrange
+      handedNow = at;
       links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
 
       // act
@@ -115,7 +141,7 @@ void main() {
           ConnectFailed(ConnectFailureReason.deviceNotConnectable),
         ),
       );
-      expect(events.events.whereType<ConnectedEvent>(), isEmpty);
+      expect(events.raised, [LinkOpenBegan(device: device, at: at)]);
       final failed = log.records.last;
       expect(failed.message, 'connect failed');
       expect(failed.level, BlueyLogLevel.error);

@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import 'api/connection/borrowed_connection.dart';
 import 'api/connection/bluey_connection.dart';
 import 'api/connection/connection.dart';
+import 'api/connection/connection_event_translation.dart';
 import 'api/connection/connection_failure_translation.dart';
 import 'api/connection/connections.dart';
 import 'connection/bluey_connection.dart';
@@ -91,7 +92,7 @@ class Bluey {
   late final Connections _connections = Connections(present: _present);
   late final LinkRegistry _registry = LinkRegistry(
     links: PlatformLinks(_platform, log: _logger),
-    events: _eventBus,
+    events: PublishedLinkEvents(_eventBus),
     log: _logger,
     now: clock.now,
   );
@@ -170,9 +171,7 @@ class Bluey {
     // that), there's nothing to await. This is the common case on real
     // platforms after the plugin has been initialised once during the
     // app's lifetime — the OS-cached state is available immediately.
-    if (bluey._currentState != BluetoothState.unknown) {
-      return bluey;
-    }
+    if (bluey._currentState != BluetoothState.unknown) return bluey;
     try {
       // Await the first meaningful state event so the sync cache is
       // fresh. `firstWhere` keeps waiting if the platform emits

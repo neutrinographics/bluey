@@ -1,18 +1,18 @@
 import 'dart:async';
 
-import '../../../shared/application/event_publisher.dart';
 import '../../../shared/application/log.dart';
 import '../../../shared/application/log_level.dart';
 import '../../../shared/application/now.dart';
 import '../../../shared/domain/device_address.dart';
 import '../../../shared/domain/either.dart';
-import '../domain/connection_event.dart';
 import '../domain/connection_failure.dart';
 import '../domain/link.dart';
+import '../domain/link_event.dart';
 import '../domain/link_id.dart';
 import '../domain/live_links.dart';
 import 'connection_log_words.dart';
 import 'link_session.dart';
+import 'ports/link_events.dart';
 import 'ports/links.dart';
 
 const _timedOut = ConnectFailed(ConnectFailureReason.timeout);
@@ -29,7 +29,7 @@ const _timedOut = ConnectFailed(ConnectFailureReason.timeout);
 final class LinkRegistry {
   LinkRegistry({
     required Links links,
-    required EventPublisher events,
+    required LinkEvents events,
     required Log log,
     required Now now,
   }) : _links = links,
@@ -38,7 +38,7 @@ final class LinkRegistry {
        _now = now;
 
   final Links _links;
-  final EventPublisher _events;
+  final LinkEvents _events;
   final Log _log;
   final Now _now;
   final Map<DeviceAddress, LinkSession> _sessions = {};
@@ -104,7 +104,7 @@ final class LinkRegistry {
     DeviceAddress device,
     Duration? timeout,
   ) async {
-    _events.emit(ConnectingEvent(deviceAddress: device));
+    _events.raise(LinkOpenBegan(device: device, at: _now()));
     _logDevice(device, 'connect started');
     final answer = await _links.open(device, timeout: timeout);
     switch (answer) {
@@ -115,24 +115,28 @@ final class LinkRegistry {
         return Left(value);
       case Right(:final value):
         final session = _sessionOf(device, value);
-        _events.emit(ConnectedEvent(deviceAddress: device));
         _logDevice(device, 'connect succeeded');
         _announceChange(device);
         return Right(session);
     }
   }
 
+  /// The session of the link just opened, stored before the open is told
+  /// of, so whoever hears of it finds the device's link live.
   LinkSession _sessionOf(DeviceAddress device, LinkId id) {
+    final opened = Link.open(id: id, device: device, at: _now());
     final session = LinkSession(
-      link: Link.opened(id: id, device: device),
+      link: opened.link,
       links: _links,
       events: _events,
       log: _log,
+      now: _now,
     );
     _sessions[device] = session;
     _table = _table.opened(device);
     session.phases.listen((_) => _announceChange(device));
     session.onEnd((_) => _forget(session));
+    opened.events.forEach(_events.raise);
     return session;
   }
 

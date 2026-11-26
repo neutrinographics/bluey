@@ -1,5 +1,6 @@
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
@@ -8,10 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 const id = LinkId('L1');
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
+final opened = DateTime.utc(2026, 11, 26, 9);
+final at = DateTime.utc(2026, 11, 26, 10);
 
 Link after(List<LinkInput> inputs) => inputs.fold(
-  const Link.opened(id: id, device: device),
-  (link, input) => link.on(input).link,
+  Link.open(id: id, device: device, at: opened).link,
+  (link, input) => link.on(input, at: opened).link,
 );
 
 const discovered = ServicesDiscovered();
@@ -27,43 +30,56 @@ const dropped = Ended(EndedByDrop());
 Closing closing(UpPhase returnTo, ClosingBy by) =>
     Closing(returnTo: returnTo, by: by);
 
-/// The end a link in [phase] must report: the one an ended phase holds.
-LinkEnd? endOf(LinkPhase phase) => switch (phase) {
-  Ended(:final end) => end,
-  _ => null,
-};
-
 typedef Row =
     (
       String name,
       List<LinkInput> before,
       LinkInput input,
       LinkPhase phase,
+      LinkEnd? end,
       LinkDuty? duty,
       LinkPhase? entered,
       LinkEnd? endInSight,
     );
 
 void checkEach(List<Row> rows) {
-  for (final (name, before, input, phase, duty, entered, endInSight) in rows) {
+  for (final (name, before, input, phase, end, duty, entered, endInSight)
+      in rows) {
     test(name, () {
       // arrange
       final link = after(before);
 
       // act
-      final step = link.on(input);
+      final step = link.on(input, at: at);
 
       // assert
       expect(step.link.phase, phase);
+      expect(step.link.end, end);
       expect(step.duty, duty);
       expect(step.entered, entered);
-      expect(step.link.end, endOf(phase));
       expect(step.link.endInSight, endInSight);
+      expect(step.events, [
+        if (end != null) LinkEnded(device: device, at: at, end: end),
+      ]);
     });
   }
 }
 
 void main() {
+  group('opening', () {
+    test('a link opens linked and raises that it opened', () {
+      // act
+      final step = Link.open(id: id, device: device, at: at);
+
+      // assert
+      expect(step.link.phase, linked);
+      expect((step.link.id, step.link.device), (id, device));
+      expect(step.entered, linked);
+      expect(step.duty, isNull);
+      expect(step.events, [LinkOpened(device: device, at: at)]);
+    });
+  });
+
   group('the lifecycle table', () {
     checkEach([
       (
@@ -71,6 +87,7 @@ void main() {
         [],
         discovered,
         ready,
+        null,
         null,
         ready,
         null,
@@ -83,12 +100,14 @@ void main() {
         null,
         null,
         null,
+        null,
       ),
       (
         'a connecting report changes nothing',
         [],
         const RadioReported(LinkReport.connecting),
         linked,
+        null,
         null,
         null,
         null,
@@ -99,6 +118,7 @@ void main() {
         radioClosing,
         closing(ready, ClosingBy.radio),
         null,
+        null,
         closing(ready, ClosingBy.radio),
         const EndedByDrop(),
       ),
@@ -107,7 +127,8 @@ void main() {
         [discovered],
         request,
         closing(ready, ClosingBy.request),
-        LinkDuty.closeTheLink,
+        null,
+        const CloseTheLink(),
         closing(ready, ClosingBy.request),
         const EndedOnRequest(),
       ),
@@ -118,6 +139,7 @@ void main() {
         closing(linked, ClosingBy.request),
         null,
         null,
+        null,
         const EndedOnRequest(),
       ),
       (
@@ -126,7 +148,8 @@ void main() {
         [radioClosing],
         request,
         closing(linked, ClosingBy.both),
-        LinkDuty.closeTheLink,
+        null,
+        const CloseTheLink(),
         null,
         const EndedOnRequest(),
       ),
@@ -135,7 +158,8 @@ void main() {
         [request],
         const CloseConfirmed(),
         onRequest,
-        LinkDuty.release,
+        const EndedOnRequest(),
+        const ReleaseTheLink(EndedOnRequest()),
         onRequest,
         const EndedOnRequest(),
       ),
@@ -144,7 +168,8 @@ void main() {
         [request],
         radioGone,
         onRequest,
-        LinkDuty.release,
+        const EndedOnRequest(),
+        const ReleaseTheLink(EndedOnRequest()),
         onRequest,
         const EndedOnRequest(),
       ),
@@ -153,7 +178,8 @@ void main() {
         [request],
         const ReportsEnded(),
         onRequest,
-        LinkDuty.release,
+        const EndedOnRequest(),
+        const ReleaseTheLink(EndedOnRequest()),
         onRequest,
         const EndedOnRequest(),
       ),
@@ -162,7 +188,8 @@ void main() {
         [radioClosing],
         radioGone,
         dropped,
-        LinkDuty.release,
+        const EndedByDrop(),
+        const ReleaseTheLink(EndedByDrop()),
         dropped,
         const EndedByDrop(),
       ),
@@ -171,6 +198,7 @@ void main() {
         [discovered, request],
         const CloseFailed(),
         ready,
+        null,
         null,
         ready,
         null,
@@ -181,6 +209,7 @@ void main() {
         const CloseFailed(),
         linked,
         null,
+        null,
         linked,
         null,
       ),
@@ -189,7 +218,8 @@ void main() {
         [],
         radioGone,
         dropped,
-        LinkDuty.release,
+        const EndedByDrop(),
+        const ReleaseTheLink(EndedByDrop()),
         dropped,
         const EndedByDrop(),
       ),
@@ -198,7 +228,8 @@ void main() {
         [discovered],
         const ReportsEnded(),
         dropped,
-        LinkDuty.release,
+        const EndedByDrop(),
+        const ReleaseTheLink(EndedByDrop()),
         dropped,
         const EndedByDrop(),
       ),
@@ -207,7 +238,8 @@ void main() {
         [discovered],
         const RadioOutageBegan(RadioOutage.off),
         const Ended(EndedByRadioOutage(RadioOutage.off)),
-        LinkDuty.release,
+        const EndedByRadioOutage(RadioOutage.off),
+        const ReleaseTheLink(EndedByRadioOutage(RadioOutage.off)),
         const Ended(EndedByRadioOutage(RadioOutage.off)),
         const EndedByRadioOutage(RadioOutage.off),
       ),
@@ -216,7 +248,8 @@ void main() {
         [request],
         const RadioOutageBegan(RadioOutage.unknown),
         const Ended(EndedByRadioOutage(RadioOutage.unknown)),
-        LinkDuty.release,
+        const EndedByRadioOutage(RadioOutage.unknown),
+        const ReleaseTheLink(EndedByRadioOutage(RadioOutage.unknown)),
         const Ended(EndedByRadioOutage(RadioOutage.unknown)),
         const EndedByRadioOutage(RadioOutage.unknown),
       ),
@@ -228,12 +261,14 @@ void main() {
         null,
         null,
         null,
+        null,
       ),
       (
         'discovery while closing changes nothing',
         [request],
         discovered,
         closing(linked, ClosingBy.request),
+        null,
         null,
         null,
         const EndedOnRequest(),
@@ -251,12 +286,14 @@ void main() {
         null,
         null,
         null,
+        null,
       ),
       (
         'a close the radio ends before it is asked is not answered',
         [radioClosing],
         const CloseConfirmed(),
         closing(linked, ClosingBy.radio),
+        null,
         null,
         null,
         const EndedByDrop(),
@@ -266,6 +303,7 @@ void main() {
         [radioClosing],
         const CloseFailed(),
         closing(linked, ClosingBy.radio),
+        null,
         null,
         null,
         const EndedByDrop(),
@@ -278,6 +316,7 @@ void main() {
         closing(ready, ClosingBy.radio),
         null,
         null,
+        null,
         const EndedByDrop(),
       ),
       (
@@ -285,6 +324,7 @@ void main() {
         [request],
         radioClosing,
         closing(linked, ClosingBy.request),
+        null,
         null,
         null,
         const EndedOnRequest(),
@@ -296,6 +336,7 @@ void main() {
         const CloseFailed(),
         ready,
         null,
+        null,
         ready,
         null,
       ),
@@ -304,7 +345,8 @@ void main() {
         [discovered, radioClosing, request, const CloseFailed()],
         request,
         closing(ready, ClosingBy.both),
-        LinkDuty.closeTheLink,
+        null,
+        const CloseTheLink(),
         null,
         const EndedOnRequest(),
       ),
@@ -313,6 +355,7 @@ void main() {
         [request],
         const RadioReported(LinkReport.connected),
         closing(linked, ClosingBy.request),
+        null,
         null,
         null,
         const EndedOnRequest(),
@@ -324,6 +367,7 @@ void main() {
         closing(linked, ClosingBy.radio),
         null,
         null,
+        null,
         const EndedByDrop(),
       ),
       (
@@ -331,7 +375,8 @@ void main() {
         [radioClosing],
         const ReportsEnded(),
         dropped,
-        LinkDuty.release,
+        const EndedByDrop(),
+        const ReleaseTheLink(EndedByDrop()),
         dropped,
         const EndedByDrop(),
       ),
@@ -341,6 +386,7 @@ void main() {
         radioClosing,
         closing(linked, ClosingBy.radio),
         null,
+        null,
         closing(linked, ClosingBy.radio),
         const EndedByDrop(),
       ),
@@ -349,7 +395,8 @@ void main() {
         [radioClosing, request],
         radioGone,
         onRequest,
-        LinkDuty.release,
+        const EndedOnRequest(),
+        const ReleaseTheLink(EndedOnRequest()),
         onRequest,
         const EndedOnRequest(),
       ),
@@ -358,7 +405,8 @@ void main() {
         [radioClosing, request],
         const CloseConfirmed(),
         onRequest,
-        LinkDuty.release,
+        const EndedOnRequest(),
+        const ReleaseTheLink(EndedOnRequest()),
         onRequest,
         const EndedOnRequest(),
       ),
@@ -389,14 +437,32 @@ void main() {
       for (final link in ended) {
         for (final input in every) {
           // act
-          final step = link.on(input);
+          final step = link.on(input, at: at);
 
           // assert
           expect(step.link, same(link));
           expect(step.duty, isNull);
           expect(step.entered, isNull);
+          expect(step.events, isEmpty);
         }
       }
+    });
+  });
+
+  group('duties', () {
+    test('are equal by value', () {
+      // assert
+      expect(const CloseTheLink(), const CloseTheLink());
+      expect(const CloseTheLink().hashCode, const CloseTheLink().hashCode);
+      expect(
+        const ReleaseTheLink(EndedByDrop()).hashCode,
+        const ReleaseTheLink(EndedByDrop()).hashCode,
+      );
+      expect(
+        const ReleaseTheLink(EndedByDrop()),
+        isNot(const ReleaseTheLink(EndedOnRequest())),
+      );
+      expect(const CloseTheLink(), isNot(const ReleaseTheLink(EndedByDrop())));
     });
   });
 

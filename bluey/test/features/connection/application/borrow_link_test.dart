@@ -2,15 +2,15 @@ import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
 import 'package:bluey/src/features/connection/application/connect_device.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
-import 'package:bluey/src/features/connection/domain/connection_event.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
+import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/either_results.dart';
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
-import '../../../fixtures/shared/application/recording_event_publisher.dart';
+import '../../../fixtures/features/connection/recording_link_events.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
@@ -18,13 +18,13 @@ const success = Right<ConnectionFailure, void>(null);
 
 void main() {
   late InMemoryLinks links;
-  late RecordingEventPublisher events;
+  late RecordingLinkEvents events;
   late BorrowLink borrow;
   late ConnectDevice connect;
 
   setUp(() {
     links = InMemoryLinks()..reach(device);
-    events = RecordingEventPublisher();
+    events = RecordingLinkEvents();
     final registry = LinkRegistry(
       links: links,
       events: events,
@@ -131,7 +131,7 @@ void main() {
       await borrowed();
 
       // assert
-      expect(events.events, [isA<ConnectingEvent>(), isA<ConnectedEvent>()]);
+      expect(events.raised, [isA<LinkOpenBegan>(), isA<LinkOpened>()]);
     });
   });
 }

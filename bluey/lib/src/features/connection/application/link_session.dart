@@ -1,16 +1,16 @@
 import 'dart:async';
 
-import '../../../shared/application/event_publisher.dart';
 import '../../../shared/application/log.dart';
 import '../../../shared/application/log_level.dart';
+import '../../../shared/application/now.dart';
 import '../../../shared/domain/either.dart';
-import '../domain/connection_event.dart';
 import '../domain/connection_failure.dart';
 import '../domain/link.dart';
 import '../domain/link_end.dart';
 import '../domain/link_input.dart';
 import '../domain/link_phase.dart';
 import 'connection_log_words.dart';
+import 'ports/link_events.dart';
 import 'ports/links.dart';
 
 /// Runs one link: it feeds the [Link] what the radio and the caller say, does
@@ -26,12 +26,14 @@ final class LinkSession {
   LinkSession({
     required Link link,
     required Links links,
-    required EventPublisher events,
+    required LinkEvents events,
     required Log log,
+    required Now now,
   }) : _link = link,
        _links = links,
        _events = events,
-       _log = log {
+       _log = log,
+       _now = now {
     _reports = links
         .reportsOf(link.id)
         .listen(
@@ -44,8 +46,9 @@ final class LinkSession {
   }
 
   final Links _links;
-  final EventPublisher _events;
+  final LinkEvents _events;
   final Log _log;
+  final Now _now;
   final StreamController<LinkPhase> _phases =
       StreamController<LinkPhase>.broadcast();
   final List<FutureOr<void> Function(LinkEnd end)> _releases = [];
@@ -108,26 +111,38 @@ final class LinkSession {
   ///
   /// A call while a close is in flight answers with that close, and a call on
   /// an ended link answers success without asking the platform. A failed
-  /// close leaves the link as it was, unless the link ended anyway.
+  /// close leaves the link as it was, unless the link ended anyway. A
+  /// request that starts no close answers once the link has ended.
   Future<Either<ConnectionFailure, void>> disconnect() {
     final inFlight = _closeInFlight;
     if (inFlight != null) return inFlight;
     if (_link.hasEnded) return _afterRelease();
     _logDevice('disconnect entered');
-    _feed(const DisconnectRequested());
-    return _closeInFlight ?? _afterRelease();
+    final duty = _step(const DisconnectRequested()).duty;
+    if (duty is CloseTheLink) return _closeInFlight = _close();
+    _carryOut(duty);
+    return _afterRelease();
   }
 
-  void _feed(LinkInput input) {
-    final step = _link.on(input);
+  void _feed(LinkInput input) => _carryOut(_step(input).duty);
+
+  /// Stores what [input] does to the link, then tells of it, so whoever
+  /// hears of a step reads the link as the step left it.
+  LinkStep _step(LinkInput input) {
+    final step = _link.on(input, at: _now());
     _link = step.link;
     if (step.entered case final entered?) _announce(entered);
-    switch ((step.duty, _link.phase)) {
-      case (LinkDuty.closeTheLink, _):
+    step.events.forEach(_events.raise);
+    return step;
+  }
+
+  void _carryOut(LinkDuty? duty) {
+    switch (duty) {
+      case CloseTheLink():
         _closeInFlight = _close();
-      case (LinkDuty.release, Ended(:final end)):
+      case ReleaseTheLink(:final end):
         unawaited(_release(end));
-      case _:
+      case null:
         break;
     }
   }
@@ -164,9 +179,6 @@ final class LinkSession {
       _guarded('end answer failed', () => answerEnd(end));
     }
     _operationsUp.clear();
-    _events.emit(
-      DisconnectedEvent(deviceAddress: _link.device, reason: _reasonOf(end)),
-    );
     unawaited(_reports.cancel());
     unawaited(_outages.cancel());
     for (var next = 0; next < _releases.length; next++) {
@@ -204,12 +216,6 @@ final class LinkSession {
     data: {'deviceId': '${_link.device}', 'error': '$error'},
     errorCode: error.runtimeType.toString(),
   );
-
-  static String _reasonOf(LinkEnd end) => switch (end) {
-    EndedOnRequest() => 'requested',
-    EndedByDrop() => 'linkLoss',
-    EndedByRadioOutage() => 'radioOutage',
-  };
 
   void _logDevice(String message) => _log.log(
     BlueyLogLevel.info,
