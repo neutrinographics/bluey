@@ -31,12 +31,14 @@ void main() {
       publisher: BlueyEventBus(),
       log: logger,
       now: clock.now,
+      extension: ConnectionExtension.none,
       platformName: 'fake',
       gattFor:
-          (session) => LinkGattClient(
+          (session, endAsException) => LinkGattClient(
             platformInstance: platform,
             session: session,
             logger: logger,
+            endAsException: endAsException,
           ),
     );
   });
@@ -102,12 +104,14 @@ void main() {
         publisher: BlueyEventBus(),
         log: logger,
         now: clock.now,
+        extension: ConnectionExtension.none,
         platformName: 'nameOfThisPlatform',
         gattFor:
-            (session) => LinkGattClient(
+            (session, endAsException) => LinkGattClient(
               platformInstance: platform,
               session: session,
               logger: logger,
+              endAsException: endAsException,
             ),
       );
       final connection = await named.connect(device);

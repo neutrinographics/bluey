@@ -92,12 +92,18 @@ class Bluey {
     publisher: _eventBus,
     log: _logger,
     now: clock.now,
+    extension: switch (capabilities.platformKind) {
+      PlatformKind.android => ConnectionExtension.android,
+      PlatformKind.ios => ConnectionExtension.ios,
+      PlatformKind.fake || PlatformKind.other => ConnectionExtension.none,
+    },
     platformName: capabilities.platformKind.name,
     gattFor:
-        (session) => LinkGattClient(
+        (session, endAsException) => LinkGattClient(
           platformInstance: _platform,
           session: session,
           logger: _logger,
+          endAsException: endAsException,
           events: _eventBus,
         ),
   );

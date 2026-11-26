@@ -5,8 +5,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../fakes/fake_platform.dart';
-import '../fakes/test_helpers.dart';
+import '../../fakes/fake_platform.dart';
+import '../../fakes/test_helpers.dart';
 
 /// Tests for Convention 2 (replay-on-subscribe) on Connection's four
 /// Type A streams: `stateChanges`, `servicesChanges`, `bondStateChanges`,

@@ -3,8 +3,8 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../fakes/fake_platform.dart';
-import '../fakes/test_helpers.dart';
+import '../../fakes/fake_platform.dart';
+import '../../fakes/test_helpers.dart';
 
 /// Tests that `BlueyConnection` consults [Capabilities] before subscribing
 /// to or fetching bond / PHY / connection-parameter state from the

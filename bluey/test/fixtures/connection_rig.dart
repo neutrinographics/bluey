@@ -17,23 +17,30 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 /// sees the same one-owner-per-link rules an app does.
 class ConnectionRig {
   ConnectionRig(
-    platform.BlueyPlatform platform, {
+    platform.BlueyPlatform radio, {
     BlueyLogger? logger,
     BlueyEventBus? events,
   }) {
     final log = logger ?? BlueyLogger();
     final bus = events ?? BlueyEventBus();
     _assembly = ConnectionAssembly(
-      ports: platformConnectionPorts(platform, log: log),
+      ports: platformConnectionPorts(radio, log: log),
       publisher: bus,
       log: log,
       now: clock.now,
-      platformName: platform.capabilities.platformKind.name,
+      extension: switch (radio.capabilities.platformKind) {
+        platform.PlatformKind.android => ConnectionExtension.android,
+        platform.PlatformKind.ios => ConnectionExtension.ios,
+        platform.PlatformKind.fake ||
+        platform.PlatformKind.other => ConnectionExtension.none,
+      },
+      platformName: radio.capabilities.platformKind.name,
       gattFor:
-          (session) => LinkGattClient(
-            platformInstance: platform,
+          (session, endAsException) => LinkGattClient(
+            platformInstance: radio,
             session: session,
             logger: log,
+            endAsException: endAsException,
             events: bus,
           ),
     );

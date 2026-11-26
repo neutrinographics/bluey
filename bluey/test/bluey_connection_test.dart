@@ -899,7 +899,7 @@ void main() {
           .having((e) => e.message, 'message', message)
           .having((e) => e.data, 'data', {
             'deviceId': deviceId.toString(),
-            'exception': 'StateError',
+            'exception': 'UnexpectedPlatformFailure',
           });
 
       test(

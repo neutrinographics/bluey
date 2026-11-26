@@ -12,7 +12,6 @@ library;
 const unplaced = <String>[
   'lib/src/bluey.dart -> unplaced',
   'lib/src/connection/bluey_connection.dart -> unplaced',
-  'lib/src/connection/connection_parameters_mapper.dart -> unplaced',
   'lib/src/connection/lifecycle_client.dart -> unplaced',
   'lib/src/connection/peer_silence_monitor.dart -> unplaced',
   'lib/src/connection/value_objects/attribute_handle.dart -> unplaced',
@@ -80,7 +79,6 @@ const boundaries = <String>[
 const frameworkPlacement = <String>[
   'lib/src/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/bluey_connection.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/connection/connection_parameters_mapper.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/lifecycle_client.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/discovery/bluey_scanner.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/gatt_server/bluey_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
@@ -111,8 +109,8 @@ const lintOptions = <String>[];
 
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
-  'lib/src/bluey.dart -> 968 lines',
-  'lib/src/connection/bluey_connection.dart -> 1454 lines',
+  'lib/src/bluey.dart -> 974 lines',
+  'lib/src/connection/bluey_connection.dart -> 970 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
   'lib/src/discovery/bluey_scanner.dart -> 410 lines',
   'lib/src/events.dart -> 477 lines',
@@ -128,10 +126,6 @@ const edgeContexts = <String>[];
 
 /// The files not yet in the target layout that name the edge.
 const edgeFromBelow = <String>[
-  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/android_connection_extensions.dart',
-  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/connection.dart',
-  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/connection_failure_translation.dart',
-  'lib/src/connection/bluey_connection.dart -> lib/src/api/connection/ios_connection_extensions.dart',
   'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/borrowed_connection.dart',
   'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/connection.dart',
   'lib/src/peer/peer_connection.dart -> lib/src/api/connection/connection.dart',
