@@ -78,6 +78,17 @@ void main() {
       expect(step.duty, isNull);
       expect(step.events, [LinkOpened(device: device, at: at)]);
     });
+
+    test('a step\'s events cannot be changed by whoever reads them', () {
+      // arrange
+      final step = Link.open(id: id, device: device, at: at);
+
+      // act
+      void addAnEvent() => step.events.add(LinkOpened(device: device, at: at));
+
+      // assert
+      expect(addAnEvent, throwsUnsupportedError);
+    });
   });
 
   group('the lifecycle table', () {

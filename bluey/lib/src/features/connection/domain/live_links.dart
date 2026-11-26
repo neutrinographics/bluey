@@ -1,22 +1,31 @@
-import 'package:meta/meta.dart';
-
 import '../../../shared/domain/device_address.dart';
-import 'link.dart';
+import 'live_link.dart';
 
 /// Who asks for a device's link: the app, which holds a link until it lets
 /// it go, or a borrower, which uses one for a while and gives it back.
 enum LinkUser { app, borrower }
 
 /// What a caller asking for a device's link must do.
-enum Admission {
-  /// Open a link; the caller's attempt is the only one for the device.
-  open,
+sealed class Admission<L extends LiveLink> {
+  const Admission();
+}
 
-  /// Wait for the open or close in flight to settle, then ask again.
-  wait,
+/// Open a link; the caller's attempt is the only one for the device.
+final class Open<L extends LiveLink> extends Admission<L> {
+  const Open();
+}
 
-  /// Use the link that is up; nothing is opened.
-  reuse,
+/// Wait for the open or close in flight to settle, then ask again.
+final class Wait<L extends LiveLink> extends Admission<L> {
+  const Wait();
+}
+
+/// Use [link], which is up; nothing is opened.
+final class Reuse<L extends LiveLink> extends Admission<L> {
+  const Reuse(this.link);
+
+  /// The device's link, now also used by the caller.
+  final L link;
 }
 
 /// What a give-back leaves the owner of the link to do.
@@ -32,135 +41,97 @@ enum AfterGiveBack {
 /// has two attempts at once and a borrower's give-back never closes a link
 /// the app holds.
 ///
-/// It is a value that answers decisions and touches no radio. It keeps no copy
-/// of a link's state: a caller asking about a device whose link came up hands
-/// that link in, and is answered from it. A device whose give-back answered
-/// [AfterGiveBack.closeTheLink] stays known, used by nobody, until its owner
-/// forgets it once the close has ended the link.
-@immutable
-final class LiveLinks {
-  /// No device has a link or an attempt in flight.
-  const LiveLinks.empty() : _entries = const {};
-
-  const LiveLinks._(this._entries);
-
-  final Map<DeviceAddress, _Entry> _entries;
+/// It holds each device's link, so its owner keeps no second table, and
+/// touches no radio. It is generic only so the owner gets back the type of
+/// link it put in. A device whose give-back answered
+/// [AfterGiveBack.closeTheLink] stays known, used by nobody, until its link
+/// has ended.
+final class LiveLinks<L extends LiveLink> {
+  final Map<DeviceAddress, _Entry<L>> _entries = {};
 
   /// Answers whether [user] opens, waits for or reuses [device]'s link, and
-  /// the table with the user recorded when it opens or reuses.
-  ///
-  /// [link] is the device's link when it has one, and null while none exists
-  /// or an open is in flight. A waiter is not recorded: it asks again.
-  (LiveLinks, Admission) admit(
-    DeviceAddress device,
-    LinkUser user, {
-    required Link? link,
-  }) {
+  /// records the user when it reuses. A waiter is not recorded: it asks again.
+  Admission<L> admit(DeviceAddress device, LinkUser user) {
     final entry = _entries[device];
     if (entry == null) {
-      return (_with(device, _Entry.opening(user)), Admission.open);
+      _entries[device] = _Entry<L>();
+      return Open<L>();
     }
-    if (entry.opening) return (this, Admission.wait);
-    if (link == null) {
-      throw StateError('The link to $device came up; ask with that link.');
-    }
-    if (!link.isUp) return (this, Admission.wait);
-    return (_with(device, entry.joinedBy(user)), Admission.reuse);
+    final link = entry.link;
+    if (link == null || link.isClosing) return Wait<L>();
+    entry.joinedBy(user);
+    return Reuse<L>(link);
   }
 
-  /// The attempt in flight for [device] came up.
-  LiveLinks opened(DeviceAddress device) => _changed(device, (e) => e.up());
+  /// The attempt [user] started for [device] came up as [link].
+  void opened(DeviceAddress device, LinkUser user, L link) =>
+      _entries[device] = _Entry<L>(link)..joinedBy(user);
 
-  /// Removes [device], whose open failed or whose link ended, so the next
-  /// caller opens a new link.
-  LiveLinks forget(DeviceAddress device) =>
-      LiveLinks._(Map.unmodifiable({..._entries}..remove(device)));
+  /// The attempt in flight for [device] failed, so the next caller opens.
+  void notOpened(DeviceAddress device) {
+    if (_entries[device]?.link == null) _entries.remove(device);
+  }
 
-  /// One borrower fewer on [device]'s link, and whether the link must now
-  /// close: only when no borrower is left and the app does not hold it.
+  /// One user fewer on [device]'s link, and whether the link must now close:
+  /// only when no borrower is left and the app does not hold it.
   ///
-  /// Only a borrower of a link that came up gives it back; a give-back while
-  /// the open is in flight is not part of the contract. A give-back on a
-  /// known device that no borrower uses is a [StateError], since it would
-  /// hide the next borrower and close the link under them.
-  (LiveLinks, AfterGiveBack) giveBack(DeviceAddress device) {
+  /// Only a user of a link that came up gives it back; a give-back while the
+  /// open is in flight is not part of the contract. A give-back by a user who
+  /// does not use a known device's link is a [StateError], since it would
+  /// hide the next user and close the link under them.
+  AfterGiveBack givenBack(DeviceAddress device, LinkUser user) {
     final entry = _entries[device];
-    if (entry == null) return (this, AfterGiveBack.leaveIt);
-    final after = entry.lessOneBorrower(device);
-    final answer =
-        after.inUse ? AfterGiveBack.leaveIt : AfterGiveBack.closeTheLink;
-    return (_with(device, after), answer);
+    if (entry == null) return AfterGiveBack.leaveIt;
+    entry.leftBy(user, device);
+    return entry.inUse ? AfterGiveBack.leaveIt : AfterGiveBack.closeTheLink;
   }
 
   /// One borrower fewer on [device]'s link, which the app now holds.
   ///
-  /// As with [giveBack], a keep on a known device that no borrower uses is a
+  /// As with [givenBack], a keep on a known device that no borrower uses is a
   /// [StateError].
-  LiveLinks keep(DeviceAddress device) =>
-      _changed(device, (e) => e.lessOneBorrower(device).heldByTheApp());
-
-  /// Whether the app holds [device]'s link, or the attempt it started.
-  bool appHolds(DeviceAddress device) => _entries[device]?.appHolds ?? false;
-
-  /// How many borrowers use [device]'s link, or the attempt one started.
-  int borrowersOf(DeviceAddress device) => _entries[device]?.borrowers ?? 0;
-
-  /// Whether an attempt to open [device]'s link is in flight.
-  bool isOpening(DeviceAddress device) => _entries[device]?.opening ?? false;
-
-  LiveLinks _changed(DeviceAddress device, _Entry Function(_Entry) change) {
+  void kept(DeviceAddress device) {
     final entry = _entries[device];
-    return entry == null ? this : _with(device, change(entry));
+    if (entry == null) return;
+    entry
+      ..leftBy(LinkUser.borrower, device)
+      ..joinedBy(LinkUser.app);
   }
 
-  LiveLinks _with(DeviceAddress device, _Entry entry) =>
-      LiveLinks._(Map.unmodifiable({..._entries, device: entry}));
+  /// [link] to [device] has ended, so the next caller opens. Matched by
+  /// identity, so an old link's end never drops the link that followed it.
+  void ended(DeviceAddress device, L link) {
+    if (identical(_entries[device]?.link, link)) _entries.remove(device);
+  }
 }
 
-@immutable
-final class _Entry {
-  const _Entry({
-    required this.opening,
-    required this.appHolds,
-    required this.borrowers,
-  });
+/// A device's link, null while the open is in flight, and who uses it.
+final class _Entry<L extends LiveLink> {
+  _Entry([this.link]);
 
-  _Entry.opening(LinkUser user)
-    : this(
-        opening: true,
-        appHolds: user == LinkUser.app,
-        borrowers: user == LinkUser.borrower ? 1 : 0,
-      );
+  final L? link;
+  bool _appHolds = false;
+  int _borrowers = 0;
 
-  final bool opening;
-  final bool appHolds;
-  final int borrowers;
+  bool get inUse => _appHolds || _borrowers > 0;
 
-  bool get inUse => appHolds || borrowers > 0;
-
-  _Entry up() =>
-      _Entry(opening: false, appHolds: appHolds, borrowers: borrowers);
-
-  _Entry joinedBy(LinkUser user) => switch (user) {
-    LinkUser.app => heldByTheApp(),
-    LinkUser.borrower => _Entry(
-      opening: opening,
-      appHolds: appHolds,
-      borrowers: borrowers + 1,
-    ),
+  void joinedBy(LinkUser user) => switch (user) {
+    LinkUser.app => _appHolds = true,
+    LinkUser.borrower => _borrowers++,
   };
 
-  _Entry heldByTheApp() =>
-      _Entry(opening: opening, appHolds: true, borrowers: borrowers);
-
-  _Entry lessOneBorrower(DeviceAddress device) {
-    if (borrowers == 0) {
-      throw StateError('No borrower uses the link to $device.');
+  void leftBy(LinkUser user, DeviceAddress device) {
+    switch (user) {
+      case LinkUser.app:
+        if (!_appHolds) {
+          throw StateError('The app does not hold the link to $device.');
+        }
+        _appHolds = false;
+      case LinkUser.borrower:
+        if (_borrowers == 0) {
+          throw StateError('No borrower uses the link to $device.');
+        }
+        _borrowers--;
     }
-    return _Entry(
-      opening: opening,
-      appHolds: appHolds,
-      borrowers: borrowers - 1,
-    );
   }
 }

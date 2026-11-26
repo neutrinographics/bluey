@@ -9,6 +9,7 @@ import '../domain/link.dart';
 import '../domain/link_end.dart';
 import '../domain/link_input.dart';
 import '../domain/link_phase.dart';
+import '../domain/live_link.dart';
 import 'connection_log_words.dart';
 import 'ports/link_events.dart';
 import 'ports/links.dart';
@@ -21,7 +22,7 @@ import 'ports/links.dart';
 /// Once the link has ended the session never addresses the platform with its
 /// id again, since the platform may already have given that id to the next
 /// link to the same device.
-final class LinkSession {
+final class LinkSession implements LiveLink {
   /// Starts listening to the link's reports and to radio outages at once.
   LinkSession({
     required Link link,
@@ -64,6 +65,11 @@ final class LinkSession {
 
   /// Where the link stands now.
   LinkPhase get phase => _link.phase;
+
+  /// Whether the link is no longer up: closing, or ended and not yet let go
+  /// of, so a caller asking for the device's link waits for it to settle.
+  @override
+  bool get isClosing => !_link.isUp;
 
   /// Every phase the link enters. Carries no errors, and ends when the link
   /// ends.

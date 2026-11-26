@@ -44,7 +44,12 @@ final class ReleaseTheLink extends LinkDuty {
 /// that the input left its owner, the phase it entered, if any, and what it
 /// raised for others to hear of.
 final class LinkStep {
-  const LinkStep(this.link, {this.duty, this.entered, this.events = const []});
+  LinkStep(
+    this.link, {
+    this.duty,
+    this.entered,
+    List<LinkEvent> events = const [],
+  }) : events = List.unmodifiable(events);
 
   /// The link after the input.
   final Link link;

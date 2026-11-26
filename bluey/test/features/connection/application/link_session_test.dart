@@ -85,6 +85,22 @@ void main() {
 
   Iterable<LinkEnded> ends() => events.raised.whereType<LinkEnded>();
 
+  group('as a live link', () {
+    test('is closing from the moment a close is asked until it is let go '
+        'of', () async {
+      // arrange
+      final before = session.isClosing;
+
+      // act
+      final closed = session.disconnect();
+      final whileClosing = session.isClosing;
+      await closed;
+
+      // assert
+      expect((before, whileClosing, session.isClosing), (false, true, true));
+    });
+  });
+
   group('a drop', () {
     test(
       'enters the ended phase, closes the phases and runs the releases',

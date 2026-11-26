@@ -1,10 +1,10 @@
 import 'package:clock/clock.dart';
+import 'package:bluey/src/features/connection/application/borrowed_link.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
 import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_event.dart';
-import 'package:bluey/src/features/connection/domain/live_links.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -17,7 +17,7 @@ import '../../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 final at = DateTime.utc(2026, 11, 26, 10);
-const timedOut = Left<ConnectionFailure, LinkSession>(
+const timedOut = Left<ConnectionFailure, BorrowedLink>(
   ConnectFailed(ConnectFailureReason.timeout),
 );
 
@@ -43,19 +43,24 @@ void main() {
 
   setUp(build);
 
-  Future<LinkSession> acquired(LinkUser by) async =>
-      rightOf(await registry.acquire(device, by: by));
+  Future<LinkSession> held() async => rightOf(await registry.hold(device));
+
+  Future<BorrowedLink> borrowed() async =>
+      rightOf(await registry.borrow(device));
 
   List<String> messages() => [for (final line in log.records) line.message];
 
   bool? isUp(Either<ConnectionFailure, LinkSession> answer) =>
       answer.fold((_) => null, (session) => session.link.isUp);
 
+  bool? borrowedIsUp(Either<ConnectionFailure, BorrowedLink> answer) =>
+      answer.fold((_) => null, (borrowed) => borrowed.session.link.isUp);
+
   group('ending', () {
     test('a link that ends raises one end at the handed time, also when a '
         'late outage follows', () async {
       // arrange
-      await acquired(LinkUser.app);
+      await held();
       handedNow = at;
 
       // act
@@ -77,7 +82,7 @@ void main() {
       handedNow = at;
 
       // act
-      await acquired(LinkUser.app);
+      await held();
 
       // assert
       expect(events.raised, [
@@ -94,13 +99,13 @@ void main() {
 
     test('a second acquire reuses the session and announces nothing', () async {
       // arrange
-      final first = await acquired(LinkUser.app);
+      final first = await held();
 
       // act
-      final second = await acquired(LinkUser.borrower);
+      final second = await borrowed();
 
       // assert
-      expect(identical(first, second), isTrue);
+      expect(identical(first, second.session), isTrue);
       expect(links.opensAsked(device), 1);
       expect(events.raised, hasLength(2));
     });
@@ -112,13 +117,16 @@ void main() {
         links.openDelay = const Duration(seconds: 1);
 
         // act
-        final app = registry.acquire(device, by: LinkUser.app);
-        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        final app = registry.hold(device);
+        final borrower = registry.borrow(device);
         async.elapse(const Duration(seconds: 1));
 
         // assert
         expect(
-          identical(rightOf(resultOf(app)), rightOf(resultOf(borrower))),
+          identical(
+            rightOf(resultOf(app)),
+            rightOf(resultOf(borrower)).session,
+          ),
           isTrue,
         );
         expect(links.opensAsked(device), 1);
@@ -131,7 +139,7 @@ void main() {
       links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
 
       // act
-      final answer = await registry.acquire(device, by: LinkUser.app);
+      final answer = await registry.hold(device);
 
       // assert
       expect(
@@ -150,7 +158,7 @@ void main() {
         'exception': 'ConnectFailed',
       });
       expect(failed.errorCode, 'ConnectFailed');
-      await acquired(LinkUser.app);
+      await held();
       expect(links.opensAsked(device), 2);
     });
   });
@@ -166,12 +174,11 @@ void main() {
           links.failNextOpen(device, ConnectFailureReason.timeout);
 
           // act
-          final borrower = registry.acquire(
+          final borrower = registry.borrow(
             device,
-            by: LinkUser.borrower,
             timeout: const Duration(seconds: 3),
           );
-          final app = registry.acquire(device, by: LinkUser.app);
+          final app = registry.hold(device);
           async.elapse(const Duration(seconds: 5));
 
           // assert
@@ -189,10 +196,9 @@ void main() {
         links.openDelay = const Duration(seconds: 10);
 
         // act
-        final app = registry.acquire(device, by: LinkUser.app);
-        final borrower = registry.acquire(
+        final app = registry.hold(device);
+        final borrower = registry.borrow(
           device,
-          by: LinkUser.borrower,
           timeout: const Duration(seconds: 3),
         );
         async.elapse(const Duration(seconds: 3));
@@ -213,17 +219,16 @@ void main() {
         links.failNextOpen(device, ConnectFailureReason.deviceNotFound);
 
         // act
-        registry.acquire(device, by: LinkUser.app);
-        final borrower = registry.acquire(
+        registry.hold(device);
+        final borrower = registry.borrow(
           device,
-          by: LinkUser.borrower,
           timeout: const Duration(seconds: 3),
         );
         async.elapse(const Duration(seconds: 2));
 
         // assert
         expect(links.openTimeouts, [null, const Duration(seconds: 2)]);
-        expect(isUp(resultOf(borrower)), isTrue);
+        expect(borrowedIsUp(resultOf(borrower)), isTrue);
       });
     });
 
@@ -232,19 +237,47 @@ void main() {
         // arrange
         build();
         links.closeDelay = const Duration(seconds: 1);
-        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        final borrower = registry.borrow(device);
         async.elapse(Duration.zero);
-        final closing = rightOf(resultOf(borrower));
-        registry.giveBack(closing);
+        final closing = rightOf(resultOf(borrower)).session;
+        rightOf(resultOf(borrower)).giveBack();
 
         // act
-        final app = registry.acquire(device, by: LinkUser.app);
+        final app = registry.hold(device);
         async.elapse(const Duration(seconds: 1));
 
         // assert
         final reopened = rightOf(resultOf(app));
         expect(identical(reopened, closing), isFalse);
         expect(closing.link.hasEnded, isTrue);
+        expect(reopened.link.isUp, isTrue);
+        expect(links.opensAsked(device), 2);
+      });
+    });
+
+    test('a borrower and the app arriving while the link closes get one new '
+        'link between them', () {
+      fakeAsync((async) {
+        // arrange
+        build();
+        links.closeDelay = const Duration(seconds: 1);
+        final app = registry.hold(device);
+        async.elapse(Duration.zero);
+        final closing = rightOf(resultOf(app));
+        closing.disconnect();
+
+        // act
+        final borrower = registry.borrow(device);
+        final appAgain = registry.hold(device);
+        async.elapse(const Duration(seconds: 1));
+
+        // assert
+        final reopened = rightOf(resultOf(appAgain));
+        expect(
+          identical(rightOf(resultOf(borrower)).session, reopened),
+          isTrue,
+        );
+        expect(identical(reopened, closing), isFalse);
         expect(reopened.link.isUp, isTrue);
         expect(links.opensAsked(device), 2);
       });
@@ -258,10 +291,9 @@ void main() {
         links.failNextOpen(device, ConnectFailureReason.deviceNotFound);
 
         // act
-        registry.acquire(device, by: LinkUser.app);
-        final borrower = registry.acquire(
+        registry.hold(device);
+        final borrower = registry.borrow(
           device,
-          by: LinkUser.borrower,
           timeout: const Duration(seconds: 3),
         );
         async.elapse(const Duration(seconds: 3));
@@ -279,10 +311,9 @@ void main() {
         build();
         links.openDelay = const Duration(seconds: 1);
         links.failNextOpen(device, ConnectFailureReason.deviceNotFound);
-        registry.acquire(device, by: LinkUser.app);
-        final borrower = registry.acquire(
+        registry.hold(device);
+        final borrower = registry.borrow(
           device,
-          by: LinkUser.borrower,
           timeout: const Duration(seconds: 3),
         );
 
@@ -301,7 +332,7 @@ void main() {
       fakeAsync((async) {
         // arrange
         build();
-        final app = registry.acquire(device, by: LinkUser.app);
+        final app = registry.hold(device);
         async.elapse(Duration.zero);
         final session = rightOf(resultOf(app));
         links.closeDelay = const Duration(seconds: 1);
@@ -309,11 +340,11 @@ void main() {
         session.disconnect();
 
         // act
-        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        final borrower = registry.borrow(device);
         async.elapse(const Duration(seconds: 1));
 
         // assert
-        expect(identical(rightOf(resultOf(borrower)), session), isTrue);
+        expect(identical(rightOf(resultOf(borrower)).session, session), isTrue);
         expect(session.link.isUp, isTrue);
         expect(links.opensAsked(device), 1);
       });
@@ -324,15 +355,15 @@ void main() {
       fakeAsync((async) {
         // arrange
         build();
-        final borrower = registry.acquire(device, by: LinkUser.borrower);
+        final borrower = registry.borrow(device);
         async.elapse(Duration.zero);
-        final session = rightOf(resultOf(borrower));
+        final session = rightOf(resultOf(borrower)).session;
         links.closeDelay = const Duration(seconds: 1);
         links.failNextClose(device);
-        registry.giveBack(session);
+        rightOf(resultOf(borrower)).giveBack();
 
         // act
-        final app = registry.acquire(device, by: LinkUser.app);
+        final app = registry.hold(device);
         async.elapse(const Duration(seconds: 1));
 
         // assert
@@ -346,12 +377,12 @@ void main() {
   group('ending', () {
     test('a link that ends is forgotten', () async {
       // arrange
-      final first = await acquired(LinkUser.app);
+      final first = await held();
 
       // act
       links.drop(device);
       await pumpEventQueue();
-      final second = await acquired(LinkUser.app);
+      final second = await held();
 
       // assert
       expect(first.link.hasEnded, isTrue);
@@ -364,16 +395,17 @@ void main() {
   group('giving back', () {
     test('a give-back by the only user closes the link', () async {
       // arrange
-      final session = await acquired(LinkUser.borrower);
+      final borrowedLink = await borrowed();
+      final session = borrowedLink.session;
 
       // act
-      final answer = await registry.giveBack(session);
+      final answer = await borrowedLink.giveBack();
 
       // assert
       expect(answer, const Right<ConnectionFailure, void>(null));
       expect(links.closesAsked(device), 1);
       expect(session.link.hasEnded, isTrue);
-      await acquired(LinkUser.app);
+      await held();
       expect(links.opensAsked(device), 2);
     });
 
@@ -381,11 +413,12 @@ void main() {
       'a give-back whose close fails answers the failure, and the next caller reuses the link',
       () async {
         // arrange
-        final session = await acquired(LinkUser.borrower);
+        final borrowedLink = await borrowed();
+        final session = borrowedLink.session;
         links.failNextClose(device);
 
         // act
-        final answer = await registry.giveBack(session);
+        final answer = await borrowedLink.giveBack();
 
         // assert
         expect(
@@ -395,7 +428,7 @@ void main() {
           ),
         );
         expect(session.link.isUp, isTrue);
-        final next = await acquired(LinkUser.app);
+        final next = await held();
         expect(identical(next, session), isTrue);
         expect(links.opensAsked(device), 1);
       },
@@ -405,21 +438,22 @@ void main() {
       'a give-back or a keep of a session that is no longer live changes nothing',
       () async {
         // arrange
-        final ended = await acquired(LinkUser.borrower);
+        final kept = await borrowed();
+        final givenBack = await borrowed();
         links.drop(device);
         await pumpEventQueue();
-        final live = await acquired(LinkUser.borrower);
+        final live = await borrowed();
 
         // act
-        registry.keep(ended);
-        final answer = await registry.giveBack(ended);
+        kept.keep();
+        final answer = await givenBack.giveBack();
 
         // assert
         expect(answer, const Right<ConnectionFailure, void>(null));
-        expect(live.link.isUp, isTrue);
-        await registry.giveBack(live);
+        expect(live.session.link.isUp, isTrue);
+        await live.giveBack();
         expect(links.closesAsked(device), 1);
-        expect(live.link.hasEnded, isTrue);
+        expect(live.session.link.hasEnded, isTrue);
       },
     );
   });

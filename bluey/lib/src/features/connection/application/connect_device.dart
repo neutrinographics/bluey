@@ -1,7 +1,6 @@
 import '../../../shared/domain/device_address.dart';
 import '../../../shared/domain/either.dart';
 import '../domain/connection_failure.dart';
-import '../domain/live_links.dart';
 import 'link_registry.dart';
 import 'link_session.dart';
 
@@ -29,9 +28,5 @@ final class ConnectDevice {
   /// Answers the session of the device's link.
   Future<Either<ConnectionFailure, LinkSession>> run(
     ConnectDeviceRequest request,
-  ) => _registry.acquire(
-    request.device,
-    by: LinkUser.app,
-    timeout: request.timeout,
-  );
+  ) => _registry.hold(request.device, timeout: request.timeout);
 }

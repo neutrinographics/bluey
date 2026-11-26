@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
+import 'package:bluey/src/features/connection/application/borrowed_link.dart';
 import 'package:bluey/src/features/connection/application/connect_device.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
