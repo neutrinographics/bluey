@@ -1,9 +1,9 @@
-import '../features/connection/domain/connection_failure.dart';
-import '../features/connection/domain/link_end.dart';
-import '../platform/bluetooth_state.dart';
-import '../shared/domain/device_address.dart';
-import '../shared/domain/either.dart';
-import '../shared/exceptions.dart';
+import '../../features/connection/domain/connection_failure.dart';
+import '../../features/connection/domain/link_end.dart';
+import '../../platform/bluetooth_state.dart';
+import '../../shared/domain/device_address.dart';
+import '../../shared/domain/either.dart';
+import '../../shared/exceptions.dart';
 
 /// The exception an app gets for [failure], so moving an operation below the
 /// edge changes nothing an app catches.

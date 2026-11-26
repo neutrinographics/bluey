@@ -1,4 +1,4 @@
-import 'package:bluey/src/api/failure_translation.dart';
+import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_failures.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/error_translation.dart';

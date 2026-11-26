@@ -1,3 +1,11 @@
+/// [LinkGattClient], the GATT client of one link, with the remote attributes
+/// and the platform surfaces it still hands out.
+///
+/// The file keeps its old name, which no longer says what it holds, because
+/// it leaves for the GATT Client context with that context's slice, and a
+/// rename now would only be undone by that move.
+library;
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
@@ -10,7 +18,7 @@ import '../gatt_client/gatt.dart';
 import '../shared/infrastructure/bluey_logger.dart';
 import '../shared/application/log_level.dart';
 import '../shared/domain/either.dart';
-import '../api/failure_translation.dart';
+import '../api/connection/connection_failure_translation.dart';
 import '../features/connection/application/link_session.dart';
 import '../features/connection/domain/link_end.dart';
 import '../shared/characteristic_properties.dart';
@@ -153,7 +161,6 @@ class LinkGattClient {
   StreamSubscription? _platformPhySubscription;
   StreamSubscription? _platformServiceChangesSubscription;
 
-  // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
   // Failed on Service Changed, so no caller waits on a stale handle.
@@ -437,8 +444,6 @@ class LinkGattClient {
         controller.onCancel = sub.cancel;
       }, isBroadcast: true);
 
-  // I325 — relocated to AndroidConnectionExtensions; private accessor
-  // is used by _AndroidConnectionExtensionsImpl.
   Mtu get _mtuValue => Mtu.fromPlatform(_mtu);
 
   /// The one discovered service with [uuid]; see [Connection.service].
@@ -543,8 +548,6 @@ class LinkGattClient {
     return svcs.any((s) => s.uuid == uuid);
   }
 
-  // I325 — relocated to AndroidConnectionExtensions; private impl is
-  // used by _AndroidConnectionExtensionsImpl.
   Future<Mtu> _requestMtuImpl(Mtu mtu) async {
     _ensureValid();
     _ensureConnected();
@@ -787,11 +790,7 @@ class LinkGattClient {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
-    // The GATT client itself carries no lifecycle (post-C.6 the
-    // peer-protocol surface lives entirely in `PeerConnection`).
-    // Characteristics are constructed without a lifecycleClient — the
-    // getter remains on `BlueyRemoteCharacteristic` for tests / future
-    // consumers that wire activity feedback externally.
+    // No lifecycle client: the peer protocol is PeerConnection's alone.
     final characteristicHandle = AttributeHandle(pc.handle);
     return BlueyRemoteCharacteristic(
       platform: _platform,

@@ -3,9 +3,9 @@ import '../../features/connection/application/link_session.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/uuid.dart';
-import '../failure_translation.dart';
 import 'android_connection_extensions.dart';
 import 'connection.dart';
+import 'connection_failure_translation.dart';
 import 'ios_connection_extensions.dart';
 
 /// One link's session presented as the public Connection.

@@ -2,7 +2,7 @@ import 'package:bluey/src/api/connection/bluey_connection.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connection.dart';
 import 'package:bluey/src/api/connection/connections.dart';
-import 'package:bluey/src/api/failure_translation.dart';
+import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
 import 'package:bluey/src/features/connection/application/connect_device.dart';

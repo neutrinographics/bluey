@@ -34,10 +34,11 @@ bluey/lib/
     ├── api/                        the edge: what an app calls
     │   ├── bluey.dart              Bluey: assembles every context by constructor (the composition root)
     │   ├── exceptions.dart         the sealed BlueyException family
-    │   ├── failure_translation.dart  Failure to BlueyException, the one place a failure is thrown; today ConnectionFailure's
-    │   └── {context}/              public interfaces (Connection, Scanner, Server) and their thin implementations;
-    │                               today connection/: Connection and its two extension interfaces, BlueyConnection,
-    │                               Connections (one public Connection per link) and BorrowedConnection (Peer's borrow)
+    │   └── {context}/              public interfaces (Connection, Scanner, Server), their thin implementations and the
+    │                               context's failures as BlueyExceptions, the one place a failure is thrown; today
+    │                               connection/: Connection and its two extension interfaces, BlueyConnection, Connections
+    │                               (one public Connection per link), BorrowedConnection (Peer's borrow) and
+    │                               connection_failure_translation.dart (ConnectionFailure and LinkEnd to BlueyException)
     ├── features/
     │   └── {context}/              discovery, connection, gatt_client, gatt_server, peer, platform; today connection/
     │                               holds Link, LiveLinks, LinkId, ConnectionFailure and the connection events (domain),
@@ -57,7 +58,7 @@ bluey/lib/
 
 The six contexts and their vocabulary are CLAUDE.md's: Discovery, Connection, GATT Client, GATT Server, Platform and Peer.
 
-Most of today's code is still in the old layout, one flat folder per context. In place are the kernel's files named above, the Connection context's link lifecycle (slice 1's first pull request) and the edge's `failure_translation.dart` and `connection/`; `lib/src/bluey.dart` stays the composition root until `Bluey` itself moves to `api/`. A file moves in the slice that changes it, never on its own (section 11). A new file is born in the target layout.
+Most of today's code is still in the old layout, one flat folder per context. In place are the kernel's files named above, the Connection context's link lifecycle (slice 1's first pull request) and the edge's `connection/`, which holds Connection's failure translation; `lib/src/bluey.dart` stays the composition root until `Bluey` itself moves to `api/`. A file moves in the slice that changes it, never on its own (section 11). A new file is born in the target layout.
 
 A layer folder groups by role once it holds three or more files of one kind (`value_objects/`, `events/`, `failures/`). File names are Dart's `snake_case`; class names follow the Kotlin repositories (`ConnectDevice`, `PlatformScanning`, `InMemoryScanning`).
 
@@ -207,12 +208,12 @@ final answer = await _connectDevice.run(
 return _connections.of(valueOrThrow(answer, device: device.address));
 ```
 
-`valueOrThrow` and `connectionFailureAsException`, in `api/failure_translation.dart`, answer the value or throw the exception an app gets today, so moving an operation below the edge changes nothing an app catches.
+`valueOrThrow` and `connectionFailureAsException`, in `api/connection/connection_failure_translation.dart`, answer the value or throw the exception an app gets today, so moving an operation below the edge changes nothing an app catches.
 
 - **`Either`** is Bluey's own sealed type in [`shared/domain/either.dart`](../bluey/lib/src/shared/domain/either.dart): `Left` holds the failure, `Right` the success, `fold` reads both and `map` changes a success. No package is added for it.
 - **`flatMap`** chains a step that can itself fail. It is an extension, `EitherFlatMap`, not a member. A member's parameter type would be fixed by the receiver's left type, so a caller holding an `Either<ConnectionFailure, T>` as an `Either<Failure, T>` would fail at run time when its next step answered a different failure. An extension is resolved against the static type the caller holds. There is no `mapLeft`, since no unit needs one yet, and no extension on `Future<Either>`; `flatMapAsync` arrives in slice 1's second pull request, with its first caller.
 - **`Failure`** is an interface in [`shared/domain/failure.dart`](../bluey/lib/src/shared/domain/failure.dart) with one member, `message`, a sentence for a person or a log that no caller parses. Each context declares its own sealed family in its `domain/` (Connection's is [`ConnectionFailure`](../bluey/lib/src/features/connection/domain/connection_failure.dart); Discovery's `ScanFailure` comes with slice 2), because Dart seals a family within one file. A failure carries typed fields, never a map.
-- **The translator** in `api/failure_translation.dart` switches exhaustively over each family, so a new failure with no public exception fails to compile. It is named from below by `LinkGattClient`, GATT Client's code still in the unplaced `connection/bluey_connection.dart`, which imports it to throw a link's end, until slice 6 gives GATT Client a port of its own. That file names the edge from below in one more way: it imports the edge's `connection.dart` and both extension interfaces for the Android and iOS surfaces it still builds, and the edge's `BlueyConnection` imports it back, a loop that ends with this slice's second pull request, which moves those surfaces out of the file so a Connection is composed at the edge (design sections 6.8 and 6.13). The `boundaries` rule does not judge a dependency on the edge, so no list shows either.
+- **The translator** of each context sits with that context's edge (Connection's is `api/connection/connection_failure_translation.dart`) and switches exhaustively over its family, so a new failure with no public exception fails to compile. It is named from below by `LinkGattClient`, GATT Client's code still in the unplaced `connection/bluey_connection.dart`, which imports it to throw a link's end, until slice 6 gives GATT Client a port of its own. That file names the edge from below in one more way: it imports the edge's `connection.dart` and both extension interfaces for the Android and iOS surfaces it still builds, and the edge's `BlueyConnection` imports it back, a loop that ends with this slice's second pull request, which moves those surfaces out of the file so a Connection is composed at the edge (design sections 6.8 and 6.13). The `boundaries` rule does not judge a dependency on the edge, so no list shows either.
 - **Adapters** catch everything `BlueyPlatform` throws and answer a failure. A throw they do not recognise becomes an `UnexpectedPlatformFailure` that carries the cause; it is never swallowed.
 - **Streams** below `api/` carry no errors. A stream whose source can fail ends through its owner's terminal state or carries `Either`; each port's design says which. Connection's `Links` ends its stream: when the platform's state stream for a link fails, `PlatformLinks` logs it, ends the link's reports, which the lifecycle reads as a drop, and asks the platform to disconnect, best effort, since nothing else is left able to close that link.
 - **Input is parsed.** Bytes and values that arrive from the radio, the platform or a remote peer go through a factory that answers `Either` (`LifecycleInterval.of`). A throwing constructor is only for a value the app's programmer wrote (`UUID('180d')`).
@@ -335,7 +336,7 @@ Each move happens in the slice that changes the code, never on its own.
 | `events.dart` | Each context's `domain/events/`, each family under a `BlueyEvent` marker |
 | `lifecycle.dart`, `connection/lifecycle_client.dart`, `connection/peer_silence_monitor.dart`, `gatt_server/lifecycle_server.dart` | `features/peer/`, which owns both halves of the lifecycle protocol |
 | The `_map*` methods and `connection_parameters_mapper.dart` | Each context's `infrastructure/adapters/` |
-| `shared/error_translation.dart` | `shared/infrastructure/` for platform errors to failures; `api/failure_translation.dart` for failures to exceptions |
+| `shared/error_translation.dart` | `shared/infrastructure/` for platform errors to failures; `api/{context}/{context}_failure_translation.dart` for failures to exceptions |
 | `log/`, `event_bus.dart` | A port in `shared/application`, the implementation in `shared/infrastructure`; `BlueyLogLevel` and `BlueyLogEvent`, what the `Log` port speaks, live beside it in `shared/application` (moved in slice 1) |
 | `Capabilities`, which `lib/bluey.dart` re-exports from `bluey_platform_interface` and which `Mtu` and `Bluey.capabilities` name | Bluey's own `Capabilities` value object, with `PlatformKind`, in `features/platform/domain`, mapped from the platform interface's type by an adapter in `features/platform/infrastructure/adapters/`, as `PlatformDevice` becomes `Device`. It is Platform's, not the kernel's; Connection is handed the few facts it needs as its own `LinkFeatures` |
 | The other files of each context folder (`connection/`, `discovery/`, `gatt_client/`, `gatt_server/`, `peer/`, `platform/`) and of `shared/` | The layer of `features/{context}/` or `shared/` their content belongs to |

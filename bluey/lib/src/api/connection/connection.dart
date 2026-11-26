@@ -1,19 +1,19 @@
-import '../../shared/domain/device_address.dart';
+import '../../connection/value_objects/write_payload_limit.dart';
+import '../../features/connection/domain/connection_state.dart';
 import '../../gatt_client/gatt.dart';
+import '../../shared/domain/device_address.dart';
 import '../../shared/uuid.dart';
 import 'android_connection_extensions.dart';
-import '../../features/connection/domain/connection_state.dart';
 import 'ios_connection_extensions.dart';
-import '../../connection/value_objects/write_payload_limit.dart';
 
-export '../../features/connection/domain/connection_state.dart';
 export '../../connection/value_objects/connection_interval.dart';
+export '../../connection/value_objects/connection_parameters.dart'
+    show ConnectionParameters;
 export '../../connection/value_objects/mtu.dart';
 export '../../connection/value_objects/peripheral_latency.dart';
 export '../../connection/value_objects/supervision_timeout.dart';
 export '../../connection/value_objects/write_payload_limit.dart';
-export '../../connection/value_objects/connection_parameters.dart'
-    show ConnectionParameters;
+export '../../features/connection/domain/connection_state.dart';
 
 /// Bonding state of a device.
 ///
@@ -66,6 +66,10 @@ enum Phy {
 ///
 /// This is the aggregate root for all GATT operations on a connected device.
 /// Use [service] or [services] to access the device's GATT services.
+///
+/// A Connection exists only once its link is up, so its [state] starts at
+/// `linked` and is never `connecting`; it ends at `disconnected`, or at
+/// `invalidated` when the radio went off, and never comes back.
 ///
 /// The connection has the following invariants:
 /// - GATT access is only valid when [state] is [ConnectionState.ready]
@@ -198,8 +202,3 @@ abstract class Connection {
   /// future iOS-specific features.
   IosConnectionExtensions? get ios;
 }
-
-/// Connection state for a device.
-///
-/// Note: This is re-exported from bluey.dart for convenience.
-/// The actual definition is in bluey.dart.

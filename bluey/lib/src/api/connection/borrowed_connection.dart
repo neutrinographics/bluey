@@ -1,7 +1,7 @@
 import '../../features/connection/application/borrow_link.dart';
 import '../../shared/domain/device_address.dart';
-import '../failure_translation.dart';
 import 'connection.dart';
+import 'connection_failure_translation.dart';
 import 'connections.dart';
 
 /// A link in use for a short task by code that is not the app, seen through

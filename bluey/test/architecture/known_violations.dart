@@ -121,7 +121,7 @@ const lintOptions = <String>[];
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
   'lib/src/bluey.dart -> 977 lines',
-  'lib/src/connection/bluey_connection.dart -> 1456 lines',
+  'lib/src/connection/bluey_connection.dart -> 1455 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
   'lib/src/discovery/bluey_scanner.dart -> 410 lines',
   'lib/src/events.dart -> 477 lines',

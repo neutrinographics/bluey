@@ -1,4 +1,4 @@
-import 'package:bluey/src/api/failure_translation.dart';
+import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/platform/bluetooth_state.dart';
