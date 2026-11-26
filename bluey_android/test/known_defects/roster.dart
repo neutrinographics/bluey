@@ -9,6 +9,5 @@ library;
 
 /// The full names of the known defects, in the order the run meets them.
 const knownDefects = <String>[
-  'M3 (I369): a second connect() to a connected device does not orphan the first connection\'s state stream',
   'M2 (I013): a rejected startScan surfaces on the scan stream, not as an unhandled async error',
 ];

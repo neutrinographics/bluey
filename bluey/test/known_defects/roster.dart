@@ -9,9 +9,6 @@ library;
 
 /// The full names of the known defects, in the order the run meets them.
 const knownDefects = <String>[
-  'H3 (I381): remote disconnect never finalises the Connection stateChanges closes after the peer drops the link',
-  'H3 (I381): remote disconnect never finalises the Connection disconnect() after a remote drop still releases resources',
-  'H2 (I380): peer discovery probes tear down live connections discoverPeers leaves an existing peer connection intact',
   'M4 (I336): scan restart without awaiting cancel second scan delivers results',
   'M4 (I336): scan restart without awaiting cancel platform scan is not left running while scanner says stopped',
   'M5 (I382): dispose while scanning dispose stops the platform scan',

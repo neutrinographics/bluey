@@ -4,7 +4,8 @@ import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 
-import '../event_bus.dart';
+import '../shared/domain/device_address.dart';
+import '../shared/application/event_publisher.dart';
 import '../events.dart';
 import '../platform/bluetooth_state.dart';
 import '../shared/error_translation.dart';
@@ -13,7 +14,6 @@ import '../shared/manufacturer_data.dart';
 import '../shared/uuid.dart';
 import 'advertisement.dart';
 import 'device.dart';
-import 'device_address.dart';
 import 'scan.dart';
 import 'scan_result.dart';
 import 'scan_state.dart';

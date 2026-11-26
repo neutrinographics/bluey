@@ -3,7 +3,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 import 'package:flutter/services.dart' show PlatformException;
 
 import '../connection/lifecycle_client.dart';
-import '../discovery/device_address.dart';
+import 'domain/device_address.dart';
 import '../lifecycle.dart' show lifecycleEvictionAttStatus;
 import 'exceptions.dart';
 

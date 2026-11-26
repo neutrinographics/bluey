@@ -548,6 +548,30 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// tests it would sleep the wall clock.
   Duration? operationLatency;
 
+  /// The order in which a requested disconnect sends its two signals about
+  /// the link it ends, the terminal `disconnected` report and the answer to
+  /// [disconnect]. Android sends the report first and iOS the answer; by
+  /// default the fake sends both at once, so no gap exists between them.
+  ///
+  /// In either order the second signal waits until the device's next
+  /// [connect] has opened its streams, the point at which a late signal can
+  /// meet the device's next link on a phone; a disconnect held for its
+  /// answer completes only then. The fake then keeps each signal with the
+  /// link it is about, as the platform packages' `DeviceStreams` do.
+  FakeDisconnectSignals disconnectSignals = FakeDisconnectSignals.together;
+
+  final Map<String, void Function()> _secondDisconnectSignals = {};
+  final Set<String> _owedLastReport = {};
+
+  /// Whether [disconnect] echoes each request as a `disconnecting` report,
+  /// as Android's plugin does before it asks the radio, and after the
+  /// answer when the request fails. The fake then drops the echo as the
+  /// platform packages' `DeviceStreams` do, so a test can show that no echo
+  /// reaches the app. Off by default.
+  bool echoDisconnectRequests = false;
+
+  final Set<String> _echoExpected = {};
+
   // === Fault-rule queue (audit R2 / NT-5) ===
   //
   // The general fault-injection mechanism: scripted, ordered rules with
@@ -1159,14 +1183,33 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   }
 
   /// Simulates the peripheral disconnecting from us (as central).
+  ///
+  /// The `disconnected` report is the device's last event, as on the real
+  /// platforms (I369): once it is delivered both of the device's streams end
+  /// and are forgotten, so a reconnect opens new ones.
   void simulateDisconnection(String deviceId) {
-    final connection = _connections[deviceId];
+    final connection = _connections.remove(deviceId);
     if (connection != null) {
-      _connections.remove(deviceId);
       connection.stateController.add(PlatformConnectionState.disconnected);
     }
+    unawaited(_closeDeviceStreams(deviceId));
     _failParkedWrites(deviceId);
     _clearHandles(deviceId);
+  }
+
+  /// Ends [deviceId]'s state and notification streams and forgets them;
+  /// safe when it has none.
+  Future<void> _closeDeviceStreams(String deviceId) async {
+    final states = _connectionStateControllers.remove(deviceId);
+    final notifications = _notificationControllers.remove(deviceId);
+    await states?.close();
+    await notifications?.close();
+  }
+
+  /// Fails [deviceId]'s connection-state stream with [error], as a platform
+  /// channel that breaks mid-link would; the stream stays open.
+  void simulateConnectionStateError(String deviceId, Object error) {
+    _connectionStateControllers[deviceId]?.addError(error);
   }
 
   /// Simulates a notification from a connected peripheral.
@@ -1331,11 +1374,29 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    _applyFaultRules(FakeOp.stopScan);
     _isScanningPlatform = false;
   }
 
+  /// Keeps a live device's link and streams across a second connect, and a
+  /// failed connect undoes only what it opened itself, as the real platforms
+  /// do (I369): a device still connected keeps its link, a first connect
+  /// that fails leaves no streams and no link.
   @override
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    final opens = !_connectionStateControllers.containsKey(deviceId);
+    try {
+      return await _connect(deviceId, config);
+    } catch (_) {
+      if (opens) {
+        _connections.remove(deviceId);
+        await _closeDeviceStreams(deviceId);
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _connect(String deviceId, PlatformConnectConfig config) async {
     lastConnectConfig = config;
 
     final latency = operationLatency;
@@ -1377,23 +1438,27 @@ base class FakeBlueyPlatform extends BlueyPlatform {
       throw Exception('Device not found: $deviceId');
     }
 
-    final stateController =
-        StreamController<PlatformConnectionState>.broadcast();
-    final notificationController =
-        StreamController<PlatformNotification>.broadcast();
-
-    _connectionStateControllers[deviceId] = stateController;
-    _notificationControllers[deviceId] = notificationController;
-
-    _connections[deviceId] = _ConnectedDevice(
-      peripheral: peripheral,
-      stateController: stateController,
-      notificationController: notificationController,
-      mtu: config.mtu ?? 23,
-      subscribedCharacteristics: {},
+    final alreadyConnected = _connections.containsKey(deviceId);
+    final stateController = _connectionStateControllers.putIfAbsent(
+      deviceId,
+      StreamController<PlatformConnectionState>.broadcast,
     );
+    final notificationController = _notificationControllers.putIfAbsent(
+      deviceId,
+      StreamController<PlatformNotification>.broadcast,
+    );
+    _secondDisconnectSignals.remove(deviceId)?.call();
 
-    stateController.add(PlatformConnectionState.connected);
+    if (!alreadyConnected) {
+      _connections[deviceId] = _ConnectedDevice(
+        peripheral: peripheral,
+        stateController: stateController,
+        notificationController: notificationController,
+        mtu: config.mtu ?? 23,
+        subscribedCharacteristics: {},
+      );
+      stateController.add(PlatformConnectionState.connected);
+    }
 
     final link = _outboundLink;
     if (link != null && link.deviceId == deviceId) {
@@ -1410,13 +1475,61 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> disconnect(String deviceId) async {
+    if (echoDisconnectRequests) _echoExpected.add(deviceId);
+    try {
+      _applyFaultRules(FakeOp.disconnect, deviceId: deviceId);
+    } catch (_) {
+      if (echoDisconnectRequests) {
+        Timer.run(
+          () => _reportState(deviceId, PlatformConnectionState.disconnecting),
+        );
+      }
+      rethrow;
+    }
+    if (echoDisconnectRequests) {
+      _reportState(deviceId, PlatformConnectionState.disconnecting);
+    }
+    switch (disconnectSignals) {
+      case FakeDisconnectSignals.together:
+        final connection = _reportLastState(deviceId);
+        await _closeDeviceStreams(deviceId);
+        _tearDownLink(deviceId, connection);
+      case FakeDisconnectSignals.reportThenAnswer:
+        final asked = _connectionStateControllers[deviceId];
+        final connection = _reportLastState(deviceId);
+        unawaited(_closeDeviceStreams(deviceId));
+        _tearDownLink(deviceId, connection);
+        final answer = Completer<void>();
+        _secondDisconnectSignals[deviceId] = answer.complete;
+        await answer.future;
+        if (asked != null &&
+            identical(_connectionStateControllers[deviceId], asked)) {
+          await _closeDeviceStreams(deviceId);
+        }
+      case FakeDisconnectSignals.answerThenReport:
+        final connection = _connections.remove(deviceId);
+        if (_connectionStateControllers.containsKey(deviceId)) {
+          _owedLastReport.add(deviceId);
+        }
+        await _closeDeviceStreams(deviceId);
+        _tearDownLink(deviceId, connection);
+        _secondDisconnectSignals[deviceId] = () =>
+            _reportState(deviceId, PlatformConnectionState.disconnected);
+    }
+  }
+
+  /// Forgets the device's link, if it has one, and reports `disconnected`
+  /// to it.
+  _ConnectedDevice? _reportLastState(String deviceId) {
     final connection = _connections.remove(deviceId);
+    connection?.stateController.add(PlatformConnectionState.disconnected);
+    return connection;
+  }
+
+  /// Takes the device's ended link down at the far end and fails what was
+  /// parked on it.
+  void _tearDownLink(String deviceId, _ConnectedDevice? connection) {
     if (connection != null) {
-      connection.stateController.add(PlatformConnectionState.disconnected);
-      await connection.stateController.close();
-      await connection.notificationController.close();
-      _connectionStateControllers.remove(deviceId);
-      _notificationControllers.remove(deviceId);
       final link = _outboundLink;
       if (link != null && link.deviceId == deviceId) {
         link.peripheral.simulateCentralDisconnection(link.centralId);
@@ -1425,6 +1538,26 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     }
     _failParkedWrites(deviceId);
     _clearHandles(deviceId);
+  }
+
+  /// Delivers [state] to the device's current link as the platform packages
+  /// do: the echo of a disconnect request is dropped, a link's last report
+  /// that its disconnect's answer already accounted for is dropped, and any
+  /// other report means that last report is no longer coming.
+  void _reportState(String deviceId, PlatformConnectionState state) {
+    if (state == PlatformConnectionState.disconnecting &&
+        _echoExpected.remove(deviceId)) {
+      return;
+    }
+    final owed = _owedLastReport.remove(deviceId);
+    if (owed && state == PlatformConnectionState.disconnected) return;
+    final states = _connectionStateControllers[deviceId];
+    if (states == null) return;
+    states.add(state);
+    if (state == PlatformConnectionState.disconnected) {
+      _connections.remove(deviceId);
+      unawaited(_closeDeviceStreams(deviceId));
+    }
   }
 
   @override
@@ -2572,9 +2705,24 @@ class FakeBleLink {
   }
 }
 
+/// How [FakeBlueyPlatform.disconnect] orders the two signals about the link
+/// it ends.
+enum FakeDisconnectSignals {
+  /// Both at once, with no gap between them.
+  together,
+
+  /// The `disconnected` report, then the answer, as Android sends them.
+  reportThenAnswer,
+
+  /// The answer, then the `disconnected` report, as iOS sends them.
+  answerThenReport,
+}
+
 /// Operations that [FakeBlueyPlatform.enqueueFault] can target.
 enum FakeOp {
   connect,
+  disconnect,
+  stopScan,
   stopAdvertising,
   closeServer,
   discoverServices,

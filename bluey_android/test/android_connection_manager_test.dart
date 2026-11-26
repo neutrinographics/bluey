@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show PlatformException;
@@ -68,33 +69,35 @@ void main() {
         );
       });
 
-      test('translates gatt-status-failed into '
-          'PlatformConnectFailedException(unknown) preserving the status',
-          () async {
-        when(() => mockHostApi.connect(any(), any())).thenThrow(
-          PlatformException(
-            code: 'gatt-status-failed',
-            message: 'Connection failed with status 133',
-            details: 133,
-          ),
-        );
+      test(
+        'translates gatt-status-failed into '
+        'PlatformConnectFailedException(unknown) preserving the status',
+        () async {
+          when(() => mockHostApi.connect(any(), any())).thenThrow(
+            PlatformException(
+              code: 'gatt-status-failed',
+              message: 'Connection failed with status 133',
+              details: 133,
+            ),
+          );
 
-        await expectLater(
-          connectionManager.connect(
-            'device-1',
-            PlatformConnectConfig(timeoutMs: null, mtu: null),
-          ),
-          throwsA(
-            isA<PlatformConnectFailedException>()
-                .having(
-                  (e) => e.reason,
-                  'reason',
-                  PlatformConnectFailureReason.unknown,
-                )
-                .having((e) => e.status, 'status', 133),
-          ),
-        );
-      });
+          await expectLater(
+            connectionManager.connect(
+              'device-1',
+              PlatformConnectConfig(timeoutMs: null, mtu: null),
+            ),
+            throwsA(
+              isA<PlatformConnectFailedException>()
+                  .having(
+                    (e) => e.reason,
+                    'reason',
+                    PlatformConnectFailureReason.unknown,
+                  )
+                  .having((e) => e.status, 'status', 133),
+            ),
+          );
+        },
+      );
 
       test('still translates bluey-permission-denied into '
           'PlatformPermissionDeniedException', () async {
@@ -122,9 +125,9 @@ void main() {
 
       test('still translates bluetooth-unavailable into '
           'PlatformBluetoothUnavailableException', () async {
-        when(() => mockHostApi.connect(any(), any())).thenThrow(
-          PlatformException(code: 'bluetooth-unavailable'),
-        );
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenThrow(PlatformException(code: 'bluetooth-unavailable'));
 
         await expectLater(
           connectionManager.connect(
@@ -180,6 +183,192 @@ void main() {
 
         expect(received.single.characteristicHandle, 7);
         await sub.cancel();
+      });
+    });
+
+    group('a device connected twice', () {
+      test(
+        'M3 (I369): a second connect() to a connected device does not orphan the '
+        'first connection\'s state stream',
+        () async {
+          // arrange
+          final hostApi = MockBlueyHostApi();
+          final manager = AndroidConnectionManager(hostApi);
+          when(
+            () => hostApi.connect(any(), any()),
+          ).thenAnswer((_) async => 'dev');
+          const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+
+          await manager.connect('dev', config);
+          final states = <PlatformConnectionState>[];
+          manager.connectionStateStream('dev').listen(states.add);
+
+          // act
+          // Native connect is idempotent for an already-connected device.
+          await manager.connect('dev', config);
+          manager.onConnectionStateChanged(
+            ConnectionStateEventDto(
+              deviceId: 'dev',
+              state: ConnectionStateDto.disconnected,
+            ),
+          );
+          await pumpEventQueue();
+
+          // assert
+          expect(
+            states,
+            contains(PlatformConnectionState.disconnected),
+            reason: 'the first Connection never learns the link dropped',
+          );
+        },
+      );
+    });
+
+    group('a second connect the host fails', () {
+      test('keeps the first connection\'s streams attached', () async {
+        // arrange
+        var connects = 0;
+        when(() => mockHostApi.connect(any(), any())).thenAnswer((_) async {
+          connects++;
+          if (connects > 1) {
+            throw PlatformException(code: 'gatt-timeout', message: 'x');
+          }
+          return 'dev';
+        });
+        const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+        await connectionManager.connect('dev', config);
+        final states = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+        );
+        final notifications = expectLater(
+          connectionManager.notificationStream('dev'),
+          emitsInOrder([
+            isA<PlatformNotification>().having(
+              (n) => n.characteristicHandle,
+              'characteristicHandle',
+              7,
+            ),
+            emitsDone,
+          ]),
+        );
+
+        // act
+        await expectLater(
+          connectionManager.connect('dev', config),
+          throwsA(isA<PlatformConnectFailedException>()),
+        );
+        connectionManager.onNotification(
+          NotificationEventDto(
+            deviceId: 'dev',
+            characteristicUuid: '2a37',
+            value: Uint8List.fromList([1]),
+            characteristicHandle: 7,
+          ),
+        );
+        connectionManager.onConnectionStateChanged(
+          ConnectionStateEventDto(
+            deviceId: 'dev',
+            state: ConnectionStateDto.disconnected,
+          ),
+        );
+
+        // assert
+        await notifications;
+        await states;
+      });
+    });
+
+    group('a connect the host fails', () {
+      test('leaves the device with no state stream', () async {
+        // arrange
+        when(() => mockHostApi.connect(any(), any())).thenThrow(
+          PlatformException(code: 'gatt-timeout', message: 'Connect timeout'),
+        );
+        const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+
+        // act
+        await expectLater(
+          connectionManager.connect('device-1', config),
+          throwsA(isA<PlatformConnectFailedException>()),
+        );
+
+        // assert
+        expect(
+          connectionManager.connectionStateStream('device-1'),
+          emitsError(isA<StateError>()),
+        );
+      });
+    });
+
+    group('a connect between a requested disconnect\'s two signals', () {
+      const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+
+      void report(ConnectionStateDto state) =>
+          connectionManager.onConnectionStateChanged(
+            ConnectionStateEventDto(deviceId: 'dev', state: state),
+          );
+
+      Future<void> expectTheNextLinkKeepsItsStreams(
+        Future<void> Function() signalAboutTheEndedLink,
+      ) async {
+        final next = expectLater(
+          connectionManager.connectionStateStream('dev'),
+          emitsInOrder([
+            PlatformConnectionState.connected,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+        await signalAboutTheEndedLink();
+        await pumpEventQueue();
+        report(ConnectionStateDto.connected);
+        report(ConnectionStateDto.disconnected);
+        await next;
+      }
+
+      setUp(() {
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenAnswer((_) async => 'dev');
+      });
+
+      test('a connect made between the last report and the disconnect\'s '
+          'answer keeps its streams', () async {
+        // arrange
+        final answer = Completer<void>();
+        when(
+          () => mockHostApi.disconnect(any()),
+        ).thenAnswer((_) => answer.future);
+        await connectionManager.connect('dev', config);
+        final closing = connectionManager.disconnect('dev');
+        report(ConnectionStateDto.disconnected);
+        await pumpEventQueue();
+
+        // act
+        await connectionManager.connect('dev', config);
+
+        // assert
+        await expectTheNextLinkKeepsItsStreams(() {
+          answer.complete();
+          return closing;
+        });
+      });
+
+      test('a connect made between the disconnect\'s answer and the last '
+          'report keeps its streams', () async {
+        // arrange
+        when(() => mockHostApi.disconnect(any())).thenAnswer((_) async {});
+        await connectionManager.connect('dev', config);
+        await connectionManager.disconnect('dev');
+
+        // act
+        await connectionManager.connect('dev', config);
+
+        // assert
+        await expectTheNextLinkKeepsItsStreams(() async {
+          report(ConnectionStateDto.disconnected);
+        });
       });
     });
 

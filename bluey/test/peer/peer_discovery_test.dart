@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:bluey/bluey.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
+import 'package:bluey/src/peer/bluey_peer.dart';
 import 'package:bluey/src/peer/peer_discovery.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
+import '../fixtures/connection_rig.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -20,6 +25,7 @@ void main() {
     test('returns empty when no Bluey servers advertising', () async {
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -42,6 +48,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -63,6 +70,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -82,6 +90,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
@@ -89,10 +98,9 @@ void main() {
         scanTimeout: const Duration(milliseconds: 500),
       );
       expect(connection, isNotNull);
-      // PeerDiscovery returns the BlueyConnection bare — services have
-      // not been discovered yet, so it sits at `linked`. The caller
-      // (BlueyPeer) then runs services() and upgrade() to promote.
-      expect(connection.state, ConnectionState.linked);
+      // The probe read the server id over this very link, which
+      // discovered its services, so it is already `ready`.
+      expect(connection.state, ConnectionState.ready);
       await connection.disconnect();
     });
 
@@ -103,6 +111,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final target = ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
@@ -130,16 +139,16 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
         target,
         scanTimeout: const Duration(milliseconds: 500),
       );
-      // PeerDiscovery returns the BlueyConnection bare — services have
-      // not been discovered yet, so it sits at `linked`. The caller
-      // (BlueyPeer) then runs services() and upgrade() to promote.
-      expect(connection.state, ConnectionState.linked);
+      // The probe read the server id over this very link, which
+      // discovered its services, so it is already `ready`.
+      expect(connection.state, ConnectionState.ready);
       await connection.disconnect();
     });
   });
@@ -214,6 +223,7 @@ void main() {
 
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final ids = await discovery.discover(
@@ -236,6 +246,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       await discovery.discover(timeout: const Duration(milliseconds: 200));
@@ -254,6 +265,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       final connection = await discovery.connectTo(
@@ -279,6 +291,7 @@ void main() {
       );
       final discovery = PeerDiscovery(
         platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
       await discovery.discover(timeout: const Duration(milliseconds: 200));
@@ -295,6 +308,7 @@ void main() {
         );
         final discovery = PeerDiscovery(
           platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
         await discovery.discover(
@@ -316,6 +330,7 @@ void main() {
         );
         final discovery = PeerDiscovery(
           platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
         final connection = await discovery.connectTo(
@@ -329,4 +344,419 @@ void main() {
       },
     );
   });
+
+  // L9 (I394): the scan window bounds which candidates are probed, and a
+  // radio that refuses to stop scanning does not cost the caller its peers.
+  group('PeerDiscovery scan window and stopScan (L9)', () {
+    const window = Duration(seconds: 2);
+    const early = 'AA:BB:CC:DD:EE:01';
+    const late = 'AA:BB:CC:DD:EE:02';
+
+    test('a candidate seen after the window closes is not probed', () {
+      fakeAsync((async) {
+        // arrange
+        final fake = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = fake;
+        final earlyServerId = ServerId.generate();
+        fake.connectDelays[early] = const Duration(seconds: 1);
+        final discovery = PeerDiscovery(
+          platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
+          logger: testLogger(),
+        );
+
+        // act
+        List<ServerId>? result;
+        discovery.discover(timeout: window).then((ids) => result = ids);
+        async.elapse(const Duration(milliseconds: 1900));
+        fake.advertise(early, earlyServerId);
+        async.elapse(const Duration(milliseconds: 101));
+        fake.advertise(late, ServerId.generate());
+        async.elapse(const Duration(seconds: 10));
+
+        // assert
+        expect(fake.connectsTo(late), 0);
+        expect(result, [earlyServerId]);
+      });
+    });
+
+    test('a candidate queued inside the window whose probe has not started '
+        'when it closes is not probed', () {
+      fakeAsync((async) {
+        // arrange
+        final fake = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = fake;
+        final earlyServerId = ServerId.generate();
+        const queued = 'AA:BB:CC:DD:EE:03';
+        fake.connectDelays[early] = const Duration(seconds: 2);
+        final discovery = PeerDiscovery(
+          platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
+          logger: testLogger(),
+        );
+
+        // act
+        List<ServerId>? result;
+        discovery.discover(timeout: window).then((ids) => result = ids);
+        async.elapse(const Duration(milliseconds: 1000));
+        fake.advertise(early, earlyServerId);
+        async.elapse(const Duration(milliseconds: 500));
+        fake.advertise(queued, ServerId.generate());
+        async.elapse(const Duration(seconds: 10));
+
+        // assert
+        expect(fake.connectsTo(queued), 0);
+        expect(result, [earlyServerId]);
+      });
+    });
+
+    test('discover waits for the probe in flight before it returns', () {
+      fakeAsync((async) {
+        // arrange
+        final fake = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = fake;
+        final serverId = ServerId.generate();
+        fake.connectDelays[early] = const Duration(seconds: 1);
+        final discovery = PeerDiscovery(
+          platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
+          logger: testLogger(),
+        );
+
+        // act
+        List<ServerId>? result;
+        discovery.discover(timeout: window).then((ids) => result = ids);
+        async.elapse(const Duration(milliseconds: 1900));
+        fake.advertise(early, serverId);
+        async.elapse(const Duration(milliseconds: 200));
+        final beforeTheProbeEnds = result;
+        async.elapse(const Duration(seconds: 1));
+
+        // assert
+        expect(beforeTheProbeEnds, isNull);
+        expect(result, [serverId]);
+      });
+    });
+
+    test('discover waits for the probe in flight when the scan fails', () {
+      fakeAsync((async) {
+        // arrange
+        final fake = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = fake;
+        fake.connectDelays[early] = const Duration(seconds: 1);
+        final discovery = PeerDiscovery(
+          platformApi: fake,
+          borrow: ConnectionRig(fake).borrow,
+          logger: testLogger(),
+        );
+        Object? failure;
+        discovery
+            .discover(timeout: window)
+            .then<void>((_) {}, onError: (Object error) => failure = error);
+        async.elapse(const Duration(milliseconds: 100));
+        fake.advertise(early, ServerId.generate());
+        async.elapse(const Duration(milliseconds: 100));
+
+        // act
+        fake.failScans(StateError('scan failed'));
+        async.elapse(const Duration(milliseconds: 200));
+        final beforeTheProbeEnds = failure;
+        async.elapse(const Duration(seconds: 1));
+
+        // assert
+        expect(beforeTheProbeEnds, isNull);
+        expect(failure, isStateError);
+      });
+    });
+
+    test(
+      'a failing stopScan is logged and the peers found are still returned',
+      () {
+        fakeAsync((async) {
+          // arrange
+          final serverId = ServerId.generate();
+          fakePlatform.simulateBlueyServer(address: early, serverId: serverId);
+          fakePlatform.enqueueFault(FakeOp.stopScan, StateError('radio busy'));
+          final logger = testLogger();
+          final records = <BlueyLogEvent>[];
+          logger.events.listen(records.add);
+          final discovery = PeerDiscovery(
+            platformApi: fakePlatform,
+            borrow: ConnectionRig(fakePlatform).borrow,
+            logger: logger,
+          );
+
+          // act
+          List<ServerId>? result;
+          Object? error;
+          discovery
+              .discover(timeout: window)
+              .then<void>(
+                (ids) => result = ids,
+                onError: (Object e) => error = e,
+              );
+          async.elapse(window);
+
+          // assert
+          expect(error, isNull);
+          expect(result, [serverId]);
+          final warnings = records.where((r) => r.level == BlueyLogLevel.warn);
+          expect(warnings, hasLength(1));
+          expect(warnings.single.context, 'bluey.peer.discovery');
+          expect(warnings.single.message, 'discoverPeers stopScan failed');
+        });
+      },
+    );
+
+    test('connectTo returns the Connection it found when stopScan fails', () {
+      fakeAsync((async) {
+        // arrange
+        final serverId = ServerId.generate();
+        fakePlatform.simulateBlueyServer(address: early, serverId: serverId);
+        fakePlatform.enqueueFault(FakeOp.stopScan, StateError('radio busy'));
+        final logger = testLogger();
+        final records = <BlueyLogEvent>[];
+        logger.events.listen(records.add);
+        final discovery = PeerDiscovery(
+          platformApi: fakePlatform,
+          borrow: ConnectionRig(fakePlatform).borrow,
+          logger: logger,
+        );
+
+        // act
+        Connection? connection;
+        Object? error;
+        discovery
+            .connectTo(serverId, scanTimeout: window)
+            .then<void>(
+              (c) => connection = c,
+              onError: (Object e) => error = e,
+            );
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 100));
+
+        // assert
+        expect(error, isNull);
+        expect(connection?.deviceAddress, const DeviceAddress(early));
+        final warnings = records.where((r) => r.level == BlueyLogLevel.warn);
+        expect(warnings, hasLength(1));
+        expect(warnings.single.context, 'bluey.peer.discovery');
+        expect(warnings.single.message, 'connectTo stopScan failed');
+
+        connection?.disconnect();
+        async.flushMicrotasks();
+      });
+    });
+  });
+  group('H2 (I380): peer discovery probes tear down live connections', () {
+    test('discoverPeers leaves an existing peer connection intact', () async {
+      // arrange
+      const address = 'AA:BB:CC:DD:EE:01';
+      fakePlatform.simulateBlueyServer(
+        address: address,
+        serverId: TestServerIds.remoteIdentity,
+      );
+      final bluey = await Bluey.create(
+        localIdentity: TestServerIds.localIdentity,
+      );
+      addTearDown(bluey.dispose);
+      final peer = await bluey.connectAsPeer(
+        Device(address: const DeviceAddress(address)),
+      );
+      addTearDown(peer.disconnect);
+      expect(fakePlatform.connectedDeviceIds, contains(address));
+
+      // act
+      await bluey.discoverPeers(timeout: const Duration(milliseconds: 300));
+      await pumpEventQueue();
+
+      // assert
+      expect(
+        fakePlatform.connectedDeviceIds,
+        contains(address),
+        reason: 'the probe disconnected the link the app was using',
+      );
+      expect(peer.connection.state, isNot(ConnectionState.disconnected));
+    });
+  });
+
+  group('A probe borrows the link', () {
+    const address = 'AA:BB:CC:DD:EE:01';
+
+    test(
+      "a probe of a device the app holds reads over the app's link and leaves it",
+      () async {
+        // arrange
+        final serverId = ServerId.generate();
+        final counting = _ScheduledScanPlatform();
+        platform.BlueyPlatform.instance = counting;
+        counting.simulateBlueyServer(address: address, serverId: serverId);
+        final rig = ConnectionRig(counting);
+        final held = await rig.connect(const DeviceAddress(address));
+        await held.services();
+        final discovery = PeerDiscovery(
+          platformApi: counting,
+          borrow: rig.borrow,
+          logger: testLogger(),
+        );
+
+        // act
+        final ids = await discovery.discover(
+          timeout: const Duration(milliseconds: 300),
+        );
+        await pumpEventQueue();
+
+        // assert
+        expect(ids, [serverId]);
+        expect(counting.connectsTo(address), 1);
+        expect(held.state, ConnectionState.ready);
+        expect(counting.connectedDeviceIds, contains(address));
+        await held.disconnect();
+      },
+    );
+
+    test('a probe of a device the app holds linked makes the app\'s '
+        'Connection ready over the same link', () async {
+      // arrange
+      final serverId = ServerId.generate();
+      final counting = _ScheduledScanPlatform();
+      platform.BlueyPlatform.instance = counting;
+      counting.simulateBlueyServer(address: address, serverId: serverId);
+      final rig = ConnectionRig(counting);
+      final held = await rig.connect(const DeviceAddress(address));
+      final states = <ConnectionState>[];
+      held.stateChanges.listen(states.add);
+      final discovery = PeerDiscovery(
+        platformApi: counting,
+        borrow: rig.borrow,
+        logger: testLogger(),
+      );
+
+      // act
+      final ids = await discovery.discover(
+        timeout: const Duration(milliseconds: 300),
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(ids, [serverId]);
+      expect(held.state, ConnectionState.ready);
+      expect(states, [ConnectionState.linked, ConnectionState.ready]);
+      expect(counting.connectsTo(address), 1);
+      expect(await rig.connect(const DeviceAddress(address)), same(held));
+      await held.disconnect();
+    });
+
+    test('a probe gives back the link it opened', () async {
+      // arrange
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(address: address, serverId: serverId);
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        borrow: ConnectionRig(fakePlatform).borrow,
+        logger: testLogger(),
+      );
+
+      // act
+      final ids = await discovery.discover(
+        timeout: const Duration(milliseconds: 300),
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(ids, [serverId]);
+      expect(fakePlatform.connectedDeviceIds, isNot(contains(address)));
+    });
+
+    test('BlueyPeer.connect keeps the link of the peer it found', () async {
+      // arrange
+      final serverId = ServerId.generate();
+      fakePlatform.simulateBlueyServer(address: address, serverId: serverId);
+      final rig = ConnectionRig(fakePlatform);
+      final peer = createBlueyPeer(
+        platformApi: fakePlatform,
+        serverId: serverId,
+        localIdentity: TestServerIds.localIdentity,
+        logger: testLogger(),
+        borrow: rig.borrow,
+        connectionIdOf: rig.connectionIdOf,
+      );
+
+      // act
+      final peerConnection = await peer.connect(
+        scanTimeout: const Duration(milliseconds: 500),
+      );
+      await pumpEventQueue();
+      final appConnection = await rig.connect(const DeviceAddress(address));
+
+      // assert
+      expect(peerConnection.connection.state, ConnectionState.ready);
+      expect(fakePlatform.connectedDeviceIds, contains(address));
+      expect(identical(appConnection, peerConnection.connection), isTrue);
+      await peerConnection.disconnect();
+    });
+  });
+}
+
+/// A fake that lets a test advertise a candidate at a chosen moment of an
+/// open scan, and delay and count the connects to each device, so a probe
+/// can be placed on either side of the scan window's close.
+final class _ScheduledScanPlatform extends FakeBlueyPlatform {
+  final List<StreamController<platform.PlatformDevice>> _scans = [];
+  final List<String> _connects = [];
+
+  /// How long a connect to each device takes before it reaches the fake.
+  final Map<String, Duration> connectDelays = {};
+
+  /// How many connects were asked of [address].
+  int connectsTo(String address) =>
+      _connects.where((id) => id == address).length;
+
+  /// Registers a Bluey server at [address] and reports it to every scan
+  /// opened so far.
+  void advertise(String address, ServerId serverId) {
+    simulateBlueyServer(address: address, serverId: serverId);
+    for (final scan in _scans) {
+      scan.add(
+        platform.PlatformDevice(
+          id: address,
+          name: 'Bluey Server',
+          rssi: -50,
+          serviceUuids: [lifecycle.controlServiceUuid],
+          manufacturerDataCompanyId: null,
+          manufacturerData: null,
+        ),
+      );
+    }
+  }
+
+  /// Fails every scan opened so far with [error].
+  void failScans(Object error) {
+    for (final scan in _scans) {
+      scan.addError(error);
+    }
+  }
+
+  @override
+  Stream<platform.PlatformDevice> scan(platform.PlatformScanConfig config) {
+    final scan = StreamController<platform.PlatformDevice>.broadcast();
+    _scans.add(scan);
+    super.scan(config).listen(scan.add, onError: scan.addError);
+    return scan.stream;
+  }
+
+  @override
+  Future<String> connect(
+    String deviceId,
+    platform.PlatformConnectConfig config,
+  ) async {
+    _connects.add(deviceId);
+    final delay = connectDelays[deviceId];
+    if (delay != null) {
+      final elapsed = Completer<void>();
+      Timer(delay, elapsed.complete);
+      await elapsed.future;
+    }
+    return super.connect(deviceId, config);
+  }
 }

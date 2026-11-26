@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter/services.dart' show PlatformException;
+import 'device_streams.dart';
 import 'messages.g.dart';
 
 /// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
@@ -71,14 +71,11 @@ Future<T> _translateGattPlatformError<T>(
 /// Handles BLE connection management, GATT client operations,
 /// bonding, PHY, and connection parameter stubs for the Android platform.
 ///
-/// Delegates to [BlueyHostApi] for native communication and manages
-/// per-device stream controllers for connection state and notifications.
+/// Delegates to [BlueyHostApi] for native communication and to
+/// [DeviceStreams] for each device's connection state and notifications.
 class AndroidConnectionManager {
   final BlueyHostApi _hostApi;
-  final Map<String, StreamController<PlatformConnectionState>>
-  _connectionStateControllers = {};
-  final Map<String, StreamController<PlatformNotification>>
-  _notificationControllers = {};
+  final DeviceStreams _streams = DeviceStreams();
 
   AndroidConnectionManager(this._hostApi);
 
@@ -86,8 +83,8 @@ class AndroidConnectionManager {
 
   /// Connects to a device and returns the connection ID.
   ///
-  /// Creates per-device stream controllers for connection state
-  /// and notifications.
+  /// Opens the device's streams, keeping any a previous connect opened;
+  /// a failed connect closes only the streams it opened itself.
   ///
   /// Failures are re-expressed as [PlatformConnectFailedException]:
   /// the native layer reports a connect timeout as `gatt-timeout` and a
@@ -97,14 +94,20 @@ class AndroidConnectionManager {
   /// operation on a connection. Permission and adapter-unavailable
   /// errors keep their own typed forms.
   Future<String> connect(String deviceId, PlatformConnectConfig config) async {
+    final opened = _streams.open(deviceId);
+    try {
+      return await _connectOnHost(deviceId, config);
+    } catch (_) {
+      if (opened) await _streams.close(deviceId);
+      rethrow;
+    }
+  }
+
+  Future<String> _connectOnHost(
+    String deviceId,
+    PlatformConnectConfig config,
+  ) async {
     final dto = ConnectConfigDto(timeoutMs: config.timeoutMs, mtu: config.mtu);
-
-    _connectionStateControllers[deviceId] =
-        StreamController<PlatformConnectionState>.broadcast();
-
-    _notificationControllers[deviceId] =
-        StreamController<PlatformNotification>.broadcast();
-
     try {
       return await _translateGattPlatformError(
         'connect',
@@ -122,38 +125,21 @@ class AndroidConnectionManager {
     }
   }
 
-  /// Disconnects from a device and cleans up per-device streams.
-  Future<void> disconnect(String deviceId) async {
-    await _hostApi.disconnect(deviceId);
-
-    final stateController = _connectionStateControllers.remove(deviceId);
-    await stateController?.close();
-
-    final notificationController = _notificationControllers.remove(deviceId);
-    await notificationController?.close();
-  }
+  /// Disconnects from a device and ends the streams of the link it closed.
+  Future<void> disconnect(String deviceId) =>
+      _streams.disconnect(deviceId, () => _hostApi.disconnect(deviceId));
 
   /// Returns the connection state stream for the given device.
   ///
   /// Returns an error stream if the device is not connected.
-  Stream<PlatformConnectionState> connectionStateStream(String deviceId) {
-    final controller = _connectionStateControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
-  }
+  Stream<PlatformConnectionState> connectionStateStream(String deviceId) =>
+      _streams.statesOf(deviceId);
 
   /// Returns the notification stream for the given device.
   ///
   /// Returns an error stream if the device is not connected.
-  Stream<PlatformNotification> notificationStream(String deviceId) {
-    final controller = _notificationControllers[deviceId];
-    if (controller == null) {
-      return Stream.error(StateError('Device not connected: $deviceId'));
-    }
-    return controller.stream;
-  }
+  Stream<PlatformNotification> notificationStream(String deviceId) =>
+      _streams.notificationsOf(deviceId);
 
   // === GATT Client Operations ===
 
@@ -356,25 +342,20 @@ class AndroidConnectionManager {
 
   /// Handles connection state change events from the platform.
   void onConnectionStateChanged(ConnectionStateEventDto event) {
-    final controller = _connectionStateControllers[event.deviceId];
-    if (controller != null) {
-      controller.add(_mapConnectionState(event.state));
-    }
+    _streams.reportState(event.deviceId, _mapConnectionState(event.state));
   }
 
   /// Handles notification events from the platform.
   void onNotification(NotificationEventDto event) {
-    final controller = _notificationControllers[event.deviceId];
-    if (controller != null) {
-      controller.add(
-        PlatformNotification(
-          deviceId: event.deviceId,
-          characteristicUuid: event.characteristicUuid,
-          value: event.value,
-          characteristicHandle: event.characteristicHandle,
-        ),
-      );
-    }
+    _streams.reportNotification(
+      event.deviceId,
+      PlatformNotification(
+        deviceId: event.deviceId,
+        characteristicUuid: event.characteristicUuid,
+        value: event.value,
+        characteristicHandle: event.characteristicHandle,
+      ),
+    );
   }
 
   /// Handles MTU changed events from the platform.

@@ -1,0 +1,7 @@
+# Placed code may not drop a future: a dropped future is how a failure or a
+# late completion goes unseen (audit finding M2). The folders of the old layout
+# keep the default lints until they are empty. docs/ARCHITECTURE.md has the rule.
+linter:
+  rules:
+    - unawaited_futures
+    - discarded_futures

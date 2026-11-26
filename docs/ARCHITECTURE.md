@@ -34,10 +34,15 @@ bluey/lib/
     ├── api/                        the edge: what an app calls
     │   ├── bluey.dart              Bluey: assembles every context by constructor (the composition root)
     │   ├── exceptions.dart         the sealed BlueyException family
-    │   ├── failure_translation.dart  Failure to BlueyException, the one place a failure is thrown
-    │   └── {context}/              public interfaces (Connection, Scanner, Server) and their thin implementations
+    │   ├── failure_translation.dart  Failure to BlueyException, the one place a failure is thrown; today ConnectionFailure's
+    │   └── {context}/              public interfaces (Connection, Scanner, Server) and their thin implementations;
+    │                               today connection/: Connection and its two extension interfaces, BlueyConnection,
+    │                               Connections (one public Connection per link) and BorrowedConnection (Peer's borrow)
     ├── features/
-    │   └── {context}/              discovery, connection, gatt_client, gatt_server, peer, platform
+    │   └── {context}/              discovery, connection, gatt_client, gatt_server, peer, platform; today connection/
+    │                               holds Link, LiveLinks, LinkId, ConnectionFailure and the connection events (domain),
+    │                               LinkSession, LinkRegistry, ConnectDevice, BorrowLink and the Links port (application),
+    │                               and PlatformLinks with the platform-error mapping (infrastructure/adapters)
     │       ├── domain/             value objects, entities, state machines, events, failures
     │       ├── application/        one unit per intent, and the sessions that run a live state machine
     │       │   └── ports/          what this context needs from the radio or another context, in its own words
@@ -45,14 +50,14 @@ bluey/lib/
     │           ├── adapters/       a port answered over BlueyPlatform: DTO mapping, platform errors to failures
     │           └── bridges/        a port answered by another context
     └── shared/
-        ├── domain/                 Either, Failure, DomainEvent, UUID, ManufacturerData, CharacteristicProperties
-        ├── application/            ports every context uses: EventPublisher, Log
-        └── infrastructure/         BlueyLogger, the event bus, platform error classification
+        ├── domain/                 Either, Failure, BlueyEvent, DeviceAddress; UUID, ManufacturerData, CharacteristicProperties to come
+        ├── application/            ports every context uses: EventPublisher, Log, and what Log speaks, BlueyLogLevel and BlueyLogEvent
+        └── infrastructure/         BlueyLogger, BlueyEventBus; platform error classification to come
 ```
 
 The six contexts and their vocabulary are CLAUDE.md's: Discovery, Connection, GATT Client, GATT Server, Platform and Peer.
 
-Most of today's code is still in the old layout, one flat folder per context. Only `shared/domain/either.dart` and `shared/domain/failure.dart` are in place. A file moves in the slice that changes it, never on its own (section 11). A new file is born in the target layout.
+Most of today's code is still in the old layout, one flat folder per context. In place are the kernel's files named above, the Connection context's link lifecycle (slice 1's first pull request) and the edge's `failure_translation.dart` and `connection/`; `lib/src/bluey.dart` stays the composition root until `Bluey` itself moves to `api/`. A file moves in the slice that changes it, never on its own (section 11). A new file is born in the target layout.
 
 A layer folder groups by role once it holds three or more files of one kind (`value_objects/`, `events/`, `failures/`). File names are Dart's `snake_case`; class names follow the Kotlin repositories (`ConnectDevice`, `PlatformScanning`, `InMemoryScanning`).
 
@@ -129,7 +134,7 @@ Today's code breaks most of these rules. What each rule finds today is written d
 
 | Package | File | Lists |
 | --- | --- | --- |
-| `bluey` | [`bluey/test/architecture/known_violations.dart`](../bluey/test/architecture/known_violations.dart) | `unplaced` (53), `boundaries` (33), `frameworkPlacement` (14), `publicExports` (1), `layers`, `throws` and `lintOptions` (empty), `oversized` (9) |
+| `bluey` | [`bluey/test/architecture/known_violations.dart`](../bluey/test/architecture/known_violations.dart) | `unplaced` (44), `boundaries` (20), `frameworkPlacement` (13), `publicExports` (1), `layers`, `throws` and `lintOptions` (empty), `oversized` (9) |
 | `bluey_platform_interface` | [`bluey_platform_interface/test/architecture/known_violations.dart`](../bluey_platform_interface/test/architecture/known_violations.dart) | `oversizedDart` (2) |
 | `bluey_android` | [`bluey_android/test/architecture/known_violations.dart`](../bluey_android/test/architecture/known_violations.dart) | `oversizedDart` (3), `oversizedKotlin` (3) |
 | `bluey_ios` | [`bluey_ios/test/architecture/known_violations.dart`](../bluey_ios/test/architecture/known_violations.dart) | `oversizedDart` (3), `oversizedSwift` (2) |
@@ -184,7 +189,7 @@ On the list, but what it names changed:
 
 A slice that moves a file usually sees both parts at once, under several rules: the old path's entries are stale, and anything the moved file still does wrong is new. Fix the new, delete the stale, and the lists end the slice shorter than they began.
 
-Two entries can only be cleared by a named slice. `lib/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart` is the re-export of `Capabilities`, which slice 1 replaces with Bluey's own value object. `lib/src/platform_interface.dart -> 854 lines`, nearly all of it the one `BlueyPlatform` class, is cleared by slice 3, which splits it into one interface per role.
+Two entries can only be cleared by a named slice. `lib/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart` is the re-export of `Capabilities`, which slice 1's second pull request replaces with Bluey's own value object. `lib/src/platform_interface.dart -> 854 lines`, nearly all of it the one `BlueyPlatform` class, is cleared by slice 3, which splits it into one interface per role.
 
 ## 6. Failures as values
 
@@ -192,24 +197,27 @@ Below `api/`, a failure a caller can meet is answered as `Either<Failure, T>` an
 
 ```dart
 // features/connection/application/connect_device.dart
-Future<Either<ConnectionFailure, Link>> run(ConnectDeviceRequest request)
+Future<Either<ConnectionFailure, LinkSession>> run(ConnectDeviceRequest request)
 
-// api/bluey.dart
-Future<Connection> connect(Device device, {Duration? timeout}) async =>
-    (await _connectDevice.run(ConnectDeviceRequest(device, timeout)))
-        .fold(throwAsBlueyException, _connections.wrap);
+// lib/src/bluey.dart, the composition root until it moves to api/bluey.dart
+final answer = await _connectDevice.run(
+  ConnectDeviceRequest(device: device.address, timeout: timeout),
+);
+return _connections.of(valueOrThrow(answer, device: device.address));
 ```
 
+`valueOrThrow` and `connectionFailureAsException`, in `api/failure_translation.dart`, answer the value or throw the exception an app gets today, so moving an operation below the edge changes nothing an app catches.
+
 - **`Either`** is Bluey's own sealed type in [`shared/domain/either.dart`](../bluey/lib/src/shared/domain/either.dart): `Left` holds the failure, `Right` the success, `fold` reads both and `map` changes a success. No package is added for it.
-- **`flatMap`** chains a step that can itself fail. It is an extension, `EitherFlatMap`, not a member. A member's parameter type would be fixed by the receiver's left type, so a caller holding an `Either<ConnectionFailure, T>` as an `Either<Failure, T>` would fail at run time when its next step answered a different failure. An extension is resolved against the static type the caller holds. There is no `mapLeft` and no extension on `Future<Either>` yet; slice 1 adds them when its first use case needs them.
-- **`Failure`** is an interface in [`shared/domain/failure.dart`](../bluey/lib/src/shared/domain/failure.dart) with one member, `message`, a sentence for a person or a log that no caller parses. Each context declares its own sealed family (`ConnectionFailure`, `ScanFailure`) in its `domain/`, because Dart seals a family within one file. A failure carries typed fields, never a map.
-- **The translator** in `api/failure_translation.dart` switches exhaustively over each family, so a new failure with no public exception fails to compile.
+- **`flatMap`** chains a step that can itself fail. It is an extension, `EitherFlatMap`, not a member. A member's parameter type would be fixed by the receiver's left type, so a caller holding an `Either<ConnectionFailure, T>` as an `Either<Failure, T>` would fail at run time when its next step answered a different failure. An extension is resolved against the static type the caller holds. There is no `mapLeft`, since no unit needs one yet, and no extension on `Future<Either>`; `flatMapAsync` arrives in slice 1's second pull request, with its first caller.
+- **`Failure`** is an interface in [`shared/domain/failure.dart`](../bluey/lib/src/shared/domain/failure.dart) with one member, `message`, a sentence for a person or a log that no caller parses. Each context declares its own sealed family in its `domain/` (Connection's is [`ConnectionFailure`](../bluey/lib/src/features/connection/domain/connection_failure.dart); Discovery's `ScanFailure` comes with slice 2), because Dart seals a family within one file. A failure carries typed fields, never a map.
+- **The translator** in `api/failure_translation.dart` switches exhaustively over each family, so a new failure with no public exception fails to compile. It is named from below by `LinkGattClient`, GATT Client's code still in the unplaced `connection/bluey_connection.dart`, which imports it to throw a link's end, until slice 6 gives GATT Client a port of its own. That file names the edge from below in one more way: it imports the edge's `connection.dart` and both extension interfaces for the Android and iOS surfaces it still builds, and the edge's `BlueyConnection` imports it back, a loop that ends with this slice's second pull request, which moves those surfaces out of the file so a Connection is composed at the edge (design sections 6.8 and 6.13). The `boundaries` rule does not judge a dependency on the edge, so no list shows either.
 - **Adapters** catch everything `BlueyPlatform` throws and answer a failure. A throw they do not recognise becomes an `UnexpectedPlatformFailure` that carries the cause; it is never swallowed.
-- **Streams** below `api/` carry no errors. A stream whose source can fail ends through its owner's terminal state or carries `Either`; each port's design says which.
+- **Streams** below `api/` carry no errors. A stream whose source can fail ends through its owner's terminal state or carries `Either`; each port's design says which. Connection's `Links` ends its stream: when the platform's state stream for a link fails, `PlatformLinks` logs it, ends the link's reports, which the lifecycle reads as a drop, and asks the platform to disconnect, best effort, since nothing else is left able to close that link.
 - **Input is parsed.** Bytes and values that arrive from the radio, the platform or a remote peer go through a factory that answers `Either` (`LifecycleInterval.of`). A throwing constructor is only for a value the app's programmer wrote (`UUID('180d')`).
 - **Programming errors still throw.** A broken invariant is a `StateError`, as `error(...)` is in the Kotlin repositories. The `throws` rule allows exactly `StateError`, `ArgumentError` and `UnimplementedError`.
 
-`Either` and `Failure` are not exported from `lib/bluey.dart`; they are internal vocabulary. The translator, the exceptions' move to `api/` and the first failure families arrive with slice 1. Until a context moves, both models coexist: an unplaced file keeps throwing, and a placed file is held to values by the `throws` rule.
+`Either` and `Failure` are not exported from `lib/bluey.dart`; they are internal vocabulary. The translator and the first family, `ConnectionFailure`, arrived with slice 1. `shared/exceptions.dart` does not move to `api/` in slice 1: the translator names it where it is, and at 578 lines it cannot arrive in `api/` without splitting a sealed family, which deserves its own look. Until a context moves, both models coexist: an unplaced file keeps throwing, and a placed file is held to values by the `throws` rule.
 
 ## 7. State and ports
 
@@ -221,13 +229,15 @@ Three rules answer the audit's three structural causes, and every slice's design
 | Completion by identity | An operation that crosses to native code and completes later carries an id its caller minted. A completion names that id, and one that names an unknown id is logged and dropped | H1, M1, I063, I359 |
 | Teardown is a transition | Reaching a terminal state releases every resource, whatever caused it. `disconnect()` and `dispose()` request the same transition a remote disconnect causes | H3, I369, L4, L5 |
 
+A `LinkId` is not such an id. It is the platform's name for a link, and on today's platforms successive links to one device carry equal ids, so nothing keyed by a `LinkId` may outlive its link: once the link has ended, its id may already name the next one. Below the platform interface the same holds by device: `DeviceStreams`, in each platform package, keeps a signal about an ended link (its disconnect's answer, its last report) from touching the device's next link.
+
 A domain state machine is synchronous and holds no timer, so it can be driven by random input sequences in a test. The application session around it owns the timers and the streams.
 
 **Ports.** A context declares what it needs in `application/ports/`, in its own language, answering `Either`: Discovery asks for `Scanning`, not for `BlueyPlatform`. The exact ports are settled in the slice that moves the context, never ahead of it.
 
 **Adapters.** An adapter in `infrastructure/adapters/` answers a port over `BlueyPlatform` (`PlatformScanning`). It maps DTOs and errors and decides nothing. `BlueyPlatform` stays the federated plugin interface that Android and iOS implement; it is infrastructure's dependency, not the domain's.
 
-**Bridges.** When one context needs another, it declares a port and a bridge answers it from the other context's application units. Peer reaches a link through its own `PeerLink` port, never by importing Connection.
+**Bridges.** When one context needs another, it declares a port and a bridge answers it from the other context's application units. Peer reaches a link through its own `PeerLink` port, never by importing Connection. Until slice 5 places Peer, its unplaced files name the public `Connection` at the edge (`api/connection/`) and are handed a borrow function, `BorrowConnection`, by the composition root. The `boundaries` rule reads the edge as no context, so that dependency is on no list.
 
 **The composition root.** `api/bluey.dart` assembles everything by constructor. There is no container and no singleton, and it is the one edge file that names an infrastructure, a context's or the kernel's; it hands every other edge file its ports by constructor.
 
@@ -245,16 +255,16 @@ Every Kotlin and Swift source is held to 400 lines by the size rules (section 4)
 
 ## 9. Tests
 
-A test file mirrors its source file's path: `lib/src/features/connection/domain/link_state.dart` is tested by `test/features/connection/domain/link_state_test.dart`. Existing tests move with their source.
+A test file mirrors its source file's path: `lib/src/features/connection/domain/link.dart` is tested by `test/features/connection/domain/link_test.dart`. Existing tests move with their source.
 
 A `group` names the scenario, and each test inside it is laid out with `// arrange`, `// act` and `// assert`. A phase comment is left out only when the phase has no statement.
 
 Application units are tested against in-memory doubles of their ports (`InMemoryScanning`), kept in `test/fixtures/` under the same tree, never against mocks. `FakeBlueyPlatform` stays, for adapter tests and for the integration tests that run whole scenarios through `api/`. [`testing-conventions.md`](testing-conventions.md) holds the rules for simulated time and the fake's scenario surface.
 
-**Known defects.** A known defect is a test that reproduces an audit finding and fails until the slice that owns it fixes the bug. The eleven from the November audit live in [`bluey/test/known_defects/domain_known_defects_test.dart`](../bluey/test/known_defects/domain_known_defects_test.dart) (nine) and [`bluey_android/test/known_defects/android_adapter_known_defects_test.dart`](../bluey_android/test/known_defects/android_adapter_known_defects_test.dart) (two), each named by its finding and backlog id (`H3 (I381): ...`). The two `bluey_android` ones keep the mocktail mocks they were written with, as that suite's other tests do.
+**Known defects.** A known defect is a test that reproduces an audit finding and fails until the slice that owns it fixes the bug. The November audit wrote eleven; slice 1 fixed four of them (the two H3 tests, H2 and M3), and seven remain: six in [`bluey/test/known_defects/domain_known_defects_test.dart`](../bluey/test/known_defects/domain_known_defects_test.dart) and one in [`bluey_android/test/known_defects/android_adapter_known_defects_test.dart`](../bluey_android/test/known_defects/android_adapter_known_defects_test.dart), each named by its finding and backlog id (`M5 (I382): ...`). The `bluey_android` one keeps the mocktail mocks it was written with, as that suite's other tests do, and so did M3 when it moved into `android_connection_manager_test.dart`.
 
 - **The tag.** Each file opens with `@Tags(['known-defect'])`. The package's `dart_test.yaml` declares the tag with a skip reason, so a normal `flutter test` shows each file as one skipped suite and stays green.
-- **The roster.** Each package names its known defects in `test/known_defects/roster.dart`, one `knownDefects` list of full test names, group and test together (`'H3 (I381): remote disconnect never finalises the Connection stateChanges closes after the peer drops the link'`). A roster is a list as section 5's are: it only shrinks, and the Lists only shrink job holds it to that.
+- **The roster.** Each package names its known defects in `test/known_defects/roster.dart`, one `knownDefects` list of full test names, group and test together (`'M5 (I382): dispose while scanning dispose stops the platform scan'`). A roster is a list as section 5's are: it only shrinks, and the Lists only shrink job holds it to that.
 - **The run.** CI's Known defects job runs them with `flutter test test/known_defects --run-skipped --tags known-defect --reporter json`, and `bluey_guards:known_defects` reads the output against the package's roster. It fails when a known defect passes, when one does not run to a result (a file that no longer compiles, a failing `setUpAll`), when the run produced nothing, when the log stops before the reporter's last event, `done`, so a run cut short never hides the known defects it did not reach, when a name on the roster is not in the run (a test deleted or renamed), and when a test in the run is not on the roster. A still-failing known defect is what it expects, and the verdict prints the first line of its first error beside its name.
 - **The fix.** A fix slice starts by moving its test out of the known-defect file into the mirrored tree, where it fails: that is its red step. The fix makes it pass. The move, the fix and the name struck from the package's roster land in one commit, so the normal suite never holds a failing test and the Known defects job never sees a passing one. When a package's last known defect is fixed, the same commit deletes its known-defect file, its roster and its `dart_test.yaml` tag and takes its run, its roster and its JSON file out of the Known defects job, since an empty run reads as "the run produced no result"; the job goes with the last package.
 
@@ -267,9 +277,9 @@ Every pull request runs the jobs of [`.github/workflows/ci.yml`](../.github/work
 | Gate | Command | CI job |
 | --- | --- | --- |
 | Analysis, and a lockfile that resolves as committed | `flutter pub get && test -z "$(git status --porcelain)" && flutter analyze`, at the repository root; the status check fails on a changed file and on a new one | Analyze |
-| Formatting of the guards, the lists and placed code | `dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/shared/domain`, at the repository root (every package's architecture tests, list files and known defects); CI adds each root of new code (`lib/src/api`, `lib/src/features`, `lib/src/shared/{domain,application,infrastructure}`) once it exists. The old folders keep their layout until their code moves | Analyze |
+| Formatting of the guards, the lists and placed code | `dart format --output=none --set-exit-if-changed bluey_guards */test/architecture */test/known_defects bluey/lib/src/api bluey/lib/src/features bluey/lib/src/shared/domain bluey/lib/src/shared/application bluey/lib/src/shared/infrastructure`, at the repository root (every package's architecture tests, list files and known defects, and every root of new code); CI passes each root only when it exists, and today all five do. The old folders keep their layout until their code moves | Analyze |
 | The Dart suites | `flutter test` in `bluey_platform_interface`, `bluey_android`, `bluey_ios`, `bluey/example` and `bluey_ios/example`; `dart test` in `bluey_guards`; after each, `git diff --exit-code -- '*pubspec.lock'`, since `bluey_ios/example` resolves against its own lockfile when its suite runs | Tests (bluey_platform_interface), Tests (bluey_android), Tests (bluey_ios), Tests (bluey_guards), Tests (bluey/example), Tests (bluey_ios/example) |
-| The `bluey` suite and its two coverage floors | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib`, the whole package at 90%; then `dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain`, the domain at 95% (a `*` stands for any one folder). Each also fails on a file under its scope with code that no test loads. A scope that holds no line at all passes and says `the 95% floor holds nothing yet`, since the domain folders fill in as contexts move; today `shared/domain` holds 24 lines, all covered | Tests and coverage (bluey) |
+| The `bluey` suite and its two coverage floors | `cd bluey && flutter test --coverage && dart run bluey_guards:coverage_gate coverage/lcov.info 90 lib`, the whole package at 90%; then `dart run bluey_guards:coverage_gate coverage/lcov.info 95 lib 'lib/src/features/*/domain' lib/src/shared/domain`, the domain at 95% (a `*` stands for any one folder). Each also fails on a file under its scope with code that no test loads. A scope that holds no line at all passes and says `the 95% floor holds nothing yet`, since the domain folders fill in as contexts move; today `features/connection/domain` and `shared/domain` hold 251 lines, all covered | Tests and coverage (bluey) |
 | The architecture rules | `flutter test test/architecture` in each of `bluey`, `bluey_platform_interface`, `bluey_android` and `bluey_ios` | Architecture |
 | No list grew | `git fetch origin main && cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart`, and the same in each package with a `known_violations.dart` (its roster only where it has one) | Lists only shrink |
 | The public API dump | `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api` | Public API |
@@ -291,9 +301,9 @@ The known defects, run as the job runs them:
 
 The two test runs exit non-zero, as they should; the verdict is the third command's. Each JSON file is judged against the roster before it. It prints, for each file, how many are still failing, now passing and not run, each still-failing test with the first line of its first error, so the log shows it fails for the defect its name gives, and names each one that fails the gate with what to do.
 
-The `bluey` suite runs once in CI, in the job that holds the two coverage floors, and the Architecture job runs the four `test/architecture` folders again on their own, so a broken rule reads as "Architecture" in the checks list. The coverage floor is 90% of lines in the `bluey` package, the figure CLAUDE.md requires; a missing report fails too. A report names only the libraries a test loaded, so the gate is also given `lib` and fails naming every Dart file under it that the report lacks and that holds code that runs: a body, a constructor (even a `const` one with no body) or a variable that is not a constant and has an initializer. A file of enum values, abstract members or exports holds none and is absent from every report; today 13 of the 56 files under `bluey/lib` are such files.
+The `bluey` suite runs once in CI, in the job that holds the two coverage floors, and the Architecture job runs the four `test/architecture` folders again on their own, so a broken rule reads as "Architecture" in the checks list. The coverage floor is 90% of lines in the `bluey` package, the figure CLAUDE.md requires; a missing report fails too. A report names only the libraries a test loaded, so the gate is also given `lib` and fails naming every Dart file under it that the report lacks and that holds code that runs: a body, a constructor (even a `const` one with no body) or a variable that is not a constant and has an initializer. A file of enum values, abstract members or exports holds none and is absent from every report; today 16 of the 77 files under `bluey/lib` are such files.
 
-**Where the gates stand.** On Flutter 3.47.2 every Dart gate is green: the `bluey` suite holds 1,148 tests (and one skipped) at 90.6% line coverage against its 90% floor, its domain is at 100% (24 of 24 lines) against its 95% floor, `bluey_guards` holds 246 tests, and the example app's suite 245. The example is the one consumer of the public API in the repository, so its suite is what sees a change to the API break an app's behaviour, which analysis alone does not. `bluey_ios/example` has its own lockfile, outside the workspace, and one smoke test. The Kotlin suite (114 JVM tests, run on the debug and the release variant) and the XCTest suite (83 tests) were green on Joel's Mac at `a41a2de`, with Xcode 26.6.
+**Where the gates stand.** On Flutter 3.47.2 every Dart gate is green: the `bluey` suite holds 1,447 tests (and one skipped) at 92.5% line coverage (3,153 of 3,408 lines) against its 90% floor, its domain is at 100% (251 of 251 lines) against its 95% floor, `bluey_guards` holds 246 tests, and the example app's suite 245. The example is the one consumer of the public API in the repository, so its suite is what sees a change to the API break an app's behaviour, which analysis alone does not. `bluey_ios/example` has its own lockfile, outside the workspace, and one smoke test. The Kotlin suite (114 JVM tests, run on the debug and the release variant) and the XCTest suite (83 tests) were green on Joel's Mac at `a41a2de`, with Xcode 26.6; slice 1's first pull request changed no native file.
 
 **The Flutter pin.** Flutter is pinned by one line, `flutter: 3.47.2` under `environment:` in the root `pubspec.yaml`. Pub reads it as a floor, so an older Flutter refuses to resolve; CI installs exactly that version from the same line, so CI is the exact gate. The workspace lockfile, `pubspec.lock` at the root, is committed, so every checkout and CI resolve alike. To move the pin: change that one line, install that Flutter, run `flutter pub get` at the root, and commit `pubspec.yaml`, `pubspec.lock` and any other file the tool rewrote. The Analyze job fails when resolving changes the committed tree, so nothing the tool writes may be left out.
 
@@ -320,13 +330,13 @@ Each move happens in the slice that changes the code, never on its own.
 | Today | Target |
 | --- | --- |
 | `bluey.dart`; `Connection`, `Scanner`, `Server` and the `Remote*` interfaces with their `Bluey*` implementations | `api/`, with the logic they hold moved down into application units and domain state machines |
-| `shared/exceptions.dart` | `api/exceptions.dart`; each context gains its own sealed failures in `domain/` |
+| `shared/exceptions.dart` | `api/exceptions.dart`, in a later slice (section 6); each context gains its own sealed failures in `domain/` |
 | `events.dart` | Each context's `domain/events/`, each family under a `BlueyEvent` marker |
 | `lifecycle.dart`, `connection/lifecycle_client.dart`, `connection/peer_silence_monitor.dart`, `gatt_server/lifecycle_server.dart` | `features/peer/`, which owns both halves of the lifecycle protocol |
 | The `_map*` methods and `connection_parameters_mapper.dart` | Each context's `infrastructure/adapters/` |
 | `shared/error_translation.dart` | `shared/infrastructure/` for platform errors to failures; `api/failure_translation.dart` for failures to exceptions |
-| `log/`, `event_bus.dart` | A port in `shared/application`, the implementation in `shared/infrastructure` |
-| `Capabilities`, which `lib/bluey.dart` re-exports from `bluey_platform_interface` and which `Mtu` and `Bluey.capabilities` name | Bluey's own `Capabilities` value object in `shared/domain`, mapped from the platform interface's type by an adapter, as `PlatformDevice` becomes `Device` |
+| `log/`, `event_bus.dart` | A port in `shared/application`, the implementation in `shared/infrastructure`; `BlueyLogLevel` and `BlueyLogEvent`, what the `Log` port speaks, live beside it in `shared/application` (moved in slice 1) |
+| `Capabilities`, which `lib/bluey.dart` re-exports from `bluey_platform_interface` and which `Mtu` and `Bluey.capabilities` name | Bluey's own `Capabilities` value object, with `PlatformKind`, in `features/platform/domain`, mapped from the platform interface's type by an adapter in `features/platform/infrastructure/adapters/`, as `PlatformDevice` becomes `Device`. It is Platform's, not the kernel's; Connection is handed the few facts it needs as its own `LinkFeatures` |
 | The other files of each context folder (`connection/`, `discovery/`, `gatt_client/`, `gatt_server/`, `peer/`, `platform/`) and of `shared/` | The layer of `features/{context}/` or `shared/` their content belongs to |
 
 The slices, in order. Each gets its own short design with its own design review, and the [roadmap](roadmap.md) tracks the items each one closes.

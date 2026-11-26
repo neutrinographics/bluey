@@ -5,13 +5,13 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:meta/meta.dart';
 
-import '../event_bus.dart';
+import '../shared/application/event_publisher.dart';
 import '../events.dart';
 import '../gatt_client/gatt.dart';
 import '../lifecycle.dart' as lifecycle;
-import '../log/bluey_logger.dart';
-import '../log/log_level.dart';
-import '../discovery/device_address.dart';
+import '../shared/infrastructure/bluey_logger.dart';
+import '../shared/application/log_level.dart';
+import '../shared/domain/device_address.dart';
 import '../peer/server_id.dart';
 import '../shared/exceptions.dart';
 import 'peer_silence_monitor.dart';
