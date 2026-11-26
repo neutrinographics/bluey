@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
 import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/domain/connection_event.dart';
@@ -23,12 +24,19 @@ void main() {
   late RecordingEventPublisher events;
   late RecordingLog log;
   late LinkRegistry registry;
+  DateTime? handedNow;
 
   void build() {
+    handedNow = null;
     links = InMemoryLinks()..reach(device);
     events = RecordingEventPublisher();
     log = RecordingLog();
-    registry = LinkRegistry(links: links, events: events, log: log);
+    registry = LinkRegistry(
+      links: links,
+      events: events,
+      log: log,
+      now: () => handedNow ?? clock.now(),
+    );
   }
 
   setUp(build);
@@ -232,6 +240,30 @@ void main() {
           timeout: const Duration(seconds: 3),
         );
         async.elapse(const Duration(seconds: 3));
+
+        // assert
+        expect(resultOf(borrower), timedOut);
+        expect(links.opensAsked(device), 1);
+      });
+    });
+
+    test('a waiter times out when the clock it was handed passes its '
+        'deadline, whatever the timers say', () {
+      fakeAsync((async) {
+        // arrange
+        build();
+        links.openDelay = const Duration(seconds: 1);
+        links.failNextOpen(device, ConnectFailureReason.deviceNotFound);
+        registry.acquire(device, by: LinkUser.app);
+        final borrower = registry.acquire(
+          device,
+          by: LinkUser.borrower,
+          timeout: const Duration(seconds: 3),
+        );
+
+        // act
+        handedNow = clock.now().add(const Duration(seconds: 5));
+        async.elapse(const Duration(seconds: 1));
 
         // assert
         expect(resultOf(borrower), timedOut);

@@ -1,10 +1,9 @@
 import 'dart:async';
 
-import 'package:clock/clock.dart';
-
 import '../../../shared/application/event_publisher.dart';
 import '../../../shared/application/log.dart';
 import '../../../shared/application/log_level.dart';
+import '../../../shared/application/now.dart';
 import '../../../shared/domain/device_address.dart';
 import '../../../shared/domain/either.dart';
 import '../domain/connection_event.dart';
@@ -32,13 +31,16 @@ final class LinkRegistry {
     required Links links,
     required EventPublisher events,
     required Log log,
+    required Now now,
   }) : _links = links,
        _events = events,
-       _log = log;
+       _log = log,
+       _now = now;
 
   final Links _links;
   final EventPublisher _events;
   final Log _log;
+  final Now _now;
   final Map<DeviceAddress, LinkSession> _sessions = {};
   final Map<DeviceAddress, Completer<void>> _changes = {};
   LiveLinks _table = const LiveLinks.empty();
@@ -56,7 +58,7 @@ final class LinkRegistry {
     required LinkUser by,
     Duration? timeout,
   }) async {
-    final deadline = timeout == null ? null : clock.now().add(timeout);
+    final deadline = timeout == null ? null : _now().add(timeout);
     var budget = timeout;
     while (true) {
       final session = _sessions[device];
@@ -157,14 +159,13 @@ final class LinkRegistry {
     }
     return change
         .then((_) => true)
-        .timeout(deadline.difference(clock.now()), onTimeout: () => false);
+        .timeout(deadline.difference(_now()), onTimeout: () => false);
   }
 
   void _announceChange(DeviceAddress device) =>
       _changes.remove(device)?.complete();
 
-  static Duration? _timeLeft(DateTime? deadline) =>
-      deadline?.difference(clock.now());
+  Duration? _timeLeft(DateTime? deadline) => deadline?.difference(_now());
 
   void _logFailure(DeviceAddress device, ConnectionFailure failure) {
     final type = failure.runtimeType.toString();

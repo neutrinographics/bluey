@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
+import 'package:clock/clock.dart';
 import 'package:meta/meta.dart';
 
 import 'api/connection/borrowed_connection.dart';
@@ -92,18 +93,17 @@ class Bluey {
     links: PlatformLinks(_platform, log: _logger),
     events: _eventBus,
     log: _logger,
+    now: clock.now,
   );
   late final ConnectDevice _connectDevice = ConnectDevice(_registry);
   late final BorrowConnection _borrow = borrowingThrough(
     borrowLink: BorrowLink(_registry),
     connections: _connections,
   );
-
   StreamSubscription? _stateSubscription;
   StreamSubscription<platform.PlatformLogEvent>? _platformLogSubscription;
   final StreamController<BluetoothState> _stateController =
       StreamController<BluetoothState>.broadcast();
-
   BluetoothState _currentState = BluetoothState.unknown;
 
   /// Private synchronous constructor. Use [Bluey.create] instead.

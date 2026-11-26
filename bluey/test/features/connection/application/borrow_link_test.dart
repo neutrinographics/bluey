@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
 import 'package:bluey/src/features/connection/application/connect_device.dart';
 import 'package:bluey/src/features/connection/application/link_registry.dart';
@@ -28,6 +29,7 @@ void main() {
       links: links,
       events: events,
       log: RecordingLog(),
+      now: clock.now,
     );
     borrow = BorrowLink(registry);
     connect = ConnectDevice(registry);

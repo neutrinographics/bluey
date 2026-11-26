@@ -67,7 +67,7 @@ final Map<String, ArchitectureRule> blueyRules = {
         'dart:math',
         'package:meta',
       },
-      application: {'dart:async', 'package:clock'},
+      application: {'dart:async'},
       infrastructure: {
         'package:bluey_platform_interface',
         'package:flutter/services.dart',

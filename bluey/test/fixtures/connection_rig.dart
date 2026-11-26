@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:bluey/src/api/connection/bluey_connection.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connection.dart';
@@ -31,6 +32,7 @@ class ConnectionRig {
       links: PlatformLinks(platform, log: log),
       events: bus,
       log: log,
+      now: clock.now,
     );
     _connectDevice = ConnectDevice(registry);
     _connections = Connections(
