@@ -68,13 +68,37 @@ void main() {
   group('BlueyConnection.requestMtu gating', () {
     test('succeeds when canRequestMtu=true', () async {
       final r = await connectWith(platform.Capabilities.android);
-      final negotiated = await r.conn.android!.requestMtu(
-        Mtu(247, capabilities: platform.Capabilities.android),
-      );
+      final negotiated = await r.conn.android!.requestMtu(Mtu(247));
       expect(negotiated.value, greaterThan(0));
       await r.conn.disconnect();
       r.bluey.dispose();
     });
+
+    test(
+      'an MTU above the maximum of the platform is refused when it is requested',
+      () async {
+        final r = await connectWith(
+          const platform.Capabilities(
+            platformKind: platform.PlatformKind.android,
+            canRequestMtu: true,
+            maxMtu: 247,
+          ),
+        );
+        final android =
+            r.conn.android ?? (throw StateError('android extensions absent'));
+        expect(
+          () => android.requestMtu(Mtu(248)),
+          throwsA(
+            isA<UnsupportedOperationException>()
+                .having((e) => e.operation, 'operation', 'requestMtu above 247')
+                .having((e) => e.platform, 'platform', 'android'),
+          ),
+        );
+        expect(await android.requestMtu(Mtu(247)), Mtu(247));
+        await r.conn.disconnect();
+        r.bluey.dispose();
+      },
+    );
   });
 
   group('AndroidConnectionExtensions — capability gating', () {

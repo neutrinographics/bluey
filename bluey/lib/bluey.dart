@@ -29,11 +29,6 @@ export 'src/api/connection/connection.dart';
 export 'src/api/connection/android_connection_extensions.dart';
 export 'src/api/connection/ios_connection_extensions.dart';
 export 'src/connection/value_objects/attribute_handle.dart';
-export 'src/connection/value_objects/mtu.dart';
-export 'src/connection/value_objects/connection_interval.dart';
-export 'src/connection/value_objects/peripheral_latency.dart';
-export 'src/connection/value_objects/supervision_timeout.dart';
-export 'src/connection/value_objects/connection_parameters.dart';
 
 // GATT Client bounded context
 export 'src/gatt_client/gatt.dart';

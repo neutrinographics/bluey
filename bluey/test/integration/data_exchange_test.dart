@@ -441,7 +441,7 @@ void main() {
 
         // Act
         final mtu = await connection.android!.requestMtu(
-          Mtu(512, capabilities: platform.Capabilities.android),
+          Mtu(512),
         );
 
         // Assert
@@ -466,7 +466,7 @@ void main() {
 
         // Request larger MTU
         await connection.android!.requestMtu(
-          Mtu(256, capabilities: platform.Capabilities.android),
+          Mtu(256),
         );
 
         // Assert MTU property updated

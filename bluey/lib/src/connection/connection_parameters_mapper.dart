@@ -1,9 +1,9 @@
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 
-import 'value_objects/connection_interval.dart';
-import 'value_objects/connection_parameters.dart';
-import 'value_objects/peripheral_latency.dart';
-import 'value_objects/supervision_timeout.dart';
+import '../features/connection/domain/value_objects/connection_interval.dart';
+import '../features/connection/domain/value_objects/connection_parameters.dart';
+import '../features/connection/domain/value_objects/peripheral_latency.dart';
+import '../features/connection/domain/value_objects/supervision_timeout.dart';
 
 /// Converts a domain [ConnectionParameters] into the wire-level
 /// [PlatformConnectionParameters] DTO.

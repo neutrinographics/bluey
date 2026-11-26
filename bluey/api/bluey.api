@@ -492,7 +492,7 @@ class ManufacturerData
 class Mtu
   String toString()
   bool ==(Object other)
-  factory Mtu(int value, {required Capabilities capabilities})
+  factory Mtu(int value)
   factory Mtu.fromPlatform(int value)
   final int value
   int get hashCode

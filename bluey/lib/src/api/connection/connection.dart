@@ -1,4 +1,4 @@
-import '../../connection/value_objects/write_payload_limit.dart';
+import '../../features/connection/domain/value_objects/write_payload_limit.dart';
 import 'connection_state.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
@@ -6,61 +6,16 @@ import '../../shared/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'ios_connection_extensions.dart';
 
-export '../../connection/value_objects/connection_interval.dart';
-export '../../connection/value_objects/connection_parameters.dart'
+export '../../features/connection/domain/value_objects/bond_state.dart';
+export '../../features/connection/domain/value_objects/connection_interval.dart';
+export '../../features/connection/domain/value_objects/connection_parameters.dart'
     show ConnectionParameters;
-export '../../connection/value_objects/mtu.dart';
-export '../../connection/value_objects/peripheral_latency.dart';
-export '../../connection/value_objects/supervision_timeout.dart';
-export '../../connection/value_objects/write_payload_limit.dart';
+export '../../features/connection/domain/value_objects/mtu.dart';
+export '../../features/connection/domain/value_objects/peripheral_latency.dart';
+export '../../features/connection/domain/value_objects/phy.dart' show Phy;
+export '../../features/connection/domain/value_objects/supervision_timeout.dart';
+export '../../features/connection/domain/value_objects/write_payload_limit.dart';
 export 'connection_state.dart';
-
-/// Bonding state of a device.
-///
-/// Bonding (also known as pairing) establishes a trusted relationship
-/// between devices that persists across connections. Bonded devices
-/// can reconnect without re-pairing and may have access to encrypted
-/// characteristics.
-enum BondState {
-  /// No bond exists with this device.
-  none,
-
-  /// Bonding is in progress.
-  ///
-  /// The user may be prompted to confirm a pairing code.
-  bonding,
-
-  /// The device is bonded.
-  ///
-  /// The bond persists across disconnections and app restarts.
-  bonded,
-}
-
-/// BLE Physical Layer (PHY) options.
-///
-/// The PHY determines the radio modulation used for the connection,
-/// affecting throughput, range, and power consumption.
-enum Phy {
-  /// 1 Mbps PHY (default, most compatible).
-  ///
-  /// This is the standard BLE PHY supported by all BLE devices.
-  /// Good balance of range, speed, and compatibility.
-  le1m,
-
-  /// 2 Mbps PHY (faster, shorter range).
-  ///
-  /// Doubles the data rate compared to LE 1M, reducing transmission
-  /// time and power consumption for large transfers. However, it has
-  /// slightly reduced range. Requires Bluetooth 5.0+.
-  le2m,
-
-  /// Coded PHY (longer range, slower).
-  ///
-  /// Uses forward error correction for improved sensitivity, enabling
-  /// significantly longer range (up to 4x LE 1M). The tradeoff is lower
-  /// throughput. Requires Bluetooth 5.0+.
-  leCoded,
-}
 
 /// An active connection to a BLE device.
 ///

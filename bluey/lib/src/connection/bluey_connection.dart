@@ -27,6 +27,7 @@ import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
 import '../api/connection/android_connection_extensions.dart';
 import '../api/connection/connection.dart';
+import '../features/connection/domain/value_objects/phy.dart';
 import 'connection_parameters_mapper.dart';
 import '../api/connection/ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
@@ -152,8 +153,7 @@ class LinkGattClient {
 
   final StreamController<BondState> _bondStateController =
       StreamController<BondState>.broadcast();
-  final StreamController<({Phy tx, Phy rx})> _phyController =
-      StreamController<({Phy tx, Phy rx})>.broadcast();
+  final _phyController = StreamController<PhyPair>.broadcast();
   final StreamController<List<RemoteService>> _servicesChangesController =
       StreamController<List<RemoteService>>.broadcast();
 
@@ -681,27 +681,26 @@ class LinkGattClient {
 
   Phy get _rxPhyValue => _rxPhy;
 
-  Stream<({Phy tx, Phy rx})> get _phyChanges =>
-      Stream<({Phy tx, Phy rx})>.multi((controller) {
-        // Convention 3 (non-enum terminal): late subscribers after an
-        // outage see addError(StaleHandleException) + close so their
-        // `onError` mirrors what the corresponding sync getters throw
-        // (Convention 6).
-        final stale = _staleness;
-        if (stale != null) {
-          controller.addError(stale);
-          controller.close();
-          return;
-        }
-        // Replay the cached (tx, rx) PHY pair before bridging live events.
-        controller.add((tx: _txPhy, rx: _rxPhy));
-        final sub = _phyController.stream.listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: controller.close,
-        );
-        controller.onCancel = sub.cancel;
-      }, isBroadcast: true);
+  Stream<PhyPair> get _phyChanges => Stream<PhyPair>.multi((controller) {
+    // Convention 3 (non-enum terminal): late subscribers after an
+    // outage see addError(StaleHandleException) + close so their
+    // `onError` mirrors what the corresponding sync getters throw
+    // (Convention 6).
+    final stale = _staleness;
+    if (stale != null) {
+      controller.addError(stale);
+      controller.close();
+      return;
+    }
+    // Replay the cached (tx, rx) PHY pair before bridging live events.
+    controller.add((tx: _txPhy, rx: _rxPhy));
+    final sub = _phyController.stream.listen(
+      controller.add,
+      onError: controller.addError,
+      onDone: controller.close,
+    );
+    controller.onCancel = sub.cancel;
+  }, isBroadcast: true);
 
   Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
     _ensureValid();
@@ -1316,11 +1315,9 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
 /// reports any of the Android-only capability flags. Created at most
 /// once per connection and lazy-cached.
 ///
-/// Each member delegates straight back to the corresponding private
-/// member on the wrapping [LinkGattClient]. The bond/PHY/conn-params
-/// members are private on [LinkGattClient] (since B.3 removed them
-/// from the [Connection] interface) and only reachable via this
-/// facade.
+/// Each member delegates to the private member of the wrapping
+/// [LinkGattClient], since the bond, PHY and connection-parameter
+/// members are not on [Connection] and are reachable only here.
 class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
   final LinkGattClient _conn;
 
@@ -1437,9 +1434,11 @@ class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
   @override
   Future<Mtu> requestMtu(Mtu desired) {
     _conn._ensureValid();
+    final capabilities = _conn._platform.capabilities;
+    _requireCapability(capabilities.canRequestMtu, 'requestMtu');
     _requireCapability(
-      _conn._platform.capabilities.canRequestMtu,
-      'requestMtu',
+      desired.value <= capabilities.maxMtu,
+      'requestMtu above ${capabilities.maxMtu}',
     );
     return _conn._requestMtuImpl(desired);
   }

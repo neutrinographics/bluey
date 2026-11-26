@@ -330,7 +330,7 @@ void main() {
 
         // Request larger MTU
         final negotiatedMtu = await connection.android!.requestMtu(
-          Mtu(512, capabilities: platform.Capabilities.android),
+          Mtu(512),
         );
         expect(negotiatedMtu, equals(Mtu.fromPlatform(512)));
         expect(connection.android?.mtu, equals(Mtu.fromPlatform(512)));

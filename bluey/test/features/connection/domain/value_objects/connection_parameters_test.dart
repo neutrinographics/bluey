@@ -1,4 +1,7 @@
-import 'package:bluey/bluey.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/connection_interval.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/connection_parameters.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/peripheral_latency.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/supervision_timeout.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

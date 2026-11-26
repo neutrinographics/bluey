@@ -125,7 +125,7 @@ void main() {
       expect(before.value, equals(20));
 
       await connection.android!.requestMtu(
-        Mtu(247, capabilities: platform.Capabilities.android),
+        Mtu(247),
       );
 
       // Post-negotiation: MTU 247 -> 244 byte payload.

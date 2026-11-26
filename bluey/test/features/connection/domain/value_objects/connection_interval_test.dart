@@ -1,4 +1,4 @@
-import 'package:bluey/bluey.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/connection_interval.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

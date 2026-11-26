@@ -44,8 +44,8 @@ class WritePayloadLimit {
   /// lowers values above 512; platform "unavailable" sentinels (0, -1) and all
   /// sub-512 values pass through unchanged.
   factory WritePayloadLimit.fromPlatform(int value) => WritePayloadLimit._(
-        value > maxAttributeValueLength ? maxAttributeValueLength : value,
-      );
+    value > maxAttributeValueLength ? maxAttributeValueLength : value,
+  );
 
   const WritePayloadLimit._(this.value);
 
