@@ -6,4 +6,8 @@ enum LinkOperation {
   negotiateMtu,
   readWritePayloadLimit,
   readSignalStrength,
+  readBondState,
+  followBondState,
+  bond,
+  removeBond,
 }

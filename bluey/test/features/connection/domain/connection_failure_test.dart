@@ -186,6 +186,14 @@ void main() {
           'Reading the write payload limit timed out.',
       const OperationRejected(LinkOperation.readSignalStrength, 133):
           'Reading the signal strength was rejected with status 133.',
+      const FeatureUnsupported(LinkOperation.readBondState):
+          'Reading the bond state is not supported on this platform.',
+      const FeatureUnsupported(LinkOperation.followBondState):
+          'Following the bond state is not supported on this platform.',
+      const OperationRejected(LinkOperation.bond, 133):
+          'Bonding was rejected with status 133.',
+      const OperationTimedOut(LinkOperation.removeBond):
+          'Removing the bond timed out.',
       MtuAboveMaximum(requested: Mtu(248), maximum: 247):
           "An MTU of 248 is above this platform's maximum of 247.",
     };

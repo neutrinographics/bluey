@@ -63,6 +63,10 @@ void main() {
       (LinkOperation.negotiateMtu, 'requestMtu'),
       (LinkOperation.readWritePayloadLimit, 'getMaximumWriteLength'),
       (LinkOperation.readSignalStrength, 'readRssi'),
+      (LinkOperation.readBondState, 'bondState'),
+      (LinkOperation.followBondState, 'bondStateChanges'),
+      (LinkOperation.bond, 'bond'),
+      (LinkOperation.removeBond, 'removeBond'),
     ];
 
     for (final (operation, word) in rows) {

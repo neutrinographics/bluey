@@ -241,4 +241,8 @@ String _attemptOf(LinkOperation operation) => switch (operation) {
   LinkOperation.negotiateMtu => 'Negotiating the MTU',
   LinkOperation.readWritePayloadLimit => 'Reading the write payload limit',
   LinkOperation.readSignalStrength => 'Reading the signal strength',
+  LinkOperation.readBondState => 'Reading the bond state',
+  LinkOperation.followBondState => 'Following the bond state',
+  LinkOperation.bond => 'Bonding',
+  LinkOperation.removeBond => 'Removing the bond',
 };

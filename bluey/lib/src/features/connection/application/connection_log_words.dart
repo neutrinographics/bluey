@@ -35,6 +35,10 @@ String operationWordOf(LinkOperation operation) => switch (operation) {
   LinkOperation.negotiateMtu => 'requestMtu',
   LinkOperation.readWritePayloadLimit => 'getMaximumWriteLength',
   LinkOperation.readSignalStrength => 'readRssi',
+  LinkOperation.readBondState => 'bondState',
+  LinkOperation.followBondState => 'bondStateChanges',
+  LinkOperation.bond => 'bond',
+  LinkOperation.removeBond => 'removeBond',
 };
 
 /// The code a log line names [failure] by, the class name an app has always
