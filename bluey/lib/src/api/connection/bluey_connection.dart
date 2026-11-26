@@ -15,13 +15,19 @@ import 'ios_connection_extensions.dart';
 /// link and never keeps a copy: a Connection whose link ended stays ended,
 /// whatever the platform later says about the same device.
 final class BlueyConnection implements Connection {
-  /// Presents [session], whose GATT operations [gatt] carries.
-  BlueyConnection({required LinkSession session, required LinkGattClient gatt})
-    : _session = session,
-      _gatt = gatt;
+  /// Presents [session], whose GATT operations [gatt] carries; its
+  /// exceptions name [platform].
+  BlueyConnection({
+    required LinkSession session,
+    required LinkGattClient gatt,
+    required String platform,
+  }) : _session = session,
+       _gatt = gatt,
+       _platform = platform;
 
   final LinkSession _session;
   final LinkGattClient _gatt;
+  final String _platform;
 
   @override
   DeviceAddress get deviceAddress => _session.link.device;
@@ -68,8 +74,11 @@ final class BlueyConnection implements Connection {
   Future<int> readRssi() => _gatt.readRssi();
 
   @override
-  Future<void> disconnect() async =>
-      valueOrThrow(await _session.disconnect(), device: deviceAddress);
+  Future<void> disconnect() async => valueOrThrow(
+    await _session.disconnect(),
+    device: deviceAddress,
+    platform: _platform,
+  );
 
   @override
   AndroidConnectionExtensions? get android => _gatt.android;

@@ -36,6 +36,7 @@ void main() {
     borrow = borrowingThrough(
       borrowLink: BorrowLink(registry),
       connections: connections,
+      platform: 'fake',
     );
   });
 

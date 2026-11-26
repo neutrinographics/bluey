@@ -47,19 +47,25 @@ typedef BorrowConnection =
 
 /// A [BorrowConnection] over [borrowLink], whose Connections come from
 /// [connections], so a borrower and the app holding one link hold one
-/// object.
+/// object; its exceptions name [platform].
 BorrowConnection borrowingThrough({
   required BorrowLink borrowLink,
   required Connections connections,
+  required String platform,
 }) => (DeviceAddress device, {Duration? timeout}) async {
   final borrowed = valueOrThrow(
     await borrowLink.run(BorrowLinkRequest(device: device, timeout: timeout)),
     device: device,
+    platform: platform,
   );
   return BorrowedConnection(
     connection: connections.of(borrowed.session),
     giveBack:
-        () async => valueOrThrow(await borrowed.giveBack(), device: device),
+        () async => valueOrThrow(
+          await borrowed.giveBack(),
+          device: device,
+          platform: platform,
+        ),
     keep: borrowed.keep,
   );
 };

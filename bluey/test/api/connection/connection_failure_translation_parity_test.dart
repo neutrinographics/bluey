@@ -79,6 +79,7 @@ void main() {
         final now = connectionFailureAsException(
           connectionFailureFrom(error, operation: LinkOperation.open),
           device: device,
+          platform: 'fake',
         );
 
         // assert
@@ -97,18 +98,17 @@ void main() {
 
       // act
       final now = connectionFailureAsException(
-        connectionFailureFrom(error, operation: LinkOperation.open),
+        connectionFailureFrom(error, operation: LinkOperation.negotiateMtu),
         device: device,
+        platform: 'fake',
       );
 
       // assert
       expect(
         now,
-        isA<GattOperationFailedException>().having(
-          (e) => e.status,
-          'status',
-          0x80,
-        ),
+        isA<GattOperationFailedException>()
+            .having((e) => e.operation, 'operation', 'requestMtu')
+            .having((e) => e.status, 'status', 0x80),
       );
     });
   });

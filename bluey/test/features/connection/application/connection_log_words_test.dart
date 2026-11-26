@@ -3,6 +3,7 @@ import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -54,6 +55,7 @@ void main() {
     final rows = <(LinkOperation, String)>[
       (LinkOperation.open, 'connect'),
       (LinkOperation.close, 'disconnect'),
+      (LinkOperation.negotiateMtu, 'requestMtu'),
     ];
 
     for (final (operation, word) in rows) {
@@ -77,6 +79,11 @@ void main() {
       (const OperationTimedOut(LinkOperation.open), 'OperationTimedOut'),
       (const OperationRejected(LinkOperation.close, 133), 'OperationRejected'),
       (const UnexpectedPlatformFailure('boom'), 'UnexpectedPlatformFailure'),
+      (
+        const FeatureUnsupported(LinkOperation.negotiateMtu),
+        'FeatureUnsupported',
+      ),
+      (MtuAboveMaximum(requested: Mtu(248), maximum: 247), 'MtuAboveMaximum'),
     ];
 
     for (final (failure, code) in rows) {

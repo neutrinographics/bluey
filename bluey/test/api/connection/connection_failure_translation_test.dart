@@ -2,6 +2,7 @@ import 'package:bluey/src/api/connection/connection_failure_translation.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_operation.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:bluey/src/platform/bluetooth_state.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -22,6 +23,7 @@ void main() {
         final exception = connectionFailureAsException(
           failure,
           device: _device,
+          platform: 'fake',
         );
 
         // assert
@@ -39,7 +41,11 @@ void main() {
       const failure = LinkHadEnded(EndedOnRequest());
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -55,7 +61,11 @@ void main() {
       const failure = LinkHadEnded(EndedByDrop());
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -76,6 +86,7 @@ void main() {
         final exception = connectionFailureAsException(
           failure,
           device: _device,
+          platform: 'fake',
         );
 
         // assert
@@ -103,7 +114,11 @@ void main() {
       const failure = RadioUnavailable();
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(exception, isA<BluetoothUnavailableException>());
@@ -114,7 +129,11 @@ void main() {
       const failure = PermissionMissing('BLUETOOTH_CONNECT');
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -133,7 +152,11 @@ void main() {
       const failure = OperationTimedOut(LinkOperation.open);
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -153,7 +176,11 @@ void main() {
       const failure = OperationRejected(LinkOperation.close, 133);
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -179,7 +206,11 @@ void main() {
       );
 
       // act
-      final exception = connectionFailureAsException(failure, device: _device);
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'fake',
+      );
 
       // assert
       expect(
@@ -188,6 +219,47 @@ void main() {
             .having((e) => e.message, 'message', 'it broke')
             .having((e) => e.code, 'code', 'weird')
             .having((e) => e.cause, 'cause', same(cause)),
+      );
+    });
+    test('a feature the platform lacks is an unsupported operation naming '
+        'the platform', () {
+      // arrange
+      const failure = FeatureUnsupported(LinkOperation.negotiateMtu);
+
+      // act
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'ios',
+      );
+
+      // assert
+      expect(
+        exception,
+        isA<UnsupportedOperationException>()
+            .having((e) => e.operation, 'operation', 'requestMtu')
+            .having((e) => e.platform, 'platform', 'ios'),
+      );
+    });
+
+    test('an MTU above the maximum is an unsupported operation naming the '
+        'maximum and the platform', () {
+      // arrange
+      final failure = MtuAboveMaximum(requested: Mtu(248), maximum: 247);
+
+      // act
+      final exception = connectionFailureAsException(
+        failure,
+        device: _device,
+        platform: 'android',
+      );
+
+      // assert
+      expect(
+        exception,
+        isA<UnsupportedOperationException>()
+            .having((e) => e.operation, 'operation', 'requestMtu above 247')
+            .having((e) => e.platform, 'platform', 'android'),
       );
     });
   });
@@ -212,6 +284,7 @@ void main() {
           connectionFailureAsException(
             LinkHadEnded(end),
             device: _device,
+            platform: 'fake',
           ).toString(),
       ]);
       expect(exceptions.map((e) => e.runtimeType), [
@@ -228,7 +301,7 @@ void main() {
       const answer = Right<ConnectionFailure, int>(42);
 
       // act
-      final value = valueOrThrow(answer, device: _device);
+      final value = valueOrThrow(answer, device: _device, platform: 'fake');
 
       // assert
       expect(value, 42);
@@ -241,7 +314,7 @@ void main() {
       );
 
       // act
-      void read() => valueOrThrow(answer, device: _device);
+      void read() => valueOrThrow(answer, device: _device, platform: 'fake');
 
       // assert
       expect(

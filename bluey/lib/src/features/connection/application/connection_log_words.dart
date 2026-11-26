@@ -28,6 +28,7 @@ String stateWordOf(LinkPhase phase) => switch (phase) {
 String operationWordOf(LinkOperation operation) => switch (operation) {
   LinkOperation.open => 'connect',
   LinkOperation.close => 'disconnect',
+  LinkOperation.negotiateMtu => 'requestMtu',
 };
 
 /// The code a log line names [failure] by, the class name an app has always
@@ -40,4 +41,6 @@ String failureCodeOf(ConnectionFailure failure) => switch (failure) {
   OperationTimedOut() => 'OperationTimedOut',
   OperationRejected() => 'OperationRejected',
   UnexpectedPlatformFailure() => 'UnexpectedPlatformFailure',
+  FeatureUnsupported() => 'FeatureUnsupported',
+  MtuAboveMaximum() => 'MtuAboveMaximum',
 };

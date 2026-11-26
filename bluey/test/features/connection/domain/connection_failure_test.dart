@@ -1,6 +1,7 @@
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_operation.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:bluey/src/shared/domain/failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,8 @@ String _kindOf(ConnectionFailure failure) => switch (failure) {
   OperationTimedOut() => 'operation timed out',
   OperationRejected() => 'operation rejected',
   UnexpectedPlatformFailure() => 'unexpected platform failure',
+  FeatureUnsupported() => 'feature unsupported',
+  MtuAboveMaximum() => 'MTU above maximum',
 };
 
 void main() {
@@ -48,6 +51,14 @@ void main() {
     'UnexpectedPlatformFailure whatever its cause': (
       UnexpectedPlatformFailure('boom', code: 'E1', cause: cause),
       UnexpectedPlatformFailure('boom', code: 'E1', cause: StateError('other')),
+    ),
+    'FeatureUnsupported': (
+      const FeatureUnsupported(LinkOperation.negotiateMtu),
+      const FeatureUnsupported(LinkOperation.negotiateMtu),
+    ),
+    'MtuAboveMaximum': (
+      MtuAboveMaximum(requested: Mtu(248), maximum: 247),
+      MtuAboveMaximum(requested: Mtu(248), maximum: 247),
     ),
   };
 
@@ -87,6 +98,18 @@ void main() {
     'UnexpectedPlatformFailure by code': (
       UnexpectedPlatformFailure('boom', code: 'E1', cause: cause),
       UnexpectedPlatformFailure('boom', code: 'E2', cause: cause),
+    ),
+    'FeatureUnsupported': (
+      const FeatureUnsupported(LinkOperation.negotiateMtu),
+      const FeatureUnsupported(LinkOperation.open),
+    ),
+    'MtuAboveMaximum by requested': (
+      MtuAboveMaximum(requested: Mtu(248), maximum: 247),
+      MtuAboveMaximum(requested: Mtu(249), maximum: 247),
+    ),
+    'MtuAboveMaximum by maximum': (
+      MtuAboveMaximum(requested: Mtu(248), maximum: 247),
+      MtuAboveMaximum(requested: Mtu(248), maximum: 185),
     ),
   };
 
@@ -155,6 +178,12 @@ void main() {
           'The platform failed unexpectedly: boom.',
       const UnexpectedPlatformFailure('boom', code: 'E1'):
           'The platform failed unexpectedly (E1): boom.',
+      const OperationTimedOut(LinkOperation.negotiateMtu):
+          'Negotiating the MTU timed out.',
+      const FeatureUnsupported(LinkOperation.negotiateMtu):
+          'Negotiating the MTU is not supported on this platform.',
+      MtuAboveMaximum(requested: Mtu(248), maximum: 247):
+          "An MTU of 248 is above this platform's maximum of 247.",
     };
 
     for (final MapEntry(key: failure, value: sentence) in sentences.entries) {

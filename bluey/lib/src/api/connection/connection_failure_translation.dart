@@ -1,6 +1,7 @@
 import '../../features/connection/application/connection_log_words.dart';
 import '../../features/connection/domain/connection_failure.dart';
 import '../../features/connection/domain/link_end.dart';
+import '../../features/connection/domain/link_operation.dart';
 import '../../platform/bluetooth_state.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/domain/either.dart';
@@ -13,9 +14,13 @@ import '../../shared/exceptions.dart';
 /// shared translation, which reads `0x80` as an eviction: only a GATT read or
 /// write can be answered that way by a Bluey server, and Connection does not
 /// know the lifecycle protocol.
+///
+/// [platform] is the platform's name, which an app reads in the exception for
+/// an operation the platform cannot do.
 BlueyException connectionFailureAsException(
   ConnectionFailure failure, {
   required DeviceAddress device,
+  required String platform,
 }) => switch (failure) {
   ConnectFailed(:final reason) => ConnectionException(
     device,
@@ -33,6 +38,14 @@ BlueyException connectionFailureAsException(
     GattOperationFailedException(operationWordOf(operation), status),
   UnexpectedPlatformFailure(:final detail, :final code, :final cause) =>
     BlueyPlatformException(detail, code: code, cause: cause),
+  FeatureUnsupported(:final operation) => UnsupportedOperationException(
+    operationWordOf(operation),
+    platform,
+  ),
+  MtuAboveMaximum(:final maximum) => UnsupportedOperationException(
+    '${operationWordOf(LinkOperation.negotiateMtu)} above $maximum',
+    platform,
+  ),
 };
 
 /// The exception an app gets for using a link that has ended, so a caller
@@ -62,8 +75,14 @@ BlueyException linkEndAsException(
 T valueOrThrow<T>(
   Either<ConnectionFailure, T> answer, {
   required DeviceAddress device,
+  required String platform,
 }) => answer.fold(
-  (failure) => throw connectionFailureAsException(failure, device: device),
+  (failure) =>
+      throw connectionFailureAsException(
+        failure,
+        device: device,
+        platform: platform,
+      ),
   (value) => value,
 );
 

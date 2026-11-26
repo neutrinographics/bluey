@@ -28,6 +28,7 @@ class ConnectionRig {
       publisher: bus,
       log: log,
       now: clock.now,
+      platformName: platform.capabilities.platformKind.name,
       gattFor:
           (session) => LinkGattClient(
             platformInstance: platform,

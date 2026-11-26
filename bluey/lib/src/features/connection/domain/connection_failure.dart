@@ -3,6 +3,7 @@ import 'package:meta/meta.dart';
 import '../../../shared/domain/failure.dart';
 import 'link_end.dart';
 import 'link_operation.dart';
+import 'value_objects/mtu.dart';
 
 /// Why a connect did not open a link, in Connection's words, so the edge can
 /// tell an app that the device was out of reach from one that refused.
@@ -186,9 +187,56 @@ final class UnexpectedPlatformFailure extends ConnectionFailure {
   int get hashCode => Object.hash(UnexpectedPlatformFailure, detail, code);
 }
 
+/// The platform cannot do [operation] at all, so nothing was asked of the
+/// radio.
+final class FeatureUnsupported extends ConnectionFailure {
+  const FeatureUnsupported(this.operation);
+
+  /// The operation this platform lacks.
+  final LinkOperation operation;
+
+  @override
+  String get message =>
+      '${_attemptOf(operation)} is not supported on this platform.';
+
+  @override
+  bool operator ==(Object other) =>
+      other is FeatureUnsupported && other.operation == operation;
+
+  @override
+  int get hashCode => Object.hash(FeatureUnsupported, operation);
+}
+
+/// The MTU asked for is one the Bluetooth specification allows but this
+/// platform will not ask for.
+final class MtuAboveMaximum extends ConnectionFailure {
+  const MtuAboveMaximum({required this.requested, required this.maximum});
+
+  /// The MTU that was asked for.
+  final Mtu requested;
+
+  /// The largest MTU this platform asks for.
+  final int maximum;
+
+  @override
+  String get message =>
+      "An MTU of ${requested.value} is above this platform's maximum of "
+      '$maximum.';
+
+  @override
+  bool operator ==(Object other) =>
+      other is MtuAboveMaximum &&
+      other.requested == requested &&
+      other.maximum == maximum;
+
+  @override
+  int get hashCode => Object.hash(MtuAboveMaximum, requested, maximum);
+}
+
 /// The attempt at [operation] as a message opens it, for a person reading
 /// the failure rather than an app matching it.
 String _attemptOf(LinkOperation operation) => switch (operation) {
   LinkOperation.open => 'Opening the link',
   LinkOperation.close => 'Closing the link',
+  LinkOperation.negotiateMtu => 'Negotiating the MTU',
 };

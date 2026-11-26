@@ -1,6 +1,8 @@
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_link_features.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
+import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../fakes/fake_platform.dart';
@@ -20,5 +22,21 @@ void main() {
     // assert
     expect(ports.links, isA<PlatformLinks>());
     expect(fake.connectedDeviceIds, contains(device.value));
+  });
+  test('its features are what the platform says its links can do', () {
+    // arrange
+    const capabilities = Capabilities(
+      platformKind: PlatformKind.android,
+      canRequestMtu: true,
+      maxMtu: 185,
+      canBond: true,
+    );
+    final fake = FakeBlueyPlatform(capabilities: capabilities);
+
+    // act
+    final ports = platformConnectionPorts(fake, log: RecordingLog());
+
+    // assert
+    expect(ports.features, linkFeaturesFrom(capabilities));
   });
 }

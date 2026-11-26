@@ -92,6 +92,7 @@ class Bluey {
     publisher: _eventBus,
     log: _logger,
     now: clock.now,
+    platformName: capabilities.platformKind.name,
     gattFor:
         (session) => LinkGattClient(
           platformInstance: _platform,
@@ -796,10 +797,7 @@ class Bluey {
   /// [flag] says the platform cannot do [op].
   void _requireCapability(bool flag, String op) {
     if (!flag) {
-      throw UnsupportedOperationException(
-        op,
-        _platform.capabilities.platformKind.name,
-      );
+      throw UnsupportedOperationException(op, capabilities.platformKind.name);
     }
   }
 

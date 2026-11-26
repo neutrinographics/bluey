@@ -23,14 +23,16 @@ import 'connections.dart';
 /// borrower of the same device always hold the same Connection.
 final class ConnectionAssembly {
   /// Builds Connection over [ports], announcing its events on [publisher];
-  /// [gattFor] builds the GATT operations a session's Connection carries.
+  /// [gattFor] builds the GATT operations a session's Connection carries, and
+  /// every exception it throws names the platform as [platformName].
   ConnectionAssembly({
     required ConnectionPorts ports,
     required EventPublisher publisher,
     required Log log,
     required Now now,
+    required String platformName,
     required LinkGattClient Function(LinkSession session) gattFor,
-  }) {
+  }) : _platformName = platformName {
     final registry = LinkRegistry(
       links: ports.links,
       events: PublishedLinkEvents(publisher),
@@ -40,14 +42,20 @@ final class ConnectionAssembly {
     _connectDevice = ConnectDevice(registry);
     _connections = Connections(
       present:
-          (session) =>
-              BlueyConnection(session: session, gatt: gattFor(session)),
+          (session) => BlueyConnection(
+            session: session,
+            gatt: gattFor(session),
+            platform: platformName,
+          ),
     );
     borrow = borrowingThrough(
       borrowLink: BorrowLink(registry),
       connections: _connections,
+      platform: platformName,
     );
   }
+
+  final String _platformName;
 
   late final ConnectDevice _connectDevice;
   late final Connections _connections;
@@ -62,7 +70,9 @@ final class ConnectionAssembly {
     final answer = await _connectDevice.run(
       ConnectDeviceRequest(device: device, timeout: timeout),
     );
-    return _connections.of(valueOrThrow(answer, device: device));
+    return _connections.of(
+      valueOrThrow(answer, device: device, platform: _platformName),
+    );
   }
 
   /// The link id behind a Connection this presented; null for any other.

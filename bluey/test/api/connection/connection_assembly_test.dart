@@ -29,6 +29,7 @@ void main() {
       publisher: BlueyEventBus(),
       log: logger,
       now: clock.now,
+      platformName: 'fake',
       gattFor:
           (session) => LinkGattClient(
             platformInstance: platform,
