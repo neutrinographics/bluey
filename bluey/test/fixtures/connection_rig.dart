@@ -50,5 +50,5 @@ class ConnectionRig {
   /// The platform's name for [connection]'s link, as Bluey reads it.
   String connectionIdOf(Connection connection) =>
       _assembly.linkIdOf(connection)?.value ??
-      (throw StateError('No link id: ${connection.deviceAddress}'));
+      connection.deviceAddress.toString();
 }

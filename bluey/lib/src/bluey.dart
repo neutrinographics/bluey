@@ -445,10 +445,14 @@ class Bluey {
   }
 
   /// The platform's name for [connection]'s link, which the lifecycle
-  /// client writes with; a Connection this Bluey did not present has none.
+  /// client writes with.
+  ///
+  /// A Connection this Bluey did not present, such as another Bluey's or an
+  /// app's own, falls back to its device address, which is how today's
+  /// platforms name a link, so [tryUpgrade] still upgrades it as before.
   String _connectionIdOf(Connection connection) =>
       _connection.linkIdOf(connection)?.value ??
-      (throw StateError('No link id: ${connection.deviceAddress}'));
+      connection.deviceAddress.toString();
 
   /// Connects to [device] and returns a [PeerConnection] if the device
   /// hosts the Bluey lifecycle control service.
@@ -525,8 +529,7 @@ class Bluey {
   /// Returns `null` if [connection] does not host the Bluey lifecycle
   /// control service. It borrows no link: unlike [connectAsPeer], it reads
   /// over [connection] as the caller holds it, so it never closes the link
-  /// on a miss and the caller decides what to do next. A [Connection] this
-  /// Bluey did not present, an app's own or another Bluey's, answers `null`.
+  /// on a miss and the caller decides what to do next.
   ///
   /// Use this when you have a raw [Connection] (e.g. from a custom
   /// connect path) and want to opportunistically promote it to a peer

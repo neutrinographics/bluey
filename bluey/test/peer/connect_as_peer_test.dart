@@ -311,26 +311,26 @@ void main() {
     });
 
     test(
-      'returns null for a Connection another Bluey presented, whose link it cannot name',
+      'upgrades a Connection another Bluey presented, by its device address',
       () async {
         // arrange
         const address = 'AA:BB:CC:DD:EE:06';
-        fakePlatform.simulateBlueyServer(
-          address: address,
-          serverId: ServerId.generate(),
-        );
+        final id = ServerId.generate();
+        fakePlatform.simulateBlueyServer(address: address, serverId: id);
         final other = await Bluey.create(
           localIdentity: TestServerIds.localIdentity,
         );
         addTearDown(other.dispose);
         final theirs = await other.connect(deviceFromAddress(address));
-        addTearDown(theirs.disconnect);
 
         // act
         final peer = await bluey.tryUpgrade(theirs);
 
         // assert
-        expect(peer, isNull);
+        expect(peer?.serverId, id);
+        expect(identical(peer?.connection, theirs), isTrue);
+
+        await peer?.disconnect();
       },
     );
 
