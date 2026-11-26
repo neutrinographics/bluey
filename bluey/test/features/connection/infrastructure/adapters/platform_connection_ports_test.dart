@@ -1,5 +1,7 @@
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
+import 'package:bluey/src/features/connection/domain/value_objects/bond_state.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_bonding.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_link_features.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
@@ -65,5 +67,22 @@ void main() {
     expect(ports.signal, isA<PlatformSignalStrength>());
     expect(mtu, Right<ConnectionFailure, Mtu>(Mtu.fromPlatform(185)));
     expect(rssi, const Right<ConnectionFailure, int>(-42));
+  });
+
+  test('its bonding is over the platform it was given', () async {
+    // arrange
+    final fake = FakeBlueyPlatform()..simulatePeripheral(id: device.value);
+    final ports = platformConnectionPorts(fake, log: RecordingLog());
+    final link = (await ports.links.open(
+      device,
+    )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+    fake.simulateBondState(device.value, PlatformBondState.bonded);
+
+    // act
+    final state = await ports.bonding.stateOf(link);
+
+    // assert
+    expect(ports.bonding, isA<PlatformBonding>());
+    expect(state, const Right<ConnectionFailure, BondState>(BondState.bonded));
   });
 }

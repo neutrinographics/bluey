@@ -1,4 +1,5 @@
 import '../../domain/link_features.dart';
+import 'bonding.dart';
 import 'links.dart';
 import 'mtu_negotiation.dart';
 import 'signal_strength.dart';
@@ -12,6 +13,7 @@ final class ConnectionPorts {
     required this.features,
     required this.mtu,
     required this.signal,
+    required this.bonding,
   });
 
   /// The radio's links.
@@ -25,4 +27,7 @@ final class ConnectionPorts {
 
   /// How well a link's peer is heard.
   final SignalStrength signal;
+
+  /// How a link's device is bonded, and its bond followed.
+  final Bonding bonding;
 }

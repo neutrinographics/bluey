@@ -2148,7 +2148,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: getBondState called on a canBond=false platform',
       );
     }
-    return PlatformBondState.none;
+    _applyFaultRules(FakeOp.getBondState, deviceId: deviceId);
+    return _bondStates[deviceId] ?? PlatformBondState.none;
   }
 
   @override
@@ -2158,7 +2159,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: bondStateStream called on a canBond=false platform',
       );
     }
-    return Stream.empty();
+    return _bondReportsOf(deviceId).stream;
   }
 
   @override
@@ -2166,6 +2167,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (!_capabilities.canBond) {
       throw UnimplementedError('Fake: bond called on a canBond=false platform');
     }
+    _applyFaultRules(FakeOp.bond, deviceId: deviceId);
   }
 
   @override
@@ -2175,7 +2177,29 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: removeBond called on a canBond=false platform',
       );
     }
+    _applyFaultRules(FakeOp.removeBond, deviceId: deviceId);
   }
+
+  final Map<String, PlatformBondState> _bondStates = {};
+  final Map<String, StreamController<PlatformBondState>> _bondReports = {};
+
+  /// The radio reports that [deviceId]'s bond state is now [state], which
+  /// [getBondState] then reads too.
+  void simulateBondState(String deviceId, PlatformBondState state) {
+    _bondStates[deviceId] = state;
+    _bondReportsOf(deviceId).add(state);
+  }
+
+  /// [deviceId]'s bond state stream fails with [error] and stays open, as a
+  /// platform channel's stream does after one bad event.
+  void simulateBondStateError(String deviceId, Object error) =>
+      _bondReportsOf(deviceId).addError(error);
+
+  StreamController<PlatformBondState> _bondReportsOf(String deviceId) =>
+      _bondReports.putIfAbsent(
+        deviceId,
+        StreamController<PlatformBondState>.broadcast,
+      );
 
   @override
   Future<List<PlatformDevice>> getBondedDevices() async {
@@ -2595,6 +2619,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     for (final controller in _notificationControllers.values) {
       await controller.close();
     }
+    for (final controller in _bondReports.values) {
+      await controller.close();
+    }
   }
 }
 
@@ -2739,6 +2766,9 @@ enum FakeOp {
   requestMtu,
   getMaximumWriteLength,
   readRssi,
+  getBondState,
+  bond,
+  removeBond,
 }
 
 /// A scripted fault: fires [error] for matching calls to [op] until its
