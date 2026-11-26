@@ -4,7 +4,7 @@
 
 **Goal:** Finish slice 1: bring Joel's four open architecture rulings of 2026-11-26 into the Connection context that pull request 1 merged, then build the rest of Connection (Tasks 17 to 26 of the slice 1 plan: composition, value objects, capabilities, link features, MTU and RSSI, bonding, PHY, connection parameters, and the edge taking over).
 
-**Architecture:** This plan does not replace `docs/superpowers/plans/2026-11-18-link-lifecycle.md` (the "slice plan"). It adds eight tasks, R1 to R8, that run first on the code pull requests 43 and 44 merged, and then amends Tasks 17 to 26 of the slice plan where a ruling or a carry-over changes them. An implementer of Task N reads the slice plan's Task N and this plan's amendment to it; where the two differ, this plan wins. After R1 to R8 the domain speaks only its own language (`LinkPhase`, `LinkEvent`, `LinkOperation`), and `api/connection/` is the one place that translates it to the public one (`ConnectionState`, the three public events, the exceptions).
+**Architecture:** This plan does not replace `docs/superpowers/plans/2026-11-18-link-lifecycle.md` (the "slice plan"). It adds ten tasks, R1 to R10, that run first on the code pull requests 43 and 44 merged, and then amends Tasks 17 to 26 of the slice plan where a ruling or a carry-over changes them. An implementer of Task N reads the slice plan's Task N and this plan's amendment to it; where the two differ, this plan wins. After R1 to R10 the domain speaks only its own language (`LinkPhase`, `LinkEvent`, `LinkOperation`), and `api/connection/` is the one place that translates it to the public one (`ConnectionState`, the three public events, the exceptions).
 
 **Tech Stack:** Dart 3 (sealed classes, records, switch expressions), Flutter 3.47.2, `fake_async`, the `bluey_guards` package, Pigeon (untouched here).
 
@@ -16,7 +16,7 @@ Every constraint of the slice plan's "Global Constraints" holds. The ones a revi
 
 - TDD: no production line without a failing test first. Each task's first commit may hold the failing test alone.
 - A list in any `known_violations.dart` or `roster.dart` only shrinks. The one exception this plan makes is named in R4 (`edgeFromBelow`, born with ten entries).
-- `bluey/api/bluey.api` changes only where this plan says so (R6: three constructor lines; Task 18, 19 and 25 as the slice plan says). Any other difference in the dump fails the task.
+- `bluey/api/bluey.api` changes only where this plan says so (R7: three constructor lines; Task 18, 19 and 25 as the slice plan says). Any other difference in the dump fails the task.
 - Log lines an app can read keep their context, message and data keys and values byte for byte (ruling 46). `test/logging/` and every `expect` on a log line are the proof; a task never edits one of those expectations to pass.
 - No bounded context imports another. An `api/<context>/` file names only its own context's `features/<context>/` (ruling 4); after R4 the build holds it.
 - Domain files import nothing but `dart:core`, `dart:async`, `package:meta` and their own context's domain and `shared/domain`. After R6 no application file imports `package:clock`.
@@ -33,9 +33,9 @@ Every constraint of the slice plan's "Global Constraints" holds. The ones a revi
 The conditions most likely to bite an app that no single task's happy path exercises. Each has its test in the task named.
 
 1. **A device that connects and drops thousands of times in one process.** `PlatformLinks` must hold nothing for a link that ended. Test in R1 (the carrier map is empty after an end, and a second link to the same device gets its own carrier).
-2. **An app that filters `bluey.logEvents` by text.** The state word in `state transition` stays `ConnectionState.disconnecting`, and `errorCode` on `connect failed` stays the old type name, after the domain stops naming `ConnectionState` and failures gain codes. Tests in R5 and R8 (golden lines for every phase and every failure).
-3. **An app that compares `ConnectionEvent` timestamps with its own clock under `fakeAsync`.** The public event carries the instant the domain stamped with the injected clock, not `DateTime.now()` at translation. Test in R6.
-4. **A second `connect` while the first link is closing, and a borrower arriving in the same instant.** The generic `LiveLinks<S>` must answer `Wait` then `Open` exactly as the table did before, with no session lost between the two maps that become one. Test in R7 (the existing decision-table tests, rerun unchanged, plus one for a borrower and the app racing a close).
+2. **An app that filters `bluey.logEvents` by text.** The state word in `state transition` stays `ConnectionState.disconnecting`, and `errorCode` on `connect failed` stays the old type name, after the domain stops naming `ConnectionState` and failures gain codes. Tests in R5 and R9 (golden lines for every phase, operation and failure).
+3. **An app that compares `ConnectionEvent` timestamps with its own clock under `fakeAsync`.** The public event carries the instant the domain stamped with the injected clock, not `DateTime.now()` at translation. Tests in R6 and R7.
+4. **A second `connect` while the first link is closing, and a borrower arriving in the same instant.** `LiveLinks` must answer `Wait` then `Open` exactly as the table did before, with no session lost between the two maps that become one. Test in R8 (the existing decision-table tests, rerun unchanged, plus one for a borrower and the app racing a close).
 5. **`requestMtu(600)`, `Mtu(22)`, and a feature the platform lacks.** Each is a typed failure naming a `LinkOperation`, and the exception an app sees keeps its message. Tests in Tasks 18, 20 and 21 as amended.
 
 ## Rulings
@@ -44,22 +44,22 @@ Joel's rulings of 2026-11-26 on the reviews of pull request 43, as this plan car
 
 - **Ruling 1 (API layer by context).** No Connection file sits at the root of `api/`. R3.
 - **Ruling 2 (shared device streams).** Done in pull request 44.
-- **Ruling 3 (published language).** The domain raises internal events; `api/<context>/` translates them to the public ones; the unit that raises an event stamps its time with an injected clock. Connection's events move in this pull request. R6.
+- **Ruling 3 (published language).** The domain raises internal events; `api/<context>/` translates them to the public ones; the unit that raises an event stamps its time with an injected clock. Connection's events move in this pull request. R7.
 - **Ruling 4 (edge isolation).** An edge file names only its own context's domain and application, and may name any context's public interfaces. R4 builds the rule.
 - **Ruling 5 (phase).** `ConnectionState` stays public at `api/connection/`; `Link` has its own sealed phase; the edge maps. R5.
 
 Rulings 1 to 41 of the build ledger stand. The calls this plan makes, numbered on from them. Joel overrules any by saying so; 51 and 48's constructor change are the two that touch the public API or the architecture.
 
-- **42.** One pull request. R1 to R8 run before Task 17, so every later task is written once, against the final names.
+- **42.** One pull request. R1 to R10 run before Task 17, so every later task is written once, against the final names.
 - **43.** The translator's home is `api/connection/connection_failure_translation.dart`. `api/` keeps only the composition root and files that belong to no single context.
 - **44.** Two new guard rules. `edge contexts` is born empty and stays empty. `edge from below` lists the ten imports of `lib/src/api/` from unplaced files and only shrinks; four leave in Task 25, the other six with the Peer slice. The list-growth command learns `--first-statement=<list>`, which lets a list be born with entries in the one change that introduces it and is ignored, with a printed note, once the base has the list.
-- **45.** `LinkPhase` is sealed: `Linked` and `Ready` (both `UpPhase`), `Closing(returnTo, by)`, `Ended(end)`. `Link.phase` replaces `Link.state` and the three private fields. The domain, not the session, decides when a phase was entered (`LinkStep.entered`).
+- **45.** `LinkPhase` is sealed: `Linked` and `Ready` (both `UpPhase`), `Closing(returnTo, by)`, `Ended(end)`. `Link.phase` replaces `Link.state` and the three private fields. The domain, not the session, decides when a phase was entered (`LinkStep.entered`). `ClosingBy` is `request`, `radio` or `both`.
 - **46.** What an app can read in a log line is frozen in this slice: contexts, messages, data keys (`address`, `deviceId` as they are today, inconsistent or not) and values, including the word `ConnectionState.<name>` for a state and today's type names as `errorCode`. Renaming them is a public change for a later slice with a CHANGELOG line.
 - **47.** The clock is `typedef Now = DateTime Function();` in `shared/application/now.dart`, passed in by the composition root as `clock.now`. Application code takes it by constructor; `package:clock` leaves the application allowance of the architecture test.
-- **48.** Internal events are a sealed `LinkEvent` (`LinkOpening`, `LinkOpened`, `LinkEndReached`), raised through the port `LinkEvents`. `api/connection/` implements the port by translating to `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`, which move to `api/connection/connection_events.dart` and gain an optional `timestamp` parameter so the translator can pass the domain's instant. That is three added optional parameters in the public API dump, nothing removed.
-- **49.** `LiveLinks<S>` holds the session it tabulates, so the registry keeps one map, not three, and `Admission` becomes sealed (`Open`, `Wait`, `Reuse<S>`).
-- **50.** A failure names what was attempted with `LinkOperation`, an enum whose `word` is the frozen string of ruling 46, and every `ConnectionFailure` has a stable `code`. Stringly `operation` parameters are gone below the edge.
-- **51.** Published language for values. A value object an app builds and hands in (`Mtu`, `Phy`, `PhyPair`, `ConnectionParameters`, `ConnectionPriority`, `BondState`) is published as it stands and re-exported by its context's `api/<context>/` library; it is not copied into an edge twin. A public library exports nothing under `lib/src/features/` directly: `PublicExportsRule` refuses it, born empty in R6. Events, phases and failures are translated; values are shared.
+- **48.** Internal events are a sealed `LinkEvent` (`LinkOpenBegan`, `LinkOpened`, `LinkEnded`). The aggregate raises what it decides: `Link` returns `LinkOpened` and `LinkEnded` in its step, stamped with the instant it is handed. `LinkOpenBegan` has no aggregate yet, so the registry raises it. All three leave the application through the port `LinkEvents`. `api/connection/` implements the port by translating to `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`, which move to `api/connection/connection_events.dart` and gain an optional `timestamp` parameter so the translator can pass the domain's instant. That is three added optional parameters in the public API dump, nothing removed.
+- **49.** `LiveLinks` holds the links it tabulates, so the registry keeps one map, not three, and `Admission` becomes sealed (`Open`, `Wait`, `Reuse`). What the table reads of a link is a domain interface, `LiveLink`; the table is generic only over which `LiveLink` it holds.
+- **50.** A failure names what was attempted with `LinkOperation`, an enum in Connection's own words (`open`, `negotiateMtu`, `readSignalStrength`), not the platform interface's method names. The domain carries no log word and no failure code: the frozen strings of ruling 46 live in one application file, `connection_log_words.dart`, as exhaustive mappings, and leave with it.
+- **51.** Published language for values. A value object an app builds and hands in (`Mtu`, `Phy`, `PhyPair`, `ConnectionParameters`, `ConnectionPriority`, `BondState`) is published as it stands and re-exported by its context's `api/<context>/` library; it is not copied into an edge twin. A public library exports nothing under `lib/src/features/` directly: `PublicExportsRule` refuses it, held from R10. Events, phases and failures are translated; values are shared.
 - **52.** The assembly of Task 17 is told the platform by an edge enum and a name (`ConnectionExtension { android, ios, none }`, `platformName`), mapped by the composition root from Platform's `PlatformKind`. Connection's edge never imports `features/platform/`.
 - **53.** `LinkGattClient` is handed a `BlueyException Function(LinkEnd)` by the assembly and loses its four imports of `lib/src/api/` in Task 25.
 - **54.** Ruling 37 (the log level of a probe's failed connect) is still Joel's to make and is not decided here. The build leaves the level as merged and the pull request description lists it as open.
@@ -76,22 +76,23 @@ New files, by task. Tests mirror each path under `bluey/test/` (and `bluey_guard
 | `bluey/lib/src/features/connection/domain/link_phase.dart` | Where a link is in its life, in the domain's words | R5 |
 | `bluey/lib/src/api/connection/connection_state.dart` | The public `ConnectionState` (moved from the domain) | R5 |
 | `bluey/lib/src/api/connection/connection_state_translation.dart` | `connectionStateOf(LinkPhase)` | R5 |
-| `bluey/lib/src/features/connection/application/connection_log.dart` | The one log context and the frozen words | R5 |
+| `bluey/lib/src/features/connection/application/connection_log_words.dart` | Every app-readable word of Connection's logs that this slice freezes | R5, R9 |
 | `bluey/lib/src/shared/application/now.dart` | `typedef Now` | R6 |
-| `bluey/lib/src/features/connection/domain/link_event.dart` | What happened to a link, in the domain's words | R6 |
-| `bluey/lib/src/features/connection/application/ports/link_events.dart` | The port the application raises events through | R6 |
-| `bluey/lib/src/api/connection/connection_events.dart` | The public events (moved from the domain) | R6 |
-| `bluey/lib/src/api/connection/connection_event_translation.dart` | `PublishedLinkEvents implements LinkEvents` | R6 |
-| `bluey/lib/src/features/connection/domain/link_operation.dart` | What was attempted on a link | R8 |
+| `bluey/lib/src/features/connection/domain/link_event.dart` | What happened to a link, in the domain's words | R7 |
+| `bluey/lib/src/features/connection/application/ports/link_events.dart` | The port the application raises events through | R7 |
+| `bluey/lib/src/api/connection/connection_events.dart` | The public events (moved from the domain) | R7 |
+| `bluey/lib/src/api/connection/connection_event_translation.dart` | `PublishedLinkEvents implements LinkEvents` | R7 |
+| `bluey/lib/src/features/connection/domain/link_operation.dart` | What was attempted on a link | R9 |
+| `bluey/lib/src/features/connection/domain/live_link.dart` | What the table of live links reads of a link | R8 |
 
-Deleted: `api/failure_translation.dart` (R3), `features/connection/domain/connection_state.dart` (R5), `features/connection/domain/connection_event.dart` (R6).
+Deleted: `api/failure_translation.dart` (R3), `features/connection/domain/connection_state.dart` (R5), `features/connection/domain/connection_event.dart` (R7).
 
 ---
 
 ## Before R1: pre-flight
 
 - [ ] Restart `claude/project-thread-u804gs` from `origin/main` (`9715b72` or later); install Flutter 3.47.2; `dart pub get` at the root; create the Gradle wrapper only if a native gate is run.
-- [ ] Start the build ledger at `.superpowers/sdd/2026-11-26-link-lifecycle-pr2/` (git-ignored), with `progress.md` and `parked-minors.md` as in pull request 1, and add this plan's rows to the pre-flight scan table: for each of R1 to R8 and Tasks 17 to 26, the files it touches that carry a size entry, the lists it is expected to shrink, and whether the API dump may change.
+- [ ] Start the build ledger at `.superpowers/sdd/2026-11-26-link-lifecycle-pr2/` (git-ignored), with `progress.md` and `parked-minors.md` as in pull request 1, and add this plan's rows to the pre-flight scan table: for each of R1 to R10 and Tasks 17 to 26, the files it touches that carry a size entry, the lists it is expected to shrink, and whether the API dump may change.
 - [ ] Run every cloud gate once on the untouched branch and record the numbers (tests, coverage, list lengths) as the baseline.
 
 ---
@@ -192,10 +193,10 @@ lib/src/peer/peer_remote_service_view.dart -> lib/src/api/connection/connection.
 Ruling 5; parked minors 3, 4 and 14.
 
 **Files:**
-- Create: `features/connection/domain/link_phase.dart`, `api/connection/connection_state.dart`, `api/connection/connection_state_translation.dart`, `features/connection/application/connection_log.dart`
+- Create: `features/connection/domain/link_phase.dart`, `api/connection/connection_state.dart`, `api/connection/connection_state_translation.dart`, `features/connection/application/connection_log_words.dart`
 - Delete: `features/connection/domain/connection_state.dart`
 - Modify: `domain/link.dart`, `application/link_session.dart`, `application/link_registry.dart`, `infrastructure/adapters/platform_links.dart` (the context constant only), `api/connection/bluey_connection.dart`, `api/connection/connection.dart`, `lib/src/connection/bluey_connection.dart` and any legacy reader of `session.states`
-- Test: `test/features/connection/domain/link_test.dart` (rewritten to phases), `link_phase_test.dart`, `test/api/connection/connection_state_translation_test.dart`, `test/features/connection/application/connection_log_test.dart`, `link_session_test.dart`
+- Test: `test/features/connection/domain/link_test.dart` (rewritten to phases), `link_phase_test.dart`, `test/api/connection/connection_state_translation_test.dart`, `test/features/connection/application/connection_log_words_test.dart`, `link_session_test.dart`
 
 **Interfaces:**
 - Produces:
@@ -206,55 +207,73 @@ sealed class LinkPhase { const LinkPhase(); }
 sealed class UpPhase extends LinkPhase { const UpPhase(); }
 final class Linked extends UpPhase { const Linked(); }
 final class Ready extends UpPhase { const Ready(); }
-enum ClosingBy { request, radio, requestOverRadio }
+enum ClosingBy { request, radio, both }
 final class Closing extends LinkPhase {
   const Closing({required this.returnTo, required this.by});
   final UpPhase returnTo;   // where a failed close of ours returns the link
-  final ClosingBy by;
+  final ClosingBy by;       // who is closing it: our request, the radio, or both
 }
 final class Ended extends LinkPhase { const Ended(this.end); final LinkEnd end; }
 ```
 
   All four are equal by value. `Link.phase` (a `LinkPhase`) replaces `Link.state`, `_upState`, `_closeAsked` and `_radioClosing`; `Link.end` is `switch (phase) { Ended(:final end) => end, _ => null }`; `isUp`, `isClosing`, `hasEnded` and `endInSight` keep their meaning and are derived from the phase.
   - `LinkStep(this.link, {this.duty, this.entered})`: `entered` is the phase the step entered, null when the step stayed in the same kind of phase (a `Closing` whose `by` changed has not entered `Closing` again).
-  - `LinkDuty { closeTheLink, release }` (`releaseAndAnnounce` renamed: announcing is the session's reading of `entered`, not a duty the domain names).
+  - `LinkDuty { closeTheLink, release }` (`releaseAndAnnounce` renamed: what is announced is an event the link raises in R7, not a duty).
   - `LinkSession.phases` (`Stream<LinkPhase>`, replacing `states`) and `LinkSession.phase`.
   - `ConnectionState connectionStateOf(LinkPhase phase)`: `Linked` to `linked`, `Ready` to `ready`, `Closing` to `disconnecting`, `Ended(EndedByRadioOutage)` to `invalidated`, any other `Ended` to `disconnected`.
-  - `const connectionLogContext = 'bluey.connection';` and `String stateWordOf(LinkPhase phase)`, which answers `'ConnectionState.linked'`, `'.ready'`, `'.disconnecting'`, `'.disconnected'`, `'.invalidated'` by the same mapping, as literals.
+  - `application/connection_log_words.dart` is the one home of every word of Connection's log lines that an app can read and that this slice freezes (ruling 46). In this task it holds `const connectionLogContext = 'bluey.connection';` and `String stateWordOf(LinkPhase phase)`, which answers `'ConnectionState.linked'`, `'.ready'`, `'.disconnecting'`, `'.disconnected'`, `'.invalidated'` as literals. Its library doc says these are the words logs had before the domain had its own, kept so an app's log filters hold, and that the slice which revises log wording deletes the file.
 
-- [ ] **Step 1: Failing domain tests.** Rewrite `link_test.dart`'s table over phases, one row per row it has today, plus: a request while the radio closes gives `Closing(by: requestOverRadio)` and `entered == null`; `CloseFailed` from `Closing(returnTo: Ready, by: request)` returns to `Ready` with `entered == Ready()`; from `by: requestOverRadio` it stays `Closing(by: radio)`; every input on `Ended` returns the same link with no duty and no `entered`.
+- [ ] **Step 1: Failing domain tests.** Rewrite `link_test.dart`'s table over phases, one row per row it has today, plus: a request while the radio closes gives `Closing(by: both)` and `entered == null`; `CloseFailed` from `Closing(returnTo: Ready, by: request)` returns to `Ready` with `entered == Ready()`; from `by: both` it stays `Closing(by: radio)`; every input on `Ended` returns the same link with no duty and no `entered`.
 - [ ] **Step 2:** Run; they fail to compile. Write `link_phase.dart` and rewrite `Link` over it, each transition one `switch` arm on `(phase, input)`. No `StateError` for a combination the types now exclude (parked 14).
 - [ ] **Step 3: Failing tests for the two mappings.** `connectionStateOf` for each of the seven shapes (two up phases, `Closing`, and `Ended` with each `LinkEnd`); `stateWordOf` returns the five exact strings. The log test also asserts the session's `state transition` line for each phase against the literal it had on `main` (copy the expectation from `git show origin/main:bluey/test/...` rather than from the new code).
 - [ ] **Step 4:** Move `ConnectionState` to `api/connection/connection_state.dart` with its doc corrected (no clause about peers; `connecting` is kept for apps that switch over it and is never reported by a `Connection`). `api/connection/connection.dart` exports it. Run the API dump check: no change.
 - [ ] **Step 5:** `LinkSession`: `phases`; emit and log on `step.entered` only; replace `_link.end!` and `_closeInFlight!` with pattern matches (parked 3, 4). `BlueyConnection.state`/`stateChanges` map with `connectionStateOf`. The three `'bluey.connection'` literals become `connectionLogContext`.
 - [ ] **Step 6:** Run the `bluey` suite (the logging tests included, unedited), the architecture test, coverage floors; commit `refactor(connection): give Link its own phase and translate it at the edge`.
 
-## Task R6: The domain raises its own events; the edge publishes them
+## Task R6: The application is handed its clock
 
-Ruling 3; ruling 47; the half of ruling 51 that closes `lib/src/features/` to public exports.
+Ruling 47. A task of its own so the events of R7 change one thing.
 
 **Files:**
-- Create: `shared/application/now.dart`, `features/connection/domain/link_event.dart`, `features/connection/application/ports/link_events.dart`, `api/connection/connection_events.dart`, `api/connection/connection_event_translation.dart`
+- Create: `bluey/lib/src/shared/application/now.dart`
+- Modify: `features/connection/application/link_registry.dart`, `link_session.dart`, `lib/src/bluey.dart` (construction only), `test/architecture/bluey_architecture.dart` (the application allowance), `test/fixtures/connection_rig.dart`
+- Test: `link_registry_test.dart`, `link_session_test.dart`
+
+**Interfaces:**
+- Produces: `typedef Now = DateTime Function();` and `required Now now` on `LinkRegistry` and `LinkSession`.
+
+- [ ] **Step 1: Failing tests.** With `now` a function the test advances by hand (not `fakeAsync`'s clock), the registry's wait for a closing link times out when the handed clock passes the deadline, and the duration in the `connect succeeded` log line is measured by it.
+- [ ] **Step 2:** Implement; `lib/src/bluey.dart` passes `clock.now`. Remove `package:clock` from `link_registry.dart` and from the application allowance of the architecture test; the architecture test passes with no new list entry.
+- [ ] **Step 3:** Whole `bluey` suite; commit `refactor(connection): hand the application its clock`.
+
+## Task R7: The link raises its own events; the edge publishes them
+
+Ruling 3.
+
+**Files:**
+- Create: `features/connection/domain/link_event.dart`, `features/connection/application/ports/link_events.dart`, `api/connection/connection_events.dart`, `api/connection/connection_event_translation.dart`
 - Delete: `features/connection/domain/connection_event.dart`
-- Modify: `application/link_registry.dart`, `application/link_session.dart`, `lib/src/bluey.dart` (construction only), `lib/bluey.dart` (one export path), `bluey/api/bluey.api`, `test/architecture/bluey_architecture.dart` (the application allowance), `bluey_guards/lib/src/architecture/rules/public_exports_rule.dart`
-- Test: `test/features/connection/domain/link_event_test.dart`, `test/api/connection/connection_event_translation_test.dart`, registry and session tests, `bluey_guards/test/architecture/rules/public_exports_rule_test.dart`; fixture `test/fixtures/features/connection/recording_link_events.dart`
+- Modify: `domain/link.dart`, `application/link_registry.dart`, `application/link_session.dart`, `lib/src/bluey.dart` (construction only), `lib/bluey.dart` (one export path), `bluey/api/bluey.api`
+- Test: `test/features/connection/domain/link_event_test.dart`, `link_test.dart`, `test/api/connection/connection_event_translation_test.dart`, registry and session tests; fixture `test/fixtures/features/connection/recording_link_events.dart`
 
 **Interfaces:**
 - Produces:
 
 ```dart
-// shared/application/now.dart
-typedef Now = DateTime Function();
-
 // domain/link_event.dart
 sealed class LinkEvent {
   const LinkEvent({required this.device, required this.at});
   final DeviceAddress device;
   final DateTime at;
 }
-final class LinkOpening extends LinkEvent { … }
+final class LinkOpenBegan extends LinkEvent { … }
 final class LinkOpened extends LinkEvent { … }
-final class LinkEndReached extends LinkEvent { …; final LinkEnd end; }
+final class LinkEnded extends LinkEvent { …; final LinkEnd end; }
+
+// domain/link.dart: the aggregate raises what it decides
+static LinkStep Link.open({required LinkId id, required DeviceAddress device, required DateTime at});
+LinkStep on(LinkInput input, {required DateTime at});
+// LinkStep gains: final List<LinkEvent> events;  (empty unless the step raised one)
 
 // application/ports/link_events.dart
 abstract interface class LinkEvents { void raise(LinkEvent event); }
@@ -265,84 +284,98 @@ final class PublishedLinkEvents implements LinkEvents {
 }
 ```
 
-  - `LinkRegistry({required Links links, required LinkEvents events, required Log log, required Now now})` and the same two swaps on `LinkSession`.
+  - **Who raises what.** `Link.open` is the only way to build a link (the public constructor goes) and its step carries `LinkOpened`. `Link.on` carries `LinkEnded` in the one step that enters `Ended`, and never again. The session and the registry do not construct those two events; they pass `now()` in and hand `step.events` to the port, in order, after the step's state is stored. `LinkOpenBegan` is the one event with no aggregate behind it, since no `Link` exists until the radio answers: the registry constructs it when `LiveLinks` answers `Open`, before it asks the port to open. The design review records this as the one event the application raises, and why.
+  - `LinkRegistry({required Links links, required LinkEvents events, required Log log, required Now now})`, and `LinkEvents` in place of `EventPublisher` on `LinkSession`.
   - Public: `ConnectingEvent({required DeviceAddress deviceAddress, String? source, DateTime? timestamp})`, and the same added parameter on `ConnectedEvent` and `DisconnectedEvent`, each forwarding `super.timestamp`.
-  - `PublishedLinkEvents` owns the reason words of `DisconnectedEvent`: `EndedOnRequest` is `'requested'`, `EndedByDrop` is `'linkLoss'`, `EndedByRadioOutage` is `'radioOutage'`, exactly as `LinkSession._reasonOf` has them today; `_reasonOf` is deleted from the session.
+  - `PublishedLinkEvents` owns the public reason words of `DisconnectedEvent`: `EndedOnRequest` is `'requested'`, `EndedByDrop` is `'linkLoss'`, `EndedByRadioOutage` is `'radioOutage'`, exactly as `LinkSession._reasonOf` has them today; `_reasonOf` is deleted from the session.
 
-- [ ] **Step 1: Failing translation tests.** For each `LinkEvent`, the published event's type, `deviceAddress`, `reason` and `timestamp == event.at`.
-- [ ] **Step 2: Failing application tests.** With a `RecordingLinkEvents` and `now: () => DateTime.utc(2026)` under `fakeAsync`: the registry raises `LinkOpening` then `LinkOpened` once per opened link and neither for a reuse; the session raises exactly one `LinkEndReached` when `step.entered` is `Ended`; each `at` is the injected instant; the registry's wait deadline expires by the injected clock.
-- [ ] **Step 3:** Implement; move the three public events to `api/connection/connection_events.dart` (base `ConnectionEvent` with them), add the parameter, change the export in `lib/bluey.dart`. Remove `package:clock` from `link_registry.dart` and from the application allowance of the architecture test (the root, `lib/src/bluey.dart`, passes `clock.now`).
-- [ ] **Step 4:** Run `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api`; it reports exactly the three constructor lines. Rewrite with `--write` and confirm by `git diff` that nothing else moved.
-- [ ] **Step 5: Guard, test first.** `PublicExportsRule`: a public library that exports a file under `lib/src/features/` is a violation; exports of `lib/src/api/`, `lib/src/shared/` and unplaced files pass as today. The `publicExports` list keeps its one entry.
-- [ ] **Step 6:** Whole `bluey` suite (integration tests that expect the three events on `bluey.events` pass unedited), guards' tests, architecture, coverage; commit `refactor(connection): raise link events in the domain and publish them at the edge`.
+- [ ] **Step 1: Failing domain tests.** `Link.open(…, at: t)` answers a step whose link is `Linked`, whose `entered` is `Linked()` and whose `events` are `[LinkOpened(device, at: t)]`. For each row of the table that enters `Ended`, `events` is `[LinkEnded(device, at, end)]` with the row's end; for every other row, and for every input on an ended link, `events` is empty.
+- [ ] **Step 2: Failing translation tests.** For each `LinkEvent`, the published event's type, `deviceAddress`, `reason` and `timestamp == event.at`.
+- [ ] **Step 3: Failing application tests.** With a `RecordingLinkEvents` and a fixed `now`: an opened link records `LinkOpenBegan` then `LinkOpened`, a reused one records neither, a failed open records `LinkOpenBegan` alone; a link that ends records exactly one `LinkEnded`, also when a late report follows; each `at` is the handed instant.
+- [ ] **Step 4:** Implement; move the three public events to `api/connection/connection_events.dart` (base `ConnectionEvent` with them), add the parameter, change the export in `lib/bluey.dart`.
+- [ ] **Step 5:** Run `cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api`; it reports exactly the three constructor lines. Rewrite with `--write` and confirm by `git diff` that nothing else moved.
+- [ ] **Step 6:** Whole `bluey` suite (integration tests that expect the three events on `bluey.events` pass unedited), architecture, coverage; commit `refactor(connection): raise link events in the domain and publish them at the edge`.
 
-## Task R7: The registry keeps one table
+## Task R8: The registry keeps one table
 
 Review minors on `LiveLinks` and `LinkRegistry`.
 
 **Files:**
-- Modify: `domain/live_links.dart`, `application/link_registry.dart`, `application/borrow_link.dart`, `application/connect_device.dart`, `api/connection/connections.dart` where it calls `keep`/`giveBack`
+- Create: `features/connection/domain/live_link.dart`
+- Modify: `domain/live_links.dart`, `application/link_session.dart`, `application/link_registry.dart`, `application/borrow_link.dart`, `application/connect_device.dart`, `api/connection/connections.dart` where it calls `keep`/`giveBack`
 - Test: `test/features/connection/domain/live_links_test.dart`, `link_registry_test.dart`, `borrow_link_test.dart`
 
 **Interfaces:**
 - Produces:
 
 ```dart
-sealed class Admission<S> { const Admission(); }
-final class Open<S> extends Admission<S> { const Open(); }
-final class Wait<S> extends Admission<S> { const Wait(); }
-final class Reuse<S> extends Admission<S> { const Reuse(this.held); final S held; }
+// domain/live_link.dart: what the table needs to know of a link it holds
+abstract interface class LiveLink { bool get isClosing; }
 
-final class LiveLinks<S> {
-  Admission<S> admit(DeviceAddress device, LinkUser user, {required bool Function(S held) isClosing});
-  void opened(DeviceAddress device, LinkUser user, S held);
+sealed class Admission<L extends LiveLink> { const Admission(); }
+final class Open<L extends LiveLink> extends Admission<L> { const Open(); }
+final class Wait<L extends LiveLink> extends Admission<L> { const Wait(); }
+final class Reuse<L extends LiveLink> extends Admission<L> { const Reuse(this.link); final L link; }
+
+final class LiveLinks<L extends LiveLink> {
+  Admission<L> admit(DeviceAddress device, LinkUser user);
+  void opened(DeviceAddress device, LinkUser user, L link);
   AfterGiveBack givenBack(DeviceAddress device, LinkUser user);
   void kept(DeviceAddress device);
-  void ended(DeviceAddress device, S held);   // by identity: an old session's end never drops its successor
+  void ended(DeviceAddress device, L link);   // by identity: an old link's end never drops its successor
 }
 ```
 
-  `LinkRegistry.hold(DeviceAddress device, {Duration? timeout})` answers the app's `LinkSession`; `LinkRegistry.borrow(DeviceAddress device, {Duration? timeout})` answers a `BorrowedLink` whose `giveBack` and `keep` are closures over the registry. `acquire`, `giveBack(session)` and `keep(session)` are private.
+  The table is generic only so the registry gets back the type it put in; what the table reads of a link is named in the domain (`LiveLink`), and `LinkSession implements LiveLink`. `LinkRegistry.hold(DeviceAddress device, {Duration? timeout})` answers the app's `LinkSession`; `LinkRegistry.borrow(DeviceAddress device, {Duration? timeout})` answers a `BorrowedLink` whose `giveBack` and `keep` are closures over the registry. `acquire`, `giveBack(session)` and `keep(session)` are private.
 
-- [ ] **Step 1:** Port `live_links_test.dart` to the generic form with `String` as `S`, every row kept; add `'a borrower and the app both arriving while the link closes each wait, then one opens and the other reuses'` and `'ended by an old holder leaves the new entry'`.
+- [ ] **Step 1:** Port `live_links_test.dart` to the new form with a two-line test `LiveLink`, every row kept; add `'a borrower and the app both arriving while the link closes each wait, then one opens and the other reuses'` and `'ended by an old holder leaves the new entry'`.
 - [ ] **Step 2:** Implement; the registry's `_sessions` map and every `session!` go. Run the Connection tests and the integration tests of probes (`test/integration/`), unedited.
-- [ ] **Step 3:** Commit `refactor(connection): let LiveLinks hold the sessions it tabulates`.
+- [ ] **Step 3:** Commit `refactor(connection): let LiveLinks hold the links it tabulates`.
 
-## Task R8: Failures name the operation and carry a stable code
+## Task R9: Failures name the operation in the domain's words
 
 Review Important on stringly operations; parked minor 9.
 
 **Files:**
 - Create: `features/connection/domain/link_operation.dart`
-- Modify: `domain/connection_failure.dart`, `infrastructure/adapters/platform_failures.dart`, `platform_links.dart`, `application/link_registry.dart`, `link_session.dart`, `api/connection/connection_failure_translation.dart`
-- Test: `link_operation_test.dart`, `connection_failure_test.dart`, `platform_failures_test.dart`, the translator's tests
+- Modify: `domain/connection_failure.dart`, `application/connection_log_words.dart`, `infrastructure/adapters/platform_failures.dart`, `platform_links.dart`, `application/link_registry.dart`, `link_session.dart`, `api/connection/connection_failure_translation.dart`
+- Test: `connection_failure_test.dart`, `connection_log_words_test.dart`, `platform_failures_test.dart`, the translator's tests
 
 **Interfaces:**
 - Produces:
 
 ```dart
-enum LinkOperation {
-  connect('connect'), disconnect('disconnect');
-  const LinkOperation(this.word);
-  final String word;   // what logs and exception messages say; frozen
-}
+// domain/link_operation.dart: what can be attempted on a link, in Connection's words
+enum LinkOperation { open, close }
 ```
 
-  Later tasks add values, each with the word the platform interface's method has today: `requestMtu`, `getMaximumWriteLength`, `readRssi` (Task 21); `getBondState`, `bondStateChanges`, `bond`, `removeBond` (22); `getPhy`, `phyChanges`, `requestPhy` (23); `getConnectionParameters`, `requestConnectionParameters` (24).
-  - `String get code` on every `ConnectionFailure`, a literal equal to today's class name (`'ConnectFailed'`, `'OperationTimedOut'`, …), so `errorCode` in logs does not change.
+  The domain holds no string for an operation and no code for a failure: those are wording, and wording an app can read is frozen in one place. Later tasks add values in the domain's words, never the platform interface's method names: `negotiateMtu`, `readWritePayloadLimit`, `readSignalStrength` (Task 21); `readBondState`, `watchBondState`, `bond`, `removeBond` (22); `readPhy`, `watchPhy`, `requestPhy` (23); `readParameters`, `requestParameters` (24).
+  - `application/connection_log_words.dart` gains `String operationWordOf(LinkOperation operation)` and `String failureCodeOf(ConnectionFailure failure)`, each an exhaustive `switch` answering the literal logs and exception messages carry today (`open` is `'connect'`, `close` is `'disconnect'`; a later task's value takes the string the legacy code logs for it, e.g. `negotiateMtu` is `'requestMtu'`; a failure's code is its class name on `main`, e.g. `'ConnectFailed'`, `'OperationTimedOut'`). Exhaustive, so a new operation or failure cannot be added without its word.
   - `OperationTimedOut(LinkOperation operation)`, `OperationRejected(LinkOperation operation, int status)`.
   - `connectionFailureFrom(Object error, {required LinkOperation operation})`, `answering<T>(LinkOperation operation, Future<T> Function() call)`.
   - `UnexpectedPlatformFailure` equality and hash exclude `cause`; `ConnectFailed.message` is a sentence, not a `toString` of a type.
 
-- [ ] **Step 1: Failing tests.** Each failure's `code` against the literal; the `connect failed` log line's `errorCode` and `exception` values against the lines on `main`; two `UnexpectedPlatformFailure`s with different causes and the same message are equal; the translator's message for `OperationTimedOut(LinkOperation.connect)` is the string it is today.
-- [ ] **Step 2:** Implement; replace every `failure.runtimeType` in a log call with `failure.code`.
-- [ ] **Step 3:** Whole suite, parity test, API dump (no change); commit `refactor(connection): name the attempted operation and give failures stable codes`.
+- [ ] **Step 1: Failing tests.** Each operation's word and each failure's code against the literal; the `connect failed` log line's `errorCode` and `exception` values against the lines on `main`; two `UnexpectedPlatformFailure`s with different causes and the same message are equal; the translator's message for `OperationTimedOut(LinkOperation.open)` is the string it is today.
+- [ ] **Step 2:** Implement; replace every `failure.runtimeType` in a log call with `failureCodeOf(failure)`, and the translator reads `operationWordOf`.
+- [ ] **Step 3:** Whole suite, parity test, API dump (no change); commit `refactor(connection): name the attempted operation in the domain's words`.
+
+## Task R10: A context reaches apps only through its edge
+
+The half of ruling 51 the build can hold.
+
+**Files:**
+- Modify: `bluey_guards/lib/src/architecture/rules/public_exports_rule.dart`, `docs/ARCHITECTURE.md` (the `public exports` row)
+- Test: `bluey_guards/test/architecture/rules/public_exports_rule_test.dart`
+
+- [ ] **Step 1: Failing tests.** A public library that exports a file under `lib/src/features/` is a violation; exports of `lib/src/api/`, `lib/src/shared/` and unplaced files pass as today.
+- [ ] **Step 2:** Implement. Run `bluey`'s architecture test: `publicExports` keeps its one entry and gains none, since R7 moved the only such export.
+- [ ] **Step 3:** Guards' tests, the architecture tests of all five packages; commit `feat(guards): refuse a public export from inside a context`.
 
 ---
 
 ## Amendments to Tasks 17 to 26 of the slice plan
 
-Each task is built as the slice plan writes it, with these changes. Names from R1 to R8 replace the slice plan's wherever it still says `ConnectionState` below the edge, `EventPublisher` in Connection's application, `clock.now()`, a `String operation`, or `api/failure_translation.dart`.
+Each task is built as the slice plan writes it, with these changes. Names from R1 to R10 replace the slice plan's wherever it still says `ConnectionState` below the edge, `EventPublisher` in Connection's application, `clock.now()`, a `String operation`, or `api/failure_translation.dart`.
 
 ### Task 17 (composition)
 
@@ -362,17 +395,17 @@ Each task is built as the slice plan writes it, with these changes. Names from R
 
 ### Task 20 (link features)
 
-- The translator is at `api/connection/connection_failure_translation.dart`. `FeatureUnsupported(LinkOperation operation)` and `MtuAboveMaximum` carry codes. The platform's name reaches the translator as the assembly's `platformName` string (ruling 52), not through `Capabilities`.
-- `linkFeaturesFrom` lives in the composition root's reach (`api/bluey.dart` or the assembly's caller), since it reads Platform's capabilities and produces Connection's `LinkFeatures`; it is the one function that names both, and it sits where ruling 4 allows.
+- The translator is at `api/connection/connection_failure_translation.dart`. `FeatureUnsupported(LinkOperation operation)` and `MtuAboveMaximum` each get their code in `failureCodeOf`. The platform's name reaches the translator as the assembly's `platformName` string (ruling 52), not through `Capabilities`.
+- `linkFeaturesFrom` stays exactly where the slice plan puts it: Connection's infrastructure, reading the platform interface's capabilities and never Platform's. Connection and Platform each map the platform interface for themselves, so neither context names the other and no bridge is needed.
 
 ### Task 21 (MTU, payload limit, RSSI)
 
-- Durations are measured with `Now`. `loggedLinkOperation` takes a `LinkOperation` and logs `operation.word` and `failure.code`. `checkLinkFeature` answers `FeatureUnsupported(operation)`.
+- Durations are measured with `Now`. `loggedLinkOperation` takes a `LinkOperation` and logs `operationWordOf(operation)` and `failureCodeOf(failure)`. `checkLinkFeature` answers `FeatureUnsupported(operation)`.
 - Ruling 31: pull request 1 already logs a failed first read in `LinkGattClient`. `MtuSession` takes that logging over, with the same line; Task 25 deletes the legacy copy. A test asserts the line is logged once, not twice, while both exist.
 
 ### Tasks 22 to 24 (bonding, PHY, connection parameters)
 
-- Each adds its `LinkOperation` values in its own first commit. Each session takes `Now` and `Log`; each `changes` stream carries no errors (ruling 4 of the ledger) and a failed first read is logged once under ruling 31, as in Task 21.
+- Each adds its `LinkOperation` values, in the domain's words, with their frozen log words, in its own first commit. Each session takes `Now` and `Log`; each `changes` stream carries no errors (ruling 4 of the ledger) and a failed first read is logged once under ruling 31, as in Task 21.
 
 ### Task 25 (the edge takes over)
 
@@ -382,7 +415,7 @@ Each task is built as the slice plan writes it, with these changes. Names from R
 
 ### Task 26 (docs, gates, pull request)
 
-- Design addendum "Rulings of 2026-11-26" in `docs/superpowers/specs/2026-11-18-link-lifecycle-design.md`: the five rulings and rulings 42 to 54, and section 6.13's table with rows for the GATT client and the assembly. `docs/ARCHITECTURE.md`: published language (events, phases and failures translated; values shared), the two new rules, the clock. `CLAUDE.md`: Key Design Decisions and the logging section where names changed.
+- Design addendum "Rulings of 2026-11-26" in `docs/superpowers/specs/2026-11-18-link-lifecycle-design.md`: the five rulings and rulings 42 to 54, and section 6.13's table with rows for the GATT client and the assembly. `docs/ARCHITECTURE.md`: published language (events, phases and failures translated; values shared), the two new rules, the clock, and that an aggregate raises its events. `CLAUDE.md`: Key Design Decisions and the logging section where names changed, and the glossary gains Connection's inner words: Link, phase, end, operation, borrow.
 - `connectAsPeer`'s borrow rule is noted in the root for slice 5, not moved.
 - `bluey/CHANGELOG.md`: one line, the three events accept an optional `timestamp`.
 - The pull request description lists: what changed for apps (that one line), ruling 37 still open, the native gates Joel runs on his Mac, and that `--first-statement=edgeFromBelow` is removed in the next change.
@@ -392,27 +425,27 @@ Each task is built as the slice plan writes it, with these changes. Names from R
 ## Design review (cohesion, coupling, DDD, Clean Architecture)
 
 **Each unit's single responsibility.**
-- `LinkPhase`: where one link is in its life. `Link`: the transitions between phases and the duty each leaves. `LinkEvent`: what happened to a link and when. `LinkOperation`: what was attempted. None formats, logs or names a public type.
-- `LiveLinks<S>`: who holds which device's link and what an arrival does. It knows nothing of what `S` is beyond the predicate it is handed.
-- `LinkSession`: runs one link's inputs through `Link`, performs duties, reports phases. `LinkRegistry`: opens links and admits users. `LinkEvents`: the one way either says something happened.
-- `connection_log.dart`: the words Connection's log lines are frozen to. It exists so the frozen vocabulary has one home that is not the public enum.
+- `LinkPhase`: where one link is in its life. `Link`: the aggregate; it decides each transition, the duty it leaves and the event it raises. `LinkEvent`: what happened to a link and when. `LinkOperation`: what can be attempted on a link. None formats, logs, holds a string for a log, or names a public type.
+- `LiveLinks`: who holds which device's link and what an arrival does. `LiveLink`: the one thing the table reads of a link (whether it is closing), named in the domain so the table takes no predicate and no application type.
+- `LinkSession`: runs one link's inputs through `Link`, performs duties, reports phases, forwards the events the link raised. `LinkRegistry`: opens links and admits users. `LinkEvents`: the one way events leave the application.
+- `connection_log_words.dart`: every word of Connection's log lines that an app can read and this slice freezes: the context, the state words, the operation words, the failure codes. One reason to change (log wording is revised) and one deletion ends it. It is why the domain can use its own words while the logs keep theirs.
 - `connectionStateOf`, `PublishedLinkEvents`, `connection_failure_translation.dart`: three translators, one per kind of thing published (phase, event, failure), each a pure mapping.
 - `EdgeContextRule`, `EdgeFromBelowRule`: one question each about one direction of import.
 
 **Each dependency and its direction.**
-- `features/connection/domain` imports `shared/domain` only. After R5 and R6 it imports nothing public: `ConnectionState` and the public events are gone from it.
-- `features/connection/application` imports its domain, its ports, `shared/application` (`Log`, `Now`). It no longer imports `EventPublisher` or `package:clock`.
+- `features/connection/domain` imports `shared/domain` only. After R5 and R7 it imports nothing public: `ConnectionState` and the public events are gone from it.
+- `features/connection/application` imports its domain, its ports, `shared/application` (`Log`, `Now`). It no longer imports `EventPublisher` or `package:clock`. `LinkSession` implements the domain's `LiveLink`: application depending on domain, the allowed direction.
 - `features/connection/infrastructure` implements the ports over the platform interface.
 - `api/connection/` imports `features/connection/**` and `shared/**`, and implements `LinkEvents`: the port is declared inward, implemented outward. It imports no other context's `features/`.
-- The composition root alone names Platform and Connection together (`PlatformKind` to `ConnectionExtension`, capabilities to `LinkFeatures`).
+- The composition root alone names Platform and Connection together, in one place: `PlatformKind` to `ConnectionExtension`. `LinkFeatures` is mapped in Connection's infrastructure from the platform interface, so it names no other context.
 - `bluey_guards` rules depend on `SourceTree`, `Placement` and `Dependency`, as every rule does.
 - Still pointing the wrong way, listed and shrinking: ten imports of the edge from unplaced code (four leave in Task 25).
 
 **Bounded context and language.**
-- Everything here is the Connection context, plus two guard rules and one shared typedef. Inside it the words are link, phase (linked, ready, closing, ended), end, duty, operation, borrower. At the edge the words are Connection, `ConnectionState`, connecting/connected/disconnected events, exceptions. The glossary in `CLAUDE.md` already defines Connection and Link's place under it; Task 26 adds phase.
+- Everything here is the Connection context, plus two guard rules and one shared typedef. Inside it the words are link, phase (linked, ready, closing, ended), end, duty, operation, borrower. At the edge the words are Connection, `ConnectionState`, connecting/connected/disconnected events, exceptions. The glossary in `CLAUDE.md` defines Connection but none of its inner words; Task 26 adds Link, phase, end, operation and borrow. The domain's operations are named for what Connection does (`negotiateMtu`, `readSignalStrength`), and the platform interface's method names appear only in infrastructure and in the frozen log words.
 - `Client`, `Server`, `Peer` are untouched. Platform's `Capabilities` stays Platform's; Connection sees only `LinkFeatures`, its own word.
 
-**The layer each file lands in.** The File Structure table gives it per file: three domain files, two application files (one a port), one shared application typedef, five edge files, two guard rules.
+**The layer each file lands in.** The File Structure table gives it per file: four domain files, two application files (one a port), one shared application typedef, five edge files, two guard rules.
 
 **Claims about existing classes, checked against source at `9715b72`.**
 - `Link` holds a public `ConnectionState state` and the private `_upState`, `_closeAsked`, `_radioClosing` (`domain/link.dart`), so ruling 5 is a rewrite of its fields, not of its table.
@@ -426,21 +459,33 @@ Each task is built as the slice plan writes it, with these changes. Names from R
 - The ten imports of `lib/src/api/` from unplaced files are the ten listed in R4, found by search; `lib/src/bluey.dart` is a composition root and is not among them.
 - `DisconnectEcho` clears its mark only on `disconnected` (`bluey_android/lib/src/disconnect_echo.dart`).
 
+**Known compromises, each with its end.**
+- `LinkOpenBegan` is raised by the registry, not by an aggregate, because a `Link` exists only once the radio has answered. Giving `Link` an opening phase would end it; that changes when a session exists and is not in this slice.
+- `connection_log_words.dart` keeps public-sounding words (`ConnectionState.linked`) in the application layer. It is a frozen vocabulary, not a dependency: no import of the edge. It ends with the slice that revises log wording.
+- Values an app builds are published from the domain (ruling 51) and not translated.
+
 **Findings fixed in this document before the verdict.**
 - A first draft kept `releaseAndAnnounce`; announcing is not the domain's duty once `entered` exists, so the duty is `release`.
 - A first draft had the translator read the clock; ruling 3 says the raising unit stamps the time, so `LinkEvent.at` is set in the application and the translator only passes it on.
 - A first draft handed `ConnectionAssembly` Platform's `Capabilities`; that is an edge file naming another context's domain, so ruling 52 replaced it.
 - A first draft renamed the `address`/`deviceId` log keys for consistency; that changes what an app reads, so ruling 46 freezes them.
+- Review of 2026-11-26 (Joel asked for a check against DDD and cohesion), six findings, all fixed above:
+  1. The application constructed every event. An aggregate raises its own: `Link` now returns `LinkOpened` and `LinkEnded` in its step.
+  2. `LinkOperation` carried the platform interface's method names (`getMaximumWriteLength`) and a log `word`, and failures carried a log `code`, all in the domain. The domain now uses its own words and holds no wording; the frozen strings are one application file.
+  3. `LiveLinks<S>` took an opaque `S` and a predicate, which emptied the table of domain language. It now holds a `LiveLink`, a domain interface.
+  4. The amendment to Task 20 moved `linkFeaturesFrom` to the composition root and had it read Platform's capabilities, against the slice plan and against the rule that contexts meet only through a bridge. It stays in Connection's infrastructure over the platform interface.
+  5. One task changed the clock, the events and a guard rule. They are three tasks now (R6, R7, R10), each with one reason to be rejected.
+  6. Event and phase names: `LinkOpening` and `LinkEndReached` were not past-tense facts and `requestOverRadio` hid a pair. They are `LinkOpenBegan`, `LinkEnded` and `ClosingBy.both`.
 
 Verdict: ready.
 
 ## Self-Review
 
-- **Coverage of the rulings and carry-overs.** Ruling 1: R3. Ruling 3: R6. Ruling 4: R4. Ruling 5: R5. Guard with a shrink-only list: R4. Ruling 41: R1. Ruling 31: Tasks 21 to 24. Parked 9: R8; 22, 23, 24: Task 17; 25, 31: Task 25; 28, 32: R1; 29: R2; 3, 4, 14: R5. Ruling 37: left open, named in Task 26. Review minors on `connection.dart`, the `LinkGattClient` file note, `LiveLinks`, stringly operations, `runtimeType` in logs, the clock: R3, R7, R8, R6.
-- **Type consistency.** `LinkEvents`, `Now`, `LinkPhase`, `LinkOperation`, `ConnectionExtension`, `PublishedLinkEvents`, `connectionStateOf`, `stateWordOf`, `connectionLogContext` are spelled the same wherever they appear.
+- **Coverage of the rulings and carry-overs.** Ruling 1: R3. Ruling 3: R7. Ruling 4: R4. Ruling 5: R5. Guard with a shrink-only list: R4. Ruling 41: R1. Ruling 31: Tasks 21 to 24. Parked 9: R9; 22, 23, 24: Task 17; 25, 31: Task 25; 28, 32: R1; 29: R2; 3, 4, 14: R5. Ruling 37: left open, named in Task 26. Review minors on `connection.dart`, the `LinkGattClient` file note, `LiveLinks`, stringly operations, `runtimeType` in logs, the clock: R3, R8, R9, R6. The export guard of ruling 51: R10.
+- **Type consistency.** `LinkEvents`, `LinkOpenBegan`, `LinkOpened`, `LinkEnded`, `LiveLink`, `Now`, `LinkPhase`, `LinkOperation`, `ConnectionExtension`, `PublishedLinkEvents`, `connectionStateOf`, `stateWordOf`, `operationWordOf`, `failureCodeOf`, `connectionLogContext` are spelled the same wherever they appear.
 - **Review Focus.** Each of the five lines names its task and its test.
-- **Proportion.** Tasks R1 to R8 give signatures, test names and assertions; bodies are the implementer's.
+- **Proportion.** Tasks R1 to R10 give signatures, test names and assertions; bodies are the implementer's.
 
 ## Execution Handoff
 
-Subagent-driven, as pull request 1 was and as Joel chose for this slice: Opus for every implementer and reviewer, one task at a time in the order R1 to R8, then 17 to 26, with the ledger updated after each. A design question that comes up during the build goes to the coordinator for its own thread; the build does not answer it.
+Subagent-driven, as pull request 1 was and as Joel chose for this slice: Opus for every implementer and reviewer, one task at a time in the order R1 to R10, then 17 to 26, with the ledger updated after each. A design question that comes up during the build goes to the coordinator for its own thread; the build does not answer it.
