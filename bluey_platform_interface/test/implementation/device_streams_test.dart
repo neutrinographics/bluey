@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:bluey_android/src/device_streams.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:bluey_platform_interface/platform_implementation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -293,15 +293,19 @@ void main() {
     );
   });
 
-  group('the platform\'s echo of a disconnect request', () {
-    test('the disconnecting report that follows a disconnect request is not '
-        'delivered', () async {
+  group('a disconnecting report', () {
+    test('a disconnecting report after a disconnect request is delivered, '
+        'since an echo is the platform package\'s to drop', () async {
       // arrange
       streams.open('dev');
       final answer = Completer<void>();
       final states = expectLater(
         streams.statesOf('dev'),
-        emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+        emitsInOrder([
+          PlatformConnectionState.disconnecting,
+          PlatformConnectionState.disconnected,
+          emitsDone,
+        ]),
       );
 
       // act
@@ -313,74 +317,6 @@ void main() {
       await states;
       answer.complete();
       await closing;
-    });
-
-    test(
-      'an echo that arrives after a failed answer is not delivered',
-      () async {
-        // arrange
-        streams.open('dev');
-        final states = expectLater(
-          streams.statesOf('dev'),
-          emitsInOrder([
-            PlatformConnectionState.disconnecting,
-            PlatformConnectionState.disconnected,
-            emitsDone,
-          ]),
-        );
-        await expectLater(
-          streams.disconnect('dev', () async => throw StateError('refused')),
-          throwsStateError,
-        );
-
-        // act
-        streams.reportState('dev', PlatformConnectionState.disconnecting);
-        streams.reportState('dev', PlatformConnectionState.disconnecting);
-        streams.reportState('dev', PlatformConnectionState.disconnected);
-
-        // assert
-        await states;
-      },
-    );
-
-    test(
-      'a disconnecting report with no disconnect asked is delivered',
-      () async {
-        // arrange
-        streams.open('dev');
-        final states = expectLater(
-          streams.statesOf('dev'),
-          emits(PlatformConnectionState.disconnecting),
-        );
-
-        // act
-        streams.reportState('dev', PlatformConnectionState.disconnecting);
-
-        // assert
-        await states;
-      },
-    );
-
-    test('a disconnected report means no echo is coming, so the next link\'s '
-        'disconnecting report is delivered', () async {
-      // arrange
-      streams.open('dev');
-      final answer = Completer<void>();
-      final closing = streams.disconnect('dev', () => answer.future);
-      streams.reportState('dev', PlatformConnectionState.disconnected);
-      answer.complete();
-      await closing;
-      streams.open('dev');
-      final next = expectLater(
-        streams.statesOf('dev'),
-        emits(PlatformConnectionState.disconnecting),
-      );
-
-      // act
-      streams.reportState('dev', PlatformConnectionState.disconnecting);
-
-      // assert
-      await next;
     });
   });
 }

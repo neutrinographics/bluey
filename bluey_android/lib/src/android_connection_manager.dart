@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:bluey_platform_interface/platform_implementation.dart';
 import 'package:flutter/services.dart' show PlatformException;
-import 'device_streams.dart';
+import 'disconnect_echo.dart';
 import 'messages.g.dart';
 
 /// Catches a [PlatformException] thrown by Pigeon and re-throws it as the
@@ -72,10 +73,12 @@ Future<T> _translateGattPlatformError<T>(
 /// bonding, PHY, and connection parameter stubs for the Android platform.
 ///
 /// Delegates to [BlueyHostApi] for native communication and to
-/// [DeviceStreams] for each device's connection state and notifications.
+/// [DeviceStreams] for each device's connection state and notifications,
+/// after [DisconnectEcho] has dropped the plugin's echo of a disconnect.
 class AndroidConnectionManager {
   final BlueyHostApi _hostApi;
   final DeviceStreams _streams = DeviceStreams();
+  final DisconnectEcho _disconnectEcho = DisconnectEcho();
 
   AndroidConnectionManager(this._hostApi);
 
@@ -126,8 +129,10 @@ class AndroidConnectionManager {
   }
 
   /// Disconnects from a device and ends the streams of the link it closed.
-  Future<void> disconnect(String deviceId) =>
-      _streams.disconnect(deviceId, () => _hostApi.disconnect(deviceId));
+  Future<void> disconnect(String deviceId) {
+    _disconnectEcho.expectFor(deviceId);
+    return _streams.disconnect(deviceId, () => _hostApi.disconnect(deviceId));
+  }
 
   /// Returns the connection state stream for the given device.
   ///
@@ -342,7 +347,9 @@ class AndroidConnectionManager {
 
   /// Handles connection state change events from the platform.
   void onConnectionStateChanged(ConnectionStateEventDto event) {
-    _streams.reportState(event.deviceId, _mapConnectionState(event.state));
+    final state = _mapConnectionState(event.state);
+    if (_disconnectEcho.isEcho(event.deviceId, state)) return;
+    _streams.reportState(event.deviceId, state);
   }
 
   /// Handles notification events from the platform.
@@ -366,44 +373,36 @@ class AndroidConnectionManager {
 
   // === Private Mapping ===
 
-  PlatformConnectionState _mapConnectionState(ConnectionStateDto dto) {
-    switch (dto) {
-      case ConnectionStateDto.disconnected:
-        return PlatformConnectionState.disconnected;
-      case ConnectionStateDto.connecting:
-        return PlatformConnectionState.connecting;
-      case ConnectionStateDto.connected:
-        return PlatformConnectionState.connected;
-      case ConnectionStateDto.disconnecting:
-        return PlatformConnectionState.disconnecting;
-    }
-  }
+  PlatformConnectionState _mapConnectionState(
+    ConnectionStateDto dto,
+  ) => switch (dto) {
+    ConnectionStateDto.disconnected => PlatformConnectionState.disconnected,
+    ConnectionStateDto.connecting => PlatformConnectionState.connecting,
+    ConnectionStateDto.connected => PlatformConnectionState.connected,
+    ConnectionStateDto.disconnecting => PlatformConnectionState.disconnecting,
+  };
 
-  PlatformService _mapService(ServiceDto dto) {
-    return PlatformService(
-      uuid: dto.uuid,
-      isPrimary: dto.isPrimary,
-      characteristics: dto.characteristics.map(_mapCharacteristic).toList(),
-      includedServices: dto.includedServices.map(_mapService).toList(),
-    );
-  }
+  PlatformService _mapService(ServiceDto dto) => PlatformService(
+    uuid: dto.uuid,
+    isPrimary: dto.isPrimary,
+    characteristics: dto.characteristics.map(_mapCharacteristic).toList(),
+    includedServices: dto.includedServices.map(_mapService).toList(),
+  );
 
-  PlatformCharacteristic _mapCharacteristic(CharacteristicDto dto) {
-    return PlatformCharacteristic(
-      uuid: dto.uuid,
-      properties: PlatformCharacteristicProperties(
-        canRead: dto.properties.canRead,
-        canWrite: dto.properties.canWrite,
-        canWriteWithoutResponse: dto.properties.canWriteWithoutResponse,
-        canNotify: dto.properties.canNotify,
-        canIndicate: dto.properties.canIndicate,
-      ),
-      descriptors: dto.descriptors.map(_mapDescriptor).toList(),
-      handle: dto.handle,
-    );
-  }
+  PlatformCharacteristic _mapCharacteristic(CharacteristicDto dto) =>
+      PlatformCharacteristic(
+        uuid: dto.uuid,
+        properties: PlatformCharacteristicProperties(
+          canRead: dto.properties.canRead,
+          canWrite: dto.properties.canWrite,
+          canWriteWithoutResponse: dto.properties.canWriteWithoutResponse,
+          canNotify: dto.properties.canNotify,
+          canIndicate: dto.properties.canIndicate,
+        ),
+        descriptors: dto.descriptors.map(_mapDescriptor).toList(),
+        handle: dto.handle,
+      );
 
-  PlatformDescriptor _mapDescriptor(DescriptorDto dto) {
-    return PlatformDescriptor(uuid: dto.uuid, handle: dto.handle);
-  }
+  PlatformDescriptor _mapDescriptor(DescriptorDto dto) =>
+      PlatformDescriptor(uuid: dto.uuid, handle: dto.handle);
 }

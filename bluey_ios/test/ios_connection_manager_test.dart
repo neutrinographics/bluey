@@ -431,6 +431,44 @@ void main() {
         final notifStream = connectionManager.notificationStream('device-1');
         expect(notifStream, emitsError(isA<StateError>()));
       });
+
+      test('a disconnecting report after a disconnect request is delivered, '
+          'since iOS has no echo to drop', () async {
+        // arrange
+        when(
+          () => mockHostApi.connect(any(), any()),
+        ).thenAnswer((_) async => 'conn-123');
+        const config = PlatformConnectConfig(timeoutMs: null, mtu: null);
+        await connectionManager.connect('device-1', config);
+        final answer = Completer<void>();
+        when(
+          () => mockHostApi.disconnect(any()),
+        ).thenAnswer((_) => answer.future);
+        final states = expectLater(
+          connectionManager.connectionStateStream('device-1'),
+          emitsInOrder([
+            PlatformConnectionState.disconnecting,
+            PlatformConnectionState.disconnected,
+            emitsDone,
+          ]),
+        );
+
+        // act
+        final closing = connectionManager.disconnect('device-1');
+        for (final state in [
+          ConnectionStateDto.disconnecting,
+          ConnectionStateDto.disconnected,
+        ]) {
+          connectionManager.onConnectionStateChanged(
+            ConnectionStateEventDto(deviceId: 'device-1', state: state),
+          );
+        }
+
+        // assert
+        await states;
+        answer.complete();
+        await closing;
+      });
     });
 
     group('connectionStateStream', () {

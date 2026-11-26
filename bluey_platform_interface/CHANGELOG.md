@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New library `platform_implementation.dart` for code the platform packages share; it holds `DeviceStreams`. Not for apps.
+
 ## 0.4.0
 
 **Breaking changes:**

@@ -104,6 +104,9 @@ const publicExports = <String>[
   'lib/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
 ];
 
+/// The files that name a library reserved for the platform packages.
+const reservedLibraries = <String>[];
+
 /// The placed files that point outward.
 const layers = <String>[];
 

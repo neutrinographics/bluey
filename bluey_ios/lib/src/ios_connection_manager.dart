@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:bluey_platform_interface/platform_implementation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 
-import 'device_streams.dart';
 import 'messages.g.dart';
 import 'uuid_utils.dart';
 
