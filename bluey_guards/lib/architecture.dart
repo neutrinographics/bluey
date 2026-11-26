@@ -18,6 +18,7 @@ export 'src/architecture/rules/layer_rule.dart';
 export 'src/architecture/rules/lint_options_rule.dart';
 export 'src/architecture/rules/placement_rule.dart';
 export 'src/architecture/rules/public_exports_rule.dart';
+export 'src/architecture/rules/reserved_library_rule.dart';
 export 'src/architecture/rules/size_rule.dart';
 export 'src/architecture/rules/throws_rule.dart';
 export 'src/architecture/source_file.dart';

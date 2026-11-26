@@ -46,6 +46,11 @@ final Map<String, ArchitectureRule> blueyRules = {
     compositionRoots: const {_compositionRoot},
   ),
   'publicExports': PublicExportsRule(package: _package),
+  'reservedLibraries': const ReservedLibraryRule(
+    libraries: {
+      'package:bluey_platform_interface/platform_implementation.dart',
+    },
+  ),
   'layers': LayerRule(
     package: _package,
     allowances: const LayerAllowances(
