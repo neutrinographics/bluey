@@ -777,8 +777,35 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// carries [PlatformScanFailedException] with [reason] and the platform
   /// scan stops.
   void simulateScanRefusal(PlatformScanFailureReason reason) {
-    _runningScan?.addError(PlatformScanFailedException(reason));
+    final running = _runningScan;
+    if (running == null) return;
+    running.addError(PlatformScanFailedException(reason));
+    _runningScan = null;
     _isScanningPlatform = false;
+  }
+
+  /// Delivers [device] on the running scan, as the platform does when its
+  /// radio hears an advertisement; a no-op while no scan runs.
+  void simulateScanResult(PlatformDevice device) {
+    final running = _runningScan;
+    if (running == null || running.isClosed) return;
+    running.add(device);
+  }
+
+  Completer<void>? _heldStopScan;
+
+  /// Arranges for the next [stopScan] to wait until [releaseHeldStopScan],
+  /// so a test can act while a stop is in flight.
+  void holdNextStopScan() {
+    _heldStopScan = Completer<void>();
+  }
+
+  /// Lets a stop held by [holdNextStopScan] go on.
+  void releaseHeldStopScan() {
+    final held = _heldStopScan;
+    if (held == null) throw StateError('No held stopScan to release');
+    _heldStopScan = null;
+    held.complete();
   }
 
   // === Connect-phase failure seams (audit R1 / NT-1) ===
@@ -1346,8 +1373,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
     lastScanConfig = config;
     _isScanningPlatform = true;
-    // Create a new controller for each scan to avoid "closed stream" issues
-    final scanController = StreamController<PlatformDevice>.broadcast();
+    // Synchronous so a result put on the scan is heard before a scan that
+    // replaces it cancels the listener, as a radio with no latency would.
+    final scanController = StreamController<PlatformDevice>.broadcast(
+      sync: true,
+    );
     _runningScan = scanController;
 
     final scanFailure = _pendingScanFailure;
@@ -1384,7 +1414,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    await _heldStopScan?.future;
     _applyFaultRules(FakeOp.stopScan);
+    _runningScan = null;
     _isScanningPlatform = false;
   }
 

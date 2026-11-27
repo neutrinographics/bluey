@@ -156,7 +156,26 @@ void scanningContract(String name, ScanningHarness Function() create) {
       final answer = await h.scanning.stop();
 
       // assert
-      expect(answer, isA<Left<ScanFailure, void>>());
+      expect(
+        answer,
+        isA<Left<ScanFailure, void>>().having(
+          (left) => left.value,
+          'failure',
+          isA<UnexpectedScanFailure>(),
+        ),
+      );
+    });
+
+    test('after a failed stop the radio is still scanning', () async {
+      // arrange
+      h.scanning.scan(_everything);
+      h.failNextStop();
+
+      // act
+      await h.scanning.stop();
+
+      // assert
+      expect(h.scanningFor, _everything);
     });
 
     test('a held stop does not answer until it is released', () async {
@@ -197,6 +216,59 @@ void scanningContract(String name, ScanningHarness Function() create) {
         expect(h.scanningFor, isNull);
       },
     );
+
+    test('a refusal while idle delivers nothing', () async {
+      // arrange
+      final heard = <ScanReport>[];
+      final subscription = h.scanning.reports.listen(heard.add);
+
+      // act
+      h.refuse(ScanRefusalReason.startedTooOften);
+      await pumpEventQueue();
+
+      // assert
+      expect(heard, isEmpty);
+      await subscription.cancel();
+    });
+
+    test('nothing is heard after a refusal', () async {
+      // arrange
+      final heard = <ScanReport>[];
+      final subscription = h.scanning.reports.listen(heard.add);
+      h.scanning.scan(_everything);
+      h.refuse(ScanRefusalReason.startedTooOften);
+      await pumpEventQueue();
+      heard.clear();
+
+      // act
+      h.hear(_result('AA:BB:CC:DD:EE:01'));
+      await pumpEventQueue();
+
+      // assert
+      expect(heard, isEmpty);
+      await subscription.cancel();
+    });
+
+    test('a stop after a replaced scan answers success and nothing more is '
+        'heard', () async {
+      // arrange
+      final heard = <ScanReport>[];
+      final subscription = h.scanning.reports.listen(heard.add);
+      h.scanning.scan(_everything);
+      h.scanning.scan(_balanced);
+      final answer = await h.scanning.stop();
+      await pumpEventQueue();
+
+      // act
+      h.hear(_result('AA:BB:CC:DD:EE:01'));
+      await pumpEventQueue();
+
+      // assert
+      expect(answer, const Right<ScanFailure, void>(null));
+      expect(h.scanningFor, isNull);
+      expect(heard, isEmpty);
+      await subscription.cancel();
+    });
 
     test('the reports never carry an error', () async {
       // arrange
