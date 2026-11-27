@@ -40,9 +40,8 @@ are the maintainer's to adjust.
 > second pull request: the whole Connection context but its GATT client is in
 > the target layout, and Bluey has its own `Capabilities`. **Slice 2
 > (scanning and advertising sessions) is next.** The slice left two known
-> compromises, each with a proposed end that Joel has not yet confirmed: a
-> link's opening phase (I398, proposed for a small pull request before slice
-> 2) and the frozen log wording (I399, proposed for one pass after slice 6).
+> compromises: a link's opening phase, now given to `Link` (I398), and the
+> frozen log wording (I399, one pass after slice 6).
 
 ## Guardrails (design invariants)
 
@@ -190,7 +189,7 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☐ **Low** — [Defensive-copy byte buffers + unify DTO equality](backlog/I371-vo-dto-integrity.md) · Mutable `Uint8List` escapes value objects; 12 of 17 DTOs lack value equality (audit DA-29/30).
 - ☐ **Low** — [Fix the example app where it teaches the wrong patterns](backlog/I376-example-app-reference-quality.md) · Missing shared-link guard, inert tolerance setting, stringly-typed disconnect flow (audit DA-40..42).
 - ☐ **Low** — [Work through the 2026-07-07 MINOR ledger](backlog/I377-audit-minor-ledger.md) · ~30 small API/robustness/DRY fixes, tracked as one sweep against the audit doc.
-- ☐ **Low** — [Give a link its opening phase](backlog/I398-give-a-link-its-opening-phase.md) · Connection's registry, not its `Link` aggregate, raises the event that a link's open began, since a `Link` exists only once the radio answers (a compromise of slice 1). · Proposed: a small pull request after slice 1, before slice 2
+- ☑ **Low** — [Give a link its opening phase](backlog/I398-give-a-link-its-opening-phase.md) · Connection's registry, not its `Link` aggregate, raised the event that a link's open began, since a `Link` existed only once the radio answered (a compromise of slice 1). · Fixed before slice 2 in `f087e5a` (plan `superpowers/plans/2026-11-27-link-opening-phase.md`)
 - ☐ **Low** — [Revise the log wording of every context in one pass](backlog/I399-revise-the-log-wording-of-every-context.md) · The words an app reads in log lines are frozen while contexts move, so Connection's lines keep the old state, operation and context words (a compromise of slice 1). · Proposed: one pass after slice 6 (what is left)
 
 ## Shipped

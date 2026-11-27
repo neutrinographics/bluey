@@ -74,8 +74,7 @@ cd bluey_guards && dart test
 cd bluey && flutter test test/architecture
 
 # No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package).
-# The flag lets bluey's new edgeFromBelow list state today's debt; remove it in the first change after the one that adds it merges
-cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart --first-statement=edgeFromBelow
+cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart
 
 # The public API dump: check it, or rewrite it after a change that was meant
 cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api
@@ -131,7 +130,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 - **Immutable data, mutable connections** - Device/Advertisement are snapshots; Connection state is observable
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
 - **Sealed exceptions, open events** - exceptions are sealed families (exhaustive pattern matching); domain events share an open base, `BlueyEvent`, so a `switch` over them needs a default branch
-- **The domain raises its own events, the edge publishes them** - Connection's aggregate `Link` raises `LinkOpened` and `LinkEnded` (the registry raises `LinkOpenBegan`), stamped with the clock the application is handed (`Now`); `api/connection/` translates them to `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`, carrying that instant as the event's `timestamp`
+- **The domain raises its own events, the edge publishes them** - Connection's aggregate `Link` raises `LinkOpenBegan`, `LinkOpened` and `LinkEnded`, stamped with the clock the application is handed (`Now`); `api/connection/` translates them to `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`, carrying that instant as the event's `timestamp`
 
 ### Handle-based attribute identity (post-I088)
 
@@ -164,7 +163,7 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - `bluey.logEvents` is a broadcast `Stream<BlueyLogEvent>` covering domain-layer **and** native (Android + iOS) events in arrival order — single subscription point for the whole stack.
 - `bluey.setLogLevel(BlueyLogLevel level)` filters Dart-side and pushes the filter down to the native side, so no Pigeon traffic is incurred for filtered events. Default level is `info`.
 - Levels: `trace`, `debug`, `info`, `warn`, `error`.
-- `bluey.connection`'s lifecycle lines (`connect started`, `connect succeeded`, `connect failed`, `state transition`, `disconnect entered`, `disconnect resolved`) now come from Connection's application layer (`LinkRegistry` and `LinkSession`), where they came from `Bluey` and the old `BlueyConnection`, so a probe's link logs them too; the GATT client's lines keep the same context. The MTU request and the two readings (`requestMtu`, `getMaximumWriteLength`, `readRssi`) are Connection's too and still log under `bluey.gatt`, and a failed line's `errorCode` is a failure code (`OperationTimedOut`, `LinkEnded`, ...).
+- `bluey.connection`'s lifecycle lines (`connect started`, `connect succeeded`, `connect failed`, `state transition`, `disconnect entered`, `disconnect resolved`) now come from Connection's application layer (`LinkRegistry` and `LinkSession`), where they came from `Bluey` and the old `BlueyConnection`, so a probe's link logs them too; the GATT client's lines keep the same context. The MTU request and the two readings (`requestMtu`, `getMaximumWriteLength`, `readRssi`) are Connection's too and still log under `bluey.gatt`, and a failed line's `errorCode` is a failure code (`OperationTimedOut`, `LinkEnded`, ...). A failed open logs `connect failed` at error for the app and at debug for a borrower, whose failed probe is routine.
 - Connection's frozen log vocabulary (contexts, state words such as `ConnectionState.disconnecting`, operation words, failure codes) lives in one file, `features/connection/application/connection_log_words.dart`, frozen until one pass revises the wording of every context's logs. Message words and data keys (`bond state read failed`, `deviceId`) stay beside the line that logs them.
 - Context naming convention: `bluey`, `bluey.connection`, `bluey.connection.lifecycle`, `bluey.server`, `bluey.server.lifecycle`, `bluey.peer`, `bluey.peer.discovery`, `bluey.android.{plugin,gatt_server,gatt_queue,advertiser}`, `bluey.ios.{plugin,central,peripheral,op_slot}`.
 - Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
@@ -187,7 +186,7 @@ The domain layer uses bounded-context-aligned vocabulary; the platform-interface
 | **ServerId** | Peer | The stable identity advertised through the lifecycle control service. Survives MAC randomization on Android and CBPeripheral identifier rotation on iOS. |
 | **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `centralConnections`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
 | **Link** | Connection (inner) | The radio link from this device, as GATT client, to one remote device; a `Connection` is its public face. In code, `Link`, the aggregate that decides what each input does to it. |
-| **Phase** | Connection (inner) | Where a link is in its life: linked, ready, closing or ended (`LinkPhase`). The edge maps it to the public `ConnectionState`. |
+| **Phase** | Connection (inner) | Where a link is in its life: opening, linked, ready, closing or ended, or never opened when its open failed (`LinkPhase`). The edge maps it to the public `ConnectionState`. |
 | **End** | Connection (inner) | Why a link ended: the app asked, it dropped, or the radio went away (`LinkEnd`). |
 | **Operation** | Connection (inner) | What was attempted on a link, in Connection's own words (`LinkOperation`: `open`, `negotiateMtu`, `readSignalStrength`, ...), never the platform's method names. |
 | **Borrow** | Connection (inner) | A short use of a device's link by code that is not the app (today peer discovery and `connectAsPeer`): it reuses a link the app holds, and closes on give-back only a link it opened. |
