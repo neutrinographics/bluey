@@ -87,10 +87,7 @@ class Scanner(
             }
 
             override fun onScanFailed(errorCode: Int) {
-                // Must dispatch to main thread for Flutter platform channel
-                handler.post {
-                    flutterApi.onScanComplete {}
-                }
+                reportScanFailure(errorCode)
             }
         }
 
@@ -113,6 +110,17 @@ class Scanner(
             callback(Result.failure(BlueyAndroidError.PermissionDenied("BLUETOOTH_SCAN")))
         } catch (e: Exception) {
             callback(Result.failure(e))
+        }
+    }
+
+    /**
+     * Tells Dart why the platform refused the scan: the app that asked can
+     * only learn it from the code, since a refused scan never completes.
+     */
+    internal fun reportScanFailure(errorCode: Int) {
+        // Must dispatch to main thread for Flutter platform channel
+        handler.post {
+            flutterApi.onScanFailed(errorCode.toLong()) {}
         }
     }
 

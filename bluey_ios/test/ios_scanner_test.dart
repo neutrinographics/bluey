@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:bluey_ios/src/ios_scanner.dart';
@@ -162,6 +165,74 @@ void main() {
         expandUuid('0123456789abcdef0123456789abcdef'),
         equals('01234567-89ab-cdef-0123-456789abcdef'),
       );
+    });
+
+    group('a refused scan', () {
+      PlatformScanConfig config() =>
+          PlatformScanConfig(serviceUuids: const [], timeoutMs: null);
+
+      test('a startScan rejected as bluetooth-unavailable puts '
+          'PlatformBluetoothUnavailableException on the stream', () async {
+        // arrange
+        when(() => mockHostApi.startScan(any())).thenAnswer(
+          (_) async =>
+              throw PlatformException(
+                code: 'bluetooth-unavailable',
+                message: 'not ready',
+              ),
+        );
+        final unhandled = <Object>[];
+        final errors = <Object>[];
+
+        // act
+        runZonedGuarded(() {
+          scanner.scan(config()).listen((_) {}, onError: errors.add);
+        }, (e, _) => unhandled.add(e));
+        await pumpEventQueue();
+
+        // assert
+        expect(unhandled, isEmpty);
+        expect(errors.single, isA<PlatformBluetoothUnavailableException>());
+      });
+
+      test('a rejection that a later scan superseded is dropped', () async {
+        // arrange
+        final first = Completer<void>();
+        var calls = 0;
+        when(() => mockHostApi.startScan(any())).thenAnswer((_) {
+          calls++;
+          return calls == 1 ? first.future : Future<void>.value();
+        });
+        final errors = <Object>[];
+        scanner.scan(config()).listen((_) {}, onError: errors.add);
+        scanner.scan(config());
+
+        // act
+        first.completeError(PlatformException(code: 'bluetooth-unavailable'));
+        await pumpEventQueue();
+
+        // assert
+        expect(errors, isEmpty);
+      });
+
+      test('a rejection that a later stopScan superseded is dropped', () async {
+        // arrange
+        final start = Completer<void>();
+        when(
+          () => mockHostApi.startScan(any()),
+        ).thenAnswer((_) => start.future);
+        when(() => mockHostApi.stopScan()).thenAnswer((_) async {});
+        final errors = <Object>[];
+        scanner.scan(config()).listen((_) {}, onError: errors.add);
+        await scanner.stopScan();
+
+        // act
+        start.completeError(PlatformException(code: 'bluetooth-unavailable'));
+        await pumpEventQueue();
+
+        // assert
+        expect(errors, isEmpty);
+      });
     });
   });
 }

@@ -2370,6 +2370,27 @@ class BlueyFlutterApi(private val binaryMessenger: BinaryMessenger, private val 
       } 
     }
   }
+  /**
+   * The platform refused or lost the scan; [errorCode] is Android's
+   * `ScanCallback.SCAN_FAILED_*` value, so Dart can tell the app why.
+   */
+  fun onScanFailed(errorCodeArg: Long, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onScanFailed$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(errorCodeArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(MessagesPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
   /** Connection state changed. */
   fun onConnectionStateChanged(eventArg: ConnectionStateEventDto, callback: (Result<Unit>) -> Unit)
 {

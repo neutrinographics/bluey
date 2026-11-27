@@ -11,6 +11,10 @@ class AndroidScanner {
   final StreamController<PlatformDevice> _scanController =
       StreamController<PlatformDevice>.broadcast();
 
+  /// Raised by every [scan] and [stopScan], so a rejected start that a later
+  /// call replaced is not reported against a scan nobody asks for any more.
+  int _generation = 0;
+
   AndroidScanner(this._hostApi);
 
   /// Starts a BLE scan with the given [config] and returns a stream
@@ -22,8 +26,10 @@ class AndroidScanner {
       mode: _mapScanModeToDto(config.scanMode),
     );
 
-    // Start scan (async, doesn't block)
-    _hostApi.startScan(dto);
+    final generation = ++_generation;
+    _hostApi.startScan(dto).catchError((Object error) {
+      if (generation == _generation) _scanController.addError(error);
+    });
 
     return _scanController.stream;
   }
@@ -42,6 +48,7 @@ class AndroidScanner {
 
   /// Stops the current BLE scan.
   Future<void> stopScan() async {
+    _generation++;
     await _hostApi.stopScan();
   }
 
@@ -53,6 +60,32 @@ class AndroidScanner {
   /// Callback handler invoked when a scan completes.
   void onScanComplete() {
     // No-op for now
+  }
+
+  /// Callback handler invoked when the platform refuses or loses the scan.
+  void onScanFailed(int errorCode) {
+    _scanController.addError(
+      PlatformScanFailedException(_reasonOf(errorCode), code: errorCode),
+    );
+  }
+
+  PlatformScanFailureReason _reasonOf(int errorCode) {
+    switch (errorCode) {
+      case 1:
+        return PlatformScanFailureReason.alreadyStarted;
+      case 2:
+        return PlatformScanFailureReason.registrationFailed;
+      case 3:
+        return PlatformScanFailureReason.internalError;
+      case 4:
+        return PlatformScanFailureReason.unsupported;
+      case 5:
+        return PlatformScanFailureReason.outOfHardwareResources;
+      case 6:
+        return PlatformScanFailureReason.startedTooOften;
+      default:
+        return PlatformScanFailureReason.unknown;
+    }
   }
 
   PlatformDevice _mapDevice(DeviceDto dto) {

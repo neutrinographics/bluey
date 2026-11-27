@@ -1,5 +1,0 @@
-# A known defect is a test that fails until the slice that owns it fixes the bug.
-# The suite skips it, and the known-defects job runs it and expects it to fail.
-tags:
-  known-defect:
-    skip: "Known defect: fails until its slice fixes it. See docs/ARCHITECTURE.md."

@@ -39,9 +39,7 @@ void main() {
         Device(address: const DeviceAddress(deviceId)),
       );
 
-      final mtu = await connection.android!.requestMtu(
-        Mtu(512),
-      );
+      final mtu = await connection.android!.requestMtu(Mtu(512));
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
     });
@@ -53,9 +51,7 @@ void main() {
         Device(address: const DeviceAddress(deviceId)),
       );
 
-      final mtu = await connection.android!.requestMtu(
-        Mtu(185),
-      );
+      final mtu = await connection.android!.requestMtu(Mtu(185));
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
     });
@@ -73,9 +69,7 @@ void main() {
       );
 
       await expectLater(
-        connection.android!.requestMtu(
-          Mtu(512),
-        ),
+        connection.android!.requestMtu(Mtu(512)),
         throwsA(isA<GattTimeoutException>()),
       );
     });
@@ -109,10 +103,10 @@ void main() {
       final errors = <Object>[];
       var done = false;
       scanner.scan().listen(
-            (_) {},
-            onError: errors.add,
-            onDone: () => done = true,
-          );
+        (_) {},
+        onError: errors.add,
+        onDone: () => done = true,
+      );
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -122,23 +116,49 @@ void main() {
       expect(scanner.state, ScanState.stopped);
     });
 
-    test('the scan-failure seam is one-shot: the next scan succeeds',
-        () async {
+    test('the scan-failure seam is one-shot: the next scan succeeds', () async {
       fakePlatform.simulatePeripheral(id: deviceId, name: 'Scan OK');
       fakePlatform.simulateScanFailure(
         PlatformException(code: 'bluey-unknown', message: 'scan failed: 2'),
       );
 
       final failing = bluey.scanner();
-      await expectLater(
-        failing.scan(),
-        emitsError(isA<BlueyException>()),
-      );
+      await expectLater(failing.scan(), emitsError(isA<BlueyException>()));
 
       final working = bluey.scanner();
       final result = await working.scan().first;
       expect(result.device.address, const DeviceAddress(deviceId));
       await working.stop();
+    });
+  });
+
+  group('simulateScanRefusal', () {
+    test('puts PlatformScanFailedException on the running scan and stops '
+        'the platform scan', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+      final errors = <Object>[];
+      fakePlatform
+          .scan(
+            platform.PlatformScanConfig(
+              serviceUuids: const [],
+              timeoutMs: null,
+            ),
+          )
+          .listen((_) {}, onError: errors.add);
+      await Future<void>.delayed(Duration.zero);
+
+      // act
+      fakePlatform.simulateScanRefusal(
+        platform.PlatformScanFailureReason.startedTooOften,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // assert
+      final error = errors.single as platform.PlatformScanFailedException;
+      expect(error.reason, platform.PlatformScanFailureReason.startedTooOften);
+      expect(fakePlatform.isScanning, isFalse);
+      await fakePlatform.dispose();
     });
   });
 }

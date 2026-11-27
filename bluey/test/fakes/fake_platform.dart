@@ -773,6 +773,14 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _pendingScanFailure = error;
   }
 
+  /// Makes the running scan fail the way a platform refusal does: its stream
+  /// carries [PlatformScanFailedException] with [reason] and the platform
+  /// scan stops.
+  void simulateScanRefusal(PlatformScanFailureReason reason) {
+    _runningScan?.addError(PlatformScanFailedException(reason));
+    _isScanningPlatform = false;
+  }
+
   // === Connect-phase failure seams (audit R1 / NT-1) ===
 
   /// Arranges for the next [connect] call to [deviceId] to throw a
@@ -1275,6 +1283,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Test seam — flipped to true on the first event delivery inside [scan]
   /// and back to false when [stopScan] is called.
   bool _isScanningPlatform = false;
+  StreamController<PlatformDevice>? _runningScan;
 
   /// Whether the fake platform scan is currently active.
   /// Exposed as a test seam so tests can assert that cancelling the
@@ -1339,6 +1348,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _isScanningPlatform = true;
     // Create a new controller for each scan to avoid "closed stream" issues
     final scanController = StreamController<PlatformDevice>.broadcast();
+    _runningScan = scanController;
 
     final scanFailure = _pendingScanFailure;
     if (scanFailure != null) {

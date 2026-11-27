@@ -288,7 +288,7 @@ A `group` names the scenario, and each test inside it is laid out with `// arran
 
 Application units are tested against in-memory doubles of their ports (`InMemoryScanning`), kept in `test/fixtures/` under the same tree, never against mocks. `FakeBlueyPlatform` stays, for adapter tests and for the integration tests that run whole scenarios through `api/`. [`testing-conventions.md`](testing-conventions.md) holds the rules for simulated time and the fake's scenario surface.
 
-**Known defects.** A known defect is a test that reproduces an audit finding and fails until the slice that owns it fixes the bug. The November audit wrote eleven; slice 1 fixed four of them (the two H3 tests, H2 and M3), and seven remain: six in [`bluey/test/known_defects/domain_known_defects_test.dart`](../bluey/test/known_defects/domain_known_defects_test.dart) and one in [`bluey_android/test/known_defects/android_adapter_known_defects_test.dart`](../bluey_android/test/known_defects/android_adapter_known_defects_test.dart), each named by its finding and backlog id (`M5 (I382): ...`). The `bluey_android` one keeps the mocktail mocks it was written with, as that suite's other tests do, and so did M3 when it moved into `android_connection_manager_test.dart`.
+**Known defects.** A known defect is a test that reproduces an audit finding and fails until the slice that owns it fixes the bug. The November audit wrote eleven; slice 1 fixed four of them (the two H3 tests, H2 and M3) and slice 2's scanning pull request M2, and six remain, all in [`bluey/test/known_defects/domain_known_defects_test.dart`](../bluey/test/known_defects/domain_known_defects_test.dart), each named by its finding and backlog id (`M5 (I382): ...`). M3 and M2 kept the mocktail mocks they were written with when they moved into `bluey_android`'s `android_connection_manager_test.dart` and `android_scanner_test.dart`.
 
 - **The tag.** Each file opens with `@Tags(['known-defect'])`. The package's `dart_test.yaml` declares the tag with a skip reason, so a normal `flutter test` shows each file as one skipped suite and stays green.
 - **The roster.** Each package names its known defects in `test/known_defects/roster.dart`, one `knownDefects` list of full test names, group and test together (`'M5 (I382): dispose while scanning dispose stops the platform scan'`). A roster is a list as section 5's are: it only shrinks, and the Lists only shrink job holds it to that.
@@ -320,13 +320,11 @@ The known defects, run as the job runs them:
 
 ```bash
 (cd bluey && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "${TMPDIR:-/tmp}/bluey.json")
-(cd bluey_android && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "${TMPDIR:-/tmp}/bluey_android.json")
 (cd bluey && dart run bluey_guards:known_defects \
-  test/known_defects/roster.dart "${TMPDIR:-/tmp}/bluey.json" \
-  ../bluey_android/test/known_defects/roster.dart "${TMPDIR:-/tmp}/bluey_android.json")
+  test/known_defects/roster.dart "${TMPDIR:-/tmp}/bluey.json")
 ```
 
-The two test runs exit non-zero, as they should; the verdict is the third command's. Each JSON file is judged against the roster before it. It prints, for each file, how many are still failing, now passing and not run, each still-failing test with the first line of its first error, so the log shows it fails for the defect its name gives, and names each one that fails the gate with what to do.
+The test run exits non-zero, as they should; the verdict is the third command's. Each JSON file is judged against the roster before it. It prints, for each file, how many are still failing, now passing and not run, each still-failing test with the first line of its first error, so the log shows it fails for the defect its name gives, and names each one that fails the gate with what to do.
 
 The `bluey` suite runs once in CI, in the job that holds the two coverage floors, and the Architecture job runs the four `test/architecture` folders again on their own, so a broken rule reads as "Architecture" in the checks list. The coverage floor is 90% of lines in the `bluey` package, the figure CLAUDE.md requires; a missing report fails too. A report names only the libraries a test loaded, so the gate is also given `lib` and fails naming every Dart file under it that the report lacks and that holds code that runs: a body, a constructor (even a `const` one with no body) or a variable that is not a constant and has an initializer. A file of enum values, abstract members or exports holds none and is absent from every report; today 28 of the 117 files under `bluey/lib` are such files.
 
