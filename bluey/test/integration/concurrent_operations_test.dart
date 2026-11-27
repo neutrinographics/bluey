@@ -76,16 +76,27 @@ void main() {
         await subscription1.cancel();
         scanner1.dispose();
 
-        // Add another device
-        fakePlatform.simulatePeripheral(
-          id: 'AA:BB:CC:DD:EE:02',
-          name: 'Device 2',
-        );
-
-        // Need to trigger another scan for the new device
+        // A scanner joining the scan still running hears what the radio
+        // hears from then on, without the radio being restarted for it.
         final scanner3 = bluey.scanner();
         final results3 = <ScanResult>[];
         final subscription3 = scanner3.scan().listen(results3.add);
+        await Future.delayed(Duration.zero);
+        for (final (id, name) in [
+          ('AA:BB:CC:DD:EE:01', 'Device 1'),
+          ('AA:BB:CC:DD:EE:02', 'Device 2'),
+        ]) {
+          fakePlatform.simulateScanResult(
+            platform.PlatformDevice(
+              id: id,
+              name: name,
+              rssi: -60,
+              serviceUuids: const [],
+              manufacturerDataCompanyId: null,
+              manufacturerData: null,
+            ),
+          );
+        }
         await Future.delayed(Duration.zero);
 
         await subscription2.cancel();
@@ -93,8 +104,9 @@ void main() {
         scanner2.dispose();
         scanner3.dispose();
 
-        // Third listener should find both devices
+        // Third listener should find both devices, and so should the second
         expect(results3, hasLength(2));
+        expect(results2, hasLength(3));
 
         await bluey.dispose();
       });

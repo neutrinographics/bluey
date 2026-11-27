@@ -17,8 +17,9 @@ export 'src/shared/domain/device_address.dart';
 export 'src/shared/domain/bluey_event.dart';
 
 // Discovery bounded context
-export 'src/discovery/scanner.dart';
-export 'src/discovery/scan_state.dart';
+export 'src/api/discovery/scanner.dart';
+export 'src/api/discovery/scan_state.dart';
+export 'src/api/discovery/scan_failed_exception.dart';
 
 // Connection bounded context
 export 'src/api/connection/connection.dart';
@@ -49,6 +50,7 @@ export 'src/lifecycle.dart' show LifecycleInterval;
 
 // Domain events
 export 'src/events.dart';
+export 'src/api/discovery/scan_events.dart';
 export 'src/api/connection/connection_events.dart';
 
 // Structured logging

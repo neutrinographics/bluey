@@ -3,7 +3,7 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../fakes/fake_platform.dart';
+import '../../fakes/fake_platform.dart';
 
 /// Scanner.scan gains a ScanMode (Android duty-cycle control): a consumer
 /// whose mesh is fully connected can drop from continuous scanning

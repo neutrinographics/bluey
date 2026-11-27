@@ -128,13 +128,13 @@ void main() {
         'boundaries',
         (entries) => [
           ...entries,
-          'lib/src/discovery/bluey_scanner.dart -> lib/src/peer/server_id.dart',
+          'lib/src/gatt_client/gatt.dart -> lib/src/peer/server_id.dart',
         ],
       );
 
       // assert
       expect(growth.added, [
-        'boundaries: lib/src/discovery/bluey_scanner.dart -> '
+        'boundaries: lib/src/gatt_client/gatt.dart -> '
             'lib/src/peer/server_id.dart',
       ]);
     });
@@ -146,16 +146,16 @@ void main() {
         'boundaries',
         (entries) => [
           ...entries,
-          'lib/src/discovery/bluey_scanner.dart -> '
+          'lib/src/shared/exceptions.dart -> '
               'lib/src/features/platform/domain/capabilities.dart',
         ],
       );
 
       // assert
       expect(growth.raised, [
-        'boundaries: lib/src/discovery/bluey_scanner.dart into platform, 1 at '
+        'boundaries: lib/src/shared/exceptions.dart into platform, 1 at '
             'the base and 2 at the head: '
-            'lib/src/discovery/bluey_scanner.dart -> '
+            'lib/src/shared/exceptions.dart -> '
             'lib/src/features/platform/domain/capabilities.dart',
       ]);
     });

@@ -7,13 +7,14 @@ import 'package:meta/meta.dart';
 
 import 'api/connection/connection.dart';
 import 'api/connection/connection_assembly.dart';
+import 'api/discovery/discovery_assembly.dart';
+import 'api/discovery/scanner.dart';
 import 'connection/bluey_connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
-import 'discovery/bluey_scanner.dart';
-import 'discovery/scanner.dart';
 import 'events.dart';
 import 'features/connection/infrastructure/adapters/platform_connection_ports.dart';
+import 'features/discovery/infrastructure/adapters/platform_scanning.dart';
 import 'features/platform/domain/capabilities.dart';
 import 'features/platform/infrastructure/adapters/platform_capabilities.dart';
 import 'gatt_server/bluey_server.dart';
@@ -34,7 +35,7 @@ import 'shared/gatt_timeouts.dart';
 import 'shared/infrastructure/bluey_event_bus.dart';
 import 'shared/infrastructure/bluey_logger.dart';
 
-export 'discovery/scanner.dart';
+export 'api/discovery/scanner.dart';
 export 'platform/bluetooth_state.dart';
 
 /// The main entry point to Bluey.
@@ -105,6 +106,12 @@ class Bluey {
           endAsException: endAsException,
           events: _eventBus,
         ),
+  );
+  late final DiscoveryAssembly _discovery = DiscoveryAssembly(
+    scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
+    publisher: _eventBus,
+    log: _logger,
+    now: clock.now,
   );
 
   StreamSubscription? _stateSubscription;
@@ -398,10 +405,8 @@ class Bluey {
     );
   }
 
-  /// Create a Scanner for discovering nearby BLE devices.
-  ///
-  /// Returns a [Scanner] aggregate root for the Discovery bounded context.
-  /// Call [Scanner.dispose] when done to release resources.
+  /// A new Scanner for nearby BLE devices. Scanners share one radio scan, so
+  /// none replaces or stops another's; call [Scanner.dispose] when done.
   ///
   /// Example:
   /// ```dart
@@ -409,12 +414,11 @@ class Bluey {
   /// final subscription = scanner.scan().listen((result) {
   ///   print('Found: ${result.device.name} at ${result.rssi} dBm');
   /// });
-  /// // ...
   /// scanner.dispose();
   /// ```
   Scanner scanner() {
     _requireAdapterOn();
-    return BlueyScanner(_platform, _eventBus);
+    return _discovery.scanner();
   }
 
   /// Connect to a device, within [timeout] when one is given.
@@ -443,7 +447,7 @@ class Bluey {
     try {
       return await attempt();
     } on BlueyException catch (error) {
-      _emitEvent(
+      _eventBus.emit(
         ErrorEvent(
           message: 'Connection failed to ${device.address.toShortString()}',
           error: error,
@@ -947,6 +951,7 @@ class Bluey {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
+    await _discovery.dispose();
     await _eventBus.close();
     await _logger.dispose();
   }
@@ -964,10 +969,5 @@ class Bluey {
       case platform.BluetoothState.on:
         return BluetoothState.on;
     }
-  }
-
-  /// Emits an event to the event bus.
-  void _emitEvent(BlueyEvent event) {
-    _eventBus.emit(event);
   }
 }

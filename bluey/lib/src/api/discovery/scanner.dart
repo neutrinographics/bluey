@@ -1,12 +1,12 @@
-import '../shared/domain/uuid.dart';
-import '../features/discovery/domain/scan_mode.dart';
-import '../features/discovery/domain/scan_result.dart';
+import '../../shared/domain/uuid.dart';
+import '../../features/discovery/domain/scan_mode.dart';
+import '../../features/discovery/domain/scan_result.dart';
 import 'scan_state.dart';
 
-export '../features/discovery/domain/advertisement.dart';
-export '../features/discovery/domain/device.dart';
-export '../features/discovery/domain/scan_mode.dart';
-export '../features/discovery/domain/scan_result.dart';
+export '../../features/discovery/domain/advertisement.dart';
+export '../../features/discovery/domain/device.dart';
+export '../../features/discovery/domain/scan_mode.dart';
+export '../../features/discovery/domain/scan_result.dart';
 
 /// Aggregate root for the Discovery bounded context.
 ///
