@@ -1,5 +1,4 @@
 import 'package:bluey/src/features/connection/application/link_session.dart';
-import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,11 +15,11 @@ Future<LinkSession> upSession(InMemoryLinks links, DeviceAddress device) async {
     device,
   )).fold((failure) => fail('the open failed: $failure'), (id) => id);
   final at = DateTime.utc(2026, 11, 26, 10);
-  return LinkSession(
-    link: Link.open(id: id, device: device, at: at).link,
+  return LinkSession.begin(
+    device: device,
     links: links,
     events: RecordingLinkEvents(),
     log: RecordingLog(),
     now: () => at,
-  );
+  )..opened(id);
 }

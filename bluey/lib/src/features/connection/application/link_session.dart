@@ -25,21 +25,6 @@ import 'ports/links.dart';
 /// id again, since the platform may already have given that id to the next
 /// link to the same device.
 final class LinkSession implements LiveLink {
-  /// Starts listening to the link's reports and to radio outages at once.
-  LinkSession({
-    required Link link,
-    required Links links,
-    required LinkEvents events,
-    required Log log,
-    required Now now,
-  }) : _link = link,
-       _links = links,
-       _events = events,
-       _log = log,
-       _now = now {
-    _follow(id);
-  }
-
   /// A session over a link to [device] whose open begins now, which it
   /// tells of at once. It hears nothing of the radio until [opened].
   LinkSession.begin({
@@ -78,7 +63,7 @@ final class LinkSession implements LiveLink {
   Link get link => _link;
 
   /// The platform's handle for the link. A session reaches its callers
-  /// only once its link is up, so the handle is there for every caller.
+  /// only once its link has opened, so the handle is there for every caller.
   LinkId get id =>
       _link.id ??
       (throw StateError('The link to ${_link.device} has not opened.'));
@@ -86,10 +71,10 @@ final class LinkSession implements LiveLink {
   /// Where the link stands now.
   LinkPhase get phase => _link.phase;
 
-  /// Whether the link is no longer up: closing, or ended and not yet let go
-  /// of, so a caller asking for the device's link waits for it to settle.
+  /// Whether the link is up, so a caller asking for the device's link may
+  /// reuse it; while it opens, closes or has ended the caller waits.
   @override
-  bool get isClosing => !_link.isUp;
+  bool get isUp => _link.isUp;
 
   /// Every phase the link enters. Carries no errors, and ends when the link
   /// ends.

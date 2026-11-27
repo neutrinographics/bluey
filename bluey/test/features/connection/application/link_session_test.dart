@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/api/connection/connection_state.dart';
-import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
@@ -48,13 +47,13 @@ void main() {
     final id = (await links.open(
       at,
     )).fold((failure) => fail('the open failed: $failure'), (id) => id);
-    final opened = LinkSession(
-      link: Link.open(id: id, device: at, at: now).link,
+    final opened = LinkSession.begin(
+      device: at,
       links: links,
       events: events,
       log: log,
       now: () => now,
-    );
+    )..opened(id);
     opened.onEnd(released.add);
     return opened;
   }
@@ -68,6 +67,7 @@ void main() {
     log = RecordingLog();
     released = [];
     session = await openSession(device);
+    events.raised.clear();
   });
 
   LinkSession openTimedSession(FakeAsync async) {
@@ -104,7 +104,7 @@ void main() {
       // assert
       expect(events.raised, [LinkOpenBegan(device: opening, at: now)]);
       expect(began.phase, const Opening());
-      expect(began.isClosing, isTrue);
+      expect(began.isUp, isFalse);
       expect(log.records, isEmpty);
       expect(links.outagesHeard, isTrue, reason: 'the setUp session listens');
     });
@@ -148,7 +148,7 @@ void main() {
       // assert
       expect(began.phase, const Linked());
       expect(began.id, openedId);
-      expect(began.isClosing, isFalse);
+      expect(began.isUp, isTrue);
       expect(events.raised.last, LinkOpened(device: opening, at: now));
       expect(log.records, isEmpty);
       expect(seen, [const Linked()]);
@@ -276,13 +276,13 @@ void main() {
       )).fold((failure) => fail('the open failed: $failure'), (id) => id);
 
       // act
-      final opened = LinkSession(
-        link: Link.open(id: id, device: timed, at: now).link,
+      final opened = LinkSession.begin(
+        device: timed,
         links: links,
         events: events,
         log: log,
         now: () => now,
-      );
+      )..opened(id);
 
       // assert
       expect(opened.id, id);
@@ -290,27 +290,27 @@ void main() {
   });
 
   group('as a live link', () {
-    test('is closing from the moment a close is asked until it is let go '
-        'of', () async {
+    test('is no longer up from the moment a close is asked until it is let '
+        'go of', () async {
       // arrange
-      final before = session.isClosing;
+      final before = session.isUp;
 
       // act
       final closed = session.disconnect();
-      final whileClosing = session.isClosing;
+      final whileClosing = session.isUp;
       await closed;
 
       // assert
-      expect((before, whileClosing, session.isClosing), (false, true, true));
+      expect((before, whileClosing, session.isUp), (true, false, false));
     });
 
-    test('is closing once its link has dropped', () async {
+    test('is no longer up once its link has dropped', () async {
       // act
       links.drop(device);
       await pumpEventQueue();
 
       // assert
-      expect((session.link.hasEnded, session.isClosing), (true, true));
+      expect((session.link.hasEnded, session.isUp), (true, false));
     });
   });
 
@@ -360,13 +360,13 @@ void main() {
     test('reports that end while the link is up end it as a drop', () async {
       // arrange
       final radio = EndingReports()..reach(device);
-      final ended = LinkSession(
-        link: Link.open(id: const LinkId('L1'), device: device, at: now).link,
+      final ended = LinkSession.begin(
+        device: device,
         links: radio,
         events: events,
         log: log,
         now: () => now,
-      );
+      )..opened(const LinkId('L1'));
 
       // act
       await radio.reports.close();

@@ -14,10 +14,10 @@ final at = DateTime.utc(2026, 11, 26, 10);
 
 Link opening() => Link.begin(device: device, at: opened).link;
 
-Link after(List<LinkInput> inputs) => inputs.fold(
-  Link.open(id: id, device: device, at: opened).link,
-  (link, input) => link.on(input, at: opened).link,
-);
+Link after(List<LinkInput> inputs) => [
+  const OpenSucceeded(id),
+  ...inputs,
+].fold(opening(), (link, input) => link.on(input, at: opened).link);
 
 const discovered = ServicesDiscovered();
 const request = DisconnectRequested();
@@ -68,22 +68,10 @@ void checkEach(List<Row> rows) {
 }
 
 void main() {
-  group('opening', () {
-    test('a link opens linked and raises that it opened', () {
-      // act
-      final step = Link.open(id: id, device: device, at: at);
-
-      // assert
-      expect(step.link.phase, linked);
-      expect((step.link.id, step.link.device), (id, device));
-      expect(step.entered, linked);
-      expect(step.duty, isNull);
-      expect(step.events, [LinkOpened(device: device, at: at)]);
-    });
-
+  group('beginning', () {
     test('a step\'s events cannot be changed by whoever reads them', () {
       // arrange
-      final step = Link.open(id: id, device: device, at: at);
+      final step = Link.begin(device: device, at: at);
 
       // act
       void addAnEvent() => step.events.add(LinkOpened(device: device, at: at));
@@ -91,9 +79,7 @@ void main() {
       // assert
       expect(addAnEvent, throwsUnsupportedError);
     });
-  });
 
-  group('beginning', () {
     test('a link begins opening, with no id, and raises that its open '
         'began', () {
       // act

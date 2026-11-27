@@ -123,24 +123,6 @@ final class Link {
     );
   }
 
-  /// A link the platform has just connected, as [begin] and the open's
-  /// success make it.
-  static LinkStep open({
-    required LinkId id,
-    required DeviceAddress device,
-    required DateTime at,
-  }) {
-    final opened = begin(
-      device: device,
-      at: at,
-    ).link.on(OpenSucceeded(id), at: at);
-    return LinkStep(
-      opened.link,
-      entered: opened.entered,
-      events: opened.events,
-    );
-  }
-
   const Link._({required this.id, required this.device, required this.phase});
 
   /// The platform's handle for the link, null until the open succeeds and

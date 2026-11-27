@@ -6,9 +6,6 @@ import '../../../shared/application/now.dart';
 import '../../../shared/domain/device_address.dart';
 import '../../../shared/domain/either.dart';
 import '../domain/connection_failure.dart';
-import '../domain/link.dart';
-import '../domain/link_event.dart';
-import '../domain/link_id.dart';
 import '../domain/live_links.dart';
 import 'borrowed_link.dart';
 import 'connection_log_words.dart';
@@ -85,11 +82,11 @@ final class LinkRegistry {
     final deadline = timeout == null ? null : _now().add(timeout);
     var budget = timeout;
     while (true) {
-      switch (_table.admit(device, by)) {
+      switch (_table.admit(device, by, begin: () => _begin(device))) {
         case Reuse(:final link):
           return Right(link);
-        case Open():
-          return _open(device, by, budget);
+        case Open(:final link):
+          return _open(link, budget);
         case Wait():
           if (!await _changed(device, deadline)) return const Left(_timedOut);
           budget = _timeLeft(deadline);
@@ -116,44 +113,44 @@ final class LinkRegistry {
   /// changes nothing.
   void _keep(LinkSession session) => _table.kept(session.link.device, session);
 
-  Future<Either<ConnectionFailure, LinkSession>> _open(
-    DeviceAddress device,
-    LinkUser by,
-    Duration? timeout,
-  ) async {
-    _events.raise(LinkOpenBegan(device: device, at: _now()));
-    _logDevice(device, 'connect started');
-    final answer = await _links.open(device, timeout: timeout);
-    switch (answer) {
-      case Left(:final value):
-        _table.notOpened(device);
-        _logFailure(device, value);
-        _announceChange(device);
-        return Left(value);
-      case Right(:final value):
-        final session = _sessionOf(device, by, value);
-        _logDevice(device, 'connect succeeded');
-        _announceChange(device);
-        return Right(session);
-    }
-  }
-
-  /// The session of the link just opened, stored before the open is told
-  /// of, so whoever hears of it finds the device's link live.
-  LinkSession _sessionOf(DeviceAddress device, LinkUser by, LinkId id) {
-    final opened = Link.open(id: id, device: device, at: _now());
-    final session = LinkSession(
-      link: opened.link,
+  /// The session of a link to [device] whose open begins now, which the
+  /// table holds from this moment, so a second caller waits for it.
+  LinkSession _begin(DeviceAddress device) {
+    final session = LinkSession.begin(
+      device: device,
       links: _links,
       events: _events,
       log: _log,
       now: _now,
     );
-    _table.opened(device, by, session);
     session.phases.listen((_) => _announceChange(device));
-    session.onEnd((_) => _ended(session));
-    opened.events.forEach(_events.raise);
     return session;
+  }
+
+  /// Opens [session]'s link on the platform and tells the link how it went,
+  /// after the table and the end's release are in place, so whoever hears
+  /// of the open finds the device's link live.
+  Future<Either<ConnectionFailure, LinkSession>> _open(
+    LinkSession session,
+    Duration? timeout,
+  ) async {
+    final device = session.link.device;
+    _logDevice(device, 'connect started');
+    final answer = await _links.open(device, timeout: timeout);
+    switch (answer) {
+      case Left(:final value):
+        session.notOpened();
+        _table.notOpened(device, session);
+        _logFailure(device, value);
+        _announceChange(device);
+        return Left(value);
+      case Right(:final value):
+        session.onEnd((_) => _ended(session));
+        session.opened(value);
+        _logDevice(device, 'connect succeeded');
+        _announceChange(device);
+        return Right(session);
+    }
   }
 
   void _ended(LinkSession session) {
