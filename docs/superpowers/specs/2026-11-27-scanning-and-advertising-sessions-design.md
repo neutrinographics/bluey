@@ -75,20 +75,21 @@ Discovery (inner):
 
 | Term | Meaning | In code |
 |---|---|---|
-| Radio scan | The one scan the radio runs for Bluey, and the scans open on it | `RadioScan` (aggregate) |
+| Radio scan | The one scan the radio runs for Bluey, with its scanners and their scans | `RadioScan` (aggregate root) |
 | Scan | One caller's scan: opened by an ask, open until it ends | `ScanId`, `ScanPhase` |
 | Ask | What a caller wants found: a filter and a mode | `ScanAsk`, `ScanFilter`, `ScanMode` |
 | Coverage | What the radio must scan for so that every open scan is served | `ScanCoverage` |
 | End | Why a scan ended: the caller stopped it, its time ran out, the radio refused, or the radio went away | `ScanEnd` |
 | Result | One advertisement heard from one device (the public word, kept) | `ScanResult`, `Device`, `Advertisement` |
-| Scanner | One holder of scans, the inner side of a public `Scanner` | `ScannerSession`, `ScannerPhase` |
+| Scanner | One holder of scans, the inner side of a public `Scanner`; an entity of the radio scan | `ScannerId`, `ScannerPhase` |
 
 GATT Server (inner, advertising only):
 
 | Term | Meaning | In code |
 |---|---|---|
 | Advertising | What this device is advertising and where that stands | `Advertising` (aggregate), `AdvertisingPhase` |
-| Content | What is advertised: name, services, manufacturer data, mode | `AdvertisedContent` |
+| Ask | What a server wants advertised, how, and for how long | `AdvertisingAsk` (content, mode, time limit) |
+| Content | What is advertised: name, services, manufacturer data | `AdvertisedContent` |
 | Supplementary services | Services a scan for them must find, which need not sit in the primary packet | `AdvertisedContent.supplementaryServices` |
 | End | Why advertising stopped: asked, timed out, refused, the radio went away | `AdvertisingEnd` |
 
@@ -112,24 +113,26 @@ lib/src/
         device.dart  advertisement.dart  scan_result.dart  scan_mode.dart   (moved)
         scan_filter.dart             ScanFilter: everything, or a set of services
         scan_ask.dart                ScanAsk, ScanCoverage
-        scan_id.dart
+        scan_id.dart                 ScanId, ScannerId
         scan_phase.dart              ScanPhase, ScanEnd
         scanner_phase.dart           ScannerPhase and the rule that derives it
-        radio_scan.dart              the aggregate
+        radio_scan.dart              the aggregate root
+        scanner_scans.dart           one scanner and its scans, the root's entity
         radio_scan_input.dart        its inputs, its step and its duty
         scan_event.dart              ScanEvent family
         scan_failure.dart            ScanFailure family
       application/
         ports/scanning.dart          the radio's scan
         ports/scan_events.dart       where Discovery tells of its scans
-        radio_scanner.dart           runs the aggregate's duties, routes results
-        scanner_session.dart         one holder's scans and its phase
-        open_scan.dart               one scan's results, timer and end
+        radio_scan_session.dart      feeds the aggregate and runs its duties
+        open_scanner.dart            one scanner's handle: its phase as a stream, its stop
+        open_scan.dart               one scan's handle: its results, its timer, its end
       infrastructure/adapters/
         platform_scanning.dart
         platform_scan_failures.dart
     gatt_server/
       domain/
+        advertising_ask.dart         AdvertisingAsk
         advertised_content.dart
         advertise_mode.dart          moved from gatt_server/server.dart
         advertising.dart             the aggregate, its inputs, step and duty
@@ -167,7 +170,7 @@ lib/src/
 
 ### 6.3 Scanning: the aggregate
 
-`RadioScan` holds the radio's phase and the open scans. It is pure: no timers, no streams, no `await`.
+`RadioScan` is the aggregate root. It holds the radio's phase and its scanners; each scanner is an entity (`ScannerId`) that holds its scans (`ScanId`, ask, phase). Everything that is true of scanning at one moment is inside this one boundary, and every scan event is raised by its step. It is pure: no timers, no streams, no `await`.
 
 Radio phases:
 
@@ -178,17 +181,23 @@ Radio phases:
 
 Scan phases: `Waiting` (asked, not yet served), `Scanning`, `Leaving(end)` (it left as the last scan and the radio is stopping because of it; its results have already ended), `Ended(end)`.
 
-A step answers the events raised and at most one duty for the application to run: `Scan(coverage)`, `StopTheRadio` or nothing.
+A step answers the events raised and at most one duty for the application to run: `Scan(coverage)`, `StopTheRadio` or nothing. The table shows the inputs that move the radio; three more follow it.
 
 | Input | Radio `Quiet` or `Unsure` | Radio `Scanning(c)` | Radio `Stopping` |
 |---|---|---|---|
-| `ScanAsked(id, ask)` | the scan is `Waiting`, then at once `Scanning`; radio `Scanning(ask)`; duty `Scan(ask)` | the scan is `Waiting`, then at once `Scanning`. If `c` covers the ask, no duty; otherwise radio `Scanning(c ∪ ask)`, duty `Scan(c ∪ ask)` | the scan is `Waiting`; no duty |
+| `ScanAsked(scanner, id, ask)` | the scan is `Waiting`, then at once `Scanning`; radio `Scanning(ask)`; duty `Scan(ask)` | the scan is `Waiting`, then at once `Scanning`. If `c` covers the ask, no duty; otherwise radio `Scanning(c ∪ ask)`, duty `Scan(c ∪ ask)` | the scan is `Waiting`; no duty |
 | `ScanLeft(id, end)` | no scan is open: nothing | If others stay: the scan is `Ended(end)`, no duty, coverage kept. If it was the last: the scan is `Leaving(end)`, radio `Stopping`, duty `StopTheRadio` | a `Waiting` scan is `Ended(end)`; nothing else |
 | `RadioStopped` | programming error | programming error | each `Leaving(end)` scan is `Ended(end)`. If scans are `Waiting`: they become `Scanning`, radio `Scanning(their union)`, duty `Scan`. Otherwise radio `Quiet` |
 | `RadioStopFailed(failure)` | programming error | programming error | each `Leaving(end)` scan is `Ended(end)` with its own end. If scans are `Waiting`: as `RadioStopped`, since a new `Scan` replaces whatever the radio is doing. Otherwise radio `Unsure` |
 | `RadioRefused(failure)` | nothing | every open scan is `Ended(EndedByFailure(failure))`; radio `Quiet` | nothing (it describes a scan already being stopped) |
 | `RadioWentAway(outage)` | radio `Quiet` | every scan is `Ended(EndedByRadioOutage(outage))`; radio `Quiet` | every scan, `Waiting` and `Leaving`, is `Ended(EndedByRadioOutage(outage))`; the radio stays `Stopping` until the stop settles, then `Quiet` |
-| `Closed` (Bluey is disposed) | from `Unsure`: duty `StopTheRadio`, radio `Stopping`. From `Quiet`: nothing | every scan is `Ended(EndedOnRequest)`; radio `Stopping`; duty `StopTheRadio` | every `Waiting` scan is `Ended(EndedOnRequest)`; nothing else |
+| `ShutDown` (Bluey is disposed) | from `Unsure`: duty `StopTheRadio`, radio `Stopping`. From `Quiet`: nothing | every scan is `Ended(EndedOnRequest)`; radio `Stopping`; duty `StopTheRadio` | every `Waiting` scan is `Ended(EndedOnRequest)`; nothing else |
+
+The other three inputs never move the radio by themselves:
+
+- `ScannerOpened(scanner)` adds a scanner with no scans. `ScannerClosed(scanner)` makes each of its scans leave, as `ScanLeft` does, and marks it `closed`.
+- `ResultHeard(result)` answers one event, `ResultDelivered(result, scans)`, naming the scans that get it (the rule is below), or nothing when no scan does. Routing is a rule about the open scans and the coverage, so it is the aggregate's, and the application only delivers.
+- After each input the root compares every scanner's phase before and after and raises `ScannerBeganStarting`, `ScannerStarted`, `ScannerBeganStopping` or `ScannerStopped(end)` for each change, in that order within a scanner. No unit outside the aggregate derives a scanner's standing or raises a scan event.
 
 A stop settles only in `Stopping`, because the application runs exactly one stop per `StopTheRadio` duty and the phase is not left before it settles; anywhere else it is a programming error and the aggregate says so.
 
@@ -203,7 +212,7 @@ The rules behind the table:
 - **M4:** an ask while the radio is stopping waits and is started when the stop settles. Nothing is decided between `await`s.
 - **M5:** disposing a scanner makes each of its scans leave; the last leaver stops the radio.
 
-**Which scans a result goes to.** `ScanCoverage.wantedBy(result, scans)` decides, purely:
+**Which scans a result goes to.** `ResultHeard` decides, from each open scan's `ScanFilter` and the radio's coverage:
 
 1. A scan whose filter is everything gets every result.
 2. A scan with a service filter gets a result that shows one of its services.
@@ -211,7 +220,7 @@ The rules behind the table:
 
 Two limits follow, both stated in §7: with two different service filters open, a result the OS matched invisibly reaches both scans; and while an unfiltered scan is open, the radio scans unfiltered, so iOS reports no overflow matches at all and a filtered scan finds only devices that show the service.
 
-`ScannerPhase` is one holder's standing, derived by one pure rule from its own scans: `scanning` if any is `Scanning`; else `starting` if any is `Waiting`; else `stopping` if any is `Leaving`; else `idle`. Two terminal values sit above the rule: `lost(outage)` once the radio went away, and `closed` once disposed. The radio's phase never enters it: a `Scanner`'s state is about its own scans.
+`ScannerPhase` is one scanner's standing, derived inside the aggregate by one rule from its own scans: `scanning` if any is `Scanning`; else `starting` if any is `Waiting`; else `stopping` if any is `Leaving`; else `idle`. Two values are terminal and set by the root: `lost(outage)` for every scanner that exists when `RadioWentAway` arrives, with or without scans (today an idle scanner is invalidated too), and `closed` on `ScannerClosed`. An ask from a lost or closed scanner is refused by the root. The radio's phase never enters a scanner's: a `Scanner`'s state is about its own scans.
 
 ### 6.4 Scanning: application, port and adapter
 
@@ -231,12 +240,12 @@ abstract interface class Scanning {
 }
 ```
 
-- **`RadioScanner`** (one per `Bluey`) holds the `RadioScan`, feeds it inputs one at a time, runs the duty each step answers over `Scanning`, hands each `Heard` result to the scans the coverage says want it (§6.3), and raises events through `ScanEvents`. It is the only unit that calls the port. Disposing it feeds `Closed`.
-- **`OpenScan`** is one scan: its results as a stream that carries no errors, its timeout timer, `leave()`, and `Future<ScanEnd> ended`. The timer makes it leave with `EndedByTimeout`. The platform is never handed `timeoutMs`.
-- **`ScannerSession`** (one per `bluey.scanner()`, and one per scan peer discovery makes) opens scans through the `RadioScanner`, keeps its own scans, exposes its `ScannerPhase` and changes, and on disposal makes its scans leave. A `stop()` on it makes every scan of the session leave and answers when the radio stop that caused, if any, has settled, with its failure if it failed.
+- **`RadioScanSession`** (one per `Bluey`) holds the `RadioScan`, feeds it inputs one at a time (asks and leaves from the handles, reports and outages from the port), runs the duty each step answers over `Scanning`, hands each `ResultDelivered` to the scans it names, and passes the step's events to `ScanEvents`. It decides nothing, and it is the only unit that calls the port. Disposing it feeds `ShutDown`.
+- **`OpenScan`** is the handle of one scan: its results as a stream that carries no errors, its timeout timer, `leave()`, and `Future<ScanEnd> ended`. The timer makes it leave with `EndedByTimeout`. The platform is never handed `timeoutMs`.
+- **`OpenScanner`** (one per `bluey.scanner()`, and one per scan peer discovery makes) is the handle of one scanner: it opens scans, shows the scanner's `ScannerPhase` as the aggregate reports it, and closes the scanner. Its `stop()` makes every scan of the scanner leave and answers when the radio stop that caused, if any, has settled, with its failure if it failed. It holds no state of its own beyond its streams.
 - **`PlatformScanning`** answers the port over `BlueyPlatform`: it maps `ScanCoverage` to `PlatformScanConfig` (never a timeout), `PlatformDevice` to `ScanResult` (parsing through factories that answer `Either`; a result that does not parse is logged and dropped), and a stream error to `Refused(failure)` through `platform_scan_failures.dart`. It decides nothing.
 
-**Events.** `ScanEvents.raise(ScanEvent)` takes `ScannerBeganStarting`, `ScannerStarted`, `ScannerBeganStopping`, `ScannerStopped(end)`, raised by a `ScannerSession` as its phase changes, and `DeviceHeard(result)`, raised by the `RadioScanner` once per result that at least one open scan gets. Each is stamped by the injected `Now`.
+**Events.** `ScanEvents.raise(ScanEvent)` carries what the aggregate's steps raised: the four scanner events and `ResultDelivered`, each stamped with the instant the input carried, read from the injected `Now` by the session, as `Link`'s are.
 
 **Failures (I013).** `ScanFailure` is Discovery's sealed family: `ScanRefused(reason)`, `ScanPermissionMissing(permission)`, `ScanRadioUnavailable`, `UnexpectedScanFailure(detail, code, cause)`. `ScanRefusalReason` is `alreadyStarted`, `registrationFailed`, `internalError`, `unsupported`, `outOfHardwareResources`, `startedTooOften`, `unknown`, which are Android's `SCAN_FAILED_*` codes 1 to 6 in Discovery's words.
 
@@ -249,13 +258,13 @@ abstract interface class Scanning {
 
 ### 6.5 Scanning: the edge
 
-`api/discovery/` holds the public `Scanner` and its one implementation over a `ScannerSession`.
+`api/discovery/` holds the public `Scanner` and its one implementation over an `OpenScanner`.
 
 - `scan({services, timeout, mode})` opens a scan and answers its results. The stream ends when the scan ends; if it ended by failure, the stream first carries the translated exception. Cancelling the subscription makes the scan leave, as today.
 - `ScanState` is translated from `ScannerPhase`: `idle → stopped`, `starting`, `scanning`, `stopping`, `lost → invalidated`, `closed → stopped`. After an outage or disposal `scan()` throws `StaleHandleException`, as today.
-- `PublishedScanEvents` turns `ScanEvent`s into the five public events, with the same fields and `source` they have today and the instant as `timestamp`.
+- `PublishedScanEvents` turns `ScanEvent`s into the five public events (`ResultDelivered` becomes `DeviceDiscoveredEvent`), with the same fields and `source` they have today and the instant as `timestamp`.
 - `scan_failure_translation.dart` switches over `ScanFailure` with no default: `ScanRefused → ScanFailedException(reason)`, `ScanPermissionMissing → PermissionDeniedException`, `ScanRadioUnavailable → BluetoothUnavailableException`, `UnexpectedScanFailure → BlueyPlatformException`.
-- `DiscoveryAssembly` is handed the `Scanning` port, the event publisher, the log and `Now` by the composition root, which alone builds `PlatformScanning` (ARCHITECTURE §3: only the composition root names infrastructure; `ConnectionAssembly` is handed its ports the same way). It builds the `RadioScanner` and `PublishedScanEvents` once per `Bluey`, hands out a `Scanner` per `bluey.scanner()`, answers peer discovery's scan function (§6.6), and is disposed with `Bluey`, which stops the radio if it is still scanning.
+- `DiscoveryAssembly` is handed the `Scanning` port, the event publisher, the log and `Now` by the composition root, which alone builds `PlatformScanning` (ARCHITECTURE §3: only the composition root names infrastructure; `ConnectionAssembly` is handed its ports the same way). It builds the `RadioScanSession` and `PublishedScanEvents` once per `Bluey`, hands out a `Scanner` per `bluey.scanner()`, answers peer discovery's scan function (§6.6), and is disposed with `Bluey`, which stops the radio if it is still scanning.
 - `lib/src/bluey.dart` sits exactly at its 974-line entry. It loses the scanner's construction and gains one assembly, so the wiring is kept to what it replaces; the plan holds the file at or under its count, and anything longer goes into the assembly.
 
 **`ScanFailedException`** is new and public. `BlueyException` is sealed in `shared/exceptions.dart`, a file that sits exactly at its 578-line entry and cannot grow, and a new direct member would break every app's exhaustive `switch`. So `ScanFailedException extends BlueyPlatformException`, declared at `api/discovery/` with its `ScanFailureReason`. An app that matches `BlueyPlatformException` keeps working; an app that wants the reason matches the subclass. This is the one decision in the slice I would most like Joel to look at (§11, call 1).
@@ -269,28 +278,30 @@ abstract interface class Scanning {
 typedef DevicesAdvertising = Stream<DeviceAddress> Function(UUID service);
 ```
 
-`DiscoveryAssembly.devicesAdvertising` is that function, and `Bluey` passes it on. Each listen opens a `ScannerSession` of its own with one scan filtered to the service and no stated mode; cancelling makes the scan leave and closes the session; a failure arrives as the translated exception. A session per listen means a Bluetooth toggle does not leave peer discovery with a lost session: the next `discoverPeers()` opens a new one, as it recovers today. `PeerDiscovery` keeps its own window timers, as it has them today, and no longer calls `stopScan`.
+`DiscoveryAssembly.devicesAdvertising` is that function, and `Bluey` passes it on. Each listen opens a scanner of its own with one scan filtered to the service and no stated mode; cancelling makes the scan leave and closes the scanner; a failure arrives as the translated exception. A scanner per listen means a Bluetooth toggle does not leave peer discovery with a lost scanner: the next `discoverPeers()` opens a new one, as it recovers today. `PeerDiscovery` keeps its own window timers, as it has them today, and no longer calls `stopScan`.
 
 What changes: `discoverPeers()` during an app's scan no longer touches the app's filter or stops its scan, and the app's scan no longer starves the probe. `peer_discovery.dart` loses its `frameworkPlacement` entry, since scanning was its only use of the platform. Peer's scans are announced on `bluey.events` like any other scanner's (the same call slice 1 made for probe links).
 
 ### 6.7 Advertising: the aggregate
 
-The radio advertises one thing, so there is one `Advertising` per `Bluey`, whichever `Server` object asks. It is pure and holds one phase: `Idle`, `Starting(content)`, `On(content)`, `Stopping(content)`, `Replacing(old, next)`. None is terminal: after an outage it is `Idle` again and a later server can advertise.
+The radio advertises one thing, so there is one `Advertising` per `Bluey`, whichever `Server` object asks. It is pure and holds one phase: `Idle`, `Starting(ask)`, `On(ask)`, `Stopping(ask)`, `Replacing(old, next)`. An `AdvertisingAsk` is the content, the mode and an optional time limit; two asks are the same when their content and mode are. None is terminal: after an outage it is `Idle` again and a later server can advertise.
 
 | Input | What it does |
 |---|---|
-| `StartAsked(content)` in `Idle` | `Starting(content)`; duty `Start(content)` |
-| `StartAsked(content)` in `On(same content)` | nothing changes on the radio; the step says the ask is already met, so the session only restarts the timeout |
+| `StartAsked(ask)` in `Idle` | `Starting(ask)`; duty `Start(ask)` |
+| `StartAsked(ask)` in `On(same ask)` | nothing changes on the radio; the time limit starts again from the new ask |
 | `StartAsked(next)` in `On(old)` | `Replacing(old, next)`; duty `Stop` |
-| `RadioStopped` in `Replacing(old, next)` | `Starting(next)`; duty `Start(next)` |
-| `RadioStopFailed(failure)` in `Replacing(old, next)` | `On(old)`: the radio still advertises the old content, and its timeout runs on; the ask fails with `failure` |
-| `RadioStarted` in `Starting(content)` | `On(content)` |
+| `RadioStopped` in `Replacing(old, next)` | `Starting(next)`; duty `Start(next)`; the old time limit ends |
+| `RadioStopFailed(failure)` in `Replacing(old, next)` | `On(old)`: the radio still advertises the old content, and its time limit runs on; the ask fails with `failure` |
+| `RadioStarted` in `Starting(ask)` | `On(ask)`; its time limit starts |
 | `RadioStartFailed(failure)` in `Starting` | `Idle`, ended by `EndedByFailure(failure)`; the ask fails |
-| `StopAsked` or `TimedOut` in `On(content)` | `Stopping(content)`; duty `Stop` |
-| `RadioStopped` in `Stopping` | `Idle`, ended by `EndedOnRequest` or `EndedByTimeout` |
-| `RadioStopFailed(failure)` in `Stopping(content)` | `On(content)`: the last state the radio confirmed. A stop that was asked fails with `failure`; a timeout's stop is logged at error and not tried again, and the app can still stop |
+| `StopAsked` or `TimeLimitReached` in `On(ask)` | `Stopping(ask)`; duty `Stop` |
+| `RadioStopped` in `Stopping` | `Idle`, ended by `EndedOnRequest` or `EndedByTimeout`; the time limit ends |
+| `RadioStopFailed(failure)` in `Stopping(ask)` | `On(ask)`: the last state the radio confirmed. A stop that was asked fails with `failure`; a time limit's stop is logged at error and not tried again, and the app can still stop |
 | `StopAsked` in `Idle` | nothing |
-| `RadioWentAway(outage)` in any phase | `Idle`, ended by `EndedByRadioOutage(outage)`; an ask in flight fails |
+| `RadioWentAway(outage)` in any phase | `Idle`, ended by `EndedByRadioOutage(outage)`; the time limit ends; an ask in flight fails |
+
+**The time limit is the aggregate's rule and the session's timer.** A step that starts, restarts or ends the time limit says so in what it answers (`KeepFor(duration)`, `KeepUnlimited`), beside its duty. The session holds the one timer and does only what the step said, so "when does the limit start, restart and end" is read in one place and tested as a table.
 
 Replace is stop then start because Android's native `startAdvertising` answers success and does nothing while it is already advertising, so a start alone would not replace anything. A rejected restart therefore leaves the radio quiet and the state `Idle`, which is what "the state follows the radio" means here (decision 2, and L1).
 
@@ -300,19 +311,19 @@ Asks never overlap: the session runs one ask at a time and queues the next, so t
 
 ```dart
 abstract interface class Advertiser {
-  Future<Either<AdvertisingFailure, void>> start(AdvertisedContent content);
+  Future<Either<AdvertisingFailure, void>> start(AdvertisingAsk ask);
   Future<Either<AdvertisingFailure, void>> stop();
   Stream<RadioOutage> get outages;
 }
 ```
 
-- **`AdvertisingSession`** (one per `Bluey`, shared by every `Server` it hands out) holds the `Advertising`, serialises asks, runs duties over `Advertiser`, raises `AdvertisingEvent`s through `AdvertisingEvents`, and owns the timeout: one timer for the content on air, set when the phase reaches `On`, dropped only when the radio confirms that content stopped, which feeds `TimedOut`. The platform is never handed `timeoutMs`, so the timeout behaves the same on both platforms, to the millisecond, and the state follows it (the Dart half of M8).
-- **`PlatformAdvertiser`** maps `AdvertisedContent` to `PlatformAdvertiseConfig`. It alone decides that supplementary services go to the scan response, and it leaves out one already listed among the services.
+- **`AdvertisingSession`** (one per `Bluey`, shared by every `Server` it hands out) holds the `Advertising`, serialises asks, runs duties over `Advertiser`, passes the events each step raised to `AdvertisingEvents`, and holds the one timer the steps tell it to keep, which feeds `TimeLimitReached`. The platform is never handed `timeoutMs`, so the timeout behaves the same on both platforms, to the millisecond, and the state follows it (the Dart half of M8).
+- **`PlatformAdvertiser`** maps an `AdvertisingAsk` to `PlatformAdvertiseConfig` (never a timeout). It alone knows that supplementary services go to the scan response, and it decides nothing: that a supplementary service never repeats a listed one is `AdvertisedContent`'s invariant, held by its factory.
 - **`AdvertisingFailure`**: `AdvertisingRefused(reason)` with `dataTooLarge`, `notSupported`, `unknown`; `AdvertisingPermissionMissing`; `AdvertisingRadioUnavailable`; `UnexpectedAdvertisingFailure`.
 
 **The edge and `BlueyServer`.** `Server` and `BlueyServer` are unplaced and may not name the edge, and the public `AdvertisingState` is named by `Server`, so it stays in `gatt_server/advertising_state.dart`. `api/gatt_server/advertising_assembly.dart` is handed the `Advertiser` port by the composition root, builds the one session and the event publisher, and gives each `BlueyServer` three things: the `AdvertisingSession`, an `AdvertisingState Function(AdvertisingPhase)` and a `BlueyException Function(AdvertisingFailure)`. This is the arrangement slice 1 used for `LinkGattClient` and `LinkEnd`.
 
-`BlueyServer.startAdvertising` keeps what is the server's (the capability check, waiting for the control service and pending `addService` calls), builds an `AdvertisedContent` (the control service as a supplementary service when `peerDiscoverable`), asks the session, and throws the translated failure. Its advertising fields, `_setAdvertisingState`, the config mapping and the event emission leave the file. Its own outage and disposal handling stays: a server that saw an outage shows `invalidated` itself, as today, while the session returns to `Idle` on the same outage through its port; a disposed server asks the session to stop, as today's `dispose()` stops the radio.
+`BlueyServer.startAdvertising` keeps what is the server's (the capability check, waiting for the control service and pending `addService` calls), builds an `AdvertisingAsk` (the control service as a supplementary service of its content when `peerDiscoverable`), asks the session, and throws the translated failure. Its advertising fields, `_setAdvertisingState`, the config mapping and the event emission leave the file. Its own outage and disposal handling stays: a server that saw an outage shows `invalidated` itself, as today, while the session returns to `Idle` on the same outage through its port; a disposed server asks the session to stop, as today's `dispose()` stops the radio.
 
 Two `Server` objects from one `Bluey` therefore share what is advertised: the second one's `startAdvertising` replaces the first one's content under decision 2, and both read the same state. Today the second start is swallowed by Android and the two objects disagree.
 
@@ -336,6 +347,7 @@ Slice 1's §11 call 8 left this for the second context that needs it. `shared/in
 | `Bluey` builds peer discovery's scan function from Discovery's edge | `lib/src/bluey.dart` (composition root) | Slice 5: Peer declares a port of its own and a bridge answers it from Discovery |
 | GATT Server knows the lifecycle control service to advertise it when `peerDiscoverable` | `bluey_server.dart`, building the content | Slice 5 |
 | `BlueyServer` is handed translators by the edge because it sits below it | `api/gatt_server/advertising_assembly.dart` | Slice 5: `Server` moves to `api/gatt_server/` and translates itself |
+| Three ports (`Links`, `Scanning`, `Advertiser`) each carry `outages`, a fact that is the Platform context's | each context's `application/ports/` | Slice 6, when Platform is placed: each context keeps a small port of its own for the radio's standing, answered by one bridge from Platform. Until then one helper in `shared/infrastructure` answers all three, following slice 1's `Links.outages` |
 | `BlueyServer` (to invalidate itself) and the `AdvertisingSession` (to return to idle) each follow radio outages | `bluey_server.dart` | Slice 5: one server session owns the server's end |
 | A late Android scan failure cannot be tied to the start that caused it | the Pigeon seam | Slice 4: completion by identity |
 | Android still applies no advertising timeout natively, and iOS none | native | Nothing to end: Dart owns the timeout now. Slice 4 removes the unused native parameter |
@@ -387,8 +399,8 @@ What needs Joel: his review of each; the Kotlin Gradle test run on his Mac for p
 
 Test first, as everywhere.
 
-- **Domain.** `RadioScan` and `Advertising` are tested as tables: every input in every phase, including the ones that must do nothing. Coverage rules (`ScanFilter` union, covers and matches; busiest mode) and `ScannerPhase`'s rule are tested as values. The domain floor of 95% holds.
-- **Application.** `RadioScanner`, `ScannerSession`, `OpenScan` and `AdvertisingSession` run over `InMemoryScanning` and `InMemoryAdvertiser` in `test/fixtures/features/`, with simulated time for the timeouts, following `docs/testing-conventions.md`.
+- **Domain.** `RadioScan` and `Advertising` are tested as tables: every input in every phase, including the ones that must do nothing. That includes the events each step raises, which scans a result goes to, and when the advertising time limit starts, restarts and ends. Coverage rules (`ScanFilter` union, covers and matches; busiest mode) and `ScannerPhase`'s rule are tested as values. The domain floor of 95% holds.
+- **Application.** `RadioScanSession`, `OpenScanner`, `OpenScan` and `AdvertisingSession` run over `InMemoryScanning` and `InMemoryAdvertiser` in `test/fixtures/features/`, with simulated time for the timeouts, following `docs/testing-conventions.md`.
 - **Contract suites.** One per port, run against the in-memory double and against the adapter over `FakeBlueyPlatform`, so the double cannot drift from the adapter.
 - **Edge and integration.** The existing scanner and server tests keep passing through `api/`; new ones cover two scanners at once, peer discovery during a scan, a refused scan, replace, a rejected restart and both timeouts.
 - **Known defects.** The five roster entries are struck in the commits that fix them, and their tests move into the regular suite.
@@ -402,7 +414,7 @@ Test first, as everywhere.
 4. **A refused radio scan ends every open scan with the failure**, not only the one whose ask caused the start. After a failed widening the radio is quiet on Android, so nobody is being served.
 5. **A failed radio stop still ends the scan that left** with its own end (its caller asked for no more results), tells the caller of `stop()` by the failure, and leaves the radio `Unsure`: the next ask scans afresh, and disposal asks it to stop again.
 6. **Peer discovery's scans are announced on `bluey.events`** like an app's.
-7. **The same advertising content again touches no radio and restarts the timeout.**
+7. **The same advertising ask again (same content and mode) touches no radio and restarts the time limit.**
 8. **A failed stop leaves advertising `advertising`**, the last state the radio confirmed.
 9. **`ManufacturerData` moves to the kernel** though only two contexts name it (§6.2).
 10. **`Device`, `Advertisement` and `ScanResult` are published from Discovery's domain as they stand**, under the standing rule for values (slice 1 PR 2), although the library, not the app, builds them: they carry no state and have no inner counterpart to translate from.
@@ -417,7 +429,7 @@ Left open on purpose: nothing that changes what gets built. The names in §6.2 m
 
 ## 12. Design review (cohesion, coupling, DDD, Clean Architecture)
 
-**Single responsibilities.** `RadioScan` decides what the radio must scan for and where each scan stands. `ScannerPhase` derives one holder's standing. `RadioScanner` runs duties and routes results. `OpenScan` is one scan's stream and timer. `ScannerSession` is one holder's scans. `PlatformScanning` maps. `Advertising` decides what is advertised and where it stands. `AdvertisingSession` serialises asks and owns the timeout. `PlatformAdvertiser` maps and alone knows the packet layout. Each edge file translates one thing. No unit holds both a rule and a timer.
+**Single responsibilities.** `RadioScan` is the one consistency boundary of scanning: what the radio must scan for, where each scanner and scan stands, which scans a result goes to, and every scan event. `RadioScanSession` feeds it and runs its duties. `OpenScan` and `OpenScanner` are handles: streams and a timer, no rule. `PlatformScanning` maps. `Advertising` decides what is advertised, where it stands and when its time limit runs. `AdvertisingSession` serialises asks and holds the timer it is told to keep. `PlatformAdvertiser` maps and alone knows the packet layout. Each edge file translates one thing. No unit holds both a rule and a timer, and no rule is split between a domain file and an application file.
 
 **Dependencies and their direction.** Domain files import only `shared/domain`. Application imports its own domain, its ports and `shared/application` (`Now`, the log). Adapters import their ports, `bluey_platform_interface` and `shared/infrastructure`. The edge imports its own context's features and the unplaced public types it must throw or return. Nothing in `features/` names `api/`. `features/discovery` and `features/gatt_server` do not name each other or `features/connection`; the three share only kernel values. The unplaced `BlueyServer` names `features/gatt_server` (its own context) and is handed the edge's translators; the unplaced `PeerDiscovery` names only kernel types.
 
@@ -438,6 +450,6 @@ Left open on purpose: nothing that changes what gets built. The names in §6.2 m
 - The rosters hold M4 (two entries), M5 and L1 in `bluey` and M2 in `bluey_android`.
 - `Scanner.kt`'s `onScanFailed` calls `onScanComplete`, its `startScan` stops a running scan first, and `Advertiser.kt` answers success while already advertising (read earlier in this design's research; the plan re-reads both before the tasks that touch them).
 
-**Findings fixed in this document before it was handed over.** A reviewer who read it as its builder found: cells of the scan table that were missing or impossible (a failed stop with nobody waiting, a stop settling after an outage, disposal), now `Unsure`, the rule that `Stopping` is left only when the stop settles, and `Closed` (§6.3); a single caller that would have lost `starting` (§6.3); results filtered in Dart against services iOS does not report (§6.3, rule 3); an advertising session per server over one radio, which would have brought L1 back (§6.7, §6.8); assemblies that built their own adapters, against ARCHITECTURE §3 (§6.5, §6.8); a peer discovery session that an outage would have left lost for good (§6.6); and an absent scan mode ranked as busiest (§6.3). Before that: An earlier draft had the port answer the start as an `Either`; neither platform confirms a start, so the port's `scan` answers nothing and a refusal is a report (§6.4). An earlier draft kept a scanner's `stopping` at the edge; it is now `ScannerPhase`'s, in the domain (§6.3).
+**Findings fixed in this document before it was handed over.** A reviewer who read it as its builder found: cells of the scan table that were missing or impossible (a failed stop with nobody waiting, a stop settling after an outage, disposal), now `Unsure`, the rule that `Stopping` is left only when the stop settles, and `Closed` (§6.3); a single caller that would have lost `starting` (§6.3); results filtered in Dart against services iOS does not report (§6.3, rule 3); an advertising session per server over one radio, which would have brought L1 back (§6.7, §6.8); assemblies that built their own adapters, against ARCHITECTURE §3 (§6.5, §6.8); a peer discovery session that an outage would have left lost for good (§6.6); and an absent scan mode ranked as busiest (§6.3). A second review, for DDD and cohesion at Joel's request (2026-11-27), found six more, all fixed above: a scanner's standing was derived, and the scanner events raised, in the application, though the aggregate did not know scanners (scanners are now entities of `RadioScan`, which raises every event, §6.3); result routing sat on `ScanCoverage` and `DeviceHeard` was raised by the application (now the `ResultHeard` input and `ResultDelivered`, §6.3); two application units were both called sessions and one was named like the public `Scanner` (now `RadioScanSession` with the handles `OpenScanner` and `OpenScan`, §6.4); the advertising time limit's rule was spread over the session's prose (now answered by the aggregate's steps, §6.7); `AdvertisedContent` held the mode, which is how and not what (now `AdvertisingAsk`, parallel to `ScanAsk`, §6.1); and the adapter dropped a repeated supplementary service, a rule (now `AdvertisedContent`'s invariant, §6.8). One it found and left, with its end named in §6.11: three ports each carry the radio's outages. Before that: An earlier draft had the port answer the start as an `Either`; neither platform confirms a start, so the port's `scan` answers nothing and a refusal is a report (§6.4). An earlier draft kept a scanner's `stopping` at the edge; it is now `ScannerPhase`'s, in the domain (§6.3).
 
 Verdict: ready.
