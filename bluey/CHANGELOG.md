@@ -131,6 +131,57 @@
   (15 ms — twice the BLE-spec minimum connection interval, exposed as
   `ConnectionInterval.specMinimum`) instead of accepting a configuration
   that times out every client before a heartbeat can cross the link.
+- **Two scanners no longer fight (M4, I336).** Scanners share one radio scan.
+  A second scanner's `scan()` does not replace the first one's filter, and
+  stopping one scanner does not stop the other. `discoverPeers()` no longer
+  changes the app's scan, no longer stops it, and the app's scan no longer
+  starves the probe.
+- **A refused scan is an error (M2, I013).** When the platform refuses a scan,
+  for instance on Android with no scan permission, the stream returned by
+  `scan()` carries `ScanFailedException` and ends, and the state returns to
+  `stopped`, where the stream stayed silent. `ScanFailedException` and
+  `ScanFailureReason` (Android's `SCAN_FAILED_*` codes in Bluey's words) are
+  new exports. `ScanFailedException` extends `BlueyPlatformException`, so
+  existing handlers of that type still catch it. A missing permission is
+  `PermissionDeniedException` and an unavailable radio
+  `BluetoothUnavailableException`, as elsewhere.
+- **A scan's timeout is exact and per scan.** It is timed in Dart for each
+  scan alone and is no longer also handed to the platform.
+- **`dispose()` on a scanner stops the radio (M5, I382)** when no other scan
+  is open, where the native scan kept running.
+- **`stop()` then `scan()` without awaiting works (M4, I336).** The new scan
+  waits for the stop in flight and then delivers results, where it could be
+  cancelled by the stop and leave the radio scanning with a silent stream.
+- **The five scan events carry the domain's `timestamp`.**
+  `ScanStartingEvent`, `ScanStartedEvent`, `ScanStoppingEvent`,
+  `ScanStoppedEvent` and `DeviceDiscoveredEvent` accept `timestamp:`, which
+  defaults to now as before; Bluey stamps each with the instant the scan
+  changed, read from the clock it runs on.
+- **A wider radio scan than asked.** While two scans with different filters
+  are open, the radio scans for both and does more work than either asked for
+  alone. `DeviceDiscoveredEvent` is published once per result that some open
+  scan received.
+- **Two limits of sharing one radio scan, both from what iOS reports.** With
+  two different service filters open, a device the OS matched on a service it
+  does not report reaches both scans. While any unfiltered scan is open, a
+  filtered scan finds only devices that show the service in their primary
+  packet, so `discoverPeers()` on iOS can miss a backgrounded Bluey server for
+  as long as the app runs an unfiltered scan. See `docs/cross-platform-quirks.md`.
+- **`scan(services: [])` publishes `serviceFilter: null`.** An empty list
+  means every device, and `ScanStartingEvent.serviceFilter` and
+  `ScanStartedEvent.serviceFilter` now say so with `null`, where they held
+  `[]`. Duplicate service UUIDs in `services` collapse to one.
+- **A second `scan()` while already scanning publishes no `ScanStartingEvent`
+  or `ScanStartedEvent`**, since the scanner did not start again.
+  `dispose()` on a scanning scanner publishes `ScanStoppingEvent` and then
+  `ScanStoppedEvent`.
+- **Peer discovery no longer stops the radio, and a refused probe scan fails
+  `discoverPeers()`.** Discovery's window ends by leaving its own scan, not by
+  stopping the radio, so an app's scan goes on. A probe scan the platform
+  refuses fails `discoverPeers()` with the translated exception
+  (`ScanFailedException`, `PermissionDeniedException`, ...), where it logged a
+  warning and returned. Peer discovery's scans are published on `bluey.events`
+  like an app's.
 
 ### `bluey.logEvents`
 

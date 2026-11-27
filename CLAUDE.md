@@ -100,7 +100,7 @@ cd bluey/example && flutter run
 
 ## Architecture
 
-`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow. Each context reaches apps only through its edge, `api/<context>/`: events, phases and failures are translated there into the public ones, while the value objects an app builds (`Mtu`, `Phy`, `ConnectionParameters`, `BondState`) are published from the context's domain as they stand. `Capabilities` and `PlatformKind` are Bluey's own, in the Platform context (`features/platform/domain`), exported through `api/platform/`.
+`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow. Each context reaches apps only through its edge, `api/<context>/`: events, phases and failures are translated there into the public ones, while the value objects an app builds (`Mtu`, `Phy`, `ConnectionParameters`, `BondState`) are published from the context's domain as they stand. `Capabilities` and `PlatformKind` are Bluey's own, in the Platform context (`features/platform/domain`), exported through `api/platform/`. Discovery's edge, `api/discovery/`, presents one public `Scanner` per `bluey.scanner()` over Discovery's one radio scan: `DiscoveryAssembly` builds the `RadioScanSession` once per `Bluey`, so scanners share the radio instead of replacing each other's scan, and it answers peer discovery's scan function. A refused scan reaches an app as `ScanFailedException` (a `BlueyPlatformException` carrying a `ScanFailureReason`), `ScanState` is translated from `ScannerPhase`, and the five scan events are published from the domain's `ScanEvent`s.
 
 ### Clean Architecture Layers
 
@@ -190,6 +190,11 @@ The domain layer uses bounded-context-aligned vocabulary; the platform-interface
 | **End** | Connection (inner) | Why a link ended: the app asked, it dropped, or the radio went away (`LinkEnd`). |
 | **Operation** | Connection (inner) | What was attempted on a link, in Connection's own words (`LinkOperation`: `open`, `negotiateMtu`, `readSignalStrength`, ...), never the platform's method names. |
 | **Borrow** | Connection (inner) | A short use of a device's link by code that is not the app (today peer discovery and `connectAsPeer`): it reuses a link the app holds, and closes on give-back only a link it opened. |
+| **Radio scan** | Discovery (inner) | The one scan the radio runs for Bluey, with its scanners and their scans (`RadioScan`, the aggregate root; `RadioScanSession` runs it). Every scanner shares it. |
+| **Scan** | Discovery (inner) | One caller's scan: opened by an ask, open until it ends (`ScanId`, `ScanPhase`; `OpenScan` is its handle). |
+| **Ask** | Discovery (inner) | What a caller wants found: a filter and an optional mode (`ScanAsk`, `ScanFilter`, `ScanMode`). |
+| **Coverage** | Discovery (inner) | What the radio must scan for so that every open scan is served: the union of the open asks' filters and the busiest mode stated (`ScanCoverage`). It only widens while the radio scans. |
+| **Scanner (inner)** | Discovery (inner) | One holder of scans, the inner side of a public `Scanner` and an entity of the radio scan (`ScannerId`, `ScannerPhase`; `OpenScanner` is its handle). The edge maps its phase to the public `ScanState`. |
 | **AttributeHandle** | Connection / GATT Client | Opaque platform-assigned identifier for a service / characteristic / descriptor. Valid only within one connection; invalidated on disconnect or Service Changed. |
 
 #### Quick reference (use / avoid)

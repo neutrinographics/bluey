@@ -4,8 +4,9 @@ title: `BlueyScanner` does not support overlapping `scan()` calls
 category: bug
 severity: medium
 platform: domain
-status: open
-last_verified: 2026-11-17
+status: fixed
+last_verified: 2026-11-27
+fixed_in: fcfc6d1
 related: [I335]
 ---
 
@@ -87,3 +88,7 @@ Codex on PR #32 as a P2 footgun.
 ## Audit 2026-11-17
 
 The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) (M4) names the everyday trigger: restarting a scan without awaiting the cancel (`sub.cancel(); scanner.scan()`), or as the timeout fires. The suspended `stop()` resumes, cancels the new subscription and sets `stopped`, so the radio keeps scanning, the stream is silent and `stop()` is a no-op. Severity is now medium. Test: `M4 (I336)` in `bluey/test/known_defects/domain_known_defects_test.dart`. Closed by slice 2 (scanning and advertising sessions) of the architecture foundation ([design](../superpowers/specs/2026-11-17-architecture-foundation-design.md)).
+
+## Fixed
+
+Slice 2, scanning pull request ([design](../superpowers/specs/2026-11-27-scanning-and-advertising-sessions-design.md)). Neither of the two suggested options: scanners share one radio scan held by Discovery's `RadioScan`. Each scan is its own, a second scanner's `scan()` widens what the radio scans for and replaces nothing, a scan that leaves does not stop the others, and an ask made while the radio is stopping waits for the stop and is then served, so `stop()` then `scan()` without awaiting delivers results (`fcfc6d1`). Both known-defect tests (the two M4 entries) moved into the regular suite.
