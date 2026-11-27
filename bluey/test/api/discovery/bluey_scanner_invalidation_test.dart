@@ -77,6 +77,30 @@ void main() {
       },
     );
 
+    test('a scanner lost to an outage stays invalidated by it after '
+        'Bluey is disposed', () async {
+      // arrange
+      final scanner = bluey.scanner();
+      fakePlatform.setState(platform.BluetoothState.off);
+      await pumpEventQueue();
+
+      // act
+      await bluey.dispose();
+
+      // assert
+      expect(scanner.state, ScanState.invalidated);
+      expect(
+        () => scanner.scan(),
+        throwsA(
+          isA<StaleHandleException>().having(
+            (e) => e.cause,
+            'cause',
+            const AdapterTransitionInvalidation(BluetoothState.off),
+          ),
+        ),
+      );
+    });
+
     test('scan() after dispose does not start a platform scan', () async {
       final scanner = bluey.scanner();
       scanner.dispose();

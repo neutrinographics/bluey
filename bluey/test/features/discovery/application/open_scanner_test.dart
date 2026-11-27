@@ -43,12 +43,52 @@ void main() {
 
         // assert
         expect(phases, const [
+          ScannerStarting(),
           ScannerScanning(),
           ScannerStopping(),
           ScannerIdle(),
           ScannerClosed(),
         ]);
         expect(done, isTrue);
+      });
+    });
+    test('a scan joining the radio scan another scanner runs passes '
+        'through starting, as its events do', () {
+      fakeAsync((async) {
+        // arrange
+        final rig = RadioScanRig();
+        opened(rig.session.openScanner().scan(askFor()));
+        async.flushMicrotasks();
+        final scanner = rig.session.openScanner();
+        final phases = <ScannerPhase>[];
+        scanner.phases.listen(phases.add);
+
+        // act
+        opened(scanner.scan(askFor()));
+        async.flushMicrotasks();
+
+        // assert
+        expect(phases, const [ScannerStarting(), ScannerScanning()]);
+        expect(scanner.phase, const ScannerScanning());
+      });
+    });
+
+    test('a second scan of a scanner already scanning tells nothing', () {
+      fakeAsync((async) {
+        // arrange
+        final rig = RadioScanRig();
+        final scanner = rig.session.openScanner();
+        opened(scanner.scan(askFor()));
+        async.flushMicrotasks();
+        final phases = <ScannerPhase>[];
+        scanner.phases.listen(phases.add);
+
+        // act
+        opened(scanner.scan(askFor()));
+        async.flushMicrotasks();
+
+        // assert
+        expect(phases, isEmpty);
       });
     });
   });

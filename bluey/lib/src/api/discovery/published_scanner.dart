@@ -23,27 +23,21 @@ final class PublishedScanner implements Scanner {
 
   final OpenScanner _scanner;
 
-  /// The outage the scanner was lost to before it was disposed, kept because
-  /// closing it makes it read as closed, and an app must still be told the
-  /// outage, not the disposal, killed it.
-  ScannerLost? _lostBeforeDisposal;
-
+  /// Set at once by [dispose], whose closing the radio scan steps later, so
+  /// a disposed scanner reads closed straight away.
   bool _disposed = false;
 
-  ScannerPhase get _phase {
-    if (_lostBeforeDisposal case final lost?) return lost;
-    if (_disposed) return const ScannerClosed();
-    return _scanner.phase;
-  }
+  ScannerPhase get _phase => switch (_scanner.phase) {
+    final ScannerLost lost => lost,
+    _ when _disposed => const ScannerClosed(),
+    final phase => phase,
+  };
 
   @override
   ScanState get state => scanStateOf(_phase);
 
   /// The current state first, to every listener, then each change; closes
   /// once the scanner is lost or closed, since its state never changes again.
-  ///
-  /// A scan the radio already serves passes through starting all the same,
-  /// as its events do, so an app sees the states it always saw.
   @override
   Stream<ScanState> get stateChanges => Stream<ScanState>.multi((listener) {
     var last = state;
@@ -54,10 +48,8 @@ final class PublishedScanner implements Scanner {
     }
     late final StreamSubscription<ScannerPhase> following;
     following = _scanner.phases.listen((phase) {
-      for (final next in _statesBetween(last, scanStateOf(phase))) {
-        last = next;
-        listener.addSync(next);
-      }
+      final next = scanStateOf(phase);
+      if (next != last) listener.addSync(last = next);
       if (_isFinal(phase)) {
         unawaited(following.cancel());
         listener.closeSync();
@@ -79,7 +71,7 @@ final class PublishedScanner implements Scanner {
   )) {
     Left(:final value) =>
       throw StaleHandleException(
-        cause: _invalidationOf(_lostBeforeDisposal ?? value.phase),
+        cause: _invalidationOf(value.phase),
         instanceType: InvalidatedInstance.scanner,
       ),
     Right(:final value) => _resultsOf(value),
@@ -94,7 +86,6 @@ final class PublishedScanner implements Scanner {
   @override
   void dispose() {
     if (_disposed) return;
-    if (_scanner.phase case final ScannerLost lost) _lostBeforeDisposal = lost;
     _disposed = true;
     unawaited(_scanner.close());
   }
@@ -113,19 +104,6 @@ final class PublishedScanner implements Scanner {
     }
   }
 }
-
-/// The states an app is told on the way from [from] to [to].
-List<ScanState> _statesBetween(ScanState from, ScanState to) => switch ((
-  from,
-  to,
-)) {
-  _ when from == to => const [],
-  (ScanState.stopped, ScanState.scanning) => const [
-    ScanState.starting,
-    ScanState.scanning,
-  ],
-  _ => [to],
-};
 
 bool _isFinal(ScannerPhase phase) =>
     phase is ScannerLost || phase is ScannerClosed;

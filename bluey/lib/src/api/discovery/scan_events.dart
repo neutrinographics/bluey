@@ -1,3 +1,6 @@
+/// @docImport 'scanner.dart';
+library;
+
 import '../../shared/domain/bluey_event.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/domain/uuid.dart';

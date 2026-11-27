@@ -28,15 +28,22 @@ final class HeldScan {
 /// step that ended it and a scanner that lives for hours holds few scans.
 @immutable
 final class ScannerScans {
-  const ScannerScans.none() : scans = const [], _terminal = null;
+  const ScannerScans.none()
+    : scans = const [],
+      _terminal = null,
+      _closedByApp = false;
 
-  ScannerScans._(List<HeldScan> scans, this._terminal)
+  ScannerScans._(List<HeldScan> scans, this._terminal, this._closedByApp)
     : scans = List.unmodifiable(scans);
 
   final List<HeldScan> scans;
 
-  /// Lost or closed, set by the radio scan and never undone but by closing.
+  /// Lost or closed, set by the radio scan and never undone: closing a lost
+  /// scanner keeps it lost, so its holder is still told the outage ended it.
   final ScannerPhase? _terminal;
+
+  /// Whether the app closed the scanner, lost first or not.
+  final bool _closedByApp;
 
   /// Where the scanner stands: lost or closed once it is, otherwise from its
   /// own scans alone, since the radio's phase is not a scanner's business.
@@ -45,7 +52,7 @@ final class ScannerScans {
   /// Whether nothing is left to tell of the scanner: the app closed it and
   /// none of its scans is still to end.
   bool get isSpent =>
-      _terminal is ScannerClosed && scans.every((scan) => scan.phase is Ended);
+      _closedByApp && scans.every((scan) => scan.phase is Ended);
 
   /// Whether the scanner may still ask for scans.
   bool get mayAsk => _terminal == null;
@@ -62,8 +69,11 @@ final class ScannerScans {
   }
 
   /// This scanner with [id] asked for [ask], standing at [phase].
-  ScannerScans asked(ScanId id, ScanAsk ask, ScanPhase phase) =>
-      ScannerScans._([...scans, HeldScan(id, ask, phase)], _terminal);
+  ScannerScans asked(ScanId id, ScanAsk ask, ScanPhase phase) => ScannerScans._(
+    [...scans, HeldScan(id, ask, phase)],
+    _terminal,
+    _closedByApp,
+  );
 
   /// This scanner with [id] asked for [ask] and ended at once by the outage
   /// that lost it, or null when the scanner is not lost.
@@ -79,24 +89,33 @@ final class ScannerScans {
   /// This scanner with each scan moved to what [change] answers for it,
   /// or left where it is when [change] answers null.
   ScannerScans moved(ScanPhase? Function(HeldScan scan) change) =>
-      ScannerScans._([
-        for (final scan in scans)
-          HeldScan(scan.id, scan.ask, change(scan) ?? scan.phase),
-      ], _terminal);
+      ScannerScans._(
+        [
+          for (final scan in scans)
+            HeldScan(scan.id, scan.ask, change(scan) ?? scan.phase),
+        ],
+        _terminal,
+        _closedByApp,
+      );
 
   /// This scanner without the scans that had already ended.
-  ScannerScans withoutEnded() => ScannerScans._([
-    for (final scan in scans)
-      if (scan.phase is! Ended) scan,
-  ], _terminal);
+  ScannerScans withoutEnded() => ScannerScans._(
+    [
+      for (final scan in scans)
+        if (scan.phase is! Ended) scan,
+    ],
+    _terminal,
+    _closedByApp,
+  );
 
   /// This scanner lost to [outage], unless the app already closed it.
   ScannerScans lost(RadioOutage outage) =>
-      ScannerScans._(scans, _terminal ?? ScannerLost(outage));
+      ScannerScans._(scans, _terminal ?? ScannerLost(outage), _closedByApp);
 
   /// This scanner closed by the app; a scan still leaving keeps its place
   /// until the radio's stop ends it.
-  ScannerScans closed() => ScannerScans._(scans, const ScannerClosed());
+  ScannerScans closed() =>
+      ScannerScans._(scans, _terminal ?? const ScannerClosed(), true);
 
   /// What [scanner] raised in moving from [before] to this: each scan that
   /// ended, then the change of the scanner's own standing.

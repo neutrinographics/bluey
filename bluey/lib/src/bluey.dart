@@ -107,12 +107,7 @@ class Bluey {
           events: _eventBus,
         ),
   );
-  late final DiscoveryAssembly _discovery = DiscoveryAssembly(
-    scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
-    publisher: _eventBus,
-    log: _logger,
-    now: clock.now,
-  );
+  DiscoveryAssembly? _discovery;
 
   StreamSubscription? _stateSubscription;
 
@@ -418,7 +413,13 @@ class Bluey {
   /// ```
   Scanner scanner() {
     _requireAdapterOn();
-    return _discovery.scanner();
+    return (_discovery ??= DiscoveryAssembly(
+          scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
+          publisher: _eventBus,
+          log: _logger,
+          now: clock.now,
+        ))
+        .scanner();
   }
 
   /// Connect to a device, within [timeout] when one is given.
@@ -943,15 +944,13 @@ class Bluey {
     return id;
   }
 
-  /// Release all resources.
-  ///
-  /// After calling dispose, this instance cannot be used. Construct a
-  /// fresh instance via [Bluey.create] if you need to reinitialise.
+  /// Releases every resource; this instance cannot be used afterwards, so
+  /// build a fresh one with [Bluey.create] to start again.
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
-    await _discovery.dispose();
+    await _discovery?.dispose();
     await _eventBus.close();
     await _logger.dispose();
   }

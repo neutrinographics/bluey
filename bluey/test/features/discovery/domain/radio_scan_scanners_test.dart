@@ -438,7 +438,7 @@ void main() {
       expect(step.duty, isNull);
     });
 
-    test('of a lost scanner closes it and raises nothing', () {
+    test('of a lost scanner keeps it lost and raises nothing', () {
       // arrange
       final scan = after([...scanning(), const RadioWentAway(outage)]);
 
@@ -447,7 +447,22 @@ void main() {
 
       // assert
       expect(step.events, isEmpty);
-      expect(step.scan.standingOf(a), const ScannerClosed());
+      expect(step.scan.standingOf(a), const ScannerLost(outage));
+    });
+
+    test('of a lost scanner leaves it unable to ask', () {
+      // arrange
+      final scan = after([
+        const ScannerOpened(a),
+        const RadioWentAway(outage),
+        const ScannerDisposed(a),
+      ]);
+
+      // act
+      void askFromIt() => scan.on(ScanAsked(a, s1, ask()), at: at);
+
+      // assert
+      expect(askFromIt, throwsStateError);
     });
   });
 
@@ -580,6 +595,22 @@ void main() {
       expect(step.events, isEmpty);
       expect(step.duty, isNull);
       expect(step.scan.standingOf(a), isNull);
+    });
+
+    test('a lost scanner the app closed is forgotten in the next step', () {
+      // arrange
+      final closed = after([
+        const ScannerOpened(a),
+        const RadioWentAway(outage),
+      ]).on(const ScannerDisposed(a), at: at);
+
+      // act
+      final next = closed.scan.on(const ScannerOpened(b), at: at);
+
+      // assert
+      expect(closed.scan.standingOf(a), const ScannerLost(outage));
+      expect(next.scan.standingOf(a), isNull);
+      expect(next.scan.heldScannerCount, 1);
     });
 
     test('a lost scanner the app never closes stays', () {

@@ -221,6 +221,44 @@ void main() {
       ]);
     });
 
+    test('dispose while scanning publishes stopping then stopped', () async {
+      // arrange
+      final scanner = discovery.scanner();
+      scanner.scan().listen((_) {});
+      await pumpEventQueue();
+      publisher.events.clear();
+
+      // act
+      scanner.dispose();
+      await pumpEventQueue();
+
+      // assert
+      expect(publisher.events.map((e) => e.runtimeType), [
+        ScanStoppingEvent,
+        ScanStoppedEvent,
+      ]);
+    });
+
+    test('a second scan while already scanning publishes no start', () async {
+      // arrange
+      final scanner = discovery.scanner();
+      scanner.scan().listen((_) {});
+      await pumpEventQueue();
+      publisher.events.clear();
+
+      // act
+      scanner.scan().listen((_) {});
+      await pumpEventQueue();
+
+      // assert
+      expect(
+        publisher.events.where(
+          (e) => e is ScanStartingEvent || e is ScanStartedEvent,
+        ),
+        isEmpty,
+      );
+    });
+
     test('are stamped with the clock the assembly is handed', () async {
       // arrange
       fake.simulatePeripheral(id: 'AA:BB:CC:DD:EE:01', name: 'x');

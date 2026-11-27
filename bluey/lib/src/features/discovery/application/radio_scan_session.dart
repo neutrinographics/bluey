@@ -103,7 +103,7 @@ final class RadioScanSession {
     final step = _radioScan.on(input, at: _now());
     _radioScan = step.scan;
     for (final seat in List.of(_seats.values)) {
-      seat.moved(_radioScan.standingOf(seat.id));
+      seat.moved(_radioScan.standingOf(seat.id), step.events);
     }
     for (final event in step.events) {
       _events.raise(event);
@@ -205,8 +205,16 @@ final class _Seat implements ScannerSeat {
   @override
   Stream<ScannerPhase> get phases => _phases.stream;
 
-  void moved(ScannerPhase? next) {
+  /// Tells [next], and first starting when [events] say the scanner began
+  /// starting in the same step, so its phases pass where its events do.
+  void moved(ScannerPhase? next, List<ScanEvent> events) {
     if (next == null || next == phase) return;
+    final startedInStep = events.any(
+      (event) => event is ScannerBeganStarting && event.scanner == id,
+    );
+    if (next is ScannerScanning && startedInStep) {
+      _phases.add(const ScannerStarting());
+    }
     phase = next;
     _phases.add(next);
   }

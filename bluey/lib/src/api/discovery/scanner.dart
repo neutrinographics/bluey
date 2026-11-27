@@ -1,3 +1,6 @@
+/// @docImport '../../bluey.dart';
+library;
+
 import '../../shared/domain/uuid.dart';
 import '../../features/discovery/domain/scan_mode.dart';
 import '../../features/discovery/domain/scan_result.dart';
@@ -8,13 +11,9 @@ export '../../features/discovery/domain/device.dart';
 export '../../features/discovery/domain/scan_mode.dart';
 export '../../features/discovery/domain/scan_result.dart';
 
-/// Aggregate root for the Discovery bounded context.
-///
-/// A Scanner manages the lifecycle of BLE scanning operations. Obtain one
-/// from [Bluey.scanner()], use it to discover nearby devices, and call
-/// [dispose] when done.
-///
-/// This parallels [Server] for the GATT Server bounded context.
+/// The app's face of scanning: one scanner of the radio scan every scanner
+/// of a [Bluey] shares, so two scanners never replace or stop each other's
+/// scans. Obtain one from [Bluey.scanner] and [dispose] it when done.
 ///
 /// ## Usage
 ///
