@@ -46,7 +46,7 @@
   - `final class OpenSucceeded extends LinkInput { const OpenSucceeded(this.id); final LinkId id; }` and `final class OpenFailed extends LinkInput { const OpenFailed(); }`.
   - `final class FollowTheLink extends LinkDuty { const FollowTheLink(this.id); final LinkId id; }` and `final class ForgetTheLink extends LinkDuty { const ForgetTheLink(); }`, equal by value. `CloseTheLink` becomes `const CloseTheLink(this.id)` with `final LinkId id`, equal by id.
   - `static LinkStep Link.begin({required DeviceAddress device, required DateTime at})`.
-  - `Link.id` is `LinkId?`. `Link.hasEnded` stays `phase is Ended`. New `bool get neverOpened => phase is NeverOpened`.
+  - `Link.id` is `LinkId?`, documented as the platform's handle for a link that is up (Connection tells links apart by device). `Link.hasEnded` stays `phase is Ended`. No getter is added for `NeverOpened`: nothing in `lib/` would read it.
   - `LinkId get id` on `LinkSession`: `link.id`, or `StateError('The link to <device> has not opened.')`.
 - `Link.open(id, device, at)` **stays in this task** so the registry still compiles. Reimplement it as `begin` followed by `OpenSucceeded(id)`, answering a step with `entered: Linked`, `events: [LinkOpened]` and no duty, exactly what it answers today. Task 3 deletes it.
 
@@ -75,7 +75,7 @@ test('an open that fails leaves a link that never opened and raises nothing', ()
   final step = opening().on(const OpenFailed(), at: at);
   expect(step.link.phase, const NeverOpened());
   expect((step.link.id, step.link.end, step.link.endInSight), (null, null, null));
-  expect((step.link.isUp, step.link.hasEnded, step.link.neverOpened), (false, false, true));
+  expect((step.link.isUp, step.link.hasEnded), (false, false));
   expect(step.entered, const NeverOpened());
   expect(step.duty, const ForgetTheLink());
   expect(step.events, isEmpty);
@@ -110,8 +110,8 @@ Update the existing close rows to expect `CloseTheLink(id)`, and the `isUp/isClo
 ### Task 2: A session that begins its link
 
 **Files:**
-- Modify: `application/link_session.dart`
-- Test: `application/link_session_test.dart`
+- Modify: `application/link_session.dart`, `application/connection_log_words.dart`
+- Test: `application/link_session_test.dart`, `application/connection_log_words_test.dart`
 
 **Interfaces:**
 - Consumes: Task 1's `Link.begin`, `OpenSucceeded`, `OpenFailed`, `FollowTheLink`, `ForgetTheLink`.
@@ -124,7 +124,7 @@ Update the existing close rows to expect `CloseTheLink(id)`, and the `isUp/isClo
 **Decisions the tests pin:**
 - On `FollowTheLink(id)` the session starts the two subscriptions the unnamed constructor starts (`links.reportsOf(id)` and `links.outages`). Make the two subscription fields nullable and cancel them null-safely in `_release`.
 - On `ForgetTheLink` the session closes its phase stream and completes its teardown, so a `disconnect()` waiting on it answers success. Registered `onEnd` releases are **not** run: there is no `LinkEnd` to hand them. Say so in `onEnd`'s doc.
-- The open's steps add their phase to `phases` (`Opening` is never seen, since nobody can listen before `begin` returns; `Linked` and `NeverOpened` are) but log **no** `state transition` line. Do this by keeping the log line out of the path `opened` and `notOpened` take, not by a flag on `_step`: split `_announce` into the telling (`_phases.add`) and the logging, and have `_step` take which.
+- The open's steps add their phase to `phases` (`Opening` is never seen, since nobody can listen before `begin` returns; `Linked` and `NeverOpened` are) but log **no** `state transition` line. The rule is frozen wording, so it lives in `application/connection_log_words.dart` as `bool tellsOfStateTransition(LinkInput input)`: false for `OpenSucceeded` and `OpenFailed`, true for every other input (an exhaustive switch, with a doc saying no such line was ever logged for an open). `_step` asks it before logging; `_phases.add` is unconditional. Test it in `connection_log_words_test.dart`, one case per input.
 - `isClosing` keeps its meaning (`!_link.isUp`), so an opening session already answers true.
 
 - [ ] **Step 1: Write the failing tests** in a new `beginning` group, building with `LinkSession.begin(device: device, links: links, events: events, log: log, now: () => now)`:
@@ -169,23 +169,23 @@ test('a session begins by raising that the open began, and listens to nothing', 
 - Produces:
   - `abstract interface class LiveLink { bool get isUp; }`: whether the link can be used now; false while it opens, closes, or has ended and is not yet let go of. `LinkSession.isUp => _link.isUp` replaces `isClosing`.
   - `LiveLinks<L>`:
-    - `Admission<L> admit(DeviceAddress device, LinkUser user)`: no entry answers `Open` and records nothing; an entry whose link is not up answers `Wait`; otherwise records the user and answers `Reuse`.
-    - `void began(DeviceAddress device, L link)`: the device's entry now holds `link`, used by nobody. A device that already has an entry is a `StateError('<device> already has a link.')`.
-    - `void opened(DeviceAddress device, LinkUser user)`: records `user` on the device's entry.
+    - `Admission<L> admit(DeviceAddress device, LinkUser user, {required L Function() begin})`: no entry calls `begin`, stores the link with `user` as its user and answers `Open(link)`; an entry whose link is not up answers `Wait` and does not call `begin`; otherwise it records the user and answers `Reuse(link)`, without calling `begin`.
+    - `final class Open<L> extends Admission<L> { const Open(this.link); final L link; }`: the link just begun, which the caller must now open.
     - `void notOpened(DeviceAddress device, L link)`: drops the entry when `link` is the one it holds, matched by identity.
-    - `givenBack`, `kept`, `ended` unchanged. `_Entry.link` is non-null.
+    - The old `opened(device, user, link)` is deleted: the opener is recorded by `admit`. `givenBack`, `kept`, `ended` are unchanged. `_Entry.link` is non-null.
 
-**The registry's `_open`, in order** (this order is what apps observe; keep it):
-1. `LinkSession.begin(...)` (raises `LinkOpenBegan`), 2. `_table.began(device, session)`, 3. listen to `session.phases` to announce changes, 4. log `connect started`, 5. `await _links.open(...)`.
+**The registry**, in order (this order is what apps observe; keep it). `_acquire` calls `_table.admit(device, by, begin: () => _begin(device))`, where `_begin` builds `LinkSession.begin(...)` (which raises `LinkOpenBegan`) and listens to its `phases` to announce changes. On `Open(:final link)` it runs `_open(link, by, budget)`: log `connect started`, then `await _links.open(...)`.
 - On failure: `session.notOpened()`, `_table.notOpened(device, session)`, log `connect failed`, announce the change, answer the failure.
-- On success: `_table.opened(device, by)`, `session.onEnd(...)`, `session.opened(id)` (raises `LinkOpened`), log `connect succeeded`, announce the change, answer the session.
+- On success: `session.onEnd(...)`, `session.opened(id)` (raises `LinkOpened`), log `connect succeeded`, announce the change, answer the session.
 
 `_sessionOf` goes. The registry no longer imports `domain/link.dart`, `domain/link_event.dart` or `domain/link_id.dart`.
 
-- [ ] **Step 1: Rewrite the table's tests.** In `live_links_test.dart`, the fake link gets a settable `isUp`. Replace uses of the old `opened(device, user, link)` with `began(device, link)` then `opened(device, user)`. Add:
-  - `a link that is opening makes the next caller wait`: `admit` → `Open`; `began(device, link..isUp = false)`; second `admit` → `Wait`.
-  - `beginning a second link for a device is a StateError`.
-  - `a failed open drops only the link that failed`: `began(device, first)`, `notOpened(device, second)` changes nothing (next `admit` is `Wait`), `notOpened(device, first)` makes the next `admit` answer `Open`.
+- [ ] **Step 1: Rewrite the table's tests.** In `live_links_test.dart`, the fake link gets a settable `isUp`. Replace each old `admit` + `opened(device, user, link)` pair with one `admit(device, user, begin: () => link)`, setting `link.isUp = true` where the old test called `opened`. Add:
+  - `the first caller is handed the link it must open`: `admit` answers `Open` whose `link` is identical to the one `begin` built.
+  - `a link that is opening makes the next caller wait, and begins nothing`: after the first `admit` (link not up), a second `admit` answers `Wait` and its `begin` was not called.
+  - `reusing a link begins nothing`: with the link up, `admit` answers `Reuse` and `begin` was not called.
+  - `the opener uses the link from its beginning`: `admit` as a borrower, set the link up, then `givenBack(device, link)` answers `closeTheLink` (so the borrower was recorded by `admit`).
+  - `a failed open drops only the link that failed`: `notOpened(device, other)` changes nothing (next `admit` is `Wait`), `notOpened(device, first)` makes the next `admit` answer `Open`.
   - Every existing closing/ended row keeps its expectation with `isUp = false` where it had `isClosing = true`.
 
 - [ ] **Step 2: Extend the registry's tests.** In `link_registry_test.dart`:
@@ -195,7 +195,7 @@ test('a session begins by raising that the open began, and listens to nothing', 
 
 - [ ] **Step 3: Move the fixtures and remaining tests off `Link.open` and the unnamed constructor.** `upSession` becomes `LinkSession.begin(...)..opened(id)`. `link_session_test.dart`'s `openSession` likewise; its two `isClosing` tests assert `isUp` with the booleans inverted. `link_test.dart`'s `after` helper folds over `Link.begin(...)` then `OpenSucceeded(id)`; delete the `Link.open` test. Fix `check_before_asking_test.dart` the same way.
 
-- [ ] **Step 4: Run.** `cd bluey && flutter test test/features/connection`. Expected: compile failures naming `began` and `isUp`.
+- [ ] **Step 4: Run.** `cd bluey && flutter test test/features/connection`. Expected: compile failures naming `begin` and `isUp`.
 
 - [ ] **Step 5: Implement** the table, the registry and the deletions. Update the docs of `LiveLinks`, `_Entry` ("A device's link and who uses it"), `LinkRegistry` and `Link` ("`begin` is the only way to build a link").
 
@@ -265,6 +265,8 @@ expect(failed.errorCode, 'ConnectFailed');
 
 ## Design review (cohesion, coupling, DDD, Clean Architecture)
 
+**Review of 2026-11-27 (DDD and cohesion, at Joel's request).** Four fixes, recorded in the spec's section 7: the table begins and stores a link inside `admit` (no second call the caller must remember); the table's `opened` is gone (the link alone knows it opened); the no-`state transition`-on-open rule lives with the frozen log words; no unused `neverOpened` getter.
+
 **Responsibilities.** Task 1 changes only what a `Link` decides. Task 2 changes only how a `LinkSession` carries out a link's duties. Task 3 changes what `LiveLinks` holds and how `LinkRegistry` carries out an admission; the registry loses the raising of an event and the building of a link. Task 4 is one mapping in the unit that logs the connect's lines.
 
 **Dependencies.** No new direction. Domain: `link.dart` imports `link_phase`, `link_input`, `link_event`, `link_end`, `link_id`, as today. Application: the registry drops three domain imports and gains none. Edge: one switch gains two arms. Nothing crosses a context; every file is Connection's except the documents.
@@ -273,6 +275,6 @@ expect(failed.errorCode, 'ConnectFailed');
 
 **Layers.** Phases, inputs, duties, `Link.begin`, `LiveLinks`: domain. `LinkSession`, `LinkRegistry`, the frozen log words: application. `connectionStateOf`: edge (`api/connection/`).
 
-**Claims checked against source (main at 3364a04).** `LinkSession.isClosing` is `!_link.isUp`. The unnamed `LinkSession` constructor is the only place reports and outages are subscribed. `_announce` both logs `state transition` and adds to `_phases`, and runs only from `_step`. `LinkRegistry._sessionOf` records the user in the table before raising `LinkOpened`. `Link.open` has eight uses, one in `lib/` (the registry). `session.link.id` has thirteen readers in `lib/`. `ConnectionState.connecting` exists. `LiveLinks.notOpened` today removes an entry only when its link is null. The spec says "thirteen readers" and Task 1 lists them by file.
+**Claims checked against source (main at 3364a04).** `LinkSession.isClosing` is `!_link.isUp`. The unnamed `LinkSession` constructor is the only place reports and outages are subscribed. `_announce` both logs `state transition` and adds to `_phases`, and runs only from `_step`. `LinkRegistry._sessionOf` records the user in the table before raising `LinkOpened`. `Link.open` has eight uses, one in `lib/` (the registry). `session.link.id` has thirteen readers in `lib/`. `ConnectionState.connecting` exists. `LiveLinks.notOpened` today removes an entry only when its link is null, and `admit` today reserves the device in the same call that decides, which Task 3 keeps. The spec says "thirteen readers" and Task 1 lists them by file.
 
 Verdict: ready.

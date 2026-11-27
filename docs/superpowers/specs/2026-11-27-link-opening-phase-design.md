@@ -76,13 +76,14 @@ A failed open raises nothing, so `ConnectingEvent` is still followed by silence 
 
 `CloseTheLink` gains the id to close, `CloseTheLink(id)`, so the session never has to read an id that might not be there. *(Claude's call.)*
 
-**The id.** `Link.id` becomes `LinkId?`: null while opening and for a link that never opened, set for good by `OpenSucceeded`. *(Claude's call; the alternative, an id invented before the radio answers, would be a second identity beside the platform's.)*
+**The id.** `Link.id` becomes `LinkId?`: null while opening and for a link that never opened, set for good by `OpenSucceeded`. A `LinkId` is the platform's handle for a link that is up, not what tells one link from another inside Connection: the table and the registry key everything by device, because a platform may hand the next link the last one's id. So a link without a handle is still a whole aggregate, and the doc of `Link.id` says so. *(Claude's call; the alternative, an id invented before the radio answers, would be a second identity beside the platform's.)*
 
 **The table** (`domain/live_links.dart`, `domain/live_link.dart`).
 
 - An entry always holds a link; the null placeholder goes.
 - `LiveLink.isClosing` becomes `isUp`, since the table's one question is whether a link can be reused, and it now has two reasons to answer no. `admit` answers `Wait` for a link that is not up.
-- `admit` answering `Open` records nothing; the owner follows it at once with `began(device, link)`. `opened(device, user)` records the user; `notOpened(device, link)` drops the entry, matched by identity like `ended`.
+- `admit` takes the way to begin a link, `admit(device, user, begin: …)`. When it decides the caller opens, it begins the link itself, stores it with the caller as its user, and answers `Open(link)`. Deciding and recording stay one step, as they are today, so "one attempt per device" never rests on the caller making a second call in time.
+- The table's `opened` goes: the opener is the link's user from the beginning, and a link that is not up is never handed to anyone else. `notOpened(device, link)` drops the entry, matched by identity like `ended`.
 
 ### 4.2 Application
 
@@ -91,12 +92,12 @@ A failed open raises nothing, so `ConnectingEvent` is still followed by silence 
 - Built by `LinkSession.begin(device, …)`, which takes `Link.begin`'s step and raises its event through `LinkEvents`. It subscribes to nothing yet.
 - `opened(LinkId id)` and `notOpened()` feed `OpenSucceeded` and `OpenFailed`. On `FollowTheLink` it starts the two subscriptions its constructor starts today. On `ForgetTheLink` it closes its phase stream.
 - `LinkSession.id` is added: the link's id, for whoever holds a session. A session is handed out only once its link is up, so it is always there; reading it earlier is a `StateError`. The thirteen readers of `session.link.id` move to it. *(Claude's call.)*
-- **Frozen log lines.** The open's steps log no `state transition` line, since none is logged for them today. `stateWordOf` still gets a word for each new phase so its switch stays exhaustive; I399 decides whether the lines appear.
+- **Frozen log lines.** The open's steps log no `state transition` line, since none is logged for them today. That is a fact about the frozen wording, not about running a link, so it lives with the frozen words: `connection_log_words.dart` gains `tellsOfStateTransition(LinkInput)`, false for the two open inputs, and the session asks it. `stateWordOf` still gets a word for each new phase so its switch stays exhaustive. I399 deletes the file and decides whether the lines appear.
 
 **`LinkRegistry`** (`application/link_registry.dart`).
 
-- `_open` begins a session, stores it with `began`, logs `connect started`, asks the platform, and tells the session the answer. It names no `LinkEvent`.
-- The order an app can observe is unchanged: `ConnectingEvent`, then `connect started`; on success the table records the user, then `ConnectedEvent`, then `connect succeeded`.
+- It hands the table the way to begin a session. `_open` then logs `connect started`, asks the platform, and tells the session the answer. It names no `LinkEvent`.
+- The order an app can observe is unchanged: `ConnectingEvent`, then `connect started`; on success `ConnectedEvent`, then `connect succeeded`.
 - **Ruling 37.** `connect failed` is logged at the level the link's user gives: error for the app, debug for a borrower. Context, message, data and `errorCode` do not change. `connect started` and `connect succeeded` stay at info for both.
 
 ### 4.3 Edge
@@ -111,7 +112,7 @@ A failed open raises nothing, so `ConnectingEvent` is still followed by silence 
 ## 5. Proof
 
 - `link_test.dart`: the table gains every row of 4.1, including that each existing phase ignores the two new inputs and that `Opening` ignores an outage and a disconnect request.
-- `live_links_test.dart`: a link that is opening makes the next caller wait; a failed open's give-up is matched by identity.
+- `live_links_test.dart`: `admit` begins a link only when it answers `Open`; a link that is opening makes the next caller wait; a failed open's give-up is matched by identity.
 - `link_session_test.dart`: nothing is subscribed before `opened`; the open's steps log no `state transition`.
 - `link_registry_test.dart`: the events and log lines of a successful and a failed open are exactly today's, in today's order; a borrower's failed open logs at debug and the app's at error; `link_registry.dart` no longer imports `link_event.dart`.
 - The whole `bluey` suite, the architecture rules, list growth without the flag, the API dump (unchanged), and both coverage floors.
@@ -130,6 +131,8 @@ Test names, fixture updates (`up_session.dart`, the in-memory `Links`), and the 
 
 **Layers.** `Opening`, `NeverOpened`, the two inputs and the two duties are domain. The log level and the frozen-line rule are application. The state mapping is edge.
 
-**Claims checked against source.** `LinkSession.isClosing` is already defined as `!_link.isUp` (`link_session.dart`), so renaming the table's question changes no behaviour. `LinkSession`'s constructor is where reports and outages are subscribed today. `LinkRegistry._sessionOf` stores the session before raising `LinkOpened`, which 4.2 keeps. `ConnectionState.connecting` exists (`api/connection/connection_state.dart`). No session announces `Linked` at open today, since `_announce` runs only from `_step`, and the first link is built by `Link.open` outside it.
+**Review of 2026-11-27 (Joel asked for a DDD and cohesion check).** Four findings, all fixed above. (1) `admit` answering `Open` and a separate `began` split one decision across two calls, so the table's own invariant depended on its caller; `admit` now begins and stores the link itself. (2) The table's `opened(device, user)` was a second place that learned a link had opened, beside the link; the opener is recorded from the beginning and the call is gone. (3) The rule that the open's steps log no `state transition` sat in the session's control flow; it is a frozen-wording fact and moved to the frozen-words file. (4) A `Link.neverOpened` getter had no reader in `lib/` and is not added. One trade-off stays and is stated in 4.1 and 4.2: `Link.id` is null until the radio answers, and `LinkSession.id` is a guarded read.
+
+**Claims checked against source.** `LinkSession.isClosing` is already defined as `!_link.isUp` (`link_session.dart`), so renaming the table's question changes no behaviour. `LinkSession`'s constructor is where reports and outages are subscribed today. `LinkRegistry._sessionOf` stores the session before raising `LinkOpened`; with 4.1 it is stored before anything is raised. `ConnectionState.connecting` exists (`api/connection/connection_state.dart`). No session announces `Linked` at open today, since `_announce` runs only from `_step`, and the first link is built by `Link.open` outside it.
 
 Verdict: ready.
