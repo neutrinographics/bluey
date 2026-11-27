@@ -27,24 +27,33 @@ void main() {
     (BluetoothState.unknown, RadioOutage.unknown),
   ]) {
     test('$state is the outage $outage', () async {
+      // arrange: the subscription in setUp
+      // act
       platform.setBluetoothState(state);
       await pumpEventQueue();
 
+      // assert
       expect(outages, [outage]);
     });
   }
 
   test('the adapter being on is no outage', () async {
+    // arrange: the subscription in setUp
+    // act
     platform.setBluetoothState(BluetoothState.on);
     await pumpEventQueue();
 
+    // assert
     expect(outages, isEmpty);
   });
 
   test('an error on the state stream is an unknown outage', () async {
+    // arrange: the subscription in setUp
+    // act
     platform.simulateStateError(StateError('lost'));
     await pumpEventQueue();
 
+    // assert
     expect(outages, [RadioOutage.unknown]);
   });
 }
