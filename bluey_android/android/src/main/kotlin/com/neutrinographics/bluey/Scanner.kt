@@ -87,7 +87,7 @@ class Scanner(
             }
 
             override fun onScanFailed(errorCode: Int) {
-                reportScanFailure(errorCode)
+                reportScanFailure(errorCode, from = this)
             }
         }
 
@@ -116,11 +116,13 @@ class Scanner(
     /**
      * Tells Dart why the platform refused the scan: the app that asked can
      * only learn it from the code, since a refused scan never completes.
+     * A failure [from] a callback that a later scan has replaced is dropped,
+     * since it would end the scan that replaced it.
      */
-    internal fun reportScanFailure(errorCode: Int) {
+    internal fun reportScanFailure(errorCode: Int, from: ScanCallback? = scanCallback) {
         // Must dispatch to main thread for Flutter platform channel
         handler.post {
-            flutterApi.onScanFailed(errorCode.toLong()) {}
+            if (from === scanCallback) flutterApi.onScanFailed(errorCode.toLong()) {}
         }
     }
 

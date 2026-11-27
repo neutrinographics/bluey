@@ -1317,6 +1317,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// consumer's subscription stops the radio (Convention 5 / I335).
   bool get isScanning => _isScanningPlatform;
 
+  /// Whether anything still listens to the latest scan's stream, so a test
+  /// can tell a consumer that let go of the platform from one that leaked.
+  bool get latestScanIsHeard => _runningScan?.hasListener ?? false;
+
   /// Gets whether we're currently advertising.
   bool get isAdvertising => _isAdvertising;
 

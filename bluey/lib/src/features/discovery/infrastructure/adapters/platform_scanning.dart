@@ -45,8 +45,18 @@ final class PlatformScanning implements Scanning {
   final platform.BlueyPlatform _platform;
   final Log _log;
   final Now _now;
-  final StreamController<ScanReport> _reports = StreamController<ScanReport>();
+
+  /// Once nobody hears the reports, the platform's scan is let go of too:
+  /// after an outage no stop is asked, and the platform outlives this adapter.
+  late final StreamController<ScanReport> _reports =
+      StreamController<ScanReport>(onCancel: _letGo);
   StreamSubscription<platform.PlatformDevice>? _listening;
+
+  Future<void> _letGo() async {
+    final listening = _listening;
+    _listening = null;
+    await listening?.cancel();
+  }
 
   @override
   void scan(ScanCoverage coverage) {

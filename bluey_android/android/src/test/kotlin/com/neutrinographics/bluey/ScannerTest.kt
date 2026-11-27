@@ -52,6 +52,18 @@ class ScannerTest {
     }
 
     @Test
+    fun `a failure from a scan another scan replaced is not reported`() {
+        // arrange
+        val replaced = mockk<android.bluetooth.le.ScanCallback>(relaxed = true)
+
+        // act
+        scanner.reportScanFailure(2, from = replaced)
+
+        // assert
+        verify(exactly = 0) { mockFlutterApi.onScanFailed(any(), any()) }
+    }
+
+    @Test
     fun `a refused scan does not report the scan as complete`() {
         // arrange
         val refusedAsInternalError = 3

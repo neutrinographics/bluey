@@ -208,6 +208,23 @@ void main() {
     });
   });
 
+  group('letting go of the platform', () {
+    test(
+      'nobody listening to the reports releases the platform scan',
+      () async {
+        // arrange
+        scanning.scan(const ScanCoverage(filter: Everything()));
+        expect(fake.latestScanIsHeard, isTrue);
+
+        // act
+        await subscription.cancel();
+
+        // assert
+        expect(fake.latestScanIsHeard, isFalse);
+      },
+    );
+  });
+
   group('what the platform reports wrong', () {
     test('a stream error is a refusal in Discovery\'s words and is logged '
         'nowhere as an error on reports', () async {
