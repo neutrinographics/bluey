@@ -40,7 +40,8 @@ final class StopTheRadio extends RadioDuty {
 /// The answer to one input: the radio scan as it now stands, what it raised
 /// and the duty, if any, the input left its owner.
 final class RadioScanStep {
-  RadioScanStep(this.scan, {this.events = const [], this.duty});
+  RadioScanStep(this.scan, {List<ScanEvent> events = const [], this.duty})
+    : events = List.unmodifiable(events);
 
   /// The radio scan after the input.
   final RadioScan scan;

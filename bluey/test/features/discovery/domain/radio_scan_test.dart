@@ -74,7 +74,13 @@ void expectStep(
     expect(step.scan.phaseOf(id), phase, reason: 'scan ${id.value}');
   }
   expect(step.duty, duty);
-  expect(step.events, isEmpty);
+}
+
+/// What the next step still shows of [id] in [scan]: a scan already ended is
+/// forgotten by then.
+ScanPhase? carried(RadioScan scan, ScanId id) {
+  final phase = scan.phaseOf(id);
+  return phase is Ended ? null : phase;
 }
 
 ScanResult heard() => ScanResult(
@@ -166,21 +172,20 @@ void main() {
         final step = scan.on(const ScannerOpened(b), at: at);
 
         // assert
-        expectStep(step, radio: scan.radio, phases: {s1: scan.phaseOf(s1)});
+        expectStep(step, radio: scan.radio, phases: {s1: carried(scan, s1)});
         expect(step.scan.standingOf(b), const ScannerIdle());
       });
     }
 
-    test('of a scanner already open keeps its scans', () {
+    test('of a scanner already open is a programming error', () {
       // arrange
       final scan = after(scanning());
 
       // act
-      final step = scan.on(const ScannerOpened(a), at: at);
+      void reopen() => scan.on(const ScannerOpened(a), at: at);
 
       // assert
-      expectStep(step, radio: scan.radio, phases: {s1: const Served()});
-      expect(step.scan.standingOf(a), const ScannerScanning());
+      expect(reopen, throwsStateError);
     });
   });
 
@@ -199,7 +204,7 @@ void main() {
         phases: {s1: const Leaving(onRequest)},
         duty: const StopTheRadio(),
       );
-      expect(step.scan.standingOf(a), const ScannerStopping());
+      expect(step.scan.standingOf(a), const ScannerClosed());
     });
 
     test('in RadioScanning, its scans end while another scanner\'s stays', () {
@@ -224,7 +229,7 @@ void main() {
           s3: const Served(),
         },
       );
-      expect(step.scan.standingOf(a), const ScannerIdle());
+      expect(step.scan.standingOf(a), const ScannerClosed());
     });
 
     test('in RadioScanning, of its two scans the second leaves last', () {
@@ -277,7 +282,7 @@ void main() {
         final step = scan.on(const ScannerDisposed(a), at: at);
 
         // assert
-        expectStep(step, radio: scan.radio, phases: {s1: scan.phaseOf(s1)});
+        expectStep(step, radio: scan.radio, phases: {s1: carried(scan, s1)});
       });
     }
 
@@ -470,7 +475,7 @@ void main() {
       expectStep(
         step,
         radio: RadioScanning(coverage([heart, battery])),
-        phases: {s1: const Served(), s2: const Ended(timedOut)},
+        phases: {s1: const Served(), s2: null},
       );
     });
 
@@ -501,11 +506,7 @@ void main() {
         final step = scan.on(ScanLeft(s1, onRequest), at: at);
 
         // assert
-        expectStep(
-          step,
-          radio: scan.radio,
-          phases: {s1: const Ended(timedOut)},
-        );
+        expectStep(step, radio: scan.radio, phases: {s1: null});
       });
     }
   });
@@ -647,8 +648,8 @@ void main() {
     });
 
     for (final (name, before, phases) in [
-      ('RadioQuiet', quiet(), {s1: const Ended(timedOut)}),
-      ('RadioUnsure', unsure(), {s1: const Ended(timedOut)}),
+      ('RadioQuiet', quiet(), {s1: null}),
+      ('RadioUnsure', unsure(), {s1: null}),
       (
         'RadioStopping',
         [...stopping(), ScanAsked(a, s2, ask())],
@@ -718,11 +719,7 @@ void main() {
         final step = scan.on(settled, at: at);
 
         // assert
-        expectStep(
-          step,
-          radio: const RadioQuiet(),
-          phases: {s1: const Ended(EndedByRadioOutage(outage))},
-        );
+        expectStep(step, radio: const RadioQuiet(), phases: {s1: null});
       });
     }
 
@@ -731,7 +728,8 @@ void main() {
       final scan = after([
         ...stopping(),
         const RadioWentAway(outage),
-        ScanAsked(a, s2, ask()),
+        const ScannerOpened(b),
+        ScanAsked(b, s2, ask()),
       ]);
 
       // act
@@ -758,11 +756,7 @@ void main() {
         final step = scan.on(const RadioWentAway(outage), at: at);
 
         // assert
-        expectStep(
-          step,
-          radio: const RadioQuiet(),
-          phases: {s1: const Ended(timedOut)},
-        );
+        expectStep(step, radio: const RadioQuiet(), phases: {s1: null});
       });
     }
   });
@@ -782,7 +776,7 @@ void main() {
         final step = scan.on(ResultHeard(heard()), at: at);
 
         // assert
-        expectStep(step, radio: scan.radio, phases: {s1: scan.phaseOf(s1)});
+        expectStep(step, radio: scan.radio, phases: {s1: carried(scan, s1)});
       });
     }
   });
@@ -815,7 +809,7 @@ void main() {
       expectStep(
         step,
         radio: const RadioStopping(),
-        phases: {s1: const Ended(timedOut)},
+        phases: {s1: null},
         duty: const StopTheRadio(),
       );
     });
@@ -843,11 +837,7 @@ void main() {
       final step = scan.on(const ShutDown(), at: at);
 
       // assert
-      expectStep(
-        step,
-        radio: const RadioQuiet(),
-        phases: {s1: const Ended(timedOut)},
-      );
+      expectStep(step, radio: const RadioQuiet(), phases: {s1: null});
     });
   });
 

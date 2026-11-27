@@ -1,13 +1,16 @@
 import 'package:meta/meta.dart';
 
+import '../../../shared/domain/radio_outage.dart';
 import 'radio_phase.dart';
 import 'radio_scan_input.dart';
 import 'radio_scan_step.dart';
+import 'result_routing.dart';
 import 'scan_ask.dart';
 import 'scan_id.dart';
 import 'scan_phase.dart';
 import 'scanner_phase.dart';
 import 'scanner_scans.dart';
+import 'scanners.dart';
 
 export 'radio_scan_step.dart';
 
@@ -16,36 +19,66 @@ export 'radio_scan_step.dart';
 /// for conflicting things.
 ///
 /// It is a value: [on] answers the next radio scan and leaves this one as it
-/// was. Coverage only widens while the radio scans, since narrowing would be
-/// another radio start and platforms throttle starts; an ask while a stop is
-/// in flight waits for the stop to settle.
+/// was. It alone raises the scan events, so no unit outside it derives a
+/// scanner's standing. Coverage only widens while the radio scans, since
+/// narrowing would be another radio start and platforms throttle starts; an
+/// ask while a stop is in flight waits for the stop to settle.
 @immutable
 final class RadioScan {
   /// No scanner, no scan, the radio quiet.
-  const RadioScan.quiet() : radio = const RadioQuiet(), _scanners = const {};
+  const RadioScan.quiet()
+    : radio = const RadioQuiet(),
+      _scanners = const Scanners.none();
 
-  RadioScan._(this.radio, Map<ScannerId, ScannerScans> scanners)
-    : _scanners = Map.unmodifiable(scanners);
+  const RadioScan._(this.radio, this._scanners);
 
   /// Where the shared radio stands.
   final RadioPhase radio;
 
-  final Map<ScannerId, ScannerScans> _scanners;
+  final Scanners _scanners;
 
-  /// Where [scan] stands, or null for a scan never asked.
-  ScanPhase? phaseOf(ScanId scan) => _held(scan)?.phase;
+  /// Where [scan] stands, or null for a scan never asked or ended before the
+  /// latest step.
+  ScanPhase? phaseOf(ScanId scan) => _scanners.find(scan)?.phase;
+
+  /// How many scans are still held, which stays bounded however many come
+  /// and go.
+  @visibleForTesting
+  int get heldScanCount => _scanners.scans.length;
 
   /// Where [scanner] stands, or null for a scanner never opened.
   ScannerPhase? standingOf(ScannerId scanner) => _scanners[scanner]?.standing;
 
   /// Answers what [input], which came at [at], does to the radio and every
-  /// scan.
-  RadioScanStep on(RadioScanInput input, {required DateTime at}) => switch ((
-    radio,
-    input,
-  )) {
+  /// scan, and the events that raised.
+  ///
+  /// A scan already ended when the input comes is forgotten, so the history
+  /// held stays bounded. A [StateError] for an ask from a scanner never
+  /// opened, lost or closed, for a scan already held, and for a scanner
+  /// opened twice: the handles refuse those first.
+  RadioScanStep on(RadioScanInput input, {required DateTime at}) {
+    final kept = RadioScan._(radio, _scanners.withoutEnded());
+    final next = kept._decided(input);
+    return RadioScanStep(
+      next.scan,
+      events: switch (input) {
+        ResultHeard(:final result) => resultRouted(
+          result,
+          radio: radio,
+          scans: kept._scanners.scans,
+          at: at,
+        ),
+        _ => next.scan._scanners.eventsSince(kept._scanners, at),
+      },
+      duty: next.duty,
+    );
+  }
+
+  RadioScanStep _decided(RadioScanInput input) => switch ((radio, input)) {
     (_, ScannerOpened(:final scanner)) => _opened(scanner),
-    (_, ScannerDisposed(:final scanner)) => _disposed(scanner, at),
+    (_, ScannerDisposed(:final scanner)) => _disposed(scanner),
+    (_, ScanAsked(:final scanner, :final id)) when _refuses(scanner, id) =>
+      throw StateError('Scan ${id.value} may not be asked by that scanner.'),
     (_, ResultHeard()) => RadioScanStep(this),
     (
       RadioQuiet() || RadioUnsure(),
@@ -89,14 +122,18 @@ final class RadioScan {
     (RadioScanning(), RadioWentAway(:final outage)) => _ending(
       EndedByRadioOutage(outage),
       radio: const RadioQuiet(),
+      lostTo: outage,
     ),
     (RadioStopping(), RadioWentAway(:final outage)) => _ending(
       EndedByRadioOutage(outage),
       radio: RadioStopping(outage: outage),
       leaversToo: true,
+      lostTo: outage,
     ),
-    (RadioQuiet() || RadioUnsure(), RadioWentAway()) => RadioScanStep(
-      RadioScan._(const RadioQuiet(), _scanners),
+    (RadioQuiet() || RadioUnsure(), RadioWentAway(:final outage)) => _ending(
+      EndedByRadioOutage(outage),
+      radio: const RadioQuiet(),
+      lostTo: outage,
     ),
     (RadioScanning(), ShutDown()) => _ending(
       const EndedOnRequest(),
@@ -114,29 +151,42 @@ final class RadioScan {
     (RadioQuiet(), ShutDown()) => RadioScanStep(this),
   };
 
-  RadioScanStep _opened(ScannerId scanner) =>
-      _scanners.containsKey(scanner)
-          ? RadioScanStep(this)
-          : RadioScanStep(
-            RadioScan._(radio, {
-              ..._scanners,
-              scanner: const ScannerScans.none(),
-            }),
-          );
+  RadioScanStep _opened(ScannerId scanner) {
+    if (_scanners[scanner] != null) {
+      throw StateError('Scanner ${scanner.value} was opened twice.');
+    }
+    return RadioScanStep(
+      RadioScan._(
+        radio,
+        _scanners.withScanner(scanner, const ScannerScans.none()),
+      ),
+    );
+  }
+
+  bool _refuses(ScannerId scanner, ScanId id) =>
+      _scanners[scanner]?.mayAsk != true || _scanners.find(id) != null;
 
   /// Each of the scanner's open scans leaves as if told to one by one, so
-  /// the last of all to leave stops the radio, once.
-  RadioScanStep _disposed(ScannerId scanner, DateTime at) {
-    final open = _scanners[scanner]?.scans.where((scan) => scan.isOpen) ?? [];
+  /// the last of all to leave stops the radio, once. The events are read
+  /// off the whole move, so they are those of every leave in turn.
+  RadioScanStep _disposed(ScannerId scanner) {
+    final disposed = _scanners[scanner];
+    if (disposed == null) return RadioScanStep(this);
     var step = RadioScanStep(this);
-    for (final scan in open) {
-      final next = step.scan.on(
+    for (final scan in disposed.scans.where((scan) => scan.isOpen)) {
+      final next = step.scan._decided(
         ScanLeft(scan.id, const EndedOnRequest()),
-        at: at,
       );
       step = RadioScanStep(next.scan, duty: next.duty ?? step.duty);
     }
-    return step;
+    final left = step.scan._scanners;
+    return RadioScanStep(
+      RadioScan._(
+        step.scan.radio,
+        left.withScanner(scanner, (left[scanner] ?? disposed).closed()),
+      ),
+      duty: step.duty,
+    );
   }
 
   RadioScanStep _servedAlone(ScannerId scanner, ScanId id, ScanAsk ask) {
@@ -164,8 +214,10 @@ final class RadioScan {
   }
 
   RadioScanStep _leftWhileScanning(ScanId id, ScanEnd end) {
-    if (_held(id)?.isOpen != true) return RadioScanStep(this);
-    final othersStay = _allScans.any((scan) => scan.isOpen && scan.id != id);
+    if (_scanners.find(id)?.isOpen != true) return RadioScanStep(this);
+    final othersStay = _scanners.scans.any(
+      (scan) => scan.isOpen && scan.id != id,
+    );
     if (othersStay) return RadioScanStep(_movedOne(id, Ended(end), radio));
     return RadioScanStep(
       _movedOne(id, Leaving(end), const RadioStopping()),
@@ -182,12 +234,12 @@ final class RadioScan {
   /// scans that waited for the stop are served together.
   RadioScanStep _settled({required RadioPhase ifNoneWait}) {
     final waiting = [
-      for (final scan in _allScans)
+      for (final scan in _scanners.scans)
         if (scan.phase is Waiting) scan.ask,
     ];
     final next =
         waiting.isEmpty ? ifNoneWait : RadioScanning(ScanCoverage.of(waiting));
-    final scans = _movedEach(
+    final scans = _scanners.moved(
       (scan) => switch (scan.phase) {
         Leaving(:final end) => Ended(end),
         Waiting() => const Served(),
@@ -201,30 +253,25 @@ final class RadioScan {
   }
 
   /// Every open scan, and with [leaversToo] every leaving one, ends for
-  /// [end] at once.
+  /// [end] at once; with [lostTo], every scanner is lost to that outage.
   RadioScanStep _ending(
     ScanEnd end, {
     required RadioPhase radio,
     bool leaversToo = false,
+    RadioOutage? lostTo,
     RadioDuty? duty,
-  }) => RadioScanStep(
-    RadioScan._(
-      radio,
-      _movedEach(
-        (scan) =>
-            scan.isOpen || (leaversToo && scan.phase is Leaving)
-                ? Ended(end)
-                : null,
-      ),
-    ),
-    duty: duty,
-  );
-
-  Iterable<HeldScan> get _allScans =>
-      _scanners.values.expand((scanner) => scanner.scans);
-
-  HeldScan? _held(ScanId id) =>
-      _scanners.values.map((scans) => scans.find(id)).nonNulls.firstOrNull;
+  }) {
+    final moved = _scanners.moved(
+      (scan) =>
+          scan.isOpen || (leaversToo && scan.phase is Leaving)
+              ? Ended(end)
+              : null,
+    );
+    return RadioScanStep(
+      RadioScan._(radio, lostTo == null ? moved : moved.lost(lostTo)),
+      duty: duty,
+    );
+  }
 
   RadioScan _asked(
     ScannerId scanner,
@@ -234,19 +281,15 @@ final class RadioScan {
     RadioPhase? next,
   ]) {
     final scans = _scanners[scanner] ?? const ScannerScans.none();
-    return RadioScan._(next ?? radio, {
-      ..._scanners,
-      scanner: scans.asked(id, ask, phase),
-    });
+    return RadioScan._(
+      next ?? radio,
+      _scanners.withScanner(scanner, scans.asked(id, ask, phase)),
+    );
   }
 
   RadioScan _movedOne(ScanId id, ScanPhase phase, RadioPhase next) =>
-      RadioScan._(next, _movedEach((scan) => scan.id == id ? phase : null));
-
-  Map<ScannerId, ScannerScans> _movedEach(
-    ScanPhase? Function(HeldScan scan) change,
-  ) => {
-    for (final MapEntry(key: id, value: scans) in _scanners.entries)
-      id: scans.moved(change),
-  };
+      RadioScan._(
+        next,
+        _scanners.moved((scan) => scan.id == id ? phase : null),
+      );
 }
