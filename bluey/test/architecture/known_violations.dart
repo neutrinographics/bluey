@@ -15,11 +15,7 @@ const unplaced = <String>[
   'lib/src/connection/lifecycle_client.dart -> unplaced',
   'lib/src/connection/peer_silence_monitor.dart -> unplaced',
   'lib/src/connection/value_objects/attribute_handle.dart -> unplaced',
-  'lib/src/discovery/advertisement.dart -> unplaced',
   'lib/src/discovery/bluey_scanner.dart -> unplaced',
-  'lib/src/discovery/device.dart -> unplaced',
-  'lib/src/discovery/scan.dart -> unplaced',
-  'lib/src/discovery/scan_result.dart -> unplaced',
   'lib/src/discovery/scan_state.dart -> unplaced',
   'lib/src/discovery/scanner.dart -> unplaced',
   'lib/src/events.dart -> unplaced',
@@ -107,10 +103,10 @@ const lintOptions = <String>[];
 
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
-  'lib/src/bluey.dart -> 974 lines',
+  'lib/src/bluey.dart -> 973 lines',
   'lib/src/connection/bluey_connection.dart -> 970 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
-  'lib/src/discovery/bluey_scanner.dart -> 410 lines',
+  'lib/src/discovery/bluey_scanner.dart -> 406 lines',
   'lib/src/events.dart -> 477 lines',
   'lib/src/gatt_server/bluey_server.dart -> 1180 lines',
   'lib/src/gatt_server/lifecycle_server.dart -> 413 lines',

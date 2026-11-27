@@ -11,7 +11,6 @@ import 'connection/bluey_connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
 import 'discovery/bluey_scanner.dart';
-import 'discovery/device.dart';
 import 'discovery/scanner.dart';
 import 'events.dart';
 import 'features/connection/infrastructure/adapters/platform_connection_ports.dart';

@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import '../shared/domain/device_address.dart';
+import '../../../shared/domain/device_address.dart';
 
 /// A BLE device with a stable identity.
 ///
@@ -36,8 +36,7 @@ class Device {
   static const _sentinel = Object();
 
   @override
-  bool operator ==(Object other) =>
-      other is Device && other.address == address;
+  bool operator ==(Object other) => other is Device && other.address == address;
 
   @override
   int get hashCode => address.hashCode;

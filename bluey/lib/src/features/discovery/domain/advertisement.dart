@@ -2,8 +2,8 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'package:meta/meta.dart';
 
-import '../shared/domain/manufacturer_data.dart';
-import '../shared/domain/uuid.dart';
+import '../../../shared/domain/manufacturer_data.dart';
+import '../../../shared/domain/uuid.dart';
 
 bool _listEquals<T>(List<T>? a, List<T>? b) {
   if (identical(a, b)) return true;

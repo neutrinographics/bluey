@@ -12,10 +12,6 @@ import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/domain/manufacturer_data.dart';
 import '../shared/domain/uuid.dart';
-import 'advertisement.dart';
-import 'device.dart';
-import 'scan.dart';
-import 'scan_result.dart';
 import 'scan_state.dart';
 import 'scanner.dart';
 

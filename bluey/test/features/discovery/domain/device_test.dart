@@ -1,4 +1,4 @@
-import 'package:bluey/src/discovery/device.dart';
+import 'package:bluey/src/features/discovery/domain/device.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 

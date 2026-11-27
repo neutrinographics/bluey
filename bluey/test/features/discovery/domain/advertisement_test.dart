@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bluey/src/discovery/advertisement.dart';
+import 'package:bluey/src/features/discovery/domain/advertisement.dart';
 import 'package:bluey/src/shared/domain/manufacturer_data.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 
