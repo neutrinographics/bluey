@@ -52,8 +52,8 @@ void main() {
       ],
     );
     expect(negotiation.limitReads, [
-      (session.link.id, true),
-      (session.link.id, false),
+      (session.id, true),
+      (session.id, false),
     ]);
   });
 

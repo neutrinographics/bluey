@@ -20,6 +20,8 @@ void main() {
   group('stateWordOf', () {
     // (name, phase, the word logs have always written)
     final rows = <(String, LinkPhase, String)>[
+      ('opening', const Opening(), 'ConnectionState.connecting'),
+      ('never opened', const NeverOpened(), 'ConnectionState.disconnected'),
       ('linked', const Linked(), 'ConnectionState.linked'),
       ('ready', const Ready(), 'ConnectionState.ready'),
       (

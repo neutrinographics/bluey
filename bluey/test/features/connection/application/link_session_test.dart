@@ -85,6 +85,27 @@ void main() {
 
   Iterable<LinkEnded> ends() => events.raised.whereType<LinkEnded>();
 
+  group('its id', () {
+    test('is the id the platform answered for the link', () async {
+      // arrange
+      final id = (await links.open(
+        timed,
+      )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+
+      // act
+      final opened = LinkSession(
+        link: Link.open(id: id, device: timed, at: now).link,
+        links: links,
+        events: events,
+        log: log,
+        now: () => now,
+      );
+
+      // assert
+      expect(opened.id, id);
+    });
+  });
+
   group('as a live link', () {
     test('is closing from the moment a close is asked until it is let go '
         'of', () async {

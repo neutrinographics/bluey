@@ -6,6 +6,8 @@ void main() {
   group('equality by value', () {
     // (name, a phase, an equal phase built apart, a phase that differs)
     final rows = <(String, LinkPhase, LinkPhase, LinkPhase)>[
+      ('opening', const Opening(), Opening(), const NeverOpened()),
+      ('never opened', const NeverOpened(), NeverOpened(), const Opening()),
       ('linked', const Linked(), Linked(), const Ready()),
       ('ready', const Ready(), Ready(), const Linked()),
       (

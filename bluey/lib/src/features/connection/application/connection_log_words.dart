@@ -20,6 +20,8 @@ const gattLogContext = 'bluey.gatt';
 
 /// The word a `state transition` line names for a link entering [phase].
 String stateWordOf(LinkPhase phase) => switch (phase) {
+  Opening() => 'ConnectionState.connecting',
+  NeverOpened() => 'ConnectionState.disconnected',
   Linked() => 'ConnectionState.linked',
   Ready() => 'ConnectionState.ready',
   Closing() => 'ConnectionState.disconnecting',

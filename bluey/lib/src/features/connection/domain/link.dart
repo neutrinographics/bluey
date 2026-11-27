@@ -14,15 +14,43 @@ sealed class LinkDuty {
   const LinkDuty();
 }
 
+/// The link is up: start hearing what the radio says about it.
+final class FollowTheLink extends LinkDuty {
+  const FollowTheLink(this.id);
+
+  /// The link to follow, as the platform knows it.
+  final LinkId id;
+
+  @override
+  bool operator ==(Object other) => other is FollowTheLink && other.id == id;
+
+  @override
+  int get hashCode => Object.hash(FollowTheLink, id);
+}
+
+/// The open failed: nothing was acquired for the link, so let it go.
+final class ForgetTheLink extends LinkDuty {
+  const ForgetTheLink();
+
+  @override
+  bool operator ==(Object other) => other is ForgetTheLink;
+
+  @override
+  int get hashCode => (ForgetTheLink).hashCode;
+}
+
 /// Ask the platform to close the link, and feed its answer back.
 final class CloseTheLink extends LinkDuty {
-  const CloseTheLink();
+  const CloseTheLink(this.id);
+
+  /// The link to close, as the platform knows it.
+  final LinkId id;
 
   @override
-  bool operator ==(Object other) => other is CloseTheLink;
+  bool operator ==(Object other) => other is CloseTheLink && other.id == id;
 
   @override
-  int get hashCode => (CloseTheLink).hashCode;
+  int get hashCode => Object.hash(CloseTheLink, id);
 }
 
 /// The link has ended: release what lives as long as it. It carries the
@@ -62,13 +90,14 @@ final class LinkStep {
   /// one: a closing link whose closer changed has not begun closing again.
   final LinkPhase? entered;
 
-  /// What the step raised, in order; empty unless it opened or ended the
-  /// link, so each is raised once in the link's life.
+  /// What the step raised, in order; empty unless it began, opened or ended
+  /// the link, so each is raised once in the link's life.
   final List<LinkEvent> events;
 }
 
-/// One link to a device and its lifecycle, which decides what every event
-/// does to the link.
+/// One link to a device and its lifecycle, from the moment its open is
+/// asked for, which decides what every event does to the link and raises
+/// every event the link's life tells of.
 ///
 /// It is a value: [on] answers the next link and leaves this one as it was,
 /// so one owner can keep the only current copy. An ended link is final, so a
@@ -82,26 +111,43 @@ final class LinkStep {
 /// again.
 @immutable
 final class Link {
-  /// A link the platform has just connected at [at]; the lifecycle starts
-  /// at [Linked]. It is the only way to build a link, so every link has
-  /// walked the lifecycle from its start and was told of as opened.
+  /// A link to [device] whose open is asked for at [at]; the lifecycle
+  /// starts at [Opening]. It is the only way to build a link, so every link
+  /// has walked the lifecycle from its start and was told of as beginning.
+  static LinkStep begin({required DeviceAddress device, required DateTime at}) {
+    const opening = Opening();
+    return LinkStep(
+      Link._(id: null, device: device, phase: opening),
+      entered: opening,
+      events: [LinkOpenBegan(device: device, at: at)],
+    );
+  }
+
+  /// A link the platform has just connected, as [begin] and the open's
+  /// success make it.
   static LinkStep open({
     required LinkId id,
     required DeviceAddress device,
     required DateTime at,
   }) {
-    const linked = Linked();
+    final opened = begin(
+      device: device,
+      at: at,
+    ).link.on(OpenSucceeded(id), at: at);
     return LinkStep(
-      Link._(id: id, device: device, phase: linked),
-      entered: linked,
-      events: [LinkOpened(device: device, at: at)],
+      opened.link,
+      entered: opened.entered,
+      events: opened.events,
     );
   }
 
   const Link._({required this.id, required this.device, required this.phase});
 
-  /// Which link this is.
-  final LinkId id;
+  /// The platform's handle for the link, null until the open succeeds and
+  /// for a link that never opened. It is not what tells one link from
+  /// another: a platform may hand the next link to a device the last one's
+  /// id, so Connection keys its links by device.
+  final LinkId? id;
 
   /// The device the link reaches.
   final DeviceAddress device;
@@ -118,7 +164,7 @@ final class Link {
   /// The end the link has reached, or the one a closing link is heading for;
   /// null while the link is up.
   LinkEnd? get endInSight => switch (phase) {
-    UpPhase() => null,
+    Opening() || NeverOpened() || UpPhase() => null,
     Closing(:final by) => _endOfClosingBy(by),
     Ended(:final end) => end,
   };
@@ -137,7 +183,15 @@ final class Link {
     phase,
     input,
   )) {
-    (Ended(), _) => LinkStep(this),
+    (Ended() || NeverOpened(), _) => LinkStep(this),
+    (Opening(), OpenSucceeded(:final id)) => _opened(id, at),
+    (Opening(), OpenFailed()) => LinkStep(
+      _in(const NeverOpened()),
+      duty: const ForgetTheLink(),
+      entered: const NeverOpened(),
+    ),
+    (Opening(), _) => LinkStep(this),
+    (_, OpenSucceeded() || OpenFailed()) => LinkStep(this),
     (_, RadioOutageBegan(:final outage)) => _end(
       EndedByRadioOutage(outage),
       at,
@@ -158,7 +212,7 @@ final class Link {
       _end(const EndedByDrop(), at),
     (final UpPhase up, DisconnectRequested()) => _enter(
       Closing(returnTo: up, by: ClosingBy.request),
-      duty: const CloseTheLink(),
+      duty: CloseTheLink(_upId),
     ),
     (UpPhase(), CloseConfirmed() || CloseFailed()) => LinkStep(this),
     (Closing(), ServicesDiscovered()) => LinkStep(this),
@@ -181,7 +235,7 @@ final class Link {
     (Closing(:final returnTo, by: ClosingBy.radio), DisconnectRequested()) =>
       _stay(
         Closing(returnTo: returnTo, by: ClosingBy.both),
-        duty: const CloseTheLink(),
+        duty: CloseTheLink(_upId),
       ),
     (Closing(by: ClosingBy.request || ClosingBy.both), CloseConfirmed()) =>
       _end(const EndedOnRequest(), at),
@@ -194,6 +248,21 @@ final class Link {
     (Closing(by: ClosingBy.radio), CloseConfirmed() || CloseFailed()) =>
       LinkStep(this),
   };
+
+  /// The id of a link that has opened; only such a link can be closed, so
+  /// asking it of one that has not is a fault in this class.
+  LinkId get _upId =>
+      id ?? (throw StateError('The link to $device has not opened.'));
+
+  LinkStep _opened(LinkId id, DateTime at) {
+    const linked = Linked();
+    return LinkStep(
+      Link._(id: id, device: device, phase: linked),
+      duty: FollowTheLink(id),
+      entered: linked,
+      events: [LinkOpened(device: device, at: at)],
+    );
+  }
 
   static LinkEnd _endOfClosingBy(ClosingBy by) => switch (by) {
     ClosingBy.radio => const EndedByDrop(),

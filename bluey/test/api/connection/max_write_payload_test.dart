@@ -7,10 +7,8 @@ import '../../fakes/fake_platform.dart';
 import '../../fakes/test_helpers.dart';
 
 void main() {
-  Device deviceFor(String address) => Device(
-    address: DeviceAddress(address),
-    name: 'Test Device',
-  );
+  Device deviceFor(String address) =>
+      Device(address: DeviceAddress(address), name: 'Test Device');
 
   late FakeBlueyPlatform fakePlatform;
   late Bluey bluey;
@@ -124,9 +122,7 @@ void main() {
       final before = await connection.maxWritePayload(withResponse: false);
       expect(before.value, equals(20));
 
-      await connection.android!.requestMtu(
-        Mtu(247),
-      );
+      await connection.android!.requestMtu(Mtu(247));
 
       // Post-negotiation: MTU 247 -> 244 byte payload.
       final after = await connection.maxWritePayload(withResponse: false);

@@ -67,6 +67,6 @@ final class MtuSession {
         completeDetail:
             (negotiated) =>
                 'requested=${desired.value}, negotiated=${negotiated.value}',
-        run: () => _negotiation.request(_session.link.id, desired),
+        run: () => _negotiation.request(_session.id, desired),
       );
 }

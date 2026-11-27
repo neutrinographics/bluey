@@ -42,10 +42,8 @@ import '../../fixtures/shared/application/recording_log.dart';
 /// dispatch and the "still wired up" smoke tests for an Android-flavored
 /// connection.
 void main() {
-  Device deviceFor(String address) => Device(
-    address: DeviceAddress(address),
-    name: 'Test Device',
-  );
+  Device deviceFor(String address) =>
+      Device(address: DeviceAddress(address), name: 'Test Device');
 
   /// Android-flavored profile: `platformKind == android` plus every
   /// Android-specific feature flag enabled, so the methods on
@@ -298,8 +296,8 @@ void main() {
 
     test('each member answers what its session holds', () async {
       // arrange
-      bonding.report(session.link.id, BondState.bonded);
-      phy.report(session.link.id, (tx: Phy.le2m, rx: Phy.leCoded));
+      bonding.report(session.id, BondState.bonded);
+      phy.report(session.id, (tx: Phy.le2m, rx: Phy.leCoded));
       mtu.settleAt(185);
 
       // act
@@ -375,7 +373,7 @@ void main() {
       final ended = android.bondStateChanges
           .handleError((Object error) => seen.add(error))
           .forEach(seen.add);
-      bonding.report(session.link.id, BondState.bonding);
+      bonding.report(session.id, BondState.bonding);
       await pumpEventQueue();
 
       // act

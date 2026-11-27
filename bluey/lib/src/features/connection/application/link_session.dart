@@ -7,6 +7,7 @@ import '../../../shared/domain/either.dart';
 import '../domain/connection_failure.dart';
 import '../domain/link.dart';
 import '../domain/link_end.dart';
+import '../domain/link_id.dart';
 import '../domain/link_input.dart';
 import '../domain/link_phase.dart';
 import '../domain/live_link.dart';
@@ -36,7 +37,7 @@ final class LinkSession implements LiveLink {
        _log = log,
        _now = now {
     _reports = links
-        .reportsOf(link.id)
+        .reportsOf(id)
         .listen(
           (report) => _feed(RadioReported(report)),
           onDone: () => _feed(const ReportsEnded()),
@@ -62,6 +63,12 @@ final class LinkSession implements LiveLink {
 
   /// The link as it stands now; the session holds the only current copy.
   Link get link => _link;
+
+  /// The platform's handle for the link. A session reaches its callers
+  /// only once its link is up, so the handle is there for every caller.
+  LinkId get id =>
+      _link.id ??
+      (throw StateError('The link to ${_link.device} has not opened.'));
 
   /// Where the link stands now.
   LinkPhase get phase => _link.phase;
@@ -125,7 +132,7 @@ final class LinkSession implements LiveLink {
     if (_link.hasEnded) return _afterRelease();
     _logDevice('disconnect entered');
     final duty = _step(const DisconnectRequested()).duty;
-    if (duty is CloseTheLink) return _closeInFlight = _close();
+    if (duty is CloseTheLink) return _closeInFlight = _close(duty.id);
     _carryOut(duty);
     return _afterRelease();
   }
@@ -144,8 +151,10 @@ final class LinkSession implements LiveLink {
 
   void _carryOut(LinkDuty? duty) {
     switch (duty) {
-      case CloseTheLink():
-        _closeInFlight = _close();
+      case CloseTheLink(:final id):
+        _closeInFlight = _close(id);
+      case FollowTheLink() || ForgetTheLink():
+        break;
       case ReleaseTheLink(:final end):
         unawaited(_release(end));
       case null:
@@ -163,8 +172,8 @@ final class LinkSession implements LiveLink {
     _phases.add(entered);
   }
 
-  Future<Either<ConnectionFailure, void>> _close() async {
-    final answer = await _links.close(_link.id);
+  Future<Either<ConnectionFailure, void>> _close(LinkId id) async {
+    final answer = await _links.close(id);
     _closeInFlight = null;
     if (answer case Left(:final value) when !_link.hasEnded) {
       _feed(const CloseFailed());

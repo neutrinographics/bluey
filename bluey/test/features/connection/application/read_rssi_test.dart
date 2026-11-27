@@ -37,7 +37,7 @@ void main() {
 
     // assert
     expect(answer, const Right<ConnectionFailure, int>(-58));
-    expect(strength.reads, [session.link.id]);
+    expect(strength.reads, [session.id]);
   });
 
   test('answers the end of a link that is not up, and asks nothing', () async {

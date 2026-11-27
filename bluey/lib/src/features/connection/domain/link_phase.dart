@@ -10,6 +10,31 @@ sealed class LinkPhase {
   const LinkPhase();
 }
 
+/// The platform was asked to open the link and has not answered; the link
+/// has no id yet, and nothing it is told is heard until the answer comes.
+final class Opening extends LinkPhase {
+  const Opening();
+
+  @override
+  bool operator ==(Object other) => other is Opening;
+
+  @override
+  int get hashCode => (Opening).hashCode;
+}
+
+/// The platform failed the open, so the link never came up. It is final,
+/// and carries no [LinkEnd]: a link that never opened did not end for any
+/// reason a link that was up can end for.
+final class NeverOpened extends LinkPhase {
+  const NeverOpened();
+
+  @override
+  bool operator ==(Object other) => other is NeverOpened;
+
+  @override
+  int get hashCode => (NeverOpened).hashCode;
+}
+
 /// The link is up, so a failed close of ours can return it here.
 sealed class UpPhase extends LinkPhase {
   const UpPhase();

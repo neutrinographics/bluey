@@ -12,6 +12,8 @@ const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 final opened = DateTime.utc(2026, 11, 26, 9);
 final at = DateTime.utc(2026, 11, 26, 10);
 
+Link opening() => Link.begin(device: device, at: opened).link;
+
 Link after(List<LinkInput> inputs) => inputs.fold(
   Link.open(id: id, device: device, at: opened).link,
   (link, input) => link.on(input, at: opened).link,
@@ -91,6 +93,129 @@ void main() {
     });
   });
 
+  group('beginning', () {
+    test('a link begins opening, with no id, and raises that its open '
+        'began', () {
+      // act
+      final step = Link.begin(device: device, at: at);
+
+      // assert
+      expect(step.link.phase, const Opening());
+      expect((step.link.id, step.link.device), (null, device));
+      expect(step.link.endInSight, isNull);
+      expect(step.entered, const Opening());
+      expect(step.duty, isNull);
+      expect(step.events, [LinkOpenBegan(device: device, at: at)]);
+    });
+
+    test('an open that succeeds links it under the id and raises that it '
+        'opened', () {
+      // act
+      final step = opening().on(const OpenSucceeded(id), at: at);
+
+      // assert
+      expect(step.link.phase, linked);
+      expect((step.link.id, step.link.device), (id, device));
+      expect(step.entered, linked);
+      expect(step.duty, const FollowTheLink(id));
+      expect(step.events, [LinkOpened(device: device, at: at)]);
+    });
+
+    test('an open that fails leaves a link that never opened, and raises '
+        'nothing', () {
+      // act
+      final step = opening().on(const OpenFailed(), at: at);
+
+      // assert
+      expect(step.link.phase, const NeverOpened());
+      expect(
+        (step.link.id, step.link.end, step.link.endInSight),
+        (null, null, null),
+      );
+      expect(
+        (step.link.isUp, step.link.isClosing, step.link.hasEnded),
+        (false, false, false),
+      );
+      expect(step.entered, const NeverOpened());
+      expect(step.duty, const ForgetTheLink());
+      expect(step.events, isEmpty);
+    });
+
+    const others = <LinkInput>[
+      discovered,
+      request,
+      RadioReported(LinkReport.connecting),
+      RadioReported(LinkReport.connected),
+      radioClosing,
+      radioGone,
+      ReportsEnded(),
+      CloseConfirmed(),
+      CloseFailed(),
+      RadioOutageBegan(RadioOutage.off),
+    ];
+
+    test('an opening link waits for its open\'s answer, whatever else '
+        'happens', () {
+      for (final input in others) {
+        // arrange
+        final link = opening();
+
+        // act
+        final step = link.on(input, at: at);
+
+        // assert
+        expect(step.link, same(link), reason: '$input');
+        expect(step.duty, isNull, reason: '$input');
+        expect(step.entered, isNull, reason: '$input');
+        expect(step.events, isEmpty, reason: '$input');
+      }
+    });
+
+    test('a link that never opened answers everything with itself', () {
+      // arrange
+      final never = opening().on(const OpenFailed(), at: at).link;
+
+      for (final input in [
+        ...others,
+        const OpenSucceeded(id),
+        const OpenFailed(),
+      ]) {
+        // act
+        final step = never.on(input, at: at);
+
+        // assert
+        expect(step.link, same(never), reason: '$input');
+        expect(step.duty, isNull, reason: '$input');
+        expect(step.entered, isNull, reason: '$input');
+        expect(step.events, isEmpty, reason: '$input');
+      }
+    });
+
+    test('a link past its open ignores a late answer to it', () {
+      // arrange
+      final past = [
+        after([]),
+        after([discovered]),
+        after([request]),
+        after([radioGone]),
+      ];
+
+      for (final link in past) {
+        for (final input in const [OpenSucceeded(LinkId('L2')), OpenFailed()]) {
+          // act
+          final step = link.on(input, at: at);
+
+          // assert
+          expect(step.link, same(link), reason: '${link.phase} $input');
+          expect(step.link.id, id);
+          expect(step.duty, isNull);
+          expect(step.entered, isNull);
+          expect(step.events, isEmpty);
+        }
+      }
+    });
+  });
+
   group('the lifecycle table', () {
     checkEach([
       (
@@ -139,7 +264,7 @@ void main() {
         request,
         closing(ready, ClosingBy.request),
         null,
-        const CloseTheLink(),
+        const CloseTheLink(id),
         closing(ready, ClosingBy.request),
         const EndedOnRequest(),
       ),
@@ -160,7 +285,7 @@ void main() {
         request,
         closing(linked, ClosingBy.both),
         null,
-        const CloseTheLink(),
+        const CloseTheLink(id),
         null,
         const EndedOnRequest(),
       ),
@@ -357,7 +482,7 @@ void main() {
         request,
         closing(ready, ClosingBy.both),
         null,
-        const CloseTheLink(),
+        const CloseTheLink(id),
         null,
         const EndedOnRequest(),
       ),
@@ -463,8 +588,18 @@ void main() {
   group('duties', () {
     test('are equal by value', () {
       // assert
-      expect(const CloseTheLink(), const CloseTheLink());
-      expect(const CloseTheLink().hashCode, const CloseTheLink().hashCode);
+      expect(const CloseTheLink(id), const CloseTheLink(id));
+      expect(const CloseTheLink(id).hashCode, const CloseTheLink(id).hashCode);
+      expect(const CloseTheLink(id), isNot(const CloseTheLink(LinkId('L2'))));
+      expect(const FollowTheLink(id), const FollowTheLink(id));
+      expect(
+        const FollowTheLink(id).hashCode,
+        const FollowTheLink(id).hashCode,
+      );
+      expect(const FollowTheLink(id), isNot(const FollowTheLink(LinkId('L2'))));
+      expect(const ForgetTheLink(), const ForgetTheLink());
+      expect(const ForgetTheLink().hashCode, const ForgetTheLink().hashCode);
+      expect(const ForgetTheLink(), isNot(const FollowTheLink(id)));
       expect(
         const ReleaseTheLink(EndedByDrop()).hashCode,
         const ReleaseTheLink(EndedByDrop()).hashCode,
@@ -473,7 +608,10 @@ void main() {
         const ReleaseTheLink(EndedByDrop()),
         isNot(const ReleaseTheLink(EndedOnRequest())),
       );
-      expect(const CloseTheLink(), isNot(const ReleaseTheLink(EndedByDrop())));
+      expect(
+        const CloseTheLink(id),
+        isNot(const ReleaseTheLink(EndedByDrop())),
+      );
     });
   });
 
@@ -505,6 +643,16 @@ void main() {
         true,
       ),
     ];
+
+    test('a link that is opening', () {
+      // act
+      final link = opening();
+
+      // assert
+      expect(link.isUp, isFalse);
+      expect(link.isClosing, isFalse);
+      expect(link.hasEnded, isFalse);
+    });
 
     for (final (name, inputs, isUp, isClosing, hasEnded) in rows) {
       test('a link that is $name', () {

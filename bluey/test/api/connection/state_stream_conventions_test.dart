@@ -84,7 +84,11 @@ void main() {
       final s2 = connection.stateChanges.listen(r2.add);
       await Future<void>.delayed(Duration.zero);
       expect(r1, isNotEmpty, reason: 'first subscriber should see replay');
-      expect(r2, isNotEmpty, reason: 'second subscriber should also see replay');
+      expect(
+        r2,
+        isNotEmpty,
+        reason: 'second subscriber should also see replay',
+      );
       expect(r1.first, equals(connection.state));
       expect(r2.first, equals(connection.state));
       await s1.cancel();
@@ -95,17 +99,19 @@ void main() {
     // servicesChanges
     // ---------------------------------------------------------------
 
-    test('servicesChanges: single subscriber receives current services',
-        () async {
-      final connection = await establish();
-      final current = await connection.services();
-      final received = <List<RemoteService>>[];
-      final sub = connection.servicesChanges.listen(received.add);
-      await Future<void>.delayed(Duration.zero);
-      expect(received, isNotEmpty);
-      expect(received.first.length, equals(current.length));
-      await sub.cancel();
-    });
+    test(
+      'servicesChanges: single subscriber receives current services',
+      () async {
+        final connection = await establish();
+        final current = await connection.services();
+        final received = <List<RemoteService>>[];
+        final sub = connection.servicesChanges.listen(received.add);
+        await Future<void>.delayed(Duration.zero);
+        expect(received, isNotEmpty);
+        expect(received.first.length, equals(current.length));
+        await sub.cancel();
+      },
+    );
 
     test('servicesChanges: two subscribers each get replay', () async {
       final connection = await establish();
@@ -117,7 +123,11 @@ void main() {
       final s2 = connection.servicesChanges.listen(r2.add);
       await Future<void>.delayed(Duration.zero);
       expect(r1, isNotEmpty, reason: 'first subscriber should see replay');
-      expect(r2, isNotEmpty, reason: 'second subscriber should also see replay');
+      expect(
+        r2,
+        isNotEmpty,
+        reason: 'second subscriber should also see replay',
+      );
       expect(r1.first.length, equals(current.length));
       expect(r2.first.length, equals(current.length));
       await s1.cancel();
@@ -128,17 +138,19 @@ void main() {
     // bondStateChanges (Android-only)
     // ---------------------------------------------------------------
 
-    test('bondStateChanges: single subscriber receives current value',
-        () async {
-      final connection = await establish();
-      final android = connection.android!;
-      final received = <BondState>[];
-      final sub = android.bondStateChanges.listen(received.add);
-      await Future<void>.delayed(Duration.zero);
-      expect(received, isNotEmpty);
-      expect(received.first, equals(android.bondState));
-      await sub.cancel();
-    });
+    test(
+      'bondStateChanges: single subscriber receives current value',
+      () async {
+        final connection = await establish();
+        final android = connection.android!;
+        final received = <BondState>[];
+        final sub = android.bondStateChanges.listen(received.add);
+        await Future<void>.delayed(Duration.zero);
+        expect(received, isNotEmpty);
+        expect(received.first, equals(android.bondState));
+        await sub.cancel();
+      },
+    );
 
     test('bondStateChanges: two subscribers each get replay', () async {
       final connection = await establish();
@@ -150,7 +162,11 @@ void main() {
       final s2 = android.bondStateChanges.listen(r2.add);
       await Future<void>.delayed(Duration.zero);
       expect(r1, isNotEmpty, reason: 'first subscriber should see replay');
-      expect(r2, isNotEmpty, reason: 'second subscriber should also see replay');
+      expect(
+        r2,
+        isNotEmpty,
+        reason: 'second subscriber should also see replay',
+      );
       expect(r1.first, equals(android.bondState));
       expect(r2.first, equals(android.bondState));
       await s1.cancel();
@@ -183,7 +199,11 @@ void main() {
       final s2 = android.phyChanges.listen(r2.add);
       await Future<void>.delayed(Duration.zero);
       expect(r1, isNotEmpty, reason: 'first subscriber should see replay');
-      expect(r2, isNotEmpty, reason: 'second subscriber should also see replay');
+      expect(
+        r2,
+        isNotEmpty,
+        reason: 'second subscriber should also see replay',
+      );
       expect(r1.first.tx, equals(android.txPhy));
       expect(r2.first.tx, equals(android.txPhy));
       await s1.cancel();
@@ -212,13 +232,16 @@ void main() {
       },
     );
 
-    test('connection.state returns invalidated after adapter invalidation', () async {
-      final connection = await establish();
-      fakePlatform.setState(platform.BluetoothState.off);
-      await pumpEventQueue();
+    test(
+      'connection.state returns invalidated after adapter invalidation',
+      () async {
+        final connection = await establish();
+        fakePlatform.setState(platform.BluetoothState.off);
+        await pumpEventQueue();
 
-      expect(connection.state, equals(ConnectionState.invalidated));
-    });
+        expect(connection.state, equals(ConnectionState.invalidated));
+      },
+    );
 
     test(
       'late subscriber after invalidation receives ConnectionState.invalidated and onDone',
@@ -285,27 +308,24 @@ void main() {
       },
     );
 
-    test(
-      'phyChanges errors with StaleHandleException then closes',
-      () async {
-        final connection = await establish();
-        final android = connection.android!;
-        Object? errorReceived;
-        final completer = Completer<void>();
+    test('phyChanges errors with StaleHandleException then closes', () async {
+      final connection = await establish();
+      final android = connection.android!;
+      Object? errorReceived;
+      final completer = Completer<void>();
 
-        android.phyChanges.listen(
-          (_) {},
-          onError: (e) => errorReceived = e,
-          onDone: completer.complete,
-        );
-        await Future<void>.delayed(Duration.zero);
+      android.phyChanges.listen(
+        (_) {},
+        onError: (e) => errorReceived = e,
+        onDone: completer.complete,
+      );
+      await Future<void>.delayed(Duration.zero);
 
-        fakePlatform.setState(platform.BluetoothState.off);
-        await completer.future;
+      fakePlatform.setState(platform.BluetoothState.off);
+      await completer.future;
 
-        expect(errorReceived, isA<StaleHandleException>());
-      },
-    );
+      expect(errorReceived, isA<StaleHandleException>());
+    });
 
     test(
       'late subscriber on servicesChanges after invalidation receives StaleHandleException',

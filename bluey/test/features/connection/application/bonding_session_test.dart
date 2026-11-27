@@ -63,7 +63,7 @@ void main() {
 
   test('the first read sets the state', () async {
     // arrange
-    port.answer(session.link.id, BondState.bonded);
+    port.answer(session.id, BondState.bonded);
 
     // act
     final bonding = bondingOver();
@@ -76,7 +76,7 @@ void main() {
     );
     expect(
       port.asked.where((asked) => asked.$1 == LinkOperation.readBondState),
-      [(LinkOperation.readBondState, session.link.id)],
+      [(LinkOperation.readBondState, session.id)],
     );
   });
 
@@ -84,7 +84,7 @@ void main() {
       'state it had', () async {
     // arrange
     final bonding = bondingOver();
-    final link = session.link.id;
+    final link = session.id;
     final seen = <BondState>[];
     rightOf(bonding.changes).listen(seen.add);
 
@@ -107,9 +107,9 @@ void main() {
       // arrange
       port
         ..holdReads()
-        ..answer(session.link.id, BondState.bonded);
+        ..answer(session.id, BondState.bonded);
       final bonding = bondingOver();
-      port.report(session.link.id, BondState.bonding);
+      port.report(session.id, BondState.bonding);
       await pumpEventQueue();
 
       // act
@@ -128,7 +128,7 @@ void main() {
     // arrange
     port
       ..holdReads()
-      ..answer(session.link.id, BondState.bonded);
+      ..answer(session.id, BondState.bonded);
     final bonding = bondingOver();
     links.drop(device);
     await pumpEventQueue();
@@ -218,7 +218,7 @@ void main() {
       'request answers the end', () async {
     // arrange
     final bonding = bondingOver();
-    port.report(session.link.id, BondState.bonded);
+    port.report(session.id, BondState.bonded);
     await pumpEventQueue();
     await session.disconnect();
 
@@ -270,7 +270,7 @@ void main() {
     final early = <BondState>[];
     var earlyEnded = false;
     rightOf(bonding.changes).listen(early.add, onDone: () => earlyEnded = true);
-    port.report(session.link.id, BondState.bonded);
+    port.report(session.id, BondState.bonded);
     await pumpEventQueue();
 
     // act
@@ -305,8 +305,8 @@ void main() {
       ],
     );
     expect(port.asked.skip(2), [
-      (LinkOperation.bond, session.link.id),
-      (LinkOperation.removeBond, session.link.id),
+      (LinkOperation.bond, session.id),
+      (LinkOperation.removeBond, session.id),
     ]);
     expect(log.records, isEmpty);
   });
@@ -338,7 +338,7 @@ void main() {
   test('a report after the link ended changes nothing', () async {
     // arrange
     final bonding = bondingOver();
-    final link = session.link.id;
+    final link = session.id;
     links.drop(device);
     await pumpEventQueue();
 

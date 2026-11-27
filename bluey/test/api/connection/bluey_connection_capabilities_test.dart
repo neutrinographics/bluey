@@ -32,10 +32,8 @@ import '../../fakes/test_helpers.dart';
 /// `capability_gating_test.dart`; the tests here additionally guard the
 /// connection-setup behaviour (subscribe-only-when-supported).
 void main() {
-  Device deviceFor(String address) => Device(
-    address: DeviceAddress(address),
-    name: 'Test Device',
-  );
+  Device deviceFor(String address) =>
+      Device(address: DeviceAddress(address), name: 'Test Device');
 
   group('BlueyConnection capability gating', () {
     test('connecting on a canBond=false Android platform completes without '
