@@ -5,32 +5,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../fakes/fake_platform.dart';
 
-/// A fake that counts who listens to the adapter's state, the one stream a
-/// radio scan session listens to as soon as it is built.
+/// A fake that counts scans, to show a disposed Bluey starts none.
 final class _CountingPlatform extends FakeBlueyPlatform {
-  int stateListens = 0;
+  int scans = 0;
 
   @override
-  Stream<platform.BluetoothState> get stateStream {
-    stateListens++;
-    return super.stateStream;
+  Stream<platform.PlatformDevice> scan(platform.PlatformScanConfig config) {
+    scans++;
+    return super.scan(config);
   }
 }
 
 void main() {
-  test('a Bluey that never scanned builds no radio scan, not even to '
-      'dispose it', () async {
+  test('a Bluey disposed before it scanned refuses scanner() and never '
+      'scans', () async {
     // arrange
     final fake = _CountingPlatform();
     platform.BlueyPlatform.instance = fake;
     final bluey = await Bluey.create();
-    final beforeDispose = fake.stateListens;
 
     // act
     await bluey.dispose();
 
     // assert
-    expect(fake.stateListens, beforeDispose);
+    expect(() => bluey.scanner(), throwsStateError);
+    expect(fake.scans, 0);
     await fake.dispose();
   });
 }

@@ -137,7 +137,7 @@
   changes the app's scan, no longer stops it, and the app's scan no longer
   starves the probe.
 - **A refused scan is an error (M2, I013).** When the platform refuses a scan,
-  for instance on Android with no scan permission, the stream returned by
+  for instance when scans were started too often, the stream returned by
   `scan()` carries `ScanFailedException` and ends, and the state returns to
   `stopped`, where the stream stayed silent. `ScanFailedException` and
   `ScanFailureReason` (Android's `SCAN_FAILED_*` codes in Bluey's words) are
@@ -173,6 +173,14 @@
   `[]`. Duplicate service UUIDs in `services` collapse to one.
 - **A second `scan()` while already scanning publishes no `ScanStartingEvent`
   or `ScanStartedEvent`**, since the scanner did not start again.
+- **A second `scan()` on one scanner no longer replaces the first.** Both
+  streams stay live, each with its own filter and timeout, and `stop()` ends
+  both.
+- **`scanner.state` read straight after `scan()` can read `scanning`** where
+  it read `starting` until a microtask later; `stateChanges` still passes
+  through `starting`.
+- **`scanner()` and `discoverPeers()` after `dispose()` always throw
+  `StateError`,** whether or not a scanner was made before.
   `dispose()` on a scanning scanner publishes `ScanStoppingEvent` and then
   `ScanStoppedEvent`.
 - **Peer discovery no longer stops the radio, and a refused probe scan fails

@@ -107,7 +107,6 @@ class Bluey {
           events: _eventBus,
         ),
   );
-  DiscoveryAssembly? _discovery;
 
   StreamSubscription? _stateSubscription;
 
@@ -411,18 +410,18 @@ class Bluey {
   /// });
   /// scanner.dispose();
   /// ```
+  /// Throws [StateError] after [dispose].
   Scanner scanner() {
     _requireAdapterOn();
     return _discoveryAssembly.scanner();
   }
 
-  DiscoveryAssembly get _discoveryAssembly =>
-      _discovery ??= DiscoveryAssembly(
-        scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
-        publisher: _eventBus,
-        log: _logger,
-        now: clock.now,
-      );
+  late final DiscoveryAssembly _discoveryAssembly = DiscoveryAssembly(
+    scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
+    publisher: _eventBus,
+    log: _logger,
+    now: clock.now,
+  );
 
   /// Connect to a device, within [timeout] when one is given.
   ///
@@ -919,6 +918,7 @@ class Bluey {
   /// [probeTimeout] bounds each individual probe-connect attempt; one
   /// unresponsive candidate doesn't stall the whole session. Defaults
   /// to [PeerDiscovery.defaultProbeTimeout] (3 s).
+  /// Throws [StateError] after [dispose].
   Future<List<BlueyPeer>> discoverPeers({
     Duration timeout = const Duration(seconds: 5),
     Duration probeTimeout = PeerDiscovery.defaultProbeTimeout,
@@ -950,7 +950,7 @@ class Bluey {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
-    await _discovery?.dispose();
+    await _discoveryAssembly.dispose();
     await _eventBus.close();
     await _logger.dispose();
   }

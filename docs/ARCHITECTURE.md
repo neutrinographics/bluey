@@ -337,7 +337,7 @@ The known defects, run as the job runs them:
   test/known_defects/roster.dart "${TMPDIR:-/tmp}/bluey.json")
 ```
 
-The test run exits non-zero, as they should; the verdict is the third command's. Each JSON file is judged against the roster before it. It prints, for each file, how many are still failing, now passing and not run, each still-failing test with the first line of its first error, so the log shows it fails for the defect its name gives, and names each one that fails the gate with what to do.
+The test run exits non-zero, as expected of known defects; the verdict is the third command's. Each JSON file is judged against the roster before it. It prints, for each file, how many are still failing, now passing and not run, each still-failing test with the first line of its first error, so the log shows it fails for the defect its name gives, and names each one that fails the gate with what to do.
 
 The `bluey` suite runs once in CI, in the job that holds the two coverage floors, and the Architecture job runs the four `test/architecture` folders again on their own, so a broken rule reads as "Architecture" in the checks list. The coverage floor is 90% of lines in the `bluey` package, the figure CLAUDE.md requires; a missing report fails too. A report names only the libraries a test loaded, so the gate is also given `lib` and fails naming every Dart file under it that the report lacks and that holds code that runs: a body, a constructor (even a `const` one with no body) or a variable that is not a constant and has an initializer. A file of enum values, abstract members or exports holds none and is absent from every report; today 28 of the 117 files under `bluey/lib` are such files.
 

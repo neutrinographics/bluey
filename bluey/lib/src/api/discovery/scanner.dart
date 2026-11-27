@@ -58,6 +58,11 @@ abstract class Scanner {
   /// [services] - Optional list of service UUIDs to filter by.
   /// [timeout] - Optional timeout duration.
   /// [mode] - Optional scan duty cycle (Android only; see [ScanMode]).
+  ///
+  /// The scan starts at the call, so a stream nobody listens to buffers its
+  /// results until [stop], its [timeout] or [dispose] ends it. Several scans
+  /// per scanner may be open at once, each with its own filter and timeout.
+  /// A refused scan arrives as one stream error, then done.
   Stream<ScanResult> scan({
     List<UUID>? services,
     Duration? timeout,

@@ -83,6 +83,7 @@ Prose sections (in this order, any may be omitted if empty):
 - `I100–I199` — fixed
 - `I200–I299` — wontfix
 - `I300–I399` — DDD / architectural refinement (bounded-context boundaries, value objects, ubiquitous language)
+- `I400–I499` — follow-ups found in review of the architecture slices
 
 Gaps in the numbering are intentional — they reserve space for follow-up entries in the same cluster.
 

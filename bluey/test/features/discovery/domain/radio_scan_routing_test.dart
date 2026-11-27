@@ -183,6 +183,22 @@ void main() {
       expect(scans, isNull);
     });
 
+    test('a result only the scan that left would have got', () {
+      // arrange
+      final scan = after([
+        const ScannerOpened(a),
+        ScanAsked(a, s1, ask([heart])),
+        ScanAsked(a, s2, ask([battery])),
+        ScanLeft(s2, const EndedOnRequest()),
+      ]);
+
+      // act
+      final scans = deliveredTo(scan, showing([battery]));
+
+      // assert
+      expect(scans, isNull);
+    });
+
     test('an ended scan beside a served one', () {
       // arrange
       final scan = after([

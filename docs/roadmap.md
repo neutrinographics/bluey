@@ -62,7 +62,7 @@ Non-negotiable constraints that shape *how* every item below gets implemented:
 
 Scanning and inbound advertisement data.
 
-- ☑ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded. · Slice 2 (scanning and advertising sessions), fixed in `61093ff`
+- ☑ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded. · Slice 2 (scanning and advertising sessions), fixed in `fcfc6d1`
 - ◐ **Medium** — [Expose scan options (mode, filters, duplicates)](backlog/I052-scan-options-not-exposed.md) · Scan mode shipped (`f29ec98`); allow-duplicates, RSSI, manufacturer, name, and address filters are still hardcoded.
 - ☐ **Medium** — [Close scanner streams on dispose](backlog/I094-scanner-controller-never-closed.md) · Platform scanner broadcast controllers are never closed (leak across instances).
 - ☑ **Medium** — [Support overlapping scans](backlog/I336-scanner-overlapping-scan-not-supported.md) · A second `scan()` clobbers the first; concurrent scanners aren't multiplexed. · Slice 2 (scanning and advertising sessions), fixed in `fcfc6d1`

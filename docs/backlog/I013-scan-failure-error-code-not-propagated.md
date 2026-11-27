@@ -6,7 +6,7 @@ severity: medium
 platform: android
 status: fixed
 last_verified: 2026-11-27
-fixed_in: 61093ff
+fixed_in: fcfc6d1
 historical_ref: BUGS-ANALYSIS-#15
 ---
 
@@ -38,4 +38,4 @@ The [2026-11-17 audit](../reviews/2026-11-17-correctness-and-test-rig-audit.md) 
 
 ## Fixed
 
-Slice 2, scanning pull request ([design](../superpowers/specs/2026-11-27-scanning-and-advertising-sessions-design.md)). Both Dart adapters handle the future of `startScan` and a refusal is an error on the platform scan stream (`61093ff`). Android's `onScanFailed` reports its code through a new Pigeon callback, `onScanFailed(errorCode)`, mapped to `PlatformScanFailedException` and its reason. Discovery's `PlatformScanning` turns that into a `ScanFailure`, and the edge turns it into `ScanFailedException(reason)` (`fcfc6d1`). The known-defect test moved into `bluey_android/test/android_scanner_test.dart`, and with it `bluey_android` has no known defects left. The Kotlin change (`Scanner.kt`, `ScannerTest.kt`, the generated `Messages.g.kt`) has no cloud gate: its Gradle run is on Joel's Mac.
+Slice 2, scanning pull request ([design](../superpowers/specs/2026-11-27-scanning-and-advertising-sessions-design.md)). Both Dart adapters handle the future of `startScan` and a refusal is an error on the platform scan stream (`fcfc6d1`). Android's `onScanFailed` reports its code through a new Pigeon callback, `onScanFailed(errorCode)`, mapped to `PlatformScanFailedException` and its reason. Discovery's `PlatformScanning` turns that into a `ScanFailure`, and the edge turns it into `ScanFailedException(reason)` (`fcfc6d1`). The known-defect test moved into `bluey_android/test/android_scanner_test.dart`, and with it `bluey_android` has no known defects left. The Kotlin change (`Scanner.kt`, `ScannerTest.kt`, the generated `Messages.g.kt`) has no cloud gate: its Gradle run is on Joel's Mac.
