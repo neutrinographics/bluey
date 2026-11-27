@@ -62,12 +62,12 @@ Non-negotiable constraints that shape *how* every item below gets implemented:
 
 Scanning and inbound advertisement data.
 
-- ☐ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded. · Slice 2 (scanning and advertising sessions)
+- ☑ **Medium** — [Surface scan-failure reason codes](backlog/I013-scan-failure-error-code-not-propagated.md) · Android scan failures collapse to a generic "scan complete"; the error code is discarded. · Slice 2 (scanning and advertising sessions), fixed in `fcfc6d1`
 - ◐ **Medium** — [Expose scan options (mode, filters, duplicates)](backlog/I052-scan-options-not-exposed.md) · Scan mode shipped (`f29ec98`); allow-duplicates, RSSI, manufacturer, name, and address filters are still hardcoded.
 - ☐ **Medium** — [Close scanner streams on dispose](backlog/I094-scanner-controller-never-closed.md) · Platform scanner broadcast controllers are never closed (leak across instances).
-- ☐ **Medium** — [Support overlapping scans](backlog/I336-scanner-overlapping-scan-not-supported.md) · A second `scan()` clobbers the first; concurrent scanners aren't multiplexed. · Slice 2 (scanning and advertising sessions)
+- ☑ **Medium** — [Support overlapping scans](backlog/I336-scanner-overlapping-scan-not-supported.md) · A second `scan()` clobbers the first; concurrent scanners aren't multiplexed. · Slice 2 (scanning and advertising sessions), fixed in `fcfc6d1`
 - ☐ **Medium** — [Fill or remove never-populated advertisement fields](backlog/I366-advertisement-surface-honesty.md) · `isConnectable` hardcoded true, `serviceData` always empty, `txPowerLevel` always null (audit DA-23; the dead `ScanMode` half was wired in `f29ec98`).
-- ☐ **Medium** — [Stop the scan when a scanning Scanner is disposed](backlog/I382-stop-scan-when-scanning-scanner-disposed.md) · `dispose()` while scanning never calls `stopScan`; the native scan keeps running (audit M5). · Slice 2 (scanning and advertising sessions)
+- ☑ **Medium** — [Stop the scan when a scanning Scanner is disposed](backlog/I382-stop-scan-when-scanning-scanner-disposed.md) · `dispose()` while scanning never calls `stopScan`; the native scan keeps running (audit M5). · Slice 2 (scanning and advertising sessions), fixed in `fcfc6d1`
 - ☐ **Low** — [Return all manufacturer-data entries](backlog/I014-manufacturer-data-only-first-entry.md) · Android returns only the first company-ID entry in an advertisement.
 
 ## Connection
@@ -190,6 +190,7 @@ Architecture / DDD refinement and test-fixture consistency — no user-visible b
 - ☐ **Low** — [Fix the example app where it teaches the wrong patterns](backlog/I376-example-app-reference-quality.md) · Missing shared-link guard, inert tolerance setting, stringly-typed disconnect flow (audit DA-40..42).
 - ☐ **Low** — [Work through the 2026-07-07 MINOR ledger](backlog/I377-audit-minor-ledger.md) · ~30 small API/robustness/DRY fixes, tracked as one sweep against the audit doc.
 - ☑ **Low** — [Give a link its opening phase](backlog/I398-give-a-link-its-opening-phase.md) · Connection's registry, not its `Link` aggregate, raised the event that a link's open began, since a `Link` existed only once the radio answered (a compromise of slice 1). · Fixed before slice 2 in `f087e5a` (plan `superpowers/plans/2026-11-27-link-opening-phase.md`)
+- ☐ **Low** — [Share one iOS translator from platform errors to Bluey's exceptions](backlog/I400-share-one-ios-platform-error-translator.md) · The `bluetooth-unavailable` code is read in four places in the iOS package, one added by the scan-failure work of slice 2.
 - ☐ **Low** — [Revise the log wording of every context in one pass](backlog/I399-revise-the-log-wording-of-every-context.md) · The words an app reads in log lines are frozen while contexts move, so Connection's lines keep the old state, operation and context words (a compromise of slice 1). · Proposed: one pass after slice 6 (what is left)
 
 ## Shipped

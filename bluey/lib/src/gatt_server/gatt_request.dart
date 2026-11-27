@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 import 'server.dart';
 
 /// Response status for GATT operations.

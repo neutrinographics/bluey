@@ -49,25 +49,18 @@ final class BlueyAndroid extends BlueyPlatform {
       _stateController.add(_cachedState);
     };
 
-    _flutterApi.onDeviceDiscoveredCallback = (device) {
-      _scanner.onDeviceDiscovered(device);
-    };
+    _flutterApi.onDeviceDiscoveredCallback = _scanner.onDeviceDiscovered;
 
-    _flutterApi.onScanCompleteCallback = () {
-      _scanner.onScanComplete();
-    };
+    _flutterApi.onScanCompleteCallback = _scanner.onScanComplete;
 
-    _flutterApi.onConnectionStateChangedCallback = (event) {
-      _connectionManager.onConnectionStateChanged(event);
-    };
+    _flutterApi.onScanFailedCallback = _scanner.onScanFailed;
 
-    _flutterApi.onNotificationCallback = (event) {
-      _connectionManager.onNotification(event);
-    };
+    _flutterApi.onConnectionStateChangedCallback =
+        _connectionManager.onConnectionStateChanged;
 
-    _flutterApi.onMtuChangedCallback = (event) {
-      _connectionManager.onMtuChanged(event);
-    };
+    _flutterApi.onNotificationCallback = _connectionManager.onNotification;
+
+    _flutterApi.onMtuChangedCallback = _connectionManager.onMtuChanged;
 
     // Server (peripheral) callbacks
     _flutterApi.onCentralConnectedCallback = (central) {
@@ -612,6 +605,7 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   void Function(BluetoothStateDto)? onStateChangedCallback;
   void Function(DeviceDto)? onDeviceDiscoveredCallback;
   void Function()? onScanCompleteCallback;
+  void Function(int)? onScanFailedCallback;
   void Function(ConnectionStateEventDto)? onConnectionStateChangedCallback;
   void Function(NotificationEventDto)? onNotificationCallback;
   void Function(MtuChangedEventDto)? onMtuChangedCallback;
@@ -639,6 +633,11 @@ class _BlueyFlutterApiImpl implements BlueyFlutterApi {
   @override
   void onScanComplete() {
     onScanCompleteCallback?.call();
+  }
+
+  @override
+  void onScanFailed(int errorCode) {
+    onScanFailedCallback?.call(errorCode);
   }
 
   @override

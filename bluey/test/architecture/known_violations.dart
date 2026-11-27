@@ -15,13 +15,6 @@ const unplaced = <String>[
   'lib/src/connection/lifecycle_client.dart -> unplaced',
   'lib/src/connection/peer_silence_monitor.dart -> unplaced',
   'lib/src/connection/value_objects/attribute_handle.dart -> unplaced',
-  'lib/src/discovery/advertisement.dart -> unplaced',
-  'lib/src/discovery/bluey_scanner.dart -> unplaced',
-  'lib/src/discovery/device.dart -> unplaced',
-  'lib/src/discovery/scan.dart -> unplaced',
-  'lib/src/discovery/scan_result.dart -> unplaced',
-  'lib/src/discovery/scan_state.dart -> unplaced',
-  'lib/src/discovery/scanner.dart -> unplaced',
   'lib/src/events.dart -> unplaced',
   'lib/src/gatt_client/gatt.dart -> unplaced',
   'lib/src/gatt_client/well_known_uuids.dart -> unplaced',
@@ -45,8 +38,6 @@ const unplaced = <String>[
   'lib/src/shared/error_translation.dart -> unplaced',
   'lib/src/shared/exceptions.dart -> unplaced',
   'lib/src/shared/gatt_timeouts.dart -> unplaced',
-  'lib/src/shared/manufacturer_data.dart -> unplaced',
-  'lib/src/shared/uuid.dart -> unplaced',
 ];
 
 /// The dependencies that cross from one context to another, or from the
@@ -55,7 +46,6 @@ const boundaries = <String>[
   'lib/src/connection/bluey_connection.dart -> lib/src/gatt_client/gatt.dart',
   'lib/src/connection/lifecycle_client.dart -> lib/src/gatt_client/gatt.dart',
   'lib/src/connection/lifecycle_client.dart -> lib/src/peer/server_id.dart',
-  'lib/src/discovery/bluey_scanner.dart -> lib/src/platform/bluetooth_state.dart',
   'lib/src/gatt_client/gatt.dart -> lib/src/connection/value_objects/attribute_handle.dart',
   'lib/src/gatt_server/bluey_server.dart -> lib/src/peer/peer_client.dart',
   'lib/src/gatt_server/bluey_server.dart -> lib/src/peer/server_id.dart',
@@ -80,12 +70,10 @@ const frameworkPlacement = <String>[
   'lib/src/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/bluey_connection.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/lifecycle_client.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/discovery/bluey_scanner.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/gatt_server/bluey_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/gatt_server/lifecycle_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/lifecycle.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/peer/bluey_peer.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/peer/peer_discovery.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/shared/error_translation.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/shared/error_translation.dart -> package:flutter/services.dart',
 ];
@@ -109,11 +97,10 @@ const lintOptions = <String>[];
 
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
-  'lib/src/bluey.dart -> 974 lines',
+  'lib/src/bluey.dart -> 972 lines',
   'lib/src/connection/bluey_connection.dart -> 970 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
-  'lib/src/discovery/bluey_scanner.dart -> 410 lines',
-  'lib/src/events.dart -> 477 lines',
+  'lib/src/events.dart -> 390 lines',
   'lib/src/gatt_server/bluey_server.dart -> 1180 lines',
   'lib/src/gatt_server/lifecycle_server.dart -> 413 lines',
   'lib/src/lifecycle.dart -> 364 lines',

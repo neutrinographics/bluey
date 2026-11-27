@@ -1,11 +1,11 @@
 import 'package:bluey/src/features/connection/application/ports/links.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
-import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 /// What a run of [linksContract] needs from the [Links] it holds to account:
 /// a way to put the radio into each situation the contract describes.

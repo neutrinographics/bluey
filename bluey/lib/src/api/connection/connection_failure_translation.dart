@@ -6,6 +6,7 @@ import '../../platform/bluetooth_state.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/domain/either.dart';
 import '../../shared/exceptions.dart';
+import '../../shared/domain/radio_outage.dart';
 
 /// The exception an app gets for [failure], so moving an operation below the
 /// edge changes nothing an app catches.

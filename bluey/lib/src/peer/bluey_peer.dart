@@ -22,6 +22,7 @@ import 'server_id.dart';
 /// the lifecycle client writes with.
 BlueyPeer createBlueyPeer({
   required platform.BlueyPlatform platformApi,
+  required DevicesAdvertising devicesAdvertising,
   required ServerId serverId,
   required ServerId localIdentity,
   required BlueyLogger logger,
@@ -32,6 +33,7 @@ BlueyPeer createBlueyPeer({
 }) {
   return _BlueyPeer(
     platformApi: platformApi,
+    devicesAdvertising: devicesAdvertising,
     serverId: serverId,
     localIdentity: localIdentity,
     peerSilenceTimeout: peerSilenceTimeout,
@@ -49,6 +51,7 @@ class _BlueyPeer implements BlueyPeer {
   final BlueyLogger _logger;
   final EventPublisher? _events;
   final BorrowConnection _borrow;
+  final DevicesAdvertising _devicesAdvertising;
   final String Function(Connection) _connectionIdOf;
 
   @override
@@ -58,6 +61,7 @@ class _BlueyPeer implements BlueyPeer {
 
   _BlueyPeer({
     required platform.BlueyPlatform platformApi,
+    required DevicesAdvertising devicesAdvertising,
     required this.serverId,
     required ServerId localIdentity,
     required Duration peerSilenceTimeout,
@@ -71,6 +75,7 @@ class _BlueyPeer implements BlueyPeer {
        _logger = logger,
        _events = events,
        _borrow = borrow,
+       _devicesAdvertising = devicesAdvertising,
        _connectionIdOf = connectionIdOf;
 
   @override
@@ -95,7 +100,7 @@ class _BlueyPeer implements BlueyPeer {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: _platform,
+        devicesAdvertising: _devicesAdvertising,
         borrow: _borrow,
         logger: _logger,
       );

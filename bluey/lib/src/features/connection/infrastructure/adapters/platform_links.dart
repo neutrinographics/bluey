@@ -7,10 +7,11 @@ import '../../../../shared/application/log.dart';
 import '../../../../shared/application/log_level.dart';
 import '../../../../shared/domain/device_address.dart';
 import '../../../../shared/domain/either.dart';
+import '../../../../shared/domain/radio_outage.dart';
+import '../../../../shared/infrastructure/radio_outages.dart';
 import '../../application/connection_log_words.dart';
 import '../../application/ports/links.dart';
 import '../../domain/connection_failure.dart';
-import '../../domain/link_end.dart';
 import '../../domain/link_id.dart';
 import '../../domain/link_input.dart';
 import '../../domain/link_operation.dart';
@@ -82,15 +83,7 @@ final class PlatformLinks implements Links {
       _reports[link]?.stream ?? const Stream.empty();
 
   @override
-  Stream<RadioOutage> get outages => _platform.stateStream.transform(
-    StreamTransformer.fromHandlers(
-      handleData: (state, sink) {
-        final outage = _outageOf(state);
-        if (outage != null) sink.add(outage);
-      },
-      handleError: (_, _, sink) => sink.add(RadioOutage.unknown),
-    ),
-  );
+  Stream<RadioOutage> get outages => radioOutagesOf(_platform);
 
   /// Starts carrying the link's reports in the turn its id arrives, and
   /// keeps the reports already carried when the link is still live, so a
@@ -193,12 +186,4 @@ LinkReport _reportOf(PlatformConnectionState state) => switch (state) {
   PlatformConnectionState.connected => LinkReport.connected,
   PlatformConnectionState.disconnecting => LinkReport.disconnecting,
   PlatformConnectionState.disconnected => LinkReport.disconnected,
-};
-
-RadioOutage? _outageOf(BluetoothState state) => switch (state) {
-  BluetoothState.on => null,
-  BluetoothState.off => RadioOutage.off,
-  BluetoothState.unauthorized => RadioOutage.unauthorized,
-  BluetoothState.unsupported => RadioOutage.unsupported,
-  BluetoothState.unknown => RadioOutage.unknown,
 };

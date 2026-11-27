@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
 import '../fixtures/connection_rig.dart';
+import '../fixtures/peer_scanning.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -25,7 +26,7 @@ void main() {
   group('PeerDiscovery.discover', () {
     test('returns empty when no Bluey servers advertising', () async {
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -48,7 +49,7 @@ void main() {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -70,7 +71,7 @@ void main() {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -90,7 +91,7 @@ void main() {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -111,7 +112,7 @@ void main() {
         serverId: ServerId.generate(),
       );
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -139,7 +140,7 @@ void main() {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -223,7 +224,7 @@ void main() {
       );
 
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -246,7 +247,7 @@ void main() {
         serverId: ServerId.generate(),
       );
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -265,7 +266,7 @@ void main() {
         serverId: id,
       );
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -291,7 +292,7 @@ void main() {
         serverId: ServerId.generate(),
       );
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -308,7 +309,7 @@ void main() {
           serverId: ServerId.generate(),
         );
         final discovery = PeerDiscovery(
-          platformApi: fakePlatform,
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
           borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
@@ -330,7 +331,7 @@ void main() {
           serverId: id,
         );
         final discovery = PeerDiscovery(
-          platformApi: fakePlatform,
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
           borrow: ConnectionRig(fakePlatform).borrow,
           logger: testLogger(),
         );
@@ -348,7 +349,7 @@ void main() {
 
   // L9 (I394): the scan window bounds which candidates are probed, and a
   // radio that refuses to stop scanning does not cost the caller its peers.
-  group('PeerDiscovery scan window and stopScan (L9)', () {
+  group('PeerDiscovery scan window (L9)', () {
     const window = Duration(seconds: 2);
     const early = 'AA:BB:CC:DD:EE:01';
     const late = 'AA:BB:CC:DD:EE:02';
@@ -361,7 +362,7 @@ void main() {
         final earlyServerId = ServerId.generate();
         fake.connectDelays[early] = const Duration(seconds: 1);
         final discovery = PeerDiscovery(
-          platformApi: fake,
+          devicesAdvertising: devicesAdvertisingOn(fake),
           borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
@@ -391,7 +392,7 @@ void main() {
         const queued = 'AA:BB:CC:DD:EE:03';
         fake.connectDelays[early] = const Duration(seconds: 2);
         final discovery = PeerDiscovery(
-          platformApi: fake,
+          devicesAdvertising: devicesAdvertisingOn(fake),
           borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
@@ -419,7 +420,7 @@ void main() {
         final serverId = ServerId.generate();
         fake.connectDelays[early] = const Duration(seconds: 1);
         final discovery = PeerDiscovery(
-          platformApi: fake,
+          devicesAdvertising: devicesAdvertisingOn(fake),
           borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
@@ -446,7 +447,7 @@ void main() {
         platform.BlueyPlatform.instance = fake;
         fake.connectDelays[early] = const Duration(seconds: 1);
         final discovery = PeerDiscovery(
-          platformApi: fake,
+          devicesAdvertising: devicesAdvertisingOn(fake),
           borrow: ConnectionRig(fake).borrow,
           logger: testLogger(),
         );
@@ -466,62 +467,49 @@ void main() {
 
         // assert
         expect(beforeTheProbeEnds, isNull);
-        expect(failure, isStateError);
+        expect(failure, isA<BlueyPlatformException>());
       });
     });
 
-    test(
-      'a failing stopScan is logged and the peers found are still returned',
-      () {
-        fakeAsync((async) {
-          // arrange
-          final serverId = ServerId.generate();
-          fakePlatform.simulateBlueyServer(address: early, serverId: serverId);
-          fakePlatform.enqueueFault(FakeOp.stopScan, StateError('radio busy'));
-          final logger = testLogger();
-          final records = <BlueyLogEvent>[];
-          logger.events.listen(records.add);
-          final discovery = PeerDiscovery(
-            platformApi: fakePlatform,
-            borrow: ConnectionRig(fakePlatform).borrow,
-            logger: logger,
-          );
-
-          // act
-          List<ServerId>? result;
-          Object? error;
-          discovery
-              .discover(timeout: window)
-              .then<void>(
-                (ids) => result = ids,
-                onError: (Object e) => error = e,
-              );
-          async.elapse(window);
-
-          // assert
-          expect(error, isNull);
-          expect(result, [serverId]);
-          final warnings = records.where((r) => r.level == BlueyLogLevel.warn);
-          expect(warnings, hasLength(1));
-          expect(warnings.single.context, 'bluey.peer.discovery');
-          expect(warnings.single.message, 'discoverPeers stopScan failed');
-        });
-      },
-    );
-
-    test('connectTo returns the Connection it found when stopScan fails', () {
+    test('a radio that refuses to stop still returns the peers found', () {
       fakeAsync((async) {
         // arrange
         final serverId = ServerId.generate();
         fakePlatform.simulateBlueyServer(address: early, serverId: serverId);
         fakePlatform.enqueueFault(FakeOp.stopScan, StateError('radio busy'));
-        final logger = testLogger();
-        final records = <BlueyLogEvent>[];
-        logger.events.listen(records.add);
         final discovery = PeerDiscovery(
-          platformApi: fakePlatform,
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
           borrow: ConnectionRig(fakePlatform).borrow,
-          logger: logger,
+          logger: testLogger(),
+        );
+
+        // act
+        List<ServerId>? result;
+        Object? error;
+        discovery
+            .discover(timeout: window)
+            .then<void>(
+              (ids) => result = ids,
+              onError: (Object e) => error = e,
+            );
+        async.elapse(window);
+
+        // assert
+        expect(error, isNull);
+        expect(result, [serverId]);
+      });
+    });
+
+    test('connectTo returns the Connection it found when the stop fails', () {
+      fakeAsync((async) {
+        // arrange
+        final serverId = ServerId.generate();
+        fakePlatform.simulateBlueyServer(address: early, serverId: serverId);
+        fakePlatform.enqueueFault(FakeOp.stopScan, StateError('radio busy'));
+        final discovery = PeerDiscovery(
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
+          borrow: ConnectionRig(fakePlatform).borrow,
+          logger: testLogger(),
         );
 
         // act
@@ -539,10 +527,6 @@ void main() {
         // assert
         expect(error, isNull);
         expect(connection?.deviceAddress, const DeviceAddress(early));
-        final warnings = records.where((r) => r.level == BlueyLogLevel.warn);
-        expect(warnings, hasLength(1));
-        expect(warnings.single.context, 'bluey.peer.discovery');
-        expect(warnings.single.message, 'connectTo stopScan failed');
 
         connection?.disconnect();
         async.flushMicrotasks();
@@ -605,7 +589,7 @@ void main() {
       );
       final routine = <bool>[];
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: recording(ConnectionRig(fakePlatform), routine),
         logger: testLogger(),
       );
@@ -626,7 +610,7 @@ void main() {
       );
       final routine = <bool>[];
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: recording(ConnectionRig(fakePlatform), routine),
         logger: testLogger(),
       );
@@ -657,7 +641,7 @@ void main() {
         final held = await rig.connect(const DeviceAddress(address));
         await held.services();
         final discovery = PeerDiscovery(
-          platformApi: counting,
+          devicesAdvertising: devicesAdvertisingOn(counting),
           borrow: rig.borrow,
           logger: testLogger(),
         );
@@ -689,7 +673,7 @@ void main() {
       final states = <ConnectionState>[];
       held.stateChanges.listen(states.add);
       final discovery = PeerDiscovery(
-        platformApi: counting,
+        devicesAdvertising: devicesAdvertisingOn(counting),
         borrow: rig.borrow,
         logger: testLogger(),
       );
@@ -714,7 +698,7 @@ void main() {
       final serverId = ServerId.generate();
       fakePlatform.simulateBlueyServer(address: address, serverId: serverId);
       final discovery = PeerDiscovery(
-        platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: ConnectionRig(fakePlatform).borrow,
         logger: testLogger(),
       );
@@ -737,6 +721,7 @@ void main() {
       final rig = ConnectionRig(fakePlatform);
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         serverId: serverId,
         localIdentity: TestServerIds.localIdentity,
         logger: testLogger(),

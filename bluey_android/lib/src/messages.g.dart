@@ -2101,6 +2101,10 @@ abstract class BlueyFlutterApi {
   /// Scan completed or stopped.
   void onScanComplete();
 
+  /// The platform refused or lost the scan; [errorCode] is Android's
+  /// `ScanCallback.SCAN_FAILED_*` value, so Dart can tell the app why.
+  void onScanFailed(int errorCode);
+
   /// Connection state changed.
   void onConnectionStateChanged(ConnectionStateEventDto event);
 
@@ -2188,6 +2192,27 @@ abstract class BlueyFlutterApi {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           try {
             api.onScanComplete();
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.bluey_android.BlueyFlutterApi.onScanFailed$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final int arg_errorCode = args[0]! as int;
+          try {
+            api.onScanFailed(arg_errorCode);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

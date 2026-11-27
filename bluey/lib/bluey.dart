@@ -8,8 +8,8 @@ library bluey;
 export 'src/bluey.dart';
 
 // Shared kernel
-export 'src/shared/uuid.dart';
-export 'src/shared/manufacturer_data.dart';
+export 'src/shared/domain/uuid.dart';
+export 'src/shared/domain/manufacturer_data.dart';
 export 'src/shared/characteristic_properties.dart';
 export 'src/shared/exceptions.dart';
 export 'src/shared/gatt_timeouts.dart';
@@ -17,12 +17,9 @@ export 'src/shared/domain/device_address.dart';
 export 'src/shared/domain/bluey_event.dart';
 
 // Discovery bounded context
-export 'src/discovery/scanner.dart';
-export 'src/discovery/device.dart';
-export 'src/discovery/advertisement.dart';
-export 'src/discovery/scan_result.dart';
-export 'src/discovery/scan_state.dart';
-export 'src/discovery/scan.dart';
+export 'src/api/discovery/scanner.dart';
+export 'src/api/discovery/scan_state.dart';
+export 'src/api/discovery/scan_failed_exception.dart';
 
 // Connection bounded context
 export 'src/api/connection/connection.dart';
@@ -53,6 +50,7 @@ export 'src/lifecycle.dart' show LifecycleInterval;
 
 // Domain events
 export 'src/events.dart';
+export 'src/api/discovery/scan_events.dart';
 export 'src/api/connection/connection_events.dart';
 
 // Structured logging

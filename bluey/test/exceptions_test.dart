@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/exceptions.dart';
-import 'package:bluey/src/shared/uuid.dart';
+import 'package:bluey/src/shared/domain/uuid.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 import 'package:bluey/src/peer/server_id.dart';
 import 'package:bluey/src/platform/bluetooth_state.dart';

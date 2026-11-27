@@ -773,6 +773,41 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     _pendingScanFailure = error;
   }
 
+  /// Makes the running scan fail the way a platform refusal does: its stream
+  /// carries [PlatformScanFailedException] with [reason] and the platform
+  /// scan stops.
+  void simulateScanRefusal(PlatformScanFailureReason reason) {
+    final running = _runningScan;
+    if (running == null) return;
+    running.addError(PlatformScanFailedException(reason));
+    _runningScan = null;
+    _isScanningPlatform = false;
+  }
+
+  /// Delivers [device] on the running scan, as the platform does when its
+  /// radio hears an advertisement; a no-op while no scan runs.
+  void simulateScanResult(PlatformDevice device) {
+    final running = _runningScan;
+    if (running == null || running.isClosed) return;
+    running.add(device);
+  }
+
+  Completer<void>? _heldStopScan;
+
+  /// Arranges for the next [stopScan] to wait until [releaseHeldStopScan],
+  /// so a test can act while a stop is in flight.
+  void holdNextStopScan() {
+    _heldStopScan = Completer<void>();
+  }
+
+  /// Lets a stop held by [holdNextStopScan] go on.
+  void releaseHeldStopScan() {
+    final held = _heldStopScan;
+    if (held == null) throw StateError('No held stopScan to release');
+    _heldStopScan = null;
+    held.complete();
+  }
+
   // === Connect-phase failure seams (audit R1 / NT-1) ===
 
   /// Arranges for the next [connect] call to [deviceId] to throw a
@@ -1275,11 +1310,16 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   /// Test seam — flipped to true on the first event delivery inside [scan]
   /// and back to false when [stopScan] is called.
   bool _isScanningPlatform = false;
+  StreamController<PlatformDevice>? _runningScan;
 
   /// Whether the fake platform scan is currently active.
   /// Exposed as a test seam so tests can assert that cancelling the
   /// consumer's subscription stops the radio (Convention 5 / I335).
   bool get isScanning => _isScanningPlatform;
+
+  /// Whether anything still listens to the latest scan's stream, so a test
+  /// can tell a consumer that let go of the platform from one that leaked.
+  bool get latestScanIsHeard => _runningScan?.hasListener ?? false;
 
   /// Gets whether we're currently advertising.
   bool get isAdvertising => _isAdvertising;
@@ -1337,8 +1377,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
   Stream<PlatformDevice> scan(PlatformScanConfig config) {
     lastScanConfig = config;
     _isScanningPlatform = true;
-    // Create a new controller for each scan to avoid "closed stream" issues
-    final scanController = StreamController<PlatformDevice>.broadcast();
+    // Synchronous so a result put on the scan is heard before a scan that
+    // replaces it cancels the listener, as a radio with no latency would.
+    final scanController = StreamController<PlatformDevice>.broadcast(
+      sync: true,
+    );
+    _runningScan = scanController;
 
     final scanFailure = _pendingScanFailure;
     if (scanFailure != null) {
@@ -1374,7 +1418,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    final stopping = _runningScan;
+    await _heldStopScan?.future;
     _applyFaultRules(FakeOp.stopScan);
+    if (!identical(_runningScan, stopping)) return;
+    _runningScan = null;
     _isScanningPlatform = false;
   }
 

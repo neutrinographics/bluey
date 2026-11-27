@@ -39,9 +39,7 @@ void main() {
         Device(address: const DeviceAddress(deviceId)),
       );
 
-      final mtu = await connection.android!.requestMtu(
-        Mtu(512),
-      );
+      final mtu = await connection.android!.requestMtu(Mtu(512));
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
     });
@@ -53,9 +51,7 @@ void main() {
         Device(address: const DeviceAddress(deviceId)),
       );
 
-      final mtu = await connection.android!.requestMtu(
-        Mtu(185),
-      );
+      final mtu = await connection.android!.requestMtu(Mtu(185));
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
     });
@@ -73,9 +69,7 @@ void main() {
       );
 
       await expectLater(
-        connection.android!.requestMtu(
-          Mtu(512),
-        ),
+        connection.android!.requestMtu(Mtu(512)),
         throwsA(isA<GattTimeoutException>()),
       );
     });
@@ -109,10 +103,10 @@ void main() {
       final errors = <Object>[];
       var done = false;
       scanner.scan().listen(
-            (_) {},
-            onError: errors.add,
-            onDone: () => done = true,
-          );
+        (_) {},
+        onError: errors.add,
+        onDone: () => done = true,
+      );
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -122,23 +116,160 @@ void main() {
       expect(scanner.state, ScanState.stopped);
     });
 
-    test('the scan-failure seam is one-shot: the next scan succeeds',
-        () async {
+    test('the scan-failure seam is one-shot: the next scan succeeds', () async {
       fakePlatform.simulatePeripheral(id: deviceId, name: 'Scan OK');
       fakePlatform.simulateScanFailure(
         PlatformException(code: 'bluey-unknown', message: 'scan failed: 2'),
       );
 
       final failing = bluey.scanner();
-      await expectLater(
-        failing.scan(),
-        emitsError(isA<BlueyException>()),
-      );
+      await expectLater(failing.scan(), emitsError(isA<BlueyException>()));
 
       final working = bluey.scanner();
       final result = await working.scan().first;
       expect(result.device.address, const DeviceAddress(deviceId));
       await working.stop();
+    });
+  });
+
+  group('simulateScanRefusal', () {
+    test('puts PlatformScanFailedException on the running scan and stops '
+        'the platform scan', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+      final errors = <Object>[];
+      fakePlatform
+          .scan(
+            platform.PlatformScanConfig(
+              serviceUuids: const [],
+              timeoutMs: null,
+            ),
+          )
+          .listen((_) {}, onError: errors.add);
+      await Future<void>.delayed(Duration.zero);
+
+      // act
+      fakePlatform.simulateScanRefusal(
+        platform.PlatformScanFailureReason.startedTooOften,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // assert
+      final error = errors.single as platform.PlatformScanFailedException;
+      expect(error.reason, platform.PlatformScanFailureReason.startedTooOften);
+      expect(fakePlatform.isScanning, isFalse);
+      await fakePlatform.dispose();
+    });
+
+    test('after the scan was stopped it delivers nothing', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+      final errors = <Object>[];
+      fakePlatform
+          .scan(
+            platform.PlatformScanConfig(
+              serviceUuids: const [],
+              timeoutMs: null,
+            ),
+          )
+          .listen((_) {}, onError: errors.add);
+      await Future<void>.delayed(Duration.zero);
+      await fakePlatform.stopScan();
+
+      // act
+      fakePlatform.simulateScanRefusal(
+        platform.PlatformScanFailureReason.startedTooOften,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // assert
+      expect(errors, isEmpty);
+      await fakePlatform.dispose();
+    });
+
+    test('with no scan running changes nothing', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+
+      // act
+      fakePlatform.simulateScanRefusal(
+        platform.PlatformScanFailureReason.startedTooOften,
+      );
+
+      // assert
+      expect(fakePlatform.isScanning, isFalse);
+      await fakePlatform.dispose();
+    });
+  });
+
+  group('holdNextStopScan', () {
+    test('keeps the stop pending until it is released', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+      fakePlatform.scan(
+        platform.PlatformScanConfig(serviceUuids: const [], timeoutMs: null),
+      );
+      fakePlatform.holdNextStopScan();
+      var stopped = false;
+      final stop = fakePlatform.stopScan().then((_) => stopped = true);
+
+      // act
+      await Future<void>.delayed(Duration.zero);
+      final stoppedWhileHeld = stopped;
+      final scanningWhileHeld = fakePlatform.isScanning;
+      fakePlatform.releaseHeldStopScan();
+      await stop;
+
+      // assert
+      expect(stoppedWhileHeld, isFalse);
+      expect(scanningWhileHeld, isTrue);
+      expect(fakePlatform.isScanning, isFalse);
+      await fakePlatform.dispose();
+    });
+  });
+
+  group('simulateScanResult', () {
+    const device = platform.PlatformDevice(
+      id: 'AA:BB:CC:DD:EE:01',
+      name: 'Device',
+      rssi: -60,
+      serviceUuids: [],
+      manufacturerDataCompanyId: null,
+      manufacturerData: null,
+    );
+
+    test('puts the device on the running scan', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+      final heard = <platform.PlatformDevice>[];
+      fakePlatform
+          .scan(
+            platform.PlatformScanConfig(
+              serviceUuids: const [],
+              timeoutMs: null,
+            ),
+          )
+          .listen(heard.add);
+
+      // act
+      fakePlatform.simulateScanResult(device);
+      await Future<void>.delayed(Duration.zero);
+
+      // assert
+      expect(heard, [device]);
+      await fakePlatform.dispose();
+    });
+
+    test('with no scan running delivers nothing and does not throw', () async {
+      // arrange
+      final fakePlatform = FakeBlueyPlatform();
+
+      // act
+      fakePlatform.simulateScanResult(device);
+
+      // assert
+      expect(fakePlatform.isScanning, isFalse);
+      await fakePlatform.dispose();
     });
   });
 }

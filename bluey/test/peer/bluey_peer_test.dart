@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_platform.dart';
 import '../fakes/test_helpers.dart';
 import '../fixtures/connection_rig.dart';
+import '../fixtures/peer_scanning.dart';
 
 void main() {
   late FakeBlueyPlatform fakePlatform;
@@ -32,6 +33,7 @@ void main() {
 
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
           borrow: rig.borrow,
           connectionIdOf: rig.connectionIdOf,
           serverId: id,
@@ -61,6 +63,7 @@ void main() {
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: rig.borrow,
         connectionIdOf: rig.connectionIdOf,
         serverId: ServerId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
@@ -88,6 +91,7 @@ void main() {
         // unreachable-detection path that triggers the local disconnect.
         final peer = createBlueyPeer(
           platformApi: fakePlatform,
+          devicesAdvertising: devicesAdvertisingOn(fakePlatform),
           borrow: rig.borrow,
           connectionIdOf: rig.connectionIdOf,
           serverId: id,
@@ -129,6 +133,7 @@ void main() {
       final id = ServerId.generate();
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: rig.borrow,
         connectionIdOf: rig.connectionIdOf,
         serverId: id,
@@ -147,6 +152,7 @@ void main() {
 
       final peer = createBlueyPeer(
         platformApi: fakePlatform,
+        devicesAdvertising: devicesAdvertisingOn(fakePlatform),
         borrow: rig.borrow,
         connectionIdOf: rig.connectionIdOf,
         serverId: id,

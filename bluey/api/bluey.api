@@ -328,7 +328,7 @@ class DeviceAddress
   final String value
   int get hashCode
 final class DeviceDiscoveredEvent extends BlueyEvent
-  DeviceDiscoveredEvent({required DeviceAddress deviceAddress, String? name, int? rssi, String? source})
+  DeviceDiscoveredEvent({required DeviceAddress deviceAddress, String? name, int? rssi, DateTime? timestamp, String? source})
   String toString()
   final DeviceAddress deviceAddress
   final String? name
@@ -598,6 +598,17 @@ abstract class RemoteService
 class RespondNotFoundException extends BlueyException
   String toString()
   const RespondNotFoundException(String message)
+final class ScanFailedException extends BlueyPlatformException
+  ScanFailedException(ScanFailureReason reason)
+  final ScanFailureReason reason
+enum ScanFailureReason
+  ScanFailureReason alreadyStarted
+  ScanFailureReason internalError
+  ScanFailureReason outOfHardwareResources
+  ScanFailureReason registrationFailed
+  ScanFailureReason startedTooOften
+  ScanFailureReason unknown
+  ScanFailureReason unsupported
 enum ScanMode
   ScanMode balanced
   ScanMode lowLatency
@@ -612,12 +623,12 @@ class ScanResult
   final int rssi
   int get hashCode
 final class ScanStartedEvent extends BlueyEvent
-  ScanStartedEvent({List<UUID>? serviceFilter, Duration? timeout, String? source})
+  ScanStartedEvent({List<UUID>? serviceFilter, Duration? timeout, DateTime? timestamp, String? source})
   String toString()
   final Duration? timeout
   final List<UUID>? serviceFilter
 final class ScanStartingEvent extends BlueyEvent
-  ScanStartingEvent({List<UUID>? serviceFilter, Duration? timeout, String? source})
+  ScanStartingEvent({List<UUID>? serviceFilter, Duration? timeout, DateTime? timestamp, String? source})
   String toString()
   final Duration? timeout
   final List<UUID>? serviceFilter
@@ -628,11 +639,11 @@ enum ScanState
   ScanState stopped
   ScanState stopping
 final class ScanStoppedEvent extends BlueyEvent
-  ScanStoppedEvent({String? reason, String? source})
+  ScanStoppedEvent({String? reason, DateTime? timestamp, String? source})
   String toString()
   final String? reason
 final class ScanStoppingEvent extends BlueyEvent
-  ScanStoppingEvent({String? source})
+  ScanStoppingEvent({DateTime? timestamp, String? source})
   String toString()
 abstract class Scanner
   Future<void> stop()

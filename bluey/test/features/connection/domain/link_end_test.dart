@@ -1,5 +1,6 @@
 import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 LinkEnd _built(LinkEnd Function() build) => build();
 

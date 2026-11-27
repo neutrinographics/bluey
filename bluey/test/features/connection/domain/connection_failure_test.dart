@@ -4,6 +4,7 @@ import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
 import 'package:bluey/src/shared/domain/failure.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 /// Names the subtype, so the test fails to compile when the family gains a
 /// member this list does not name.

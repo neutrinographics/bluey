@@ -1,7 +1,7 @@
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
-import 'package:flutter/services.dart' show PlatformException;
 
 import '../../../../shared/domain/either.dart';
+import '../../../../shared/infrastructure/platform_errors.dart' as platform;
 import '../../domain/connection_failure.dart';
 import '../../domain/link_end.dart';
 import '../../domain/link_operation.dart';
@@ -32,16 +32,14 @@ ConnectionFailure connectionFailureFrom(
   PlatformConnectFailedException(:final reason) => ConnectFailed(
     _connectReasonOf(reason),
   ),
-  PlatformPermissionDeniedException(:final permission) => PermissionMissing(
-    permission,
-  ),
-  PlatformBluetoothUnavailableException() => const RadioUnavailable(),
-  PlatformException(:final code, :final message) => UnexpectedPlatformFailure(
-    message ?? 'platform error ($code)',
-    code: code,
-    cause: error,
-  ),
-  _ => UnexpectedPlatformFailure(error.toString(), cause: error),
+  _ => switch (platform.platformErrorOf(error)) {
+    platform.PermissionDenied(:final permission) => PermissionMissing(
+      permission,
+    ),
+    platform.RadioUnavailable() => const RadioUnavailable(),
+    platform.Unexpected(:final detail, :final code, :final cause) =>
+      UnexpectedPlatformFailure(detail, code: code, cause: cause),
+  },
 };
 
 /// Runs one platform call and answers what it threw as a failure, so an

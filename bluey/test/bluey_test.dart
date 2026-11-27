@@ -14,6 +14,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
   List<platform.PlatformDevice> mockBondedDevices = [];
   bool requestEnableResult = true;
   Exception? scanError;
+  int scanCalls = 0;
 
   final StreamController<platform.BluetoothState> _stateController =
       StreamController<platform.BluetoothState>.broadcast();
@@ -48,6 +49,7 @@ final class MockBlueyPlatform extends platform.BlueyPlatform {
 
   @override
   Stream<platform.PlatformDevice> scan(platform.PlatformScanConfig config) {
+    scanCalls++;
     if (scanError != null) {
       return Stream.error(scanError!);
     }
@@ -455,6 +457,14 @@ void main() {
     });
 
     group('dispose', () {
+      test('scanner() afterwards is a StateError even when none was made '
+          'before, and nothing scans', () async {
+        await bluey.dispose();
+
+        expect(() => bluey.scanner(), throwsStateError);
+        expect(mockPlatform.scanCalls, 0);
+      });
+
       test('closes state stream', () async {
         await bluey.dispose();
 

@@ -175,10 +175,8 @@ jobs:
       - name: Run them; they are expected to fail
         run: |
           (cd bluey && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey.json" || true)
-          (cd bluey_android && flutter test test/known_defects --run-skipped --tags known-defect --reporter json > "$RUNNER_TEMP/bluey_android.json" || true)
       - name: Each one ran, and each one still fails
         run: |
           dart run bluey_guards:known_defects \
-            test/known_defects/roster.dart "$RUNNER_TEMP/bluey.json" \
-            ../bluey_android/test/known_defects/roster.dart "$RUNNER_TEMP/bluey_android.json"
+            test/known_defects/roster.dart "$RUNNER_TEMP/bluey.json"
         working-directory: bluey

@@ -7,14 +7,14 @@ import 'package:meta/meta.dart';
 
 import 'api/connection/connection.dart';
 import 'api/connection/connection_assembly.dart';
+import 'api/discovery/discovery_assembly.dart';
+import 'api/discovery/scanner.dart';
 import 'connection/bluey_connection.dart';
 import 'connection/lifecycle_client.dart';
 import 'peer/peer_connection.dart';
-import 'discovery/bluey_scanner.dart';
-import 'discovery/device.dart';
-import 'discovery/scanner.dart';
 import 'events.dart';
 import 'features/connection/infrastructure/adapters/platform_connection_ports.dart';
+import 'features/discovery/infrastructure/adapters/platform_scanning.dart';
 import 'features/platform/domain/capabilities.dart';
 import 'features/platform/infrastructure/adapters/platform_capabilities.dart';
 import 'gatt_server/bluey_server.dart';
@@ -35,7 +35,7 @@ import 'shared/gatt_timeouts.dart';
 import 'shared/infrastructure/bluey_event_bus.dart';
 import 'shared/infrastructure/bluey_logger.dart';
 
-export 'discovery/scanner.dart';
+export 'api/discovery/scanner.dart';
 export 'platform/bluetooth_state.dart';
 
 /// The main entry point to Bluey.
@@ -399,10 +399,8 @@ class Bluey {
     );
   }
 
-  /// Create a Scanner for discovering nearby BLE devices.
-  ///
-  /// Returns a [Scanner] aggregate root for the Discovery bounded context.
-  /// Call [Scanner.dispose] when done to release resources.
+  /// A new Scanner for nearby BLE devices. Scanners share one radio scan, so
+  /// none replaces or stops another's; call [Scanner.dispose] when done.
   ///
   /// Example:
   /// ```dart
@@ -410,13 +408,20 @@ class Bluey {
   /// final subscription = scanner.scan().listen((result) {
   ///   print('Found: ${result.device.name} at ${result.rssi} dBm');
   /// });
-  /// // ...
   /// scanner.dispose();
   /// ```
+  /// Throws [StateError] after [dispose].
   Scanner scanner() {
     _requireAdapterOn();
-    return BlueyScanner(_platform, _eventBus);
+    return _discoveryAssembly.scanner();
   }
+
+  late final DiscoveryAssembly _discoveryAssembly = DiscoveryAssembly(
+    scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
+    publisher: _eventBus,
+    log: _logger,
+    now: clock.now,
+  );
 
   /// Connect to a device, within [timeout] when one is given.
   ///
@@ -444,7 +449,7 @@ class Bluey {
     try {
       return await attempt();
     } on BlueyException catch (error) {
-      _emitEvent(
+      _eventBus.emit(
         ErrorEvent(
           message: 'Connection failed to ${device.address.toShortString()}',
           error: error,
@@ -880,18 +885,28 @@ class Bluey {
     ServerId serverId, {
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) {
-    final identity = _requireLocalIdentity('peer()');
-    return createBlueyPeer(
-      platformApi: _platform,
-      serverId: serverId,
-      localIdentity: identity,
-      peerSilenceTimeout: peerSilenceTimeout,
-      logger: _logger,
-      events: _eventBus,
-      borrow: _connection.borrow,
-      connectionIdOf: _connectionIdOf,
+    return _newPeer(
+      serverId,
+      _requireLocalIdentity('peer()'),
+      peerSilenceTimeout,
     );
   }
+
+  BlueyPeer _newPeer(
+    ServerId id,
+    ServerId identity, [
+    Duration silence = lifecycle.defaultPeerSilenceTimeout,
+  ]) => createBlueyPeer(
+    platformApi: _platform,
+    devicesAdvertising: _discoveryAssembly.devicesAdvertising,
+    serverId: id,
+    localIdentity: identity,
+    peerSilenceTimeout: silence,
+    logger: _logger,
+    events: _eventBus,
+    borrow: _connection.borrow,
+    connectionIdOf: _connectionIdOf,
+  );
 
   /// Scan for nearby Bluey servers.
   ///
@@ -903,13 +918,14 @@ class Bluey {
   /// [probeTimeout] bounds each individual probe-connect attempt; one
   /// unresponsive candidate doesn't stall the whole session. Defaults
   /// to [PeerDiscovery.defaultProbeTimeout] (3 s).
+  /// Throws [StateError] after [dispose].
   Future<List<BlueyPeer>> discoverPeers({
     Duration timeout = const Duration(seconds: 5),
     Duration probeTimeout = PeerDiscovery.defaultProbeTimeout,
   }) async {
     final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
-      platformApi: _platform,
+      devicesAdvertising: _discoveryAssembly.devicesAdvertising,
       borrow: _connection.borrow,
       logger: _logger,
     );
@@ -917,19 +933,7 @@ class Bluey {
       timeout: timeout,
       probeTimeout: probeTimeout,
     );
-    return ids
-        .map(
-          (id) => createBlueyPeer(
-            platformApi: _platform,
-            serverId: id,
-            localIdentity: identity,
-            logger: _logger,
-            events: _eventBus,
-            borrow: _connection.borrow,
-            connectionIdOf: _connectionIdOf,
-          ),
-        )
-        .toList(growable: false);
+    return ids.map((id) => _newPeer(id, identity)).toList(growable: false);
   }
 
   ServerId _requireLocalIdentity(String operation) {
@@ -940,14 +944,13 @@ class Bluey {
     return id;
   }
 
-  /// Release all resources.
-  ///
-  /// After calling dispose, this instance cannot be used. Construct a
-  /// fresh instance via [Bluey.create] if you need to reinitialise.
+  /// Releases every resource; this instance cannot be used afterwards, so
+  /// build a fresh one with [Bluey.create] to start again.
   Future<void> dispose() async {
     await _stateSubscription?.cancel();
     await _platformLogSubscription?.cancel();
     await _stateController.close();
+    await _discoveryAssembly.dispose();
     await _eventBus.close();
     await _logger.dispose();
   }
@@ -965,10 +968,5 @@ class Bluey {
       case platform.BluetoothState.on:
         return BluetoothState.on;
     }
-  }
-
-  /// Emits an event to the event bus.
-  void _emitEvent(BlueyEvent event) {
-    _eventBus.emit(event);
   }
 }

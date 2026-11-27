@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 
 import '../shared/characteristic_properties.dart';
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 
 /// Permissions for GATT characteristic and descriptor values.
 ///

@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import '../connection/value_objects/attribute_handle.dart';
 import '../shared/characteristic_properties.dart';
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 
 /// A descriptor discovered on a connected remote device.
 ///

@@ -8,6 +8,7 @@ import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const _device = DeviceAddress('AA:BB:CC:DD:EE:01');
 final _at = DateTime.utc(2026, 11, 26, 10);

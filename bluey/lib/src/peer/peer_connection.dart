@@ -3,7 +3,7 @@ import 'dart:async';
 import '../api/connection/connection.dart' show Connection, ConnectionState;
 import '../connection/lifecycle_client.dart';
 import '../gatt_client/gatt.dart' show RemoteService;
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 import 'peer_remote_service_view.dart';
 import 'server_id.dart';
 

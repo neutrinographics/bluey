@@ -6,7 +6,7 @@ import '../../features/connection/domain/connection_failure.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
 import '../../shared/domain/either.dart';
-import '../../shared/uuid.dart';
+import '../../shared/domain/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'connection.dart';
 import 'connection_failure_translation.dart';

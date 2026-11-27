@@ -15,6 +15,7 @@ import '../../../fixtures/features/connection/application/ports/in_memory_links.
 import '../../../fixtures/features/connection/application/ports/in_memory_phy_control.dart';
 import '../../../fixtures/features/connection/application/up_session.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 

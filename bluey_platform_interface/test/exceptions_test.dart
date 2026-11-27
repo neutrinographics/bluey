@@ -2,6 +2,40 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('PlatformScanFailedException', () {
+    test('names the reason and the raw code in toString', () {
+      // arrange
+      const e = PlatformScanFailedException(
+        PlatformScanFailureReason.unknown,
+        code: 99,
+      );
+
+      // act
+      final text = e.toString();
+
+      // assert
+      expect(e, isA<Exception>());
+      expect(e.reason, PlatformScanFailureReason.unknown);
+      expect(e.code, 99);
+      expect(text, contains('unknown'));
+      expect(text, contains('99'));
+    });
+
+    test('keeps no code when the platform gave none', () {
+      // arrange
+      const e = PlatformScanFailedException(
+        PlatformScanFailureReason.alreadyStarted,
+      );
+
+      // act
+      final text = e.toString();
+
+      // assert
+      expect(e.code, isNull);
+      expect(text, contains('alreadyStarted'));
+    });
+  });
+
   group('GattOperationTimeoutException', () {
     test('exposes the operation name and a default message', () {
       const e = GattOperationTimeoutException('writeCharacteristic');

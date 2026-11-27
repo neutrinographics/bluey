@@ -37,7 +37,6 @@ final class _ControlServiceRejectingPlatform extends FakeBlueyPlatform {
 }
 
 void main() {
-  const address = 'AA:BB:CC:DD:EE:01';
   const centralId = 'CC:CC:CC:CC:CC:01';
   late FakeBlueyPlatform fake;
   late Bluey bluey;
@@ -46,68 +45,6 @@ void main() {
     fake = FakeBlueyPlatform();
     platform.BlueyPlatform.instance = fake;
     bluey = await Bluey.create(localIdentity: TestServerIds.localIdentity);
-  });
-
-  group('M4 (I336): scan restart without awaiting cancel', () {
-    test('second scan delivers results', () async {
-      // arrange
-      fake.simulatePeripheral(id: address, name: 'x');
-      final scanner = bluey.scanner();
-      final first = scanner.scan().listen((_) {});
-      await pumpEventQueue();
-      final results = <ScanResult>[];
-
-      // act
-      unawaited(first.cancel());
-      final second = scanner.scan().listen(results.add);
-      await pumpEventQueue();
-
-      // assert
-      expect(results, isNotEmpty, reason: 'restarted scan is silently dead');
-      expect(scanner.isScanning, isTrue);
-      await second.cancel();
-      scanner.dispose();
-    });
-
-    test(
-      'platform scan is not left running while scanner says stopped',
-      () async {
-        // arrange
-        fake.simulatePeripheral(id: address, name: 'x');
-        final scanner = bluey.scanner();
-        final first = scanner.scan().listen((_) {});
-        await pumpEventQueue();
-
-        // act
-        unawaited(first.cancel());
-        scanner.scan().listen((_) {});
-        await pumpEventQueue();
-
-        // assert
-        expect(
-          fake.isScanning,
-          scanner.isScanning,
-          reason: 'radio keeps scanning but the domain reports stopped',
-        );
-      },
-    );
-  });
-
-  group('M5 (I382): dispose while scanning', () {
-    test('dispose stops the platform scan', () async {
-      // arrange
-      final scanner = bluey.scanner();
-      scanner.scan().listen((_) {});
-      await pumpEventQueue();
-      expect(fake.isScanning, isTrue);
-
-      // act
-      scanner.dispose();
-      await pumpEventQueue();
-
-      // assert
-      expect(fake.isScanning, isFalse, reason: 'native scan leaks on dispose');
-    });
   });
 
   group('L1 (I386): advertising state desync', () {

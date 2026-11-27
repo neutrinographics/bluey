@@ -58,6 +58,10 @@ classes drift (audit DA-38). The scenario surface, briefly:
   `simulateScanFailure`, `simulateMtuNegotiationCap`,
   `setWriteWithoutResponseBudget`/`drainPendingWrites`,
   `simulateServerRequestBlackhole`.
+- **Scan results**: `simulateScanResult`, `simulateScanRefusal`,
+  `holdNextStopScan`. The scan stream is synchronous, so a result heard just
+  before a replacing scan is delivered; a real platform may lose it, which the
+  fake cannot exercise.
 - **Dual-role end-to-end**: `FakeBleLink` cross-wires two fakes so two
   real `Bluey` endpoints exchange real traffic; `shareOnePhysicalLink`
   adds the iOS one-link-per-peer-pair topology. Known limits are listed

@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:bluey/src/features/connection/application/ports/links.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
-import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 
 import 'links_contract.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 /// A radio in memory, so Connection's application units can be tested
 /// against [Links] without a platform, with time that `fakeAsync` drives.

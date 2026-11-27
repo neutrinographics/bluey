@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:bluey/src/features/connection/application/ports/links.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
-import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
@@ -14,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../../fakes/fake_platform.dart';
 import '../../../../fixtures/features/connection/application/ports/links_contract.dart';
 import '../../../../fixtures/shared/application/recording_log.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 

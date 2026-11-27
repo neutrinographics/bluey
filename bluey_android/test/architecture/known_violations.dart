@@ -12,7 +12,7 @@ library;
 const oversizedDart = <String>[
   'lib/src/android_connection_manager.dart -> 408 lines',
   'lib/src/android_server.dart -> 407 lines',
-  'lib/src/bluey_android.dart -> 703 lines',
+  'lib/src/bluey_android.dart -> 702 lines',
 ];
 
 /// The Kotlin files longer than 400 lines.

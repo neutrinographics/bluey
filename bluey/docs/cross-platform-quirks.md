@@ -88,6 +88,19 @@ Apps that hold multiple central-role peer connections concurrently should *also*
 
 *(I338 — lifecycle-silence transport reconciliation. Stage 1 fixed the Android advisory path; Pattern B gives iOS a real disconnect signal via presence-characteristic unsubscription, making silence advisory on both platforms.)*
 
+## Scanners share one radio scan, and iOS reports less than it matched
+
+**Affects:** apps that run a scan of their own while calling `discoverPeers()`, or that open more than one `Scanner`.
+
+Bluey runs one scan on the radio for every open scan, so two scanners do not replace each other. The radio scans for the union of what the open scans asked for, and each scan is handed the results it asked for. Two limits follow, both because iOS reports less than the operating system matched on.
+
+- **Two different service filters can see each other's devices.** CoreBluetooth matches services held in an advertisement's overflow area but reports only the services of the primary packet (`CBAdvertisementDataServiceUUIDsKey`). When a device matched but shows none of the radio's services, Bluey cannot tell which scan it matched for, so every filtered scan gets it. With one filtered scan open, the OS filter is trusted and nothing extra arrives.
+- **While an unfiltered scan is open, a filtered scan finds fewer devices on iOS.** The radio then scans unfiltered, so iOS does no overflow matching and reports no overflow services. A filtered scan finds only devices that show its service in their primary packet. A backgrounded Bluey server advertises its control service in the overflow area, so `discoverPeers()` on iOS can miss it for as long as the app runs an unfiltered scan. Before, `discoverPeers()` replaced the app's scan and then stopped it; now it leaves the app's scan running and shares it.
+
+- **On Android a scan with no mode is moved to low power, once, while another scanner states `lowPower`.** The radio scans in the busiest mode any open scan stated, so a scan that stated none (the native default is low latency) is served in low power, with one radio restart, once another scanner states it.
+
+**Practical guidance.** On iOS, if peers must be found while the app also scans, filter the app's own scan by a service, or accept that a backgrounded peer may not appear until the unfiltered scan stops. Both limits come from what iOS reports.
+
 ## Single writes are capped at 512 bytes regardless of MTU
 
 The Bluetooth spec caps an attribute value at **512 octets** (Core Spec Vol 3,

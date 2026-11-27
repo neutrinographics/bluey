@@ -598,6 +598,10 @@ abstract class BlueyFlutterApi {
   /// Scan completed or stopped.
   void onScanComplete();
 
+  /// The platform refused or lost the scan; [errorCode] is Android's
+  /// `ScanCallback.SCAN_FAILED_*` value, so Dart can tell the app why.
+  void onScanFailed(int errorCode);
+
   /// Connection state changed.
   void onConnectionStateChanged(ConnectionStateEventDto event);
 

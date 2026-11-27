@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
 import '../../../fixtures/features/connection/recording_link_events.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 
