@@ -42,6 +42,11 @@ final class ScannerScans {
   /// own scans alone, since the radio's phase is not a scanner's business.
   ScannerPhase get standing => _terminal ?? _ownStanding;
 
+  /// Whether nothing is left to tell of the scanner: the app closed it and
+  /// none of its scans is still to end.
+  bool get isSpent =>
+      _terminal is ScannerClosed && scans.every((scan) => scan.phase is Ended);
+
   /// Whether the scanner may still ask for scans.
   bool get mayAsk => _terminal == null;
 

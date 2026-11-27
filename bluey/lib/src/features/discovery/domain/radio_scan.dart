@@ -1,18 +1,33 @@
 import 'package:meta/meta.dart';
 
 import '../../../shared/domain/radio_outage.dart';
+import 'radio_duty.dart';
 import 'radio_phase.dart';
 import 'radio_scan_input.dart';
-import 'radio_scan_step.dart';
 import 'result_routing.dart';
 import 'scan_ask.dart';
+import 'scan_event.dart';
 import 'scan_id.dart';
 import 'scan_phase.dart';
 import 'scanner_phase.dart';
 import 'scanner_scans.dart';
 import 'scanners.dart';
 
-export 'radio_scan_step.dart';
+/// The answer to one input: the radio scan as it now stands, what it raised
+/// and the duty, if any, the input left its owner.
+final class RadioScanStep {
+  RadioScanStep(this.scan, {List<ScanEvent> events = const [], this.duty})
+    : events = List.unmodifiable(events);
+
+  /// The radio scan after the input.
+  final RadioScan scan;
+
+  /// What the step raised, in order.
+  final List<ScanEvent> events;
+
+  /// What the owner must now do to the radio, or null when nothing is due.
+  final RadioDuty? duty;
+}
 
 /// The one radio scan every open scan shares, which decides what each input
 /// does to the radio and to every scan, so no two scans can ask the radio
@@ -46,7 +61,13 @@ final class RadioScan {
   @visibleForTesting
   int get heldScanCount => _scanners.scans.length;
 
-  /// Where [scanner] stands, or null for a scanner never opened.
+  /// How many scanners are still held, which stays bounded however many are
+  /// opened and closed.
+  @visibleForTesting
+  int get heldScannerCount => _scanners.length;
+
+  /// Where [scanner] stands, or null for a scanner never opened or closed
+  /// before the latest step with nothing left to end.
   ScannerPhase? standingOf(ScannerId scanner) => _scanners[scanner]?.standing;
 
   /// Answers what [input], which came at [at], does to the radio and every
@@ -215,10 +236,8 @@ final class RadioScan {
 
   RadioScanStep _leftWhileScanning(ScanId id, ScanEnd end) {
     if (_scanners.find(id)?.isOpen != true) return RadioScanStep(this);
-    final othersStay = _scanners.scans.any(
-      (scan) => scan.isOpen && scan.id != id,
-    );
-    if (othersStay) return RadioScanStep(_movedOne(id, Ended(end), radio));
+    if (_scanners.scans.any((scan) => scan.isOpen && scan.id != id))
+      return RadioScanStep(_movedOne(id, Ended(end), radio));
     return RadioScanStep(
       _movedOne(id, Leaving(end), const RadioStopping()),
       duty: const StopTheRadio(),
@@ -233,21 +252,11 @@ final class RadioScan {
   /// The stop settled: each leaver reaches the end it left with, and the
   /// scans that waited for the stop are served together.
   RadioScanStep _settled({required RadioPhase ifNoneWait}) {
-    final waiting = [
-      for (final scan in _scanners.scans)
-        if (scan.phase is Waiting) scan.ask,
-    ];
+    final waiting = _scanners.waitingAsks;
     final next =
         waiting.isEmpty ? ifNoneWait : RadioScanning(ScanCoverage.of(waiting));
-    final scans = _scanners.moved(
-      (scan) => switch (scan.phase) {
-        Leaving(:final end) => Ended(end),
-        Waiting() => const Served(),
-        Served() || Ended() => null,
-      },
-    );
     return RadioScanStep(
-      RadioScan._(next, scans),
+      RadioScan._(next, _scanners.settled()),
       duty: next is RadioScanning ? ScanFor(next.coverage) : null,
     );
   }
@@ -261,12 +270,7 @@ final class RadioScan {
     RadioOutage? lostTo,
     RadioDuty? duty,
   }) {
-    final moved = _scanners.moved(
-      (scan) =>
-          scan.isOpen || (leaversToo && scan.phase is Leaving)
-              ? Ended(end)
-              : null,
-    );
+    final moved = _scanners.ended(end, leaversToo: leaversToo);
     return RadioScanStep(
       RadioScan._(radio, lostTo == null ? moved : moved.lost(lostTo)),
       duty: duty,
@@ -279,17 +283,8 @@ final class RadioScan {
     ScanAsk ask,
     ScanPhase phase, [
     RadioPhase? next,
-  ]) {
-    final scans = _scanners[scanner] ?? const ScannerScans.none();
-    return RadioScan._(
-      next ?? radio,
-      _scanners.withScanner(scanner, scans.asked(id, ask, phase)),
-    );
-  }
+  ]) => RadioScan._(next ?? radio, _scanners.asked(scanner, id, ask, phase));
 
   RadioScan _movedOne(ScanId id, ScanPhase phase, RadioPhase next) =>
-      RadioScan._(
-        next,
-        _scanners.moved((scan) => scan.id == id ? phase : null),
-      );
+      RadioScan._(next, _scanners.movedOne(id, phase));
 }

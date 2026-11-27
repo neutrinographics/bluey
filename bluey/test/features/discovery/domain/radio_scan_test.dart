@@ -1,5 +1,6 @@
 import 'package:bluey/src/features/discovery/domain/advertisement.dart';
 import 'package:bluey/src/features/discovery/domain/device.dart';
+import 'package:bluey/src/features/discovery/domain/radio_duty.dart';
 import 'package:bluey/src/features/discovery/domain/radio_phase.dart';
 import 'package:bluey/src/features/discovery/domain/radio_scan.dart';
 import 'package:bluey/src/features/discovery/domain/radio_scan_input.dart';

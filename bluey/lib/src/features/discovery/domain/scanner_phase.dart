@@ -65,8 +65,8 @@ final class ScannerStopping extends ScannerPhase {
   int get hashCode => (ScannerStopping).hashCode;
 }
 
-/// The radio became unusable under the scanner; it scans nothing until the
-/// app asks again.
+/// The radio became unusable under the scanner; final, so the app opens a
+/// new scanner to scan again.
 final class ScannerLost extends ScannerPhase {
   const ScannerLost(this.outage);
 

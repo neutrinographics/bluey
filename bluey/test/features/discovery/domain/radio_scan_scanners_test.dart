@@ -1,3 +1,5 @@
+import 'package:bluey/src/features/discovery/domain/radio_duty.dart';
+import 'package:bluey/src/features/discovery/domain/radio_phase.dart';
 import 'package:bluey/src/features/discovery/domain/radio_scan.dart';
 import 'package:bluey/src/features/discovery/domain/radio_scan_input.dart';
 import 'package:bluey/src/features/discovery/domain/scan_ask.dart';
@@ -477,21 +479,100 @@ void main() {
       expect(next.scan.phaseOf(s1), isNull);
     });
 
-    test('a closed scanner keeps its standing and no scans', () {
+    test('a closed scanner with no scan is forgotten in the next step', () {
+      // arrange
+      final closed = after([
+        const ScannerOpened(a),
+      ]).on(const ScannerDisposed(a), at: at);
+
+      // act
+      final next = closed.scan.on(const ScannerOpened(b), at: at);
+
+      // assert
+      expect(closed.scan.standingOf(a), const ScannerClosed());
+      expect(next.scan.standingOf(a), isNull);
+      expect(next.scan.heldScannerCount, 1);
+    });
+
+    test('a closed scanner stays until the stop ends its leaving scan', () {
+      // arrange
+      final scan = after([...scanning(), const ScannerDisposed(a)]);
+
+      // act
+      final settled = scan.on(const RadioStopped(), at: at);
+      final next = settled.scan.on(const ScannerOpened(b), at: at);
+
+      // assert
+      expect(settled.scan.standingOf(a), const ScannerClosed());
+      expect(settled.scan.phaseOf(s1), const Ended(onRequest));
+      expect(next.scan.standingOf(a), isNull);
+      expect(next.scan.phaseOf(s1), isNull);
+      expect(next.scan.heldScanCount, 0);
+    });
+
+    test('a forgotten scanner may not ask', () {
       // arrange
       final scan = after([
-        ...scanning(),
+        const ScannerOpened(a),
         const ScannerDisposed(a),
-        const RadioStopped(),
+        const ScannerOpened(b),
       ]);
+
+      // act
+      void askFromIt() => scan.on(ScanAsked(a, s1, ask()), at: at);
+
+      // assert
+      expect(askFromIt, throwsStateError);
+    });
+
+    test('disposing a forgotten scanner does nothing', () {
+      // arrange
+      final scan = after([
+        const ScannerOpened(a),
+        const ScannerDisposed(a),
+        const ScannerOpened(b),
+      ]);
+
+      // act
+      final step = scan.on(const ScannerDisposed(a), at: at);
+
+      // assert
+      expect(step.events, isEmpty);
+      expect(step.duty, isNull);
+      expect(step.scan.standingOf(a), isNull);
+    });
+
+    test('a lost scanner the app never closes stays', () {
+      // arrange
+      final scan = after([const ScannerOpened(a), const RadioWentAway(outage)]);
 
       // act
       final next = scan.on(const ScannerOpened(b), at: at);
 
       // assert
-      expect(next.scan.standingOf(a), const ScannerClosed());
-      expect(next.scan.phaseOf(s1), isNull);
-      expect(next.scan.heldScanCount, 0);
+      expect(next.scan.standingOf(a), const ScannerLost(outage));
+    });
+
+    test('a thousand scanners opened, asked and disposed leave few held', () {
+      // arrange
+      var scan = const RadioScan.quiet();
+
+      // act
+      for (var id = 1; id <= 1000; id++) {
+        for (final input in [
+          ScannerOpened(ScannerId(id)),
+          ScanAsked(ScannerId(id), ScanId(id), ask()),
+          ScannerDisposed(ScannerId(id)),
+          const RadioStopped(),
+        ]) {
+          scan = scan.on(input, at: at).scan;
+        }
+      }
+
+      // assert
+      expect(scan.heldScannerCount, lessThanOrEqualTo(1));
+      expect(scan.standingOf(const ScannerId(500)), isNull);
+      expect(scan.radio, const RadioQuiet());
     });
 
     test('a thousand scans asked and left leave few scans held', () {
