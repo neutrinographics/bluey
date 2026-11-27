@@ -413,14 +413,16 @@ class Bluey {
   /// ```
   Scanner scanner() {
     _requireAdapterOn();
-    return (_discovery ??= DiscoveryAssembly(
-          scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
-          publisher: _eventBus,
-          log: _logger,
-          now: clock.now,
-        ))
-        .scanner();
+    return _discoveryAssembly.scanner();
   }
+
+  DiscoveryAssembly get _discoveryAssembly =>
+      _discovery ??= DiscoveryAssembly(
+        scanning: PlatformScanning(_platform, log: _logger, now: clock.now),
+        publisher: _eventBus,
+        log: _logger,
+        now: clock.now,
+      );
 
   /// Connect to a device, within [timeout] when one is given.
   ///
@@ -884,18 +886,28 @@ class Bluey {
     ServerId serverId, {
     Duration peerSilenceTimeout = lifecycle.defaultPeerSilenceTimeout,
   }) {
-    final identity = _requireLocalIdentity('peer()');
-    return createBlueyPeer(
-      platformApi: _platform,
-      serverId: serverId,
-      localIdentity: identity,
-      peerSilenceTimeout: peerSilenceTimeout,
-      logger: _logger,
-      events: _eventBus,
-      borrow: _connection.borrow,
-      connectionIdOf: _connectionIdOf,
+    return _newPeer(
+      serverId,
+      _requireLocalIdentity('peer()'),
+      peerSilenceTimeout,
     );
   }
+
+  BlueyPeer _newPeer(
+    ServerId id,
+    ServerId identity, [
+    Duration silence = lifecycle.defaultPeerSilenceTimeout,
+  ]) => createBlueyPeer(
+    platformApi: _platform,
+    devicesAdvertising: _discoveryAssembly.devicesAdvertising,
+    serverId: id,
+    localIdentity: identity,
+    peerSilenceTimeout: silence,
+    logger: _logger,
+    events: _eventBus,
+    borrow: _connection.borrow,
+    connectionIdOf: _connectionIdOf,
+  );
 
   /// Scan for nearby Bluey servers.
   ///
@@ -913,7 +925,7 @@ class Bluey {
   }) async {
     final identity = _requireLocalIdentity('discoverPeers()');
     final discovery = PeerDiscovery(
-      platformApi: _platform,
+      devicesAdvertising: _discoveryAssembly.devicesAdvertising,
       borrow: _connection.borrow,
       logger: _logger,
     );
@@ -921,19 +933,7 @@ class Bluey {
       timeout: timeout,
       probeTimeout: probeTimeout,
     );
-    return ids
-        .map(
-          (id) => createBlueyPeer(
-            platformApi: _platform,
-            serverId: id,
-            localIdentity: identity,
-            logger: _logger,
-            events: _eventBus,
-            borrow: _connection.borrow,
-            connectionIdOf: _connectionIdOf,
-          ),
-        )
-        .toList(growable: false);
+    return ids.map((id) => _newPeer(id, identity)).toList(growable: false);
   }
 
   ServerId _requireLocalIdentity(String operation) {

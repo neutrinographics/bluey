@@ -74,7 +74,6 @@ const frameworkPlacement = <String>[
   'lib/src/gatt_server/lifecycle_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/lifecycle.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/peer/bluey_peer.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/peer/peer_discovery.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/shared/error_translation.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/shared/error_translation.dart -> package:flutter/services.dart',
 ];

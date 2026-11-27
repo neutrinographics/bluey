@@ -1,22 +1,25 @@
 import 'dart:async';
 
-import 'package:bluey_platform_interface/bluey_platform_interface.dart'
-    as platform;
-
 import '../api/connection/borrowed_connection.dart';
 import '../api/connection/connection.dart';
 import '../shared/domain/device_address.dart';
+import '../shared/domain/uuid.dart';
 import '../lifecycle.dart' as lifecycle;
 import '../shared/infrastructure/bluey_logger.dart';
 import '../shared/application/log_level.dart';
 import '../shared/exceptions.dart';
 import 'server_id.dart';
 
+/// Devices heard advertising [service], until the listener cancels.
+typedef DevicesAdvertising = Stream<DeviceAddress> Function(UUID service);
+
 /// Finds Bluey peers by borrowing each scan candidate's link to read its
 /// [ServerId], so a device the app is already linked to is read over the
 /// app's link and left as it was, and a link opened for the probe is given
 /// back. Internal to the `Bluey` facade.
 class PeerDiscovery {
+  static final UUID _controlService = UUID(lifecycle.controlServiceUuid);
+
   /// Default probe-connect timeout. A single unresponsive candidate
   /// shouldn't stall the whole discovery session, so each probe is
   /// bounded short. 3 s is a heuristic balance: long enough that a
@@ -25,17 +28,17 @@ class PeerDiscovery {
   /// (the platform default).
   static const Duration defaultProbeTimeout = Duration(seconds: 3);
 
-  final platform.BlueyPlatform _platform;
+  final DevicesAdvertising _devicesAdvertising;
   final BorrowConnection _borrow;
   final BlueyLogger _logger;
 
-  /// Creates a [PeerDiscovery] that scans through [platformApi] and reaches
-  /// each candidate through [borrow].
+  /// Creates a [PeerDiscovery] that hears candidates through
+  /// [devicesAdvertising] and reaches each one through [borrow].
   PeerDiscovery({
-    required platform.BlueyPlatform platformApi,
+    required DevicesAdvertising devicesAdvertising,
     required BorrowConnection borrow,
     required BlueyLogger logger,
-  }) : _platform = platformApi,
+  }) : _devicesAdvertising = devicesAdvertising,
        _borrow = borrow,
        _logger = logger;
 
@@ -95,15 +98,11 @@ class PeerDiscovery {
       }
     }
 
-    final scanConfig = platform.PlatformScanConfig(
-      serviceUuids: [lifecycle.controlServiceUuid],
-      timeoutMs: timeout.inMilliseconds,
-    );
-    final sub = _platform.scan(scanConfig).listen(
+    final sub = _devicesAdvertising(_controlService).listen(
       (device) {
         if (windowClosed.isCompleted) return;
-        if (!probed.add(device.id)) return;
-        probeChain = probeChain.then((_) => probe(device.id));
+        if (!probed.add(device.value)) return;
+        probeChain = probeChain.then((_) => probe(device.value));
       },
       onError: (Object e) {
         if (!windowClosed.isCompleted) windowClosed.completeError(e);
@@ -124,7 +123,6 @@ class PeerDiscovery {
       deadline.cancel();
       // Not awaited — see the matching note in [connectTo].
       unawaited(sub.cancel());
-      await _stopScan('discoverPeers');
     }
     _logger.log(
       BlueyLogLevel.info,
@@ -176,14 +174,10 @@ class PeerDiscovery {
       await _giveBack(borrowed);
     }
 
-    final scanConfig = platform.PlatformScanConfig(
-      serviceUuids: [lifecycle.controlServiceUuid],
-      timeoutMs: scanTimeout.inMilliseconds,
-    );
-    final sub = _platform.scan(scanConfig).listen(
+    final sub = _devicesAdvertising(_controlService).listen(
       (device) {
-        if (!probed.add(device.id)) return;
-        probeChain = probeChain.then((_) => probe(device.id));
+        if (!probed.add(device.value)) return;
+        probeChain = probeChain.then((_) => probe(device.value));
       },
       onError: (Object e) {
         if (!completer.isCompleted) completer.completeError(e);
@@ -194,9 +188,7 @@ class PeerDiscovery {
       // let it settle before declaring failure.
       probeChain.whenComplete(() {
         if (!completer.isCompleted) {
-          completer.completeError(
-            PeerNotFoundException(expected, scanTimeout),
-          );
+          completer.completeError(PeerNotFoundException(expected, scanTimeout));
         }
       });
     });
@@ -205,28 +197,9 @@ class PeerDiscovery {
       return await completer.future;
     } finally {
       deadline.cancel();
-      // Deliberately not awaited: a broadcast-subscription cancel with
-      // no onCancel returns the root-zone null-future, and awaiting it
-      // escapes fakeAsync (parking the caller on the real event loop).
-      // stopScan is the authoritative radio-stop.
+      // Deliberately not awaited: awaiting a subscription cancel escapes
+      // fakeAsync, and the scan leaves the radio on its own.
       unawaited(sub.cancel());
-      await _stopScan('connectTo');
-    }
-  }
-
-  /// Stops the scan, logging a failure rather than raising it: by the time
-  /// the scan is stopped the caller's answer is already known, and a radio
-  /// that refuses to stop must not turn it into an error.
-  Future<void> _stopScan(String operation) async {
-    try {
-      await _platform.stopScan();
-    } catch (e) {
-      _logger.log(
-        BlueyLogLevel.warn,
-        'bluey.peer.discovery',
-        '$operation stopScan failed',
-        data: {'exception': e.runtimeType.toString()},
-      );
     }
   }
 

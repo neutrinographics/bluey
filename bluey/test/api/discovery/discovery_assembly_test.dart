@@ -112,4 +112,131 @@ void main() {
       expect(() => discovery.scanner(), throwsStateError);
     });
   });
+
+  group('devicesAdvertising', () {
+    final service = UUID('0000fe00-0000-1000-8000-00805f9b34fb');
+
+    test('listening asks the radio for the service with no stated mode', () async {
+      // arrange
+      final heard = <DeviceAddress>[];
+
+      // act
+      final subscription = discovery.devicesAdvertising(service).listen(
+        heard.add,
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(fake.isScanning, isTrue);
+      expect(fake.lastScanConfig?.serviceUuids, [service.toString()]);
+      expect(fake.lastScanConfig?.scanMode, isNull);
+      await subscription.cancel();
+    });
+
+    test('emits the address of each device heard advertising it', () async {
+      // arrange
+      fake.simulatePeripheral(
+        id: 'AA:BB:CC:DD:EE:01',
+        name: 'peer',
+        serviceUuids: [service.toString()],
+      );
+      final heard = <DeviceAddress>[];
+
+      // act
+      final subscription = discovery.devicesAdvertising(service).listen(
+        heard.add,
+      );
+      await pumpEventQueue();
+
+      // assert
+      expect(heard, [const DeviceAddress('AA:BB:CC:DD:EE:01')]);
+      await subscription.cancel();
+    });
+
+    test('cancelling stops the radio when no other scan is open', () async {
+      // arrange
+      final subscription = discovery.devicesAdvertising(service).listen((_) {});
+      await pumpEventQueue();
+
+      // act
+      await subscription.cancel();
+      await pumpEventQueue();
+
+      // assert
+      expect(fake.isScanning, isFalse);
+    });
+
+    test('cancelling leaves another scanner\'s scan running', () async {
+      // arrange
+      discovery.scanner().scan().listen((_) {});
+      final subscription = discovery.devicesAdvertising(service).listen((_) {});
+      await pumpEventQueue();
+
+      // act
+      await subscription.cancel();
+      await pumpEventQueue();
+
+      // assert
+      expect(fake.isScanning, isTrue);
+    });
+
+    test('two listens are two scanners', () async {
+      // arrange
+      final first = discovery.devicesAdvertising(service).listen((_) {});
+      final second = discovery.devicesAdvertising(service).listen((_) {});
+      await pumpEventQueue();
+
+      // act
+      await first.cancel();
+      await pumpEventQueue();
+
+      // assert
+      expect(fake.isScanning, isTrue);
+      await second.cancel();
+      await pumpEventQueue();
+      expect(fake.isScanning, isFalse);
+    });
+
+    test('a scan the platform fails adds the translated exception and closes',
+        () async {
+      // arrange
+      fake.simulateScanFailure(StateError('radio refused'));
+      final errors = <Object>[];
+      var closed = false;
+
+      // act
+      discovery
+          .devicesAdvertising(service)
+          .listen((_) {}, onError: errors.add, onDone: () => closed = true);
+      await pumpEventQueue();
+
+      // assert
+      expect(errors, hasLength(1));
+      expect(errors.single, isA<BlueyException>());
+      expect(closed, isTrue);
+    });
+
+    test('an outage closes the stream and a new listen works after it',
+        () async {
+      // arrange
+      var closed = false;
+      discovery
+          .devicesAdvertising(service)
+          .listen((_) {}, onDone: () => closed = true);
+      await pumpEventQueue();
+
+      // act
+      fake.setBluetoothState(platform.BluetoothState.off);
+      await pumpEventQueue();
+      fake.setBluetoothState(platform.BluetoothState.on);
+      await pumpEventQueue();
+      final subscription = discovery.devicesAdvertising(service).listen((_) {});
+      await pumpEventQueue();
+
+      // assert
+      expect(closed, isTrue);
+      expect(fake.isScanning, isTrue);
+      await subscription.cancel();
+    });
+  });
 }
