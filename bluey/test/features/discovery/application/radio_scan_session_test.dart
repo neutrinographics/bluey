@@ -10,11 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/discovery/application/radio_scan_rig.dart';
 
-OpenScan opened(Either<Object, OpenScan> answer) => answer.fold(
-  (failure) => fail('the scan was refused: $failure'),
-  (scan) => scan,
-);
-
 void main() {
   group('one scanner with one scan', () {
     test('the radio is asked once, results flow, and leaving stops the radio '

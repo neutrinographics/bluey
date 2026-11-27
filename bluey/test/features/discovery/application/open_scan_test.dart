@@ -1,17 +1,9 @@
-import 'package:bluey/src/features/discovery/application/open_scan.dart';
-import 'package:bluey/src/features/discovery/application/open_scanner.dart';
 import 'package:bluey/src/features/discovery/domain/scan_phase.dart';
 import 'package:bluey/src/features/discovery/domain/scan_result.dart';
-import 'package:bluey/src/shared/domain/either.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/discovery/application/radio_scan_rig.dart';
-
-OpenScan opened(Either<ScannerUnusable, OpenScan> answer) => answer.fold(
-  (unusable) => fail('the scanner was unusable: ${unusable.phase}'),
-  (scan) => scan,
-);
 
 void main() {
   group('a time limit', () {

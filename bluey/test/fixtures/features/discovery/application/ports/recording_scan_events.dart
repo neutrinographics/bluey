@@ -7,6 +7,13 @@ class RecordingScanEvents implements ScanEvents {
 
   List<ScanEvent> get raised => List.unmodifiable(_raised);
 
+  /// Called with each event as it is raised, synchronously, so a test can
+  /// act from inside a step the way a synchronous listener would.
+  void Function(ScanEvent event)? whenRaised;
+
   @override
-  void raise(ScanEvent event) => _raised.add(event);
+  void raise(ScanEvent event) {
+    _raised.add(event);
+    whenRaised?.call(event);
+  }
 }

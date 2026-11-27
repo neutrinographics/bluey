@@ -14,9 +14,13 @@ import 'scanning_contract.dart';
 ///
 /// It is its own [ScanningHarness], and adds counts of what was asked of it.
 class InMemoryScanning implements Scanning, ScanningHarness {
+  /// With [outagesAtOnce], an outage reaches its listeners inside the call
+  /// that reports it, so a test can raise one in the middle of a step.
+  InMemoryScanning({bool outagesAtOnce = false})
+    : _outages = StreamController<RadioOutage>.broadcast(sync: outagesAtOnce);
+
   final StreamController<ScanReport> _reports = StreamController<ScanReport>();
-  final StreamController<RadioOutage> _outages =
-      StreamController<RadioOutage>.broadcast();
+  final StreamController<RadioOutage> _outages;
   final List<ScanCoverage> _coverages = [];
   ScanCoverage? _scanningFor;
   int _stopsAsked = 0;

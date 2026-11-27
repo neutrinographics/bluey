@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
-
 import '../../../shared/application/log.dart';
 import '../../../shared/application/log_level.dart';
 import '../../../shared/application/now.dart';
@@ -14,10 +12,11 @@ import '../domain/scan_event.dart';
 import '../domain/scan_failure.dart';
 import '../domain/scan_id.dart';
 import '../domain/scan_phase.dart';
-import '../domain/scan_result.dart';
 import '../domain/scanner_phase.dart';
 import 'open_scan.dart';
 import 'open_scanner.dart';
+import 'owed_scan.dart';
+import 'scan_turns.dart';
 import 'ports/scan_events.dart';
 import 'ports/scanning.dart';
 
@@ -26,9 +25,9 @@ import 'ports/scanning.dart';
 /// answers, and tells each handle what concerns it, so no handle decides
 /// anything and only this unit reaches the radio.
 ///
-/// Inputs are fed one at a time: one raised while a step is being carried
-/// out waits its turn, so every step starts from the radio scan the last one
-/// left.
+/// Inputs are fed one at a time ([ScanTurns]): one raised while a step is
+/// being carried out waits its turn, and so does a handle's call that reads
+/// the radio scan, so a listener told synchronously can call back safely.
 final class RadioScanSession {
   RadioScanSession({
     required Scanning scanning,
@@ -54,14 +53,14 @@ final class RadioScanSession {
   final ScanEvents _events;
   final Log _log;
   final Now _now;
-  final Queue<RadioScanInput> _inputs = Queue<RadioScanInput>();
+  late final ScanTurns _turns = ScanTurns(_take);
   final Map<ScannerId, _Seat> _seats = {};
-  final Map<ScanId, _Held> _scans = {};
+  final Map<ScanId, OwedScan> _scans = {};
   late final StreamSubscription<ScanReport> _reports;
   late final StreamSubscription<RadioOutage> _outages;
   RadioScan _radioScan = const RadioScan.quiet();
-  bool _feeding = false;
   bool _disposed = false;
+  Future<void>? _disposal;
   int _lastScanner = 0;
   int _lastScan = 0;
   Future<Either<ScanFailure, void>>? _stopInFlight;
@@ -77,29 +76,38 @@ final class RadioScanSession {
 
   /// Ends every scan and closes every scanner, and answers once the radio
   /// stop that needed, or one already in flight, has settled.
-  Future<void> dispose() async {
-    if (_disposed) return;
+  Future<void> dispose() => _disposal ??= _shutDown();
+
+  Future<void> _shutDown() async {
     _disposed = true;
-    _feed(const ShutDown());
-    for (final seat in List.of(_seats.values)) {
-      unawaited(seat.close());
-    }
-    await _stopInFlight;
+    final stopped = Completer<void>();
+    _decide(() {
+      _feed(const ShutDown());
+      for (final seat in List.of(_seats.values)) {
+        unawaited(seat.close());
+      }
+      _decide(() => stopped.complete(_stopInFlight?.then((_) {})));
+    });
+    await stopped.future;
     unawaited(_reports.cancel());
     unawaited(_outages.cancel());
   }
 
-  void _feed(RadioScanInput input) {
-    _inputs.add(input);
-    if (_feeding) return;
-    _feeding = true;
-    try {
-      while (_inputs.isNotEmpty) {
-        _carryOut(_step(_inputs.removeFirst()));
+  void _feed(RadioScanInput input) => _turns.feed(input);
+
+  void _decide(void Function() decision) => _turns.decide(decision);
+
+  /// A scan asked behind an outage that lost its scanner ends with that
+  /// outage, since the radio scan refuses an ask from a lost scanner; a
+  /// closed scanner never gets this far, as its seat refuses at once.
+  void _take(RadioScanInput input) {
+    if (input case ScanAsked(:final scanner, :final id)) {
+      if (_radioScan.standingOf(scanner) case ScannerLost(:final outage)) {
+        _scans.remove(id)?.end(EndedByRadioOutage(outage));
+        return;
       }
-    } finally {
-      _feeding = false;
     }
+    _carryOut(_step(input));
   }
 
   /// Stores what [input] does, then tells of it, so whoever hears of a step
@@ -161,7 +169,7 @@ final class RadioScanSession {
 
   OpenScan _open(_Seat seat, ScanAsk ask) {
     final id = ScanId(++_lastScan);
-    final held = _Held(seat, () => _leave(id, const EndedOnRequest()));
+    final held = OwedScan(seat.id, () => _leave(id, const EndedOnRequest()));
     _scans[id] = held;
     final scan = OpenScan(
       id: id,
@@ -189,23 +197,8 @@ final class RadioScanSession {
 
   Iterable<ScanId> _scansOf(_Seat seat) => [
     for (final MapEntry(key: id, value: held) in _scans.entries)
-      if (held.seat == seat) id,
+      if (held.scanner == seat.id) id,
   ];
-}
-
-/// One scan the session still owes an end: its results and its end.
-final class _Held {
-  _Held(this.seat, void Function() onCancel)
-    : results = StreamController<ScanResult>(onCancel: onCancel);
-
-  final _Seat seat;
-  final StreamController<ScanResult> results;
-  final Completer<ScanEnd> ended = Completer<ScanEnd>();
-
-  void end(ScanEnd end) {
-    unawaited(results.close());
-    ended.complete(end);
-  }
 }
 
 /// One scanner as the session tracks it: the phase the radio scan last gave
@@ -238,23 +231,37 @@ final class _Seat implements ScannerSeat {
     _ => Right(_session._open(this, ask)),
   };
 
+  /// Decided once the inputs queued before it are stepped, so a stop made
+  /// from inside a step leaves the scans those steps leave open.
   @override
   Future<Either<ScanFailure, void>> stop() {
-    final scans = _session._scansOf(this).toList();
-    for (final scan in scans) {
-      _session._leave(scan, const EndedOnRequest());
-    }
-    return _session._settlingOf(scans);
+    final settled = Completer<Either<ScanFailure, void>>();
+    _session._decide(() {
+      final scans = _session._scansOf(this).toList();
+      for (final scan in scans) {
+        _session._leave(scan, const EndedOnRequest());
+      }
+      _session._decide(() => settled.complete(_session._settlingOf(scans)));
+    });
+    return settled.future;
   }
 
   @override
   Future<void> close() => _closing ??= _closed();
 
-  Future<void> _closed() async {
-    final scans = _session._scansOf(this).toList();
-    _session._feed(ScannerDisposed(id));
-    _session._seats.remove(id);
-    unawaited(_phases.close());
-    await _session._settlingOf(scans);
+  /// The seat is let go only once its disposal has been stepped, so its
+  /// phases tell it closed before they end.
+  Future<void> _closed() {
+    final settled = Completer<void>();
+    _session._decide(() {
+      final scans = _session._scansOf(this).toList();
+      _session._feed(ScannerDisposed(id));
+      _session._decide(() {
+        _session._seats.remove(id);
+        unawaited(_phases.close());
+        settled.complete(_session._settlingOf(scans).then((_) {}));
+      });
+    });
+    return settled.future;
   }
 }

@@ -1,3 +1,4 @@
+import 'package:bluey/src/features/discovery/application/open_scan.dart';
 import 'package:bluey/src/features/discovery/application/radio_scan_session.dart';
 import 'package:bluey/src/features/discovery/domain/advertisement.dart';
 import 'package:bluey/src/features/discovery/domain/device.dart';
@@ -5,7 +6,9 @@ import 'package:bluey/src/features/discovery/domain/scan_ask.dart';
 import 'package:bluey/src/features/discovery/domain/scan_filter.dart';
 import 'package:bluey/src/features/discovery/domain/scan_result.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
+import 'package:bluey/src/shared/domain/either.dart';
 import 'package:bluey/src/shared/domain/uuid.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import '../../../shared/application/recording_log.dart';
 import 'ports/in_memory_scanning.dart';
@@ -20,6 +23,12 @@ final battery = UUID.short(0x180F);
 /// A scan of [services], or of everything when none are given.
 ScanAsk askFor([List<UUID> services = const [], Duration? timeLimit]) =>
     ScanAsk(filter: ScanFilter.of(services), timeLimit: timeLimit);
+
+/// The scan [answer] opened, failing the test when it was refused.
+OpenScan opened(Either<Object, OpenScan> answer) => answer.fold(
+  (refusal) => fail('the scan was refused: $refusal'),
+  (scan) => scan,
+);
 
 /// A device heard advertising [services].
 ScanResult advertising(
@@ -39,16 +48,17 @@ ScanResult advertising(
 /// A [RadioScanSession] over the in-memory radio, with what it raised and
 /// logged kept for the test to read.
 final class RadioScanRig {
-  RadioScanRig() {
+  RadioScanRig({InMemoryScanning? scanning})
+    : scanning = scanning ?? InMemoryScanning() {
     session = RadioScanSession(
-      scanning: scanning,
+      scanning: this.scanning,
       events: events,
       log: log,
       now: () => rigInstant,
     );
   }
 
-  final InMemoryScanning scanning = InMemoryScanning();
+  final InMemoryScanning scanning;
   final RecordingScanEvents events = RecordingScanEvents();
   final RecordingLog log = RecordingLog();
   late final RadioScanSession session;

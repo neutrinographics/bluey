@@ -40,8 +40,8 @@ final class OpenScanner {
   Either<ScannerUnusable, OpenScan> scan(ScanAsk ask) => _seat.scan(ask);
 
   /// Every scan of this scanner leaves. Answers when the radio stop that
-  /// caused, if any, has settled, so a caller that awaits it knows the radio
-  /// is free; a failed stop answers its failure, and the scans still end.
+  /// leaving caused, if any, settled, with its failure if it failed; the
+  /// scans end either way.
   Future<Either<ScanFailure, void>> stop() => _seat.stop();
 
   /// Every scan leaves and the scanner can never scan again. Answers when

@@ -12,11 +12,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/discovery/application/radio_scan_rig.dart';
 
-OpenScan opened(Either<ScannerUnusable, OpenScan> answer) => answer.fold(
-  (unusable) => fail('the scanner was unusable: ${unusable.phase}'),
-  (scan) => scan,
-);
-
 void main() {
   group('phases', () {
     test('a new scanner is idle', () {
@@ -254,6 +249,20 @@ void main() {
 
       // assert
       expect(message, contains('lost'));
+    });
+
+    test('is equal by value', () {
+      // arrange
+      const lost = ScannerLost(RadioOutage.off);
+
+      // act
+      const first = ScannerUnusable(lost);
+      const second = ScannerUnusable(lost);
+
+      // assert
+      expect(first, second);
+      expect(first.hashCode, second.hashCode);
+      expect(first, isNot(const ScannerUnusable(ScannerClosed())));
     });
   });
 }
