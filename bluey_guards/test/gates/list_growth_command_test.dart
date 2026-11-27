@@ -216,6 +216,54 @@ void main() {
       expect(result.stderr, contains('no-such-ref'));
     });
 
+    test('holds a list the base lacks when a flag states it', () async {
+      // arrange
+      write(
+        _listFile,
+        '${_lists(['lib/a.dart -> unplaced'])}'
+        "const fresh = <String>['lib/src/peer/p.dart -> lib/src/api/c.dart'];\n",
+      );
+
+      // act
+      final result = await run(['main', _listFile, '--first-statement=fresh']);
+
+      // assert
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+      expect(result.stdout, contains('fresh: not at the base'));
+    });
+
+    test('prints a note when the base already has the flagged list', () async {
+      // act
+      final result = await run([
+        'main',
+        _listFile,
+        '--first-statement=unplaced',
+      ]);
+
+      // assert
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+      expect(
+        result.stdout,
+        contains(
+          '--first-statement=unplaced no longer applies: the base has this '
+          'list; remove the flag',
+        ),
+      );
+    });
+
+    test('exits 1 naming a flag no list file at the head declares', () async {
+      // act
+      final result = await run([
+        'main',
+        '--first-statement=missing',
+        _listFile,
+      ]);
+
+      // assert
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('--first-statement=missing'));
+    });
+
     test('exits 64 with the usage line when no list file is named', () async {
       // act
       final result = await run(['main']);

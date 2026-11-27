@@ -1,3 +1,11 @@
+/// [LinkGattClient], the GATT client of one link, with the remote attributes
+/// it discovers.
+///
+/// The file keeps its old name, which no longer says what it holds, because
+/// it leaves for the GATT Client context with that context's slice, and a
+/// rename now would only be undone by that move.
+library;
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
@@ -10,17 +18,12 @@ import '../gatt_client/gatt.dart';
 import '../shared/infrastructure/bluey_logger.dart';
 import '../shared/application/log_level.dart';
 import '../shared/domain/either.dart';
-import '../api/failure_translation.dart';
 import '../features/connection/application/link_session.dart';
 import '../features/connection/domain/link_end.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
 import '../shared/uuid.dart';
-import '../api/connection/android_connection_extensions.dart';
-import '../api/connection/connection.dart';
-import 'connection_parameters_mapper.dart';
-import '../api/connection/ios_connection_extensions.dart';
 import 'lifecycle_client.dart';
 import 'value_objects/attribute_handle.dart';
 
@@ -111,9 +114,8 @@ Future<T> _loggedGattOp<T>({
   }
 }
 
-/// One link's GATT client: discovery and its cache, the Service Changed
-/// handler, the readings and the Android extensions, over the link a
-/// [LinkSession] runs.
+/// One link's GATT client: discovery and its cache and the Service Changed
+/// handler, over the link a [LinkSession] runs.
 ///
 /// It keeps no copy of the link's state. It asks the session whether the
 /// link is usable, runs every platform call that needs the link through
@@ -129,49 +131,37 @@ class LinkGattClient {
 
   DeviceAddress get _device => _session.link.device;
 
-  int _mtu = 23; // Default BLE MTU
-  BondState _bondState = BondState.none;
-  Phy _txPhy = Phy.le1m;
-  Phy _rxPhy = Phy.le1m;
-  ConnectionParameters _connectionParameters = _defaultConnectionParameters();
-
-  static ConnectionParameters _defaultConnectionParameters() =>
-      ConnectionParameters(
-        interval: ConnectionInterval(30), // Default 30ms interval
-        latency: PeripheralLatency(0),
-        timeout: SupervisionTimeout(4000), // Default 4s timeout
-      );
-
-  final StreamController<BondState> _bondStateController =
-      StreamController<BondState>.broadcast();
-  final StreamController<({Phy tx, Phy rx})> _phyController =
-      StreamController<({Phy tx, Phy rx})>.broadcast();
   final StreamController<List<RemoteService>> _servicesChangesController =
       StreamController<List<RemoteService>>.broadcast();
 
-  StreamSubscription? _platformBondStateSubscription;
-  StreamSubscription? _platformPhySubscription;
   StreamSubscription? _platformServiceChangesSubscription;
 
-  // Cached services after discovery
   List<BlueyRemoteService>? _cachedServices;
 
-  // Failed on Service Changed, so no caller waits on a stale handle.
+  // Failed with AttributeHandleInvalidatedException on Service Changed, so no
+  // caller waits on a stale handle.
   final Set<Completer<Object?>> _pendingGattOpAborters = {};
+
+  /// The exception an ended link is thrown as, since an app catches what the
+  /// edge translates the end to.
+  final BlueyException Function(LinkEnd end) _endAsException;
 
   /// Where GATT-op events go; none are emitted without it.
   final EventPublisher? _events;
 
-  /// Starts following Service Changed, bond and PHY reports for the
-  /// session's link at once; all of it is released when the link ends.
+  /// Starts following Service Changed for the session's link at once; it is
+  /// released when the link ends. An ended link is thrown as
+  /// [endAsException] answers it.
   LinkGattClient({
     required platform.BlueyPlatform platformInstance,
     required LinkSession session,
     required BlueyLogger logger,
+    required BlueyException Function(LinkEnd end) endAsException,
     EventPublisher? events,
   }) : _platform = platformInstance,
        _session = session,
        _logger = logger,
+       _endAsException = endAsException,
        _events = events {
     final connectionId = _connectionId;
 
@@ -182,78 +172,7 @@ class LinkGattClient {
           _onServiceChanged();
         });
 
-    // A platform without a capability throws from its calls, so only
-    // those it has are made; the defaults above stand for the rest.
-    final caps = _platform.capabilities;
-
-    if (caps.canBond) {
-      _platformBondStateSubscription = _platform
-          .bondStateStream(connectionId)
-          .listen(
-            (platformBondState) {
-              _bondState = _mapBondState(platformBondState);
-              _bondStateController.add(_bondState);
-            },
-            onError: (error) {
-              _bondStateController.addError(error);
-            },
-          );
-
-      _readFirst('bond state', _platform.getBondState(connectionId), (bond) {
-        _bondState = _mapBondState(bond);
-      });
-    }
-
-    if (caps.canRequestPhy) {
-      _platformPhySubscription = _platform
-          .phyStream(connectionId)
-          .listen(
-            (platformPhy) {
-              _txPhy = _mapPhy(platformPhy.tx);
-              _rxPhy = _mapPhy(platformPhy.rx);
-              _phyController.add((tx: _txPhy, rx: _rxPhy));
-            },
-            onError: (error) {
-              _phyController.addError(error);
-            },
-          );
-
-      _readFirst('phy', _platform.getPhy(connectionId), (phy) {
-        _txPhy = _mapPhy(phy.tx);
-        _rxPhy = _mapPhy(phy.rx);
-      });
-    }
-
-    if (caps.canRequestConnectionParameters) {
-      _readFirst(
-        'connection parameters',
-        _platform.getConnectionParameters(connectionId),
-        (params) =>
-            _connectionParameters = connectionParametersFromPlatform(params),
-      );
-    }
-
     _session.onEnd(_release);
-  }
-
-  /// A first read that fails is logged and the default kept: a probe link
-  /// must not raise an error nobody can catch.
-  void _readFirst<T>(String what, Future<T> read, void Function(T) take) {
-    unawaited(
-      read.then(
-        take,
-        onError:
-            (Object error) => _logger.log(
-              BlueyLogLevel.warn,
-              'bluey.connection',
-              '$what read failed',
-              data: {
-                'deviceId': _device.toString(),
-                'exception': error.runtimeType.toString(),
-              },
-            ),
-      ),
-    );
   }
 
   /// Everything that lives as long as the link, let go when it ends.
@@ -262,27 +181,14 @@ class LinkGattClient {
   /// and a cancel awaited here would hold the next one up for nothing.
   void _release(LinkEnd end) {
     unawaited(_platformServiceChangesSubscription?.cancel());
-    unawaited(_platformBondStateSubscription?.cancel());
-    unawaited(_platformPhySubscription?.cancel());
     _platformServiceChangesSubscription = null;
-    _platformBondStateSubscription = null;
-    _platformPhySubscription = null;
 
-    // An outage makes the connection stale: the streams whose values are
-    // not a state of ours say so before they close (Convention 3).
-    final stale =
-        end is EndedByRadioOutage
-            ? linkEndAsException(end, device: _device)
-            : null;
-    final controllers = <StreamController<Object?>>[
-      _servicesChangesController,
-      _bondStateController,
-      _phyController,
-    ];
-    for (final controller in controllers) {
-      if (stale != null) controller.addError(stale);
-      unawaited(controller.close());
+    // An outage makes the connection stale: the stream says so before it
+    // closes (Convention 3).
+    if (end is EndedByRadioOutage) {
+      _servicesChangesController.addError(_endAsException(end));
     }
+    unawaited(_servicesChangesController.close());
 
     final cached = _cachedServices;
     _cachedServices = null;
@@ -295,9 +201,7 @@ class LinkGattClient {
   /// other way or is still up.
   BlueyException? get _staleness {
     final end = _session.link.end;
-    return end is EndedByRadioOutage
-        ? linkEndAsException(end, device: _device)
-        : null;
+    return end is EndedByRadioOutage ? _endAsException(end) : null;
   }
 
   /// Throws [StaleHandleException] once a radio outage has ended the link.
@@ -315,27 +219,18 @@ class LinkGattClient {
   /// threaded through their constructors, so a dead link never lets a raw
   /// platform exception escape.
   void _ensureConnected() {
-    final link = _session.link;
-    if (link.isUp) return;
-    throw linkEndAsException(link.endInSight!, device: _device);
+    if (_session.link.endInSight case final end?) throw _endAsException(end);
   }
 
   /// Runs one throwing platform call so that the link's end answers it at once.
   Future<T> _overLink<T>(Future<T> Function() call) async {
-    final answer = await _session.whileUp<_Raised, T>(
-      () async {
-        try {
-          return Right(await call());
-        } catch (error, stack) {
-          return Left(_Raised(error, stack));
-        }
-      },
-      orEnd:
-          (end) => _Raised(
-            linkEndAsException(end, device: _session.link.device),
-            StackTrace.current,
-          ),
-    );
+    final answer = await _session.whileUp<_Raised, T>(() async {
+      try {
+        return Right(await call());
+      } catch (error, stack) {
+        return Left(_Raised(error, stack));
+      }
+    }, orEnd: (end) => _Raised(_endAsException(end), StackTrace.current));
     return answer.fold(
       (raised) => Error.throwWithStackTrace(raised.error, raised.stack),
       (value) => value,
@@ -413,7 +308,7 @@ class LinkGattClient {
         });
   }
 
-  /// Each re-discovered service tree; see [Connection.servicesChanges].
+  /// Each re-discovered service tree, as `servicesChanges` gives it.
   Stream<List<RemoteService>> get servicesChanges =>
       Stream<List<RemoteService>>.multi((controller) {
         // Convention 3 (non-enum terminal): late subscribers after
@@ -437,11 +332,7 @@ class LinkGattClient {
         controller.onCancel = sub.cancel;
       }, isBroadcast: true);
 
-  // I325 — relocated to AndroidConnectionExtensions; private accessor
-  // is used by _AndroidConnectionExtensionsImpl.
-  Mtu get _mtuValue => Mtu.fromPlatform(_mtu);
-
-  /// The one discovered service with [uuid]; see [Connection.service].
+  /// The one discovered service with [uuid], which every Connection's `service` answers.
   RemoteService service(UUID uuid) {
     _ensureValid();
     if (_cachedServices == null) {
@@ -465,8 +356,7 @@ class LinkGattClient {
     return matches.single;
   }
 
-  /// Discovers the link's services, which makes the link ready; see
-  /// [Connection.services].
+  /// Discovers the link's services, which makes the link ready.
   Future<List<RemoteService>> services({bool cache = false}) async {
     _ensureValid();
     _ensureConnected();
@@ -536,239 +426,11 @@ class LinkGattClient {
     return _cachedServices!;
   }
 
-  /// Whether the link has a service with [uuid]; see [Connection.hasService].
+  /// Whether the link has a service with [uuid].
   Future<bool> hasService(UUID uuid) async {
     _ensureValid();
     final svcs = await services(cache: true);
     return svcs.any((s) => s.uuid == uuid);
-  }
-
-  // I325 — relocated to AndroidConnectionExtensions; private impl is
-  // used by _AndroidConnectionExtensionsImpl.
-  Future<Mtu> _requestMtuImpl(Mtu mtu) async {
-    _ensureValid();
-    _ensureConnected();
-    final requested = mtu.value;
-    final connectionId = _connectionId;
-    _mtu = await _trackInFlight(
-      () => _loggedGattOp(
-        deviceAddress: _device,
-        op: 'requestMtu',
-        startDetail: 'requested=$requested',
-        body:
-            () =>
-                _overLink(() => _platform.requestMtu(connectionId, requested)),
-        completeDetail:
-            (negotiated) => 'requested=$requested, negotiated=$negotiated',
-        logger: _logger,
-      ),
-    );
-    return Mtu.fromPlatform(_mtu);
-  }
-
-  /// The largest write the link carries; see [Connection.maxWritePayload].
-  Future<WritePayloadLimit> maxWritePayload({
-    required bool withResponse,
-  }) async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    return _trackInFlight(
-      () => _loggedGattOp(
-        deviceAddress: _device,
-        op: 'getMaximumWriteLength',
-        startDetail: 'withResponse=$withResponse',
-        body: () async {
-          final value = await _overLink(
-            () => _platform.getMaximumWriteLength(
-              connectionId,
-              withResponse: withResponse,
-            ),
-          );
-          return WritePayloadLimit.fromPlatform(value);
-        },
-        completeDetail:
-            (limit) => 'withResponse=$withResponse, limit=${limit.value}',
-        logger: _logger,
-      ),
-    );
-  }
-
-  /// The link's signal strength; see [Connection.readRssi].
-  Future<int> readRssi() async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    return _trackInFlight(
-      () => _loggedGattOp(
-        deviceAddress: _device,
-        op: 'readRssi',
-        body: () => _overLink(() => _platform.readRssi(connectionId)),
-        completeDetail: (rssi) => 'rssi=${rssi}dBm',
-        logger: _logger,
-      ),
-    );
-  }
-
-  AndroidConnectionExtensions? _androidExtensions;
-
-  /// The Android-only surface, or null elsewhere; see [Connection.android].
-  AndroidConnectionExtensions? get android {
-    if (_platform.capabilities.platformKind != platform.PlatformKind.android) {
-      return null;
-    }
-    return _androidExtensions ??= _AndroidConnectionExtensionsImpl(this);
-  }
-
-  /// The iOS-only surface, or null elsewhere; see [Connection.ios].
-  IosConnectionExtensions? get ios {
-    if (_platform.capabilities.platformKind != platform.PlatformKind.ios) {
-      return null;
-    }
-    return _iosExtensions;
-  }
-
-  BondState get _bondStateValue => _bondState;
-
-  Stream<BondState> get _bondStateChanges =>
-      Stream<BondState>.multi((controller) {
-        // Convention 3 (non-enum terminal): late subscribers after an
-        // outage see addError(StaleHandleException) + close so their
-        // `onError` mirrors what the corresponding sync getter would
-        // throw (Convention 6).
-        final stale = _staleness;
-        if (stale != null) {
-          controller.addError(stale);
-          controller.close();
-          return;
-        }
-        // Replay the cached bond state before bridging live events.
-        controller.add(_bondState);
-        final sub = _bondStateController.stream.listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: controller.close,
-        );
-        controller.onCancel = sub.cancel;
-      }, isBroadcast: true);
-
-  Future<void> _bondImpl() async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    await withErrorTranslation(
-      () => _overLink(() => _platform.bond(connectionId)),
-      operation: 'bond',
-      address: _device.value,
-    );
-  }
-
-  Future<void> _removeBondImpl() async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    await withErrorTranslation(
-      () => _overLink(() => _platform.removeBond(connectionId)),
-      operation: 'removeBond',
-      address: _device.value,
-    );
-  }
-
-  Phy get _txPhyValue => _txPhy;
-
-  Phy get _rxPhyValue => _rxPhy;
-
-  Stream<({Phy tx, Phy rx})> get _phyChanges =>
-      Stream<({Phy tx, Phy rx})>.multi((controller) {
-        // Convention 3 (non-enum terminal): late subscribers after an
-        // outage see addError(StaleHandleException) + close so their
-        // `onError` mirrors what the corresponding sync getters throw
-        // (Convention 6).
-        final stale = _staleness;
-        if (stale != null) {
-          controller.addError(stale);
-          controller.close();
-          return;
-        }
-        // Replay the cached (tx, rx) PHY pair before bridging live events.
-        controller.add((tx: _txPhy, rx: _rxPhy));
-        final sub = _phyController.stream.listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: controller.close,
-        );
-        controller.onCancel = sub.cancel;
-      }, isBroadcast: true);
-
-  Future<void> _requestPhyImpl({Phy? txPhy, Phy? rxPhy}) async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    await withErrorTranslation(
-      () => _overLink(
-        () => _platform.requestPhy(
-          connectionId,
-          txPhy != null ? _mapPhyToPlatform(txPhy) : null,
-          rxPhy != null ? _mapPhyToPlatform(rxPhy) : null,
-        ),
-      ),
-      operation: 'requestPhy',
-      address: _device.value,
-    );
-  }
-
-  ConnectionParameters get _connectionParametersValue => _connectionParameters;
-
-  Future<void> _requestConnectionParametersImpl(
-    ConnectionParameters params,
-  ) async {
-    _ensureValid();
-    _ensureConnected();
-    final connectionId = _connectionId;
-    await withErrorTranslation(
-      () => _overLink(
-        () => _platform.requestConnectionParameters(
-          connectionId,
-          connectionParametersToPlatform(params),
-        ),
-      ),
-      operation: 'requestConnectionParameters',
-      address: _device.value,
-    );
-    _connectionParameters = params;
-  }
-
-  BondState _mapBondState(platform.PlatformBondState platformBondState) {
-    switch (platformBondState) {
-      case platform.PlatformBondState.none:
-        return BondState.none;
-      case platform.PlatformBondState.bonding:
-        return BondState.bonding;
-      case platform.PlatformBondState.bonded:
-        return BondState.bonded;
-    }
-  }
-
-  Phy _mapPhy(platform.PlatformPhy platformPhy) {
-    switch (platformPhy) {
-      case platform.PlatformPhy.le1m:
-        return Phy.le1m;
-      case platform.PlatformPhy.le2m:
-        return Phy.le2m;
-      case platform.PlatformPhy.leCoded:
-        return Phy.leCoded;
-    }
-  }
-
-  platform.PlatformPhy _mapPhyToPlatform(Phy phy) {
-    switch (phy) {
-      case Phy.le1m:
-        return platform.PlatformPhy.le1m;
-      case Phy.le2m:
-        return platform.PlatformPhy.le2m;
-      case Phy.leCoded:
-        return platform.PlatformPhy.leCoded;
-    }
   }
 
   BlueyRemoteService _mapService(platform.PlatformService ps) {
@@ -787,11 +449,7 @@ class LinkGattClient {
   BlueyRemoteCharacteristic _mapCharacteristic(
     platform.PlatformCharacteristic pc,
   ) {
-    // The GATT client itself carries no lifecycle (post-C.6 the
-    // peer-protocol surface lives entirely in `PeerConnection`).
-    // Characteristics are constructed without a lifecycleClient — the
-    // getter remains on `BlueyRemoteCharacteristic` for tests / future
-    // consumers that wire activity feedback externally.
+    // No lifecycle client: the peer protocol is PeerConnection's alone.
     final characteristicHandle = AttributeHandle(pc.handle);
     return BlueyRemoteCharacteristic(
       platform: _platform,
@@ -1310,147 +968,3 @@ class BlueyRemoteDescriptor implements RemoteDescriptor {
     );
   }
 }
-
-/// Thin facade over a [LinkGattClient] that exposes the Android-only
-/// surface (bonding, PHY, connection parameters) without duplicating
-/// logic. Returned from `LinkGattClient.android` when the platform
-/// reports any of the Android-only capability flags. Created at most
-/// once per connection and lazy-cached.
-///
-/// Each member delegates straight back to the corresponding private
-/// member on the wrapping [LinkGattClient]. The bond/PHY/conn-params
-/// members are private on [LinkGattClient] (since B.3 removed them
-/// from the [Connection] interface) and only reachable via this
-/// facade.
-class _AndroidConnectionExtensionsImpl implements AndroidConnectionExtensions {
-  final LinkGattClient _conn;
-
-  _AndroidConnectionExtensionsImpl(this._conn);
-
-  void _requireCapability(bool flag, String op) {
-    if (!flag) {
-      throw UnsupportedOperationException(
-        op,
-        _conn._platform.capabilities.platformKind.name,
-      );
-    }
-  }
-
-  @override
-  BondState get bondState {
-    _conn._ensureValid();
-    _requireCapability(_conn._platform.capabilities.canBond, 'bondState');
-    return _conn._bondStateValue;
-  }
-
-  @override
-  Stream<BondState> get bondStateChanges {
-    // Convention 3 / Convention 6: do NOT throw on invalidation here.
-    // The stream itself is responsible for delivering the terminal
-    // signal (addError(StaleHandleException) + close) so late
-    // subscribers observe the failure via `onError`, mirroring what
-    // the sync `bondState` getter throws.
-    _requireCapability(
-      _conn._platform.capabilities.canBond,
-      'bondStateChanges',
-    );
-    return _conn._bondStateChanges;
-  }
-
-  @override
-  Future<void> bond() {
-    _conn._ensureValid();
-    _requireCapability(_conn._platform.capabilities.canBond, 'bond');
-    return _conn._bondImpl();
-  }
-
-  @override
-  Future<void> removeBond() {
-    _conn._ensureValid();
-    _requireCapability(_conn._platform.capabilities.canBond, 'removeBond');
-    return _conn._removeBondImpl();
-  }
-
-  @override
-  Phy get txPhy {
-    _conn._ensureValid();
-    _requireCapability(_conn._platform.capabilities.canRequestPhy, 'txPhy');
-    return _conn._txPhyValue;
-  }
-
-  @override
-  Phy get rxPhy {
-    _conn._ensureValid();
-    _requireCapability(_conn._platform.capabilities.canRequestPhy, 'rxPhy');
-    return _conn._rxPhyValue;
-  }
-
-  @override
-  Stream<({Phy tx, Phy rx})> get phyChanges {
-    // Convention 3 / Convention 6: do NOT throw on invalidation here.
-    // The stream itself is responsible for delivering the terminal
-    // signal (addError(StaleHandleException) + close) so late
-    // subscribers observe the failure via `onError`, mirroring what
-    // the sync `txPhy` / `rxPhy` getters throw.
-    _requireCapability(
-      _conn._platform.capabilities.canRequestPhy,
-      'phyChanges',
-    );
-    return _conn._phyChanges;
-  }
-
-  @override
-  Future<void> requestPhy({Phy? txPhy, Phy? rxPhy}) {
-    _conn._ensureValid();
-    _requireCapability(
-      _conn._platform.capabilities.canRequestPhy,
-      'requestPhy',
-    );
-    return _conn._requestPhyImpl(txPhy: txPhy, rxPhy: rxPhy);
-  }
-
-  @override
-  ConnectionParameters get connectionParameters {
-    _conn._ensureValid();
-    _requireCapability(
-      _conn._platform.capabilities.canRequestConnectionParameters,
-      'connectionParameters',
-    );
-    return _conn._connectionParametersValue;
-  }
-
-  @override
-  Future<void> requestConnectionParameters(ConnectionParameters params) {
-    _conn._ensureValid();
-    _requireCapability(
-      _conn._platform.capabilities.canRequestConnectionParameters,
-      'requestConnectionParameters',
-    );
-    return _conn._requestConnectionParametersImpl(params);
-  }
-
-  @override
-  Mtu get mtu {
-    _conn._ensureValid();
-    return _conn._mtuValue;
-  }
-
-  @override
-  Future<Mtu> requestMtu(Mtu desired) {
-    _conn._ensureValid();
-    _requireCapability(
-      _conn._platform.capabilities.canRequestMtu,
-      'requestMtu',
-    );
-    return _conn._requestMtuImpl(desired);
-  }
-}
-
-/// Empty const singleton implementing [IosConnectionExtensions]. Reserved
-/// for future iOS-specific features; see [IosConnectionExtensions] for
-/// the rationale.
-class _IosConnectionExtensionsImpl implements IosConnectionExtensions {
-  const _IosConnectionExtensionsImpl();
-}
-
-const _iosExtensions = _IosConnectionExtensionsImpl();

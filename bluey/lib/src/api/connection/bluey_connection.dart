@@ -1,11 +1,16 @@
 import '../../connection/bluey_connection.dart';
 import '../../features/connection/application/link_session.dart';
+import '../../features/connection/application/read_rssi.dart';
+import '../../features/connection/application/read_write_payload_limit.dart';
+import '../../features/connection/domain/connection_failure.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
+import '../../shared/domain/either.dart';
 import '../../shared/uuid.dart';
-import '../failure_translation.dart';
 import 'android_connection_extensions.dart';
 import 'connection.dart';
+import 'connection_failure_translation.dart';
+import 'connection_state_translation.dart';
 import 'ios_connection_extensions.dart';
 
 /// One link's session presented as the public Connection.
@@ -14,19 +19,37 @@ import 'ios_connection_extensions.dart';
 /// link and never keeps a copy: a Connection whose link ended stays ended,
 /// whatever the platform later says about the same device.
 final class BlueyConnection implements Connection {
-  /// Presents [session], whose GATT operations [gatt] carries.
-  BlueyConnection({required LinkSession session, required LinkGattClient gatt})
-    : _session = session,
-      _gatt = gatt;
+  /// Presents [session], whose GATT operations [gatt] carries and whose
+  /// signal and write limit the two readings read; [android] and [ios] are
+  /// the platform's extensions of this link, and its exceptions name
+  /// [platform].
+  BlueyConnection({
+    required LinkSession session,
+    required LinkGattClient gatt,
+    required ReadRssi readRssi,
+    required ReadWritePayloadLimit readWritePayloadLimit,
+    required AndroidConnectionExtensions? android,
+    required IosConnectionExtensions? ios,
+    required String platform,
+  }) : _session = session,
+       _gatt = gatt,
+       _readRssi = readRssi,
+       _readWritePayloadLimit = readWritePayloadLimit,
+       _platform = platform,
+       this.android = android,
+       this.ios = ios;
 
   final LinkSession _session;
   final LinkGattClient _gatt;
+  final ReadRssi _readRssi;
+  final ReadWritePayloadLimit _readWritePayloadLimit;
+  final String _platform;
 
   @override
   DeviceAddress get deviceAddress => _session.link.device;
 
   @override
-  ConnectionState get state => _session.link.state;
+  ConnectionState get state => connectionStateOf(_session.phase);
 
   /// Gives each listener the current state first, since a listener that
   /// arrives late must still see where the link stands, and closes once the
@@ -34,16 +57,16 @@ final class BlueyConnection implements Connection {
   @override
   Stream<ConnectionState> get stateChanges =>
       Stream<ConnectionState>.multi((controller) {
-        controller.add(_session.link.state);
+        controller.add(state);
         if (_session.link.hasEnded) {
           controller.closeSync();
           return;
         }
-        final states = _session.states.listen(
-          controller.add,
+        final phases = _session.phases.listen(
+          (phase) => controller.add(connectionStateOf(phase)),
           onDone: controller.closeSync,
         );
-        controller.onCancel = states.cancel;
+        controller.onCancel = phases.cancel;
       }, isBroadcast: true);
 
   @override
@@ -60,19 +83,24 @@ final class BlueyConnection implements Connection {
   Future<bool> hasService(UUID uuid) => _gatt.hasService(uuid);
 
   @override
-  Future<WritePayloadLimit> maxWritePayload({required bool withResponse}) =>
-      _gatt.maxWritePayload(withResponse: withResponse);
+  Future<WritePayloadLimit> maxWritePayload({
+    required bool withResponse,
+  }) async => _valueOf(
+    await _readWritePayloadLimit.run(_session, withResponse: withResponse),
+  );
 
   @override
-  Future<int> readRssi() => _gatt.readRssi();
+  Future<int> readRssi() async => _valueOf(await _readRssi.run(_session));
 
   @override
-  Future<void> disconnect() async =>
-      valueOrThrow(await _session.disconnect(), device: deviceAddress);
+  Future<void> disconnect() async => _valueOf(await _session.disconnect());
 
   @override
-  AndroidConnectionExtensions? get android => _gatt.android;
+  final AndroidConnectionExtensions? android;
 
   @override
-  IosConnectionExtensions? get ios => _gatt.ios;
+  final IosConnectionExtensions? ios;
+
+  T _valueOf<T>(Either<ConnectionFailure, T> answer) =>
+      valueOrThrow(answer, device: deviceAddress, platform: _platform);
 }

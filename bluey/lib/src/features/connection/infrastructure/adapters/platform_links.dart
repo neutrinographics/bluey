@@ -1,16 +1,19 @@
 import 'dart:async';
 
 import 'package:bluey_platform_interface/bluey_platform_interface.dart';
+import 'package:meta/meta.dart';
 
 import '../../../../shared/application/log.dart';
 import '../../../../shared/application/log_level.dart';
 import '../../../../shared/domain/device_address.dart';
 import '../../../../shared/domain/either.dart';
+import '../../application/connection_log_words.dart';
 import '../../application/ports/links.dart';
 import '../../domain/connection_failure.dart';
 import '../../domain/link_end.dart';
 import '../../domain/link_id.dart';
 import '../../domain/link_input.dart';
+import '../../domain/link_operation.dart';
 import 'platform_failures.dart';
 
 /// Connection's [Links] over [BlueyPlatform], so the lifecycle runs on a
@@ -33,13 +36,18 @@ final class PlatformLinks implements Links {
   final Log _log;
   final Map<LinkId, _CarriedReports> _reports = {};
 
+  /// How many links the adapter holds reports for, so a test can see that an
+  /// ended link leaves nothing behind.
+  @visibleForTesting
+  int get carriedLinks => _reports.length;
+
   @override
   Future<Either<ConnectionFailure, LinkId>> open(
     DeviceAddress device, {
     Duration? timeout,
   }) async {
     final answer = await answering(
-      'connect',
+      LinkOperation.open,
       () => _platform.connect(
         device.value,
         PlatformConnectConfig(timeoutMs: timeout?.inMilliseconds, mtu: null),
@@ -53,7 +61,7 @@ final class PlatformLinks implements Links {
     final reports = _reports[link];
     if (reports == null || reports.ended) return const Right(null);
     final answer = await answering(
-      'disconnect',
+      LinkOperation.close,
       () => _platform.disconnect(link.value),
     );
     return answer.fold(
@@ -63,6 +71,7 @@ final class PlatformLinks implements Links {
       },
       (_) {
         reports.end();
+        _forget(link, reports);
         return const Right(null);
       },
     );
@@ -90,12 +99,21 @@ final class PlatformLinks implements Links {
     final link = LinkId(connectionId);
     final live = _reports[link];
     if (live == null || live.ended) {
-      _reports[link] = _CarriedReports(
+      late final _CarriedReports carried;
+      carried = _CarriedReports(
         _platform.connectionStateStream(connectionId),
         onFailure: (error) => _closeAfterFailedReports(connectionId, error),
+        onDelivered: () => _forget(link, carried),
       );
+      _reports[link] = carried;
     }
     return link;
+  }
+
+  /// Lets go of an ended link's reports, unless its id already names a
+  /// successor's, whose reports a late end of the old link must not take.
+  void _forget(LinkId link, _CarriedReports ended) {
+    if (identical(_reports[link], ended)) _reports.remove(link);
   }
 
   /// The lifecycle reads failed reports as a drop and will not ask for a
@@ -104,20 +122,23 @@ final class PlatformLinks implements Links {
   void _closeAfterFailedReports(String connectionId, Object error) {
     _log.log(
       BlueyLogLevel.warn,
-      'bluey.connection',
+      connectionLogContext,
       'link reports failed',
       data: {'link': connectionId},
       errorCode: error.runtimeType.toString(),
     );
     unawaited(
-      answering('disconnect', () => _platform.disconnect(connectionId)).then(
+      answering(
+        LinkOperation.close,
+        () => _platform.disconnect(connectionId),
+      ).then(
         (answer) => answer.fold(
           (failure) => _log.log(
             BlueyLogLevel.warn,
-            'bluey.connection',
+            connectionLogContext,
             'link left open',
             data: {'link': connectionId},
-            errorCode: failure.runtimeType.toString(),
+            errorCode: failureCodeOf(failure),
           ),
           (_) {},
         ),
@@ -128,7 +149,8 @@ final class PlatformLinks implements Links {
 
 /// One link's reports, buffered until its one listener arrives and ended
 /// for good once the platform stops, fails, the link is closed or its
-/// listener leaves.
+/// listener leaves. [onDelivered] runs once its listener has had the end or
+/// has left, and not before, so reports nobody has read yet are kept.
 ///
 /// A listener leaves only when its link has ended for Connection, as after
 /// a radio outage, while the platform may still hold the link; the next open
@@ -137,7 +159,9 @@ final class _CarriedReports {
   _CarriedReports(
     Stream<PlatformConnectionState> states, {
     required void Function(Object error) onFailure,
+    required void Function() onDelivered,
   }) {
+    unawaited(_controller.done.then((_) => onDelivered()));
     _subscription = states.listen(
       (state) => _controller.add(_reportOf(state)),
       onError: (Object error) {

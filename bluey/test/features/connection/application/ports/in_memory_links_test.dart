@@ -263,6 +263,37 @@ void main() {
       });
     });
 
+    test('a close in flight when its link drops leaves the device\'s newer '
+        'link open', () {
+      fakeAsync((async) {
+        // arrange
+        final links =
+            InMemoryLinks()
+              ..reach(device)
+              ..closeDelay = const Duration(seconds: 1);
+        late LinkId old;
+        links.open(device).then((value) => old = (value as Right).value);
+        async.elapse(Duration.zero);
+        links.close(old).ignore();
+        links.drop(device);
+        late LinkId newer;
+        links.open(device).then((value) => newer = (value as Right).value);
+        async.elapse(Duration.zero);
+        final reports = <LinkReport>[];
+        var done = false;
+        links.reportsOf(newer).listen(reports.add, onDone: () => done = true);
+
+        // act
+        async.elapse(const Duration(seconds: 1));
+        links.report(device, LinkReport.disconnecting);
+        async.flushMicrotasks();
+
+        // assert
+        expect(reports, [LinkReport.disconnecting]);
+        expect(done, isFalse);
+      });
+    });
+
     test('a close of a link that already dropped answers success', () async {
       // arrange
       final links = InMemoryLinks()..reach(device);

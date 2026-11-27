@@ -449,8 +449,8 @@ void main() {
     });
 
     group('capabilities', () {
-      test('returns platform capabilities', () {
-        expect(bluey.capabilities, equals(platform.Capabilities.fake));
+      test('bluey.capabilities answers Bluey\'s own Capabilities', () {
+        expect(bluey.capabilities, Capabilities.fake);
       });
     });
 

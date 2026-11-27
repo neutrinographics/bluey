@@ -188,7 +188,7 @@ class StressTestRunner {
             final android = connection.android;
             if (android != null) {
               futures.add(
-                recordOp(() => android.requestMtu(Mtu.fromPlatform(247))),
+                recordOp(() => android.requestMtu(Mtu(247))),
               );
             }
           }
@@ -382,7 +382,7 @@ class StressTestRunner {
     if (android != null) {
       final mtuStart = stopwatch.elapsedMicroseconds;
       try {
-        await android.requestMtu(Mtu.fromPlatform(config.requestedMtu));
+        await android.requestMtu(Mtu(config.requestedMtu));
         result = result.recordSuccess(
           latency: Duration(
             microseconds: stopwatch.elapsedMicroseconds - mtuStart,
@@ -601,7 +601,7 @@ class StressTestRunner {
     final android = connection.android;
     if (android != null) {
       try {
-        await android.requestMtu(Mtu.fromPlatform(247));
+        await android.requestMtu(Mtu(247));
       } catch (_) {
         // Swallow — MTU upgrade is best-effort.
       }

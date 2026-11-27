@@ -40,7 +40,7 @@ void main() {
       );
 
       final mtu = await connection.android!.requestMtu(
-        Mtu(512, capabilities: platform.Capabilities.android),
+        Mtu(512),
       );
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
@@ -54,7 +54,7 @@ void main() {
       );
 
       final mtu = await connection.android!.requestMtu(
-        Mtu(185, capabilities: platform.Capabilities.android),
+        Mtu(185),
       );
 
       expect(mtu, equals(Mtu.fromPlatform(185)));
@@ -74,7 +74,7 @@ void main() {
 
       await expectLater(
         connection.android!.requestMtu(
-          Mtu(512, capabilities: platform.Capabilities.android),
+          Mtu(512),
         ),
         throwsA(isA<GattTimeoutException>()),
       );

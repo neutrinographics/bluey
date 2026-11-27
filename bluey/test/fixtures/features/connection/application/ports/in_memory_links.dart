@@ -60,13 +60,18 @@ class InMemoryLinks implements Links, LinksHarness {
     return Right(_live[device] ?? _mint(device));
   }
 
+  /// Closes the link live when the close was asked for, and only that one,
+  /// so a close still in flight when its link ends never closes the next.
   @override
   Future<Either<ConnectionFailure, void>> close(LinkId link) async {
     final device = _devices[link];
     if (device != null) _closes[device] = closesAsked(device) + 1;
+    final asked = device == null ? null : _live[device];
     final fails = device != null && _closeFailures.remove(device);
     await Future<void>.delayed(closeDelay);
-    if (device == null || _live[device] != link) return const Right(null);
+    if (device == null || asked != link || !identical(_live[device], asked)) {
+      return const Right(null);
+    }
     if (fails) {
       return const Left(
         UnexpectedPlatformFailure('the close was told to fail'),

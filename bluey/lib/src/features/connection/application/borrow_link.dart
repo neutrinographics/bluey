@@ -1,9 +1,8 @@
 import '../../../shared/domain/device_address.dart';
 import '../../../shared/domain/either.dart';
 import '../domain/connection_failure.dart';
-import '../domain/live_links.dart';
+import 'borrowed_link.dart';
 import 'link_registry.dart';
-import 'link_session.dart';
 
 /// What a borrower asks for: a device by its address, and the borrower's
 /// budget.
@@ -28,39 +27,5 @@ final class BorrowLink {
   /// Answers the borrower's hold on the device's link.
   Future<Either<ConnectionFailure, BorrowedLink>> run(
     BorrowLinkRequest request,
-  ) async {
-    final answer = await _registry.acquire(
-      request.device,
-      by: LinkUser.borrower,
-      timeout: request.timeout,
-    );
-    return answer.map((session) => BorrowedLink._(_registry, session));
-  }
-}
-
-/// A borrower's hold on a link. The first of [giveBack] and [keep] takes
-/// effect; later calls do nothing.
-final class BorrowedLink {
-  BorrowedLink._(this._registry, this.session);
-
-  final LinkRegistry _registry;
-  bool _ended = false;
-
-  /// The borrowed link's session.
-  final LinkSession session;
-
-  /// Ends the borrow; the link closes only if nobody else uses it, and a
-  /// failed close is answered.
-  Future<Either<ConnectionFailure, void>> giveBack() {
-    if (_ended) return Future.value(const Right(null));
-    _ended = true;
-    return _registry.giveBack(session);
-  }
-
-  /// Ends the borrow by handing the link to the app, which then holds it.
-  void keep() {
-    if (_ended) return;
-    _ended = true;
-    _registry.keep(session);
-  }
+  ) => _registry.borrow(request.device, timeout: request.timeout);
 }

@@ -25,6 +25,38 @@ void main() {
       expect(placement, isA<InApi>());
     });
 
+    test('places an edge file by the context its folder names', () {
+      // arrange
+      const path = 'lib/src/api/connection/x.dart';
+
+      // act
+      final placement = Placement.of(path);
+
+      // assert
+      expect(placement, const InApi(context: 'connection'));
+    });
+
+    test('places a file directly in the edge in no context', () {
+      // arrange
+      const path = 'lib/src/api/bluey.dart';
+
+      // act
+      final placement = Placement.of(path);
+
+      // assert
+      expect(placement, const InApi(context: null));
+    });
+
+    test('tells an edge file of a context from one directly in the edge', () {
+      // act
+      final inContext = Placement.of('lib/src/api/connection/x.dart');
+      final direct = Placement.of('lib/src/api/bluey.dart');
+
+      // assert
+      expect(inContext, isNot(direct));
+      expect(inContext.toString(), isNot(direct.toString()));
+    });
+
     test('places a context file by context and layer', () {
       // arrange
       const path = 'lib/src/features/connection/domain/value_objects/mtu.dart';

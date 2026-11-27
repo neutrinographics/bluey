@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluey/src/features/connection/application/ports/links.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
@@ -105,6 +107,7 @@ void main() {
         ],
       );
       expect(log.records.last.data, {'link': device.value});
+      expect(log.records.last.errorCode, 'UnexpectedPlatformFailure');
     });
   });
 
@@ -178,6 +181,59 @@ void main() {
     });
   });
 
+  group('carriers', () {
+    test('holds no carrier once a link has ended', () async {
+      // arrange
+      final id = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      final reports = links.reportsOf(id);
+
+      // act
+      fake.simulateDisconnection(device.value);
+      await expectLater(
+        reports,
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
+
+      // assert
+      expect(links.carriedLinks, 0);
+    });
+
+    test('a late end of an old link leaves the new link\'s carrier in '
+        'place', () async {
+      // arrange
+      final platform =
+          _LateAnsweringPlatform()..simulatePeripheral(id: device.value);
+      final links = PlatformLinks(platform, log: log);
+      final first = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      final firstReports = links.reportsOf(first);
+      final closing = links.close(first);
+      await expectLater(
+        firstReports,
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
+      final again = (await links.open(
+        device,
+      )).fold((_) => fail('open'), (id) => id);
+      final reports = links.reportsOf(again);
+
+      // act
+      platform.answerTheClose();
+      await closing;
+
+      // assert
+      expect(links.carriedLinks, 1);
+      platform.simulateDisconnection(device.value);
+      await expectLater(
+        reports,
+        emitsInOrder([LinkReport.disconnected, emitsDone]),
+      );
+    });
+  });
+
   group('outages', () {
     test('a failed adapter-state stream is an unknown outage', () async {
       // arrange
@@ -220,6 +276,20 @@ void main() {
       subscription.cancel().ignore();
     });
   });
+}
+
+/// Ends a link at once but answers its disconnect only when told, so a close
+/// can resolve after the device has been linked again.
+final class _LateAnsweringPlatform extends FakeBlueyPlatform {
+  final Completer<void> _answer = Completer<void>();
+
+  void answerTheClose() => _answer.complete();
+
+  @override
+  Future<void> disconnect(String deviceId) async {
+    await super.disconnect(deviceId);
+    await _answer.future;
+  }
 }
 
 /// Drives [FakeBlueyPlatform] into each situation [linksContract] describes,

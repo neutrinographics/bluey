@@ -467,7 +467,7 @@ void main() {
 
         // Request MTU change
         final newMtu = await connection.android!.requestMtu(
-          Mtu(512, capabilities: platform.Capabilities.android),
+          Mtu(512),
         );
 
         // Connection should still be valid

@@ -59,7 +59,7 @@ void main() {
 
           // requestMtu — records activity on success.
           conn.android!.requestMtu(
-            Mtu(247, capabilities: platform.Capabilities.android),
+            Mtu(247),
           );
           async.flushMicrotasks();
 

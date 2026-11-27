@@ -86,7 +86,8 @@ void main() {
       () {
         // arrange
         final files = tree({
-          'lib/src/api/failure_translation.dart': 'Never f() => throw Gone();',
+          'lib/src/api/connection/connection_failure_translation.dart':
+              'Never f() => throw Gone();',
           'lib/src/connection/a.dart':
               'void f() {\n  try {} catch (e) {\n    rethrow;\n  }\n}\n',
           'lib/src/shared/domain/either.dart': 'void f() => throw Gone();',

@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connections.dart';
 import 'package:bluey/src/features/connection/application/borrow_link.dart';
@@ -11,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../fixtures/api/connection/stub_connection.dart';
 import '../../fixtures/either_results.dart';
 import '../../fixtures/features/connection/application/ports/in_memory_links.dart';
-import '../../fixtures/shared/application/recording_event_publisher.dart';
+import '../../fixtures/features/connection/recording_link_events.dart';
 import '../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
@@ -26,14 +27,16 @@ void main() {
     links = InMemoryLinks()..reach(device);
     final registry = LinkRegistry(
       links: links,
-      events: RecordingEventPublisher(),
+      events: RecordingLinkEvents(),
       log: RecordingLog(),
+      now: clock.now,
     );
     connect = ConnectDevice(registry);
     connections = Connections(present: StubConnection.new);
     borrow = borrowingThrough(
       borrowLink: BorrowLink(registry),
       connections: connections,
+      platform: 'fake',
     );
   });
 

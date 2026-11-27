@@ -899,7 +899,7 @@ void main() {
           .having((e) => e.message, 'message', message)
           .having((e) => e.data, 'data', {
             'deviceId': deviceId.toString(),
-            'exception': 'StateError',
+            'exception': 'UnexpectedPlatformFailure',
           });
 
       test(
@@ -950,7 +950,7 @@ void main() {
         mockPlatform.mockMtu = 256;
 
         final mtu = await connection.android!.requestMtu(
-          Mtu(512, capabilities: platform.Capabilities.android),
+          Mtu(512),
         );
 
         expect(mtu, equals(Mtu.fromPlatform(256)));

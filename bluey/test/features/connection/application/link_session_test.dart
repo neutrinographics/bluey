@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:bluey/src/features/connection/application/link_session.dart';
-import 'package:bluey/src/features/connection/domain/connection_event.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
-import 'package:bluey/src/features/connection/domain/connection_state.dart';
+import 'package:bluey/src/api/connection/connection_state.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_event.dart';
 import 'package:bluey/src/features/connection/domain/link_id.dart';
 import 'package:bluey/src/features/connection/domain/link_input.dart';
+import 'package:bluey/src/features/connection/domain/link_phase.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -15,7 +16,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
-import '../../../fixtures/shared/application/recording_event_publisher.dart';
+import '../../../fixtures/features/connection/recording_link_events.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
@@ -25,6 +26,7 @@ const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 /// builds.
 const timed = DeviceAddress('AA:BB:CC:DD:EE:02');
 const success = Right<ConnectionFailure, void>(null);
+final now = DateTime.utc(2026, 11, 26, 10);
 
 /// Radio whose reports a test can end by hand while the link is up, which
 /// [InMemoryLinks] only does after a disconnected report or a close.
@@ -37,7 +39,7 @@ class EndingReports extends InMemoryLinks {
 
 void main() {
   late InMemoryLinks links;
-  late RecordingEventPublisher events;
+  late RecordingLinkEvents events;
   late RecordingLog log;
   late LinkSession session;
   late List<LinkEnd> released;
@@ -47,10 +49,11 @@ void main() {
       at,
     )).fold((failure) => fail('the open failed: $failure'), (id) => id);
     final opened = LinkSession(
-      link: Link.opened(id: id, device: at),
+      link: Link.open(id: id, device: at, at: now).link,
       links: links,
       events: events,
       log: log,
+      now: () => now,
     );
     opened.onEnd(released.add);
     return opened;
@@ -61,7 +64,7 @@ void main() {
         InMemoryLinks()
           ..reach(device)
           ..reach(timed);
-    events = RecordingEventPublisher();
+    events = RecordingLinkEvents();
     log = RecordingLog();
     released = [];
     session = await openSession(device);
@@ -74,23 +77,47 @@ void main() {
     return opened!;
   }
 
-  List<ConnectionState> statesOf(LinkSession session) {
-    final states = <ConnectionState>[];
-    session.states.listen(states.add);
-    return states;
+  List<LinkPhase> phasesOf(LinkSession session) {
+    final phases = <LinkPhase>[];
+    session.phases.listen(phases.add);
+    return phases;
   }
 
-  Iterable<DisconnectedEvent> disconnects() =>
-      events.events.whereType<DisconnectedEvent>();
+  Iterable<LinkEnded> ends() => events.raised.whereType<LinkEnded>();
+
+  group('as a live link', () {
+    test('is closing from the moment a close is asked until it is let go '
+        'of', () async {
+      // arrange
+      final before = session.isClosing;
+
+      // act
+      final closed = session.disconnect();
+      final whileClosing = session.isClosing;
+      await closed;
+
+      // assert
+      expect((before, whileClosing, session.isClosing), (false, true, true));
+    });
+
+    test('is closing once its link has dropped', () async {
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+
+      // assert
+      expect((session.link.hasEnded, session.isClosing), (true, true));
+    });
+  });
 
   group('a drop', () {
     test(
-      'emits disconnected, closes the states and runs the releases',
+      'enters the ended phase, closes the phases and runs the releases',
       () async {
         // arrange
-        final states = <ConnectionState>[];
+        final phases = <LinkPhase>[];
         var closed = false;
-        session.states.listen(states.add, onDone: () => closed = true);
+        session.phases.listen(phases.add, onDone: () => closed = true);
 
         // act
         links.drop(device);
@@ -98,11 +125,12 @@ void main() {
 
         // assert
         expect(session.link.end, const EndedByDrop());
-        expect(states, [ConnectionState.disconnected]);
+        expect(phases, [const Ended(EndedByDrop())]);
         expect(closed, isTrue);
         expect(released, [const EndedByDrop()]);
-        expect(disconnects().single.reason, 'linkLoss');
-        expect(disconnects().single.deviceAddress, device);
+        expect(events.raised, [
+          LinkEnded(device: device, at: now, end: const EndedByDrop()),
+        ]);
       },
     );
 
@@ -119,7 +147,7 @@ void main() {
         await pumpEventQueue();
 
         // assert
-        expect(disconnects(), hasLength(1));
+        expect(ends(), hasLength(1));
         expect(released, [const EndedByDrop()]);
         expect(session.link.end, const EndedByDrop());
       },
@@ -129,10 +157,11 @@ void main() {
       // arrange
       final radio = EndingReports()..reach(device);
       final ended = LinkSession(
-        link: const Link.opened(id: LinkId('L1'), device: device),
+        link: Link.open(id: const LinkId('L1'), device: device, at: now).link,
         links: radio,
         events: events,
         log: log,
+        now: () => now,
       );
 
       // act
@@ -141,7 +170,7 @@ void main() {
 
       // assert
       expect(ended.link.end, const EndedByDrop());
-      expect(disconnects().single.reason, 'linkLoss');
+      expect(ends().single.end, const EndedByDrop());
     });
 
     test('a late connected report does not revive the link', () async {
@@ -154,7 +183,7 @@ void main() {
       await pumpEventQueue();
 
       // assert
-      expect(session.link.state, ConnectionState.disconnected);
+      expect(session.phase, const Ended(EndedByDrop()));
       expect(session.link.hasEnded, isTrue);
     });
 
@@ -195,7 +224,7 @@ void main() {
         expect(done, isFalse);
         releasing.complete();
         expect(await answer, success);
-        expect(disconnects().single.reason, 'requested');
+        expect(ends().single.end, const EndedOnRequest());
       },
     );
 
@@ -247,7 +276,7 @@ void main() {
         // arrange
         session.servicesDiscovered();
         await pumpEventQueue();
-        final states = statesOf(session);
+        final phases = phasesOf(session);
         links.failNextClose(device);
 
         // act
@@ -261,10 +290,13 @@ void main() {
             UnexpectedPlatformFailure('the close was told to fail'),
           ),
         );
-        expect(session.link.state, ConnectionState.ready);
-        expect(states, [ConnectionState.disconnecting, ConnectionState.ready]);
+        expect(session.phase, const Ready());
+        expect(phases, [
+          const Closing(returnTo: Ready(), by: ClosingBy.request),
+          const Ready(),
+        ]);
         expect(released, isEmpty);
-        expect(disconnects(), isEmpty);
+        expect(ends(), isEmpty);
       },
     );
 
@@ -287,14 +319,14 @@ void main() {
         session
             .whileUp(
               () async => const Right<ConnectionFailure, int>(7),
-              orEnd: LinkEnded.new,
+              orEnd: LinkHadEnded.new,
             )
             .then((value) => operation = value);
         async.flushMicrotasks();
 
         // assert
         expect(answer, isA<Left<ConnectionFailure, void>>());
-        expect(session.link.state, ConnectionState.ready);
+        expect(session.phase, const Ready());
         expect(operation, const Right<ConnectionFailure, int>(7));
       });
     });
@@ -491,7 +523,7 @@ void main() {
   group('whileUp', () {
     Future<Either<ConnectionFailure, T>> whileUp<T>(
       Future<Either<ConnectionFailure, T>> Function() operation,
-    ) => session.whileUp(operation, orEnd: LinkEnded.new);
+    ) => session.whileUp(operation, orEnd: LinkHadEnded.new);
 
     test('answers the operation\'s value while the link is up', () async {
       // act
@@ -517,7 +549,7 @@ void main() {
         // assert
         expect(
           await answer,
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
         );
         operation.complete(const Right(7));
         await pumpEventQueue();
@@ -550,8 +582,8 @@ void main() {
       expect(
         (whileClosing, whileEnded),
         (
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
-          const Left<ConnectionFailure, int>(LinkEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
+          const Left<ConnectionFailure, int>(LinkHadEnded(EndedByDrop())),
         ),
       );
     });
@@ -563,15 +595,15 @@ void main() {
         () => operation.future,
         orEnd: (_) => throw StateError('boom'),
       );
-      final states = <ConnectionState>[];
-      session.states.listen(states.add);
+      final phases = <LinkPhase>[];
+      session.phases.listen(phases.add);
 
       // act
       links.drop(device);
       await pumpEventQueue();
 
       // assert
-      expect(disconnects().single.reason, 'linkLoss');
+      expect(ends().single.end, const EndedByDrop());
       expect(released, [const EndedByDrop()]);
       expect(await session.disconnect(), success);
       final failure = log.records.singleWhere(
@@ -594,9 +626,66 @@ void main() {
     });
   });
 
+  group('state transition lines', () {
+    List<String?> loggedStates() => [
+      for (final r in log.records)
+        if (r.context == 'bluey.connection' && r.message == 'state transition')
+          r.data['state'] as String?,
+    ];
+
+    test('name each phase entered as logs named it before', () async {
+      // arrange
+      links.failNextClose(device);
+      await session.disconnect();
+      session.servicesDiscovered();
+      await pumpEventQueue();
+      links.failNextClose(device);
+      await session.disconnect();
+
+      // act
+      links.outage(RadioOutage.off);
+      await pumpEventQueue();
+
+      // assert
+      expect(loggedStates(), [
+        'ConnectionState.disconnecting',
+        'ConnectionState.linked',
+        'ConnectionState.ready',
+        'ConnectionState.disconnecting',
+        'ConnectionState.ready',
+        'ConnectionState.invalidated',
+      ]);
+    });
+
+    test('name a drop as disconnected', () async {
+      // act
+      links.drop(device);
+      await pumpEventQueue();
+
+      // assert
+      expect(loggedStates(), ['ConnectionState.disconnected']);
+    });
+
+    test('log no second closing when a request joins the radio closing the '
+        'link', () async {
+      // arrange
+      links.report(device, LinkReport.disconnecting);
+      await pumpEventQueue();
+
+      // act
+      await session.disconnect();
+
+      // assert
+      expect(loggedStates(), [
+        'ConnectionState.disconnecting',
+        'ConnectionState.disconnected',
+      ]);
+    });
+  });
+
   test('an outage invalidates the link and reports radioOutage', () async {
     // arrange
-    final states = statesOf(session);
+    final phases = phasesOf(session);
 
     // act
     links.outage(RadioOutage.off);
@@ -604,14 +693,14 @@ void main() {
 
     // assert
     expect(session.link.end, const EndedByRadioOutage(RadioOutage.off));
-    expect(states, [ConnectionState.invalidated]);
+    expect(phases, [const Ended(EndedByRadioOutage(RadioOutage.off))]);
     expect(released, [const EndedByRadioOutage(RadioOutage.off)]);
-    expect(disconnects().single.reason, 'radioOutage');
+    expect(ends().single.end, const EndedByRadioOutage(RadioOutage.off));
   });
 
   test('servicesDiscovered makes the link ready, once', () async {
     // arrange
-    final states = statesOf(session);
+    final phases = phasesOf(session);
 
     // act
     session.servicesDiscovered();
@@ -619,7 +708,7 @@ void main() {
     await pumpEventQueue();
 
     // assert
-    expect(states, [ConnectionState.ready]);
-    expect(session.link.state, ConnectionState.ready);
+    expect(phases, [const Ready()]);
+    expect(session.phase, const Ready());
   });
 }

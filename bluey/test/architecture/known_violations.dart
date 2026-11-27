@@ -12,16 +12,9 @@ library;
 const unplaced = <String>[
   'lib/src/bluey.dart -> unplaced',
   'lib/src/connection/bluey_connection.dart -> unplaced',
-  'lib/src/connection/connection_parameters_mapper.dart -> unplaced',
   'lib/src/connection/lifecycle_client.dart -> unplaced',
   'lib/src/connection/peer_silence_monitor.dart -> unplaced',
   'lib/src/connection/value_objects/attribute_handle.dart -> unplaced',
-  'lib/src/connection/value_objects/connection_interval.dart -> unplaced',
-  'lib/src/connection/value_objects/connection_parameters.dart -> unplaced',
-  'lib/src/connection/value_objects/mtu.dart -> unplaced',
-  'lib/src/connection/value_objects/peripheral_latency.dart -> unplaced',
-  'lib/src/connection/value_objects/supervision_timeout.dart -> unplaced',
-  'lib/src/connection/value_objects/write_payload_limit.dart -> unplaced',
   'lib/src/discovery/advertisement.dart -> unplaced',
   'lib/src/discovery/bluey_scanner.dart -> unplaced',
   'lib/src/discovery/device.dart -> unplaced',
@@ -86,9 +79,7 @@ const boundaries = <String>[
 const frameworkPlacement = <String>[
   'lib/src/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/bluey_connection.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/connection/connection_parameters_mapper.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/connection/lifecycle_client.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-  'lib/src/connection/value_objects/mtu.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/discovery/bluey_scanner.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/gatt_server/bluey_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
   'lib/src/gatt_server/lifecycle_server.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
@@ -100,9 +91,7 @@ const frameworkPlacement = <String>[
 ];
 
 /// The public libraries' exports of anything but the package's own sources.
-const publicExports = <String>[
-  'lib/bluey.dart -> package:bluey_platform_interface/bluey_platform_interface.dart',
-];
+const publicExports = <String>[];
 
 /// The files that name a library reserved for the platform packages.
 const reservedLibraries = <String>[];
@@ -120,8 +109,8 @@ const lintOptions = <String>[];
 
 /// The Dart files longer than 300 lines.
 const oversized = <String>[
-  'lib/src/bluey.dart -> 977 lines',
-  'lib/src/connection/bluey_connection.dart -> 1456 lines',
+  'lib/src/bluey.dart -> 974 lines',
+  'lib/src/connection/bluey_connection.dart -> 970 lines',
   'lib/src/connection/lifecycle_client.dart -> 836 lines',
   'lib/src/discovery/bluey_scanner.dart -> 410 lines',
   'lib/src/events.dart -> 477 lines',
@@ -129,4 +118,18 @@ const oversized = <String>[
   'lib/src/gatt_server/lifecycle_server.dart -> 413 lines',
   'lib/src/lifecycle.dart -> 364 lines',
   'lib/src/shared/exceptions.dart -> 578 lines',
+];
+
+/// The edge files of a context that name another context's code, and the
+/// files directly in the edge, but for the composition roots, that name any.
+const edgeContexts = <String>[];
+
+/// The files not yet in the target layout that name the edge.
+const edgeFromBelow = <String>[
+  'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/borrowed_connection.dart',
+  'lib/src/peer/bluey_peer.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_connection.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_discovery.dart -> lib/src/api/connection/borrowed_connection.dart',
+  'lib/src/peer/peer_discovery.dart -> lib/src/api/connection/connection.dart',
+  'lib/src/peer/peer_remote_service_view.dart -> lib/src/api/connection/connection.dart',
 ];

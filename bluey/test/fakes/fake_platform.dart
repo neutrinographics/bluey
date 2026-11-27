@@ -1473,6 +1473,9 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     return deviceId;
   }
 
+  /// Orders the two signals of the link it ends as [disconnectSignals]
+  /// says; a device with no link and no streams is owed neither, so its
+  /// disconnect answers at once and leaves nothing for the next connect.
   @override
   Future<void> disconnect(String deviceId) async {
     if (echoDisconnectRequests) _echoExpected.add(deviceId);
@@ -1499,6 +1502,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         final connection = _reportLastState(deviceId);
         unawaited(_closeDeviceStreams(deviceId));
         _tearDownLink(deviceId, connection);
+        if (connection == null && asked == null) return;
         final answer = Completer<void>();
         _secondDisconnectSignals[deviceId] = answer.complete;
         await answer.future;
@@ -1508,11 +1512,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         }
       case FakeDisconnectSignals.answerThenReport:
         final connection = _connections.remove(deviceId);
-        if (_connectionStateControllers.containsKey(deviceId)) {
-          _owedLastReport.add(deviceId);
-        }
+        final hadStreams = _connectionStateControllers.containsKey(deviceId);
+        if (hadStreams) _owedLastReport.add(deviceId);
         await _closeDeviceStreams(deviceId);
         _tearDownLink(deviceId, connection);
+        if (connection == null && !hadStreams) return;
         _secondDisconnectSignals[deviceId] = () =>
             _reportState(deviceId, PlatformConnectionState.disconnected);
     }
@@ -2102,6 +2106,11 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     String deviceId, {
     required bool withResponse,
   }) async {
+    final latency = operationLatency;
+    if (latency != null) {
+      await Future<void>.delayed(latency);
+    }
+    _applyFaultRules(FakeOp.getMaximumWriteLength, deviceId: deviceId);
     final override = _maxWriteOverrides[deviceId];
     if (override != null) {
       return withResponse ? override.withResponse : override.withoutResponse;
@@ -2143,7 +2152,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: getBondState called on a canBond=false platform',
       );
     }
-    return PlatformBondState.none;
+    _applyFaultRules(FakeOp.getBondState, deviceId: deviceId);
+    return _bondStates[deviceId] ?? PlatformBondState.none;
   }
 
   @override
@@ -2153,7 +2163,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: bondStateStream called on a canBond=false platform',
       );
     }
-    return Stream.empty();
+    return _bondReportsOf(deviceId).stream;
   }
 
   @override
@@ -2161,6 +2171,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     if (!_capabilities.canBond) {
       throw UnimplementedError('Fake: bond called on a canBond=false platform');
     }
+    _applyFaultRules(FakeOp.bond, deviceId: deviceId);
   }
 
   @override
@@ -2170,7 +2181,29 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: removeBond called on a canBond=false platform',
       );
     }
+    _applyFaultRules(FakeOp.removeBond, deviceId: deviceId);
   }
+
+  final Map<String, PlatformBondState> _bondStates = {};
+  final Map<String, StreamController<PlatformBondState>> _bondReports = {};
+
+  /// The radio reports that [deviceId]'s bond state is now [state], which
+  /// [getBondState] then reads too.
+  void simulateBondState(String deviceId, PlatformBondState state) {
+    _bondStates[deviceId] = state;
+    _bondReportsOf(deviceId).add(state);
+  }
+
+  /// [deviceId]'s bond state stream fails with [error] and stays open, as a
+  /// platform channel's stream does after one bad event.
+  void simulateBondStateError(String deviceId, Object error) =>
+      _bondReportsOf(deviceId).addError(error);
+
+  StreamController<PlatformBondState> _bondReportsOf(String deviceId) =>
+      _bondReports.putIfAbsent(
+        deviceId,
+        StreamController<PlatformBondState>.broadcast,
+      );
 
   @override
   Future<List<PlatformDevice>> getBondedDevices() async {
@@ -2191,7 +2224,8 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: getPhy called on a canRequestPhy=false platform',
       );
     }
-    return (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
+    _applyFaultRules(FakeOp.getPhy, deviceId: deviceId);
+    return _phys[deviceId] ?? (tx: PlatformPhy.le1m, rx: PlatformPhy.le1m);
   }
 
   @override
@@ -2201,7 +2235,7 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: phyStream called on a canRequestPhy=false platform',
       );
     }
-    return Stream.empty();
+    return _phyReportsOf(deviceId).stream;
   }
 
   @override
@@ -2215,7 +2249,35 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'Fake: requestPhy called on a canRequestPhy=false platform',
       );
     }
+    _applyFaultRules(FakeOp.requestPhy, deviceId: deviceId);
   }
+
+  final Map<String, ({PlatformPhy tx, PlatformPhy rx})> _phys = {};
+  final Map<String, StreamController<({PlatformPhy tx, PlatformPhy rx})>>
+  _phyReports = {};
+
+  /// The radio reports that [deviceId]'s PHY pair is now [tx] and [rx],
+  /// which [getPhy] then reads too.
+  void simulatePhy(
+    String deviceId, {
+    required PlatformPhy tx,
+    required PlatformPhy rx,
+  }) {
+    _phys[deviceId] = (tx: tx, rx: rx);
+    _phyReportsOf(deviceId).add((tx: tx, rx: rx));
+  }
+
+  /// [deviceId]'s PHY stream fails with [error] and stays open, as a
+  /// platform channel's stream does after one bad event.
+  void simulatePhyError(String deviceId, Object error) =>
+      _phyReportsOf(deviceId).addError(error);
+
+  StreamController<({PlatformPhy tx, PlatformPhy rx})> _phyReportsOf(
+    String deviceId,
+  ) => _phyReports.putIfAbsent(
+    deviceId,
+    StreamController<({PlatformPhy tx, PlatformPhy rx})>.broadcast,
+  );
 
   // === Connection Parameters ===
 
@@ -2229,11 +2291,13 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'canRequestConnectionParameters=false platform',
       );
     }
-    return const PlatformConnectionParameters(
-      intervalMs: 30.0,
-      latency: 0,
-      timeoutMs: 4000,
-    );
+    _applyFaultRules(FakeOp.getConnectionParameters, deviceId: deviceId);
+    return _connectionParameters[deviceId] ??
+        const PlatformConnectionParameters(
+          intervalMs: 30.0,
+          latency: 0,
+          timeoutMs: 4000,
+        );
   }
 
   @override
@@ -2247,7 +2311,17 @@ base class FakeBlueyPlatform extends BlueyPlatform {
         'canRequestConnectionParameters=false platform',
       );
     }
+    _applyFaultRules(FakeOp.requestConnectionParameters, deviceId: deviceId);
   }
+
+  final Map<String, PlatformConnectionParameters> _connectionParameters = {};
+
+  /// The radio times [deviceId]'s link by [parameters], which
+  /// [getConnectionParameters] then reads.
+  void simulateConnectionParameters(
+    String deviceId,
+    PlatformConnectionParameters parameters,
+  ) => _connectionParameters[deviceId] = parameters;
 
   // === Server Operations ===
 
@@ -2590,6 +2664,12 @@ base class FakeBlueyPlatform extends BlueyPlatform {
     for (final controller in _notificationControllers.values) {
       await controller.close();
     }
+    for (final controller in _bondReports.values) {
+      await controller.close();
+    }
+    for (final controller in _phyReports.values) {
+      await controller.close();
+    }
   }
 }
 
@@ -2732,7 +2812,15 @@ enum FakeOp {
   readDescriptor,
   writeDescriptor,
   requestMtu,
+  getMaximumWriteLength,
   readRssi,
+  getBondState,
+  bond,
+  removeBond,
+  getPhy,
+  requestPhy,
+  getConnectionParameters,
+  requestConnectionParameters,
 }
 
 /// A scripted fault: fires [error] for matching calls to [op] until its

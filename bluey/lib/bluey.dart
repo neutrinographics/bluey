@@ -29,11 +29,6 @@ export 'src/api/connection/connection.dart';
 export 'src/api/connection/android_connection_extensions.dart';
 export 'src/api/connection/ios_connection_extensions.dart';
 export 'src/connection/value_objects/attribute_handle.dart';
-export 'src/connection/value_objects/mtu.dart';
-export 'src/connection/value_objects/connection_interval.dart';
-export 'src/connection/value_objects/peripheral_latency.dart';
-export 'src/connection/value_objects/supervision_timeout.dart';
-export 'src/connection/value_objects/connection_parameters.dart';
 
 // GATT Client bounded context
 export 'src/gatt_client/gatt.dart';
@@ -47,14 +42,7 @@ export 'src/gatt_server/advertising_state.dart';
 
 // Platform bounded context
 export 'src/platform/bluetooth_state.dart';
-
-// Re-export [Capabilities] from the platform interface so consumers can
-// describe / inspect platform support (e.g. constructing custom matrices
-// for tests, validating MTU bounds via `Capabilities.maxMtu`) without
-// taking a direct dependency on `bluey_platform_interface`. Per the A.5
-// review, this keeps the example app's import surface clean.
-export 'package:bluey_platform_interface/bluey_platform_interface.dart'
-    show Capabilities;
+export 'src/api/platform/platform.dart';
 
 // Peer bounded context
 export 'src/peer/peer.dart' show BlueyPeer;
@@ -65,7 +53,7 @@ export 'src/lifecycle.dart' show LifecycleInterval;
 
 // Domain events
 export 'src/events.dart';
-export 'src/features/connection/domain/connection_event.dart';
+export 'src/api/connection/connection_events.dart';
 
 // Structured logging
 export 'src/shared/application/log_event.dart' show BlueyLogEvent;

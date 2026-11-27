@@ -325,6 +325,95 @@ void main() {
     });
   });
 
+  group('a list stated for the first time', () {
+    test('may hold entries when the base lacks the list', () {
+      // arrange
+      final base = {'boundaries': <String>[]};
+      final head = {
+        'boundaries': <String>[],
+        'edgeFromBelow': ['lib/src/peer/p.dart -> lib/src/api/c.dart'],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        firstStatements: {'edgeFromBelow'},
+      );
+
+      // assert
+      expect(growth.holds, isTrue, reason: growth.describe());
+      expect(growth.firstStated, {'edgeFromBelow': 1});
+      expect(growth.notes, isEmpty);
+    });
+
+    test('says which lists it took as their first statement', () {
+      // arrange
+      final growth = ListGrowth.between(
+        path: _path,
+        base: {'boundaries': <String>[]},
+        head: {
+          'boundaries': <String>[],
+          'edgeFromBelow': ['lib/src/peer/p.dart -> lib/src/api/c.dart'],
+        },
+        firstStatements: {'edgeFromBelow'},
+      );
+
+      // act
+      final text = growth.describe();
+
+      // assert
+      expect(
+        text,
+        '$_path: no list grew.\n'
+        '  edgeFromBelow: not at the base, so its 1 entry is the first '
+        'statement of what it holds.\n',
+      );
+    });
+
+    test('is judged as ever when the base has the list, with a note to '
+        'remove the flag', () {
+      // arrange
+      final base = {'edgeFromBelow': <String>[]};
+      final head = {
+        'edgeFromBelow': ['lib/src/peer/p.dart -> lib/src/api/c.dart'],
+      };
+
+      // act
+      final growth = ListGrowth.between(
+        path: _path,
+        base: base,
+        head: head,
+        firstStatements: {'edgeFromBelow'},
+      );
+
+      // assert
+      expect(growth.added, [
+        'edgeFromBelow: lib/src/peer/p.dart -> lib/src/api/c.dart',
+      ]);
+      expect(growth.firstStated, isEmpty);
+      expect(growth.notes, [
+        '--first-statement=edgeFromBelow no longer applies: the base has '
+            'this list; remove the flag',
+      ]);
+      expect(growth.describe(), contains(growth.notes.single));
+    });
+
+    test('refuses a flag naming a list the head lacks', () {
+      // act
+      ListGrowth judge() => ListGrowth.between(
+        path: _path,
+        base: {'boundaries': <String>[]},
+        head: {'boundaries': <String>[]},
+        firstStatements: {'edgeFromBelow'},
+      );
+
+      // assert
+      expect(judge, throwsArgumentError);
+    });
+  });
+
   group('a list file the base did not have', () {
     test('holds, its lists the first statement of what the rules find', () {
       // arrange

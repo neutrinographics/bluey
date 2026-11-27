@@ -73,8 +73,9 @@ cd bluey_guards && dart test
 # The architecture rules; each package keeps its lists in test/architecture/known_violations.dart
 cd bluey && flutter test test/architecture
 
-# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package)
-cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart
+# No list grew since the branch left main (CI compares with the pull request's base, and runs it in every package).
+# The flag lets bluey's new edgeFromBelow list state today's debt; remove it in the first change after the one that adds it merges
+cd bluey && dart run test/architecture/list_growth.dart origin/main test/architecture/known_violations.dart test/known_defects/roster.dart --first-statement=edgeFromBelow
 
 # The public API dump: check it, or rewrite it after a change that was meant
 cd bluey && dart run bluey_guards:public_api lib/bluey.dart api/bluey.api
@@ -100,7 +101,7 @@ cd bluey/example && flutter run
 
 ## Architecture
 
-`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow.
+`docs/ARCHITECTURE.md` is the authoritative guide; this section is its short version. New code goes into the target layout (`lib/src/{api, features/<context>/{domain,application,infrastructure}, shared}`), the old folders only shrink, failures below `api/` are values (`Either<Failure, T>`), and the architecture test holds all of it against lists that never grow. Each context reaches apps only through its edge, `api/<context>/`: events, phases and failures are translated there into the public ones, while the value objects an app builds (`Mtu`, `Phy`, `ConnectionParameters`, `BondState`) are published from the context's domain as they stand. `Capabilities` and `PlatformKind` are Bluey's own, in the Platform context (`features/platform/domain`), exported through `api/platform/`.
 
 ### Clean Architecture Layers
 
@@ -119,7 +120,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 2. **Connection** - Device connections and the link lifecycle, bonding, PHY, connection parameters, MTU and the write payload limit, RSSI
 3. **GATT Client** - Service/characteristic read/write/notify, descriptors
 4. **GATT Server** - Peripheral role, advertising, request/response handling
-5. **Platform** - Bluetooth state, permissions, capabilities
+5. **Platform** - Bluetooth state, permissions, capabilities (Bluey's own `Capabilities` and `PlatformKind`; Connection is handed only its own `LinkFeatures`)
 6. **Peer** - Stable peer identity on top of the lifecycle protocol. `BlueyPeer`, `ServerId`, `bluey.peer()`, `bluey.discoverPeers()`. The peer module owns the client-side protocol layer — raw `BlueyConnection` is protocol-free.
 
 ### Key Design Decisions
@@ -130,6 +131,7 @@ Platform Impl         ← bluey_android, bluey_ios (Pigeon bindings + native Kot
 - **Immutable data, mutable connections** - Device/Advertisement are snapshots; Connection state is observable
 - **Pigeon for platform channels** - type-safe generated bindings, no manual MethodChannel code
 - **Sealed exceptions, open events** - exceptions are sealed families (exhaustive pattern matching); domain events share an open base, `BlueyEvent`, so a `switch` over them needs a default branch
+- **The domain raises its own events, the edge publishes them** - Connection's aggregate `Link` raises `LinkOpened` and `LinkEnded` (the registry raises `LinkOpenBegan`), stamped with the clock the application is handed (`Now`); `api/connection/` translates them to `ConnectingEvent`, `ConnectedEvent` and `DisconnectedEvent`, carrying that instant as the event's `timestamp`
 
 ### Handle-based attribute identity (post-I088)
 
@@ -143,15 +145,17 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 
 ### Platform-tagged Connection extensions (post-I089/I066)
 
-- `Connection` declares only cross-platform members (state, services, mtu, rssi, disconnect).
-- Android-specific features (bond, PHY, connection parameters, connection priority, refreshGattCache) live on `connection.android` of type `AndroidConnectionExtensions?`. iOS-specific extensions reserved on `connection.ios` of type `IosConnectionExtensions?` (currently empty).
+- `Connection` declares only cross-platform members (state, services, `maxWritePayload`, `readRssi`, disconnect).
+- Android-specific features (bond, PHY, connection parameters, MTU) live on `connection.android` of type `AndroidConnectionExtensions?`. iOS-specific extensions reserved on `connection.ios` of type `IosConnectionExtensions?` (currently empty).
+- At the edge, `AndroidConnection` and `IosConnection` (`api/connection/`) implement the two interfaces. `AndroidConnection` presents one link's Connection sessions (`BondingSession`, `PhySession`, `ParameterSession`, `MtuSession`), which `ConnectionAssembly` builds only for a link on Android; on any other platform none is built and the platform is asked nothing about bonds, PHY or parameters.
+- `Mtu(value)` checks only the specification's range, 23 to 517: `connection.android?.requestMtu(Mtu(247))`. Whether the platform can ask for it is answered when the request is made (`UnsupportedOperationException` above the platform's maximum).
 - The asymmetry is type-visible at every call site: `connection.android?.bond()` evaluates to a no-op (null) on iOS and dispatches on Android.
 
 ### Peer composition (post-I300)
 
 - `Bluey.connect(device)` returns a raw `Connection` — no peer-protocol attempt.
 - `Bluey.connectAsPeer(device)` returns `PeerConnection` (throws `NotABlueyPeerException` if the device doesn't expose the lifecycle control service).
-- Probes borrow links. `discoverPeers()`, `BlueyPeer.connect()` and `connectAsPeer` borrow the device's link from Connection's registry instead of connecting through the platform: a device the app is already linked to is read over that link and left up, and a link the borrow opened is closed when it is given back. The iOS shared-link case (I374) is left for slice 5.
+- Probes borrow links. `discoverPeers()`, `BlueyPeer.connect()` and `connectAsPeer` borrow the device's link from Connection's registry instead of connecting through the platform: a device the app is already linked to is read over that link and left up, and a link the borrow opened is closed when it is given back. The iOS shared-link case (I374) is left for slice 5. `connectAsPeer`'s own rule (keep the borrow for a peer, give it back otherwise) stays in the composition root, `lib/src/bluey.dart`, until slice 5 places Peer.
 - `Bluey.tryUpgrade(connection)` returns `PeerConnection?` for the rare post-connect upgrade path.
 - `PeerConnection` is a composition wrapper: it holds a `Connection` (use `peer.connection` for raw GATT) plus a `serverId` and the lifecycle-protocol disconnect path.
 
@@ -160,7 +164,8 @@ See `docs/superpowers/specs/2026-04-28-pigeon-gatt-handle-rewrite-design.md` for
 - `bluey.logEvents` is a broadcast `Stream<BlueyLogEvent>` covering domain-layer **and** native (Android + iOS) events in arrival order — single subscription point for the whole stack.
 - `bluey.setLogLevel(BlueyLogLevel level)` filters Dart-side and pushes the filter down to the native side, so no Pigeon traffic is incurred for filtered events. Default level is `info`.
 - Levels: `trace`, `debug`, `info`, `warn`, `error`.
-- `bluey.connection`'s lifecycle lines (`connect started`, `connect succeeded`, `connect failed`, `state transition`, `disconnect entered`, `disconnect resolved`) now come from Connection's application layer (`LinkRegistry` and `LinkSession`), where they came from `Bluey` and the old `BlueyConnection`, so a probe's link logs them too; the GATT client's lines keep the same context.
+- `bluey.connection`'s lifecycle lines (`connect started`, `connect succeeded`, `connect failed`, `state transition`, `disconnect entered`, `disconnect resolved`) now come from Connection's application layer (`LinkRegistry` and `LinkSession`), where they came from `Bluey` and the old `BlueyConnection`, so a probe's link logs them too; the GATT client's lines keep the same context. The MTU request and the two readings (`requestMtu`, `getMaximumWriteLength`, `readRssi`) are Connection's too and still log under `bluey.gatt`, and a failed line's `errorCode` is a failure code (`OperationTimedOut`, `LinkEnded`, ...).
+- Connection's frozen log vocabulary (contexts, state words such as `ConnectionState.disconnecting`, operation words, failure codes) lives in one file, `features/connection/application/connection_log_words.dart`, frozen until one pass revises the wording of every context's logs. Message words and data keys (`bond state read failed`, `deviceId`) stay beside the line that logs them.
 - Context naming convention: `bluey`, `bluey.connection`, `bluey.connection.lifecycle`, `bluey.server`, `bluey.server.lifecycle`, `bluey.peer`, `bluey.peer.discovery`, `bluey.android.{plugin,gatt_server,gatt_queue,advertiser}`, `bluey.ios.{plugin,central,peripheral,op_slot}`.
 - Native logs **also** tee to `Logcat` (Android) and `os_log` (iOS) for native-side debugging — the Dart bridge is additive, not exclusive.
 - Bootstrap caveat: events emitted during `Bluey.create()` construction are dropped if no listener has subscribed yet (broadcast stream semantics). Subscribe immediately after `create()` resolves to start capturing events.
@@ -181,6 +186,11 @@ The domain layer uses bounded-context-aligned vocabulary; the platform-interface
 | **PeerConnection** | Peer | A `Connection` wrapped with a stable `ServerId` and the lifecycle-protocol disconnect path. Composition over inheritance — `peer.connection` exposes the raw GATT surface. |
 | **ServerId** | Peer | The stable identity advertised through the lifecycle control service. Survives MAC randomization on Android and CBPeripheral identifier rotation on iOS. |
 | **Central / Peripheral** | (BLE-spec, platform-interface only) | The wire-level BLE roles. Surfaces only in `bluey_platform_interface` types (`PlatformCentral`, `centralConnections`, etc.). The domain layer translates these to `Client` / `Server` at the seam. |
+| **Link** | Connection (inner) | The radio link from this device, as GATT client, to one remote device; a `Connection` is its public face. In code, `Link`, the aggregate that decides what each input does to it. |
+| **Phase** | Connection (inner) | Where a link is in its life: linked, ready, closing or ended (`LinkPhase`). The edge maps it to the public `ConnectionState`. |
+| **End** | Connection (inner) | Why a link ended: the app asked, it dropped, or the radio went away (`LinkEnd`). |
+| **Operation** | Connection (inner) | What was attempted on a link, in Connection's own words (`LinkOperation`: `open`, `negotiateMtu`, `readSignalStrength`, ...), never the platform's method names. |
+| **Borrow** | Connection (inner) | A short use of a device's link by code that is not the app (today peer discovery and `connectAsPeer`): it reuses a link the app holds, and closes on give-back only a link it opened. |
 | **AttributeHandle** | Connection / GATT Client | Opaque platform-assigned identifier for a service / characteristic / descriptor. Valid only within one connection; invalidated on disconnect or Service Changed. |
 
 #### Quick reference (use / avoid)

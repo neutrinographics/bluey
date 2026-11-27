@@ -244,11 +244,11 @@ final class ClientLifecycleTimeoutEvent extends BlueyEvent
   String toString()
   final ClientAddress clientAddress
 final class ConnectedEvent extends BlueyEvent
-  ConnectedEvent({required DeviceAddress deviceAddress, String? source})
+  ConnectedEvent({required DeviceAddress deviceAddress, String? source, DateTime? timestamp})
   String toString()
   final DeviceAddress deviceAddress
 final class ConnectingEvent extends BlueyEvent
-  ConnectingEvent({required DeviceAddress deviceAddress, String? source})
+  ConnectingEvent({required DeviceAddress deviceAddress, String? source, DateTime? timestamp})
   String toString()
   final DeviceAddress deviceAddress
 abstract class Connection
@@ -341,7 +341,7 @@ enum DisconnectReason
   DisconnectReason timeout
   DisconnectReason unknown
 final class DisconnectedEvent extends BlueyEvent
-  DisconnectedEvent({required DeviceAddress deviceAddress, String? reason, String? source})
+  DisconnectedEvent({required DeviceAddress deviceAddress, String? reason, String? source, DateTime? timestamp})
   String toString()
   final DeviceAddress deviceAddress
   final String? reason
@@ -492,7 +492,7 @@ class ManufacturerData
 class Mtu
   String toString()
   bool ==(Object other)
-  factory Mtu(int value, {required Capabilities capabilities})
+  factory Mtu(int value)
   factory Mtu.fromPlatform(int value)
   final int value
   int get hashCode
@@ -559,6 +559,11 @@ enum Phy
   Phy le1m
   Phy le2m
   Phy leCoded
+enum PlatformKind
+  PlatformKind android
+  PlatformKind fake
+  PlatformKind ios
+  PlatformKind other
 class ReadRequest
   const ReadRequest({required Client client, required UUID characteristicId, required int offset, required int internalRequestId})
   final Client client

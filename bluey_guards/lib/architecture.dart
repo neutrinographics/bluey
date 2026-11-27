@@ -13,6 +13,8 @@ export 'src/architecture/legacy_layout.dart';
 export 'src/architecture/placement.dart';
 export 'src/architecture/ratchet.dart';
 export 'src/architecture/rules/boundary_rule.dart';
+export 'src/architecture/rules/edge_context_rule.dart';
+export 'src/architecture/rules/edge_from_below_rule.dart';
 export 'src/architecture/rules/framework_rule.dart';
 export 'src/architecture/rules/layer_rule.dart';
 export 'src/architecture/rules/lint_options_rule.dart';

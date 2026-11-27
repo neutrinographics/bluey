@@ -252,7 +252,7 @@ void main() {
     group('MTU', () {
       test('requestMtu returns negotiated MTU', () async {
         final negotiated = await connection.android!.requestMtu(
-          Mtu(256, capabilities: Capabilities.android),
+          Mtu(256),
         );
         expect(negotiated, equals(Mtu.fromPlatform(256)));
         expect(connection.android?.mtu, equals(Mtu.fromPlatform(256)));
@@ -260,7 +260,7 @@ void main() {
 
       test('requestMtu may return less than requested', () async {
         final negotiated = await connection.android!.requestMtu(
-          Mtu(517, capabilities: Capabilities.android),
+          Mtu(517),
         );
         expect(negotiated.value, lessThanOrEqualTo(512));
       });

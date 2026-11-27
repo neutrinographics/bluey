@@ -1,13 +1,9 @@
-import 'package:bluey/src/api/connection/bluey_connection.dart';
+import 'package:clock/clock.dart';
 import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/api/connection/connection.dart';
-import 'package:bluey/src/api/connection/connections.dart';
-import 'package:bluey/src/api/failure_translation.dart';
+import 'package:bluey/src/api/connection/connection_assembly.dart';
 import 'package:bluey/src/connection/bluey_connection.dart';
-import 'package:bluey/src/features/connection/application/borrow_link.dart';
-import 'package:bluey/src/features/connection/application/connect_device.dart';
-import 'package:bluey/src/features/connection/application/link_registry.dart';
-import 'package:bluey/src/features/connection/infrastructure/adapters/platform_links.dart';
+import 'package:bluey/src/features/connection/infrastructure/adapters/platform_connection_ports.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/infrastructure/bluey_event_bus.dart';
 import 'package:bluey/src/shared/infrastructure/bluey_logger.dart';
@@ -21,52 +17,46 @@ import 'package:bluey_platform_interface/bluey_platform_interface.dart'
 /// sees the same one-owner-per-link rules an app does.
 class ConnectionRig {
   ConnectionRig(
-    platform.BlueyPlatform platform, {
+    platform.BlueyPlatform radio, {
     BlueyLogger? logger,
     BlueyEventBus? events,
   }) {
     final log = logger ?? BlueyLogger();
     final bus = events ?? BlueyEventBus();
-    final registry = LinkRegistry(
-      links: PlatformLinks(platform, log: log),
-      events: bus,
+    _assembly = ConnectionAssembly(
+      ports: platformConnectionPorts(radio, log: log),
+      publisher: bus,
       log: log,
-    );
-    _connectDevice = ConnectDevice(registry);
-    _connections = Connections(
-      present:
-          (session) => BlueyConnection(
+      now: clock.now,
+      extension: switch (radio.capabilities.platformKind) {
+        platform.PlatformKind.android => ConnectionExtension.android,
+        platform.PlatformKind.ios => ConnectionExtension.ios,
+        platform.PlatformKind.fake ||
+        platform.PlatformKind.other => ConnectionExtension.none,
+      },
+      platformName: radio.capabilities.platformKind.name,
+      gattFor:
+          (session, endAsException) => LinkGattClient(
+            platformInstance: radio,
             session: session,
-            gatt: LinkGattClient(
-              platformInstance: platform,
-              session: session,
-              logger: log,
-              events: bus,
-            ),
+            logger: log,
+            endAsException: endAsException,
+            events: bus,
           ),
     );
-    borrow = borrowingThrough(
-      borrowLink: BorrowLink(registry),
-      connections: _connections,
-    );
   }
 
-  late final ConnectDevice _connectDevice;
-  late final Connections _connections;
+  late final ConnectionAssembly _assembly;
 
   /// How a borrower reaches a device's link through this rig's registry.
-  late final BorrowConnection borrow;
+  BorrowConnection get borrow => _assembly.borrow;
 
   /// The app's connect, throwing as Bluey.connect does.
-  Future<Connection> connect(DeviceAddress device, {Duration? timeout}) async {
-    final answer = await _connectDevice.run(
-      ConnectDeviceRequest(device: device, timeout: timeout),
-    );
-    return _connections.of(valueOrThrow(answer, device: device));
-  }
+  Future<Connection> connect(DeviceAddress device, {Duration? timeout}) =>
+      _assembly.connect(device, timeout: timeout);
 
   /// The platform's name for [connection]'s link, as Bluey reads it.
   String connectionIdOf(Connection connection) =>
-      _connections.linkIdOf(connection)?.value ??
+      _assembly.linkIdOf(connection)?.value ??
       connection.deviceAddress.toString();
 }

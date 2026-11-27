@@ -161,4 +161,35 @@ void main() {
       expect(printed, ['Left(a)', 'Right(1)']);
     });
   });
+
+  group('flatMapAsync', () {
+    test('flatMapAsync runs the next step on a success', () async {
+      // arrange
+      const start = Right<String, int>(2);
+
+      // act
+      final chained = await start.flatMapAsync(
+        (value) async => Right<String, String>('got $value'),
+      );
+
+      // assert
+      expect(chained, const Right<String, String>('got 2'));
+    });
+
+    test('flatMapAsync stops at a failure and does not run the step', () async {
+      // arrange
+      const start = Left<String, int>('broke');
+      var ran = false;
+
+      // act
+      final chained = await start.flatMapAsync((value) async {
+        ran = true;
+        return const Right<String, String>('never');
+      });
+
+      // assert
+      expect(chained, const Left<String, String>('broke'));
+      expect(ran, isFalse);
+    });
+  });
 }

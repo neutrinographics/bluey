@@ -285,4 +285,39 @@ void main() {
       await expectTheNextLinkKeepsItsStreams();
     });
   });
+
+  group('a disconnect of a device that was never connected', () {
+    test('answers at once when the report comes first, since no report is '
+        'owed', () async {
+      // arrange
+      fake.disconnectSignals = FakeDisconnectSignals.reportThenAnswer;
+      var answered = false;
+
+      // act
+      fake.disconnect(deviceId).whenComplete(() => answered = true).ignore();
+      await pumpEventQueue();
+
+      // assert
+      expect(answered, isTrue);
+    });
+
+    test('leaves no report for the next connect when the answer comes '
+        'first', () async {
+      // arrange
+      fake.disconnectSignals = FakeDisconnectSignals.answerThenReport;
+      await fake.disconnect(deviceId);
+
+      // act
+      await fake.connect(deviceId, config);
+
+      // assert
+      final next = expectLater(
+        fake.connectionStateStream(deviceId),
+        emitsInOrder([PlatformConnectionState.disconnected, emitsDone]),
+      );
+      await pumpEventQueue();
+      fake.simulateDisconnection(deviceId);
+      await next;
+    });
+  });
 }

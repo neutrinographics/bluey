@@ -1,18 +1,18 @@
 import 'dart:async';
 
-import '../../../shared/application/event_publisher.dart';
 import '../../../shared/application/log.dart';
 import '../../../shared/application/log_level.dart';
+import '../../../shared/application/now.dart';
 import '../../../shared/domain/either.dart';
-import '../domain/connection_event.dart';
 import '../domain/connection_failure.dart';
-import '../domain/connection_state.dart';
 import '../domain/link.dart';
 import '../domain/link_end.dart';
 import '../domain/link_input.dart';
+import '../domain/link_phase.dart';
+import '../domain/live_link.dart';
+import 'connection_log_words.dart';
+import 'ports/link_events.dart';
 import 'ports/links.dart';
-
-const _context = 'bluey.connection';
 
 /// Runs one link: it feeds the [Link] what the radio and the caller say, does
 /// what the link answers, and releases everything tied to the link when it
@@ -22,17 +22,19 @@ const _context = 'bluey.connection';
 /// Once the link has ended the session never addresses the platform with its
 /// id again, since the platform may already have given that id to the next
 /// link to the same device.
-final class LinkSession {
+final class LinkSession implements LiveLink {
   /// Starts listening to the link's reports and to radio outages at once.
   LinkSession({
     required Link link,
     required Links links,
-    required EventPublisher events,
+    required LinkEvents events,
     required Log log,
+    required Now now,
   }) : _link = link,
        _links = links,
        _events = events,
-       _log = log {
+       _log = log,
+       _now = now {
     _reports = links
         .reportsOf(link.id)
         .listen(
@@ -45,10 +47,11 @@ final class LinkSession {
   }
 
   final Links _links;
-  final EventPublisher _events;
+  final LinkEvents _events;
   final Log _log;
-  final StreamController<ConnectionState> _states =
-      StreamController<ConnectionState>.broadcast();
+  final Now _now;
+  final StreamController<LinkPhase> _phases =
+      StreamController<LinkPhase>.broadcast();
   final List<FutureOr<void> Function(LinkEnd end)> _releases = [];
   final List<void Function(LinkEnd end)> _operationsUp = [];
   final Completer<void> _released = Completer<void>();
@@ -60,9 +63,17 @@ final class LinkSession {
   /// The link as it stands now; the session holds the only current copy.
   Link get link => _link;
 
-  /// Every state the link moves to. Carries no errors, and ends when the link
+  /// Where the link stands now.
+  LinkPhase get phase => _link.phase;
+
+  /// Whether the link is no longer up: closing, or ended and not yet let go
+  /// of, so a caller asking for the device's link waits for it to settle.
+  @override
+  bool get isClosing => !_link.isUp;
+
+  /// Every phase the link enters. Carries no errors, and ends when the link
   /// ends.
-  Stream<ConnectionState> get states => _states.stream;
+  Stream<LinkPhase> get phases => _phases.stream;
 
   /// Registers something that lives as long as the link. Runs once when the
   /// link ends, whatever ended it; at once if the teardown has finished.
@@ -70,8 +81,8 @@ final class LinkSession {
   /// A release must not wait on this session's [disconnect], which answers
   /// only once every release has run, so the two would wait on each other.
   void onEnd(FutureOr<void> Function(LinkEnd end) release) {
-    if (_released.isCompleted) {
-      unawaited(_runRelease(release, _link.end!));
+    if (_link.end case final end? when _released.isCompleted) {
+      unawaited(_runRelease(release, end));
     } else {
       _releases.add(release);
     }
@@ -106,39 +117,50 @@ final class LinkSession {
   ///
   /// A call while a close is in flight answers with that close, and a call on
   /// an ended link answers success without asking the platform. A failed
-  /// close leaves the link as it was, unless the link ended anyway.
+  /// close leaves the link as it was, unless the link ended anyway. A
+  /// request that starts no close answers once the link has ended.
   Future<Either<ConnectionFailure, void>> disconnect() {
     final inFlight = _closeInFlight;
     if (inFlight != null) return inFlight;
     if (_link.hasEnded) return _afterRelease();
     _logDevice('disconnect entered');
-    _feed(const DisconnectRequested());
-    return _closeInFlight!;
+    final duty = _step(const DisconnectRequested()).duty;
+    if (duty is CloseTheLink) return _closeInFlight = _close();
+    _carryOut(duty);
+    return _afterRelease();
   }
 
-  void _feed(LinkInput input) {
-    final before = _link.state;
-    final step = _link.on(input);
+  void _feed(LinkInput input) => _carryOut(_step(input).duty);
+
+  /// Stores what [input] does to the link, then tells of it, so whoever
+  /// hears of a step reads the link as the step left it.
+  LinkStep _step(LinkInput input) {
+    final step = _link.on(input, at: _now());
     _link = step.link;
-    if (_link.state != before) _announceState();
-    switch (step.duty) {
-      case LinkDuty.closeTheLink:
+    if (step.entered case final entered?) _announce(entered);
+    step.events.forEach(_events.raise);
+    return step;
+  }
+
+  void _carryOut(LinkDuty? duty) {
+    switch (duty) {
+      case CloseTheLink():
         _closeInFlight = _close();
-      case LinkDuty.releaseAndAnnounce:
-        unawaited(_release(_link.end!));
+      case ReleaseTheLink(:final end):
+        unawaited(_release(end));
       case null:
         break;
     }
   }
 
-  void _announceState() {
+  void _announce(LinkPhase entered) {
     _log.log(
       BlueyLogLevel.info,
-      _context,
+      connectionLogContext,
       'state transition',
-      data: {'deviceId': '${_link.device}', 'state': '${_link.state}'},
+      data: {'deviceId': '${_link.device}', 'state': stateWordOf(entered)},
     );
-    _states.add(_link.state);
+    _phases.add(entered);
   }
 
   Future<Either<ConnectionFailure, void>> _close() async {
@@ -158,14 +180,11 @@ final class LinkSession {
       _released.future.then((_) => const Right(null));
 
   Future<void> _release(LinkEnd end) async {
-    unawaited(_states.close());
+    unawaited(_phases.close());
     for (final answerEnd in List.of(_operationsUp)) {
       _guarded('end answer failed', () => answerEnd(end));
     }
     _operationsUp.clear();
-    _events.emit(
-      DisconnectedEvent(deviceAddress: _link.device, reason: _reasonOf(end)),
-    );
     unawaited(_reports.cancel());
     unawaited(_outages.cancel());
     for (var next = 0; next < _releases.length; next++) {
@@ -198,21 +217,15 @@ final class LinkSession {
 
   void _warn(String message, Object error) => _log.log(
     BlueyLogLevel.warn,
-    _context,
+    connectionLogContext,
     message,
     data: {'deviceId': '${_link.device}', 'error': '$error'},
     errorCode: error.runtimeType.toString(),
   );
 
-  static String _reasonOf(LinkEnd end) => switch (end) {
-    EndedOnRequest() => 'requested',
-    EndedByDrop() => 'linkLoss',
-    EndedByRadioOutage() => 'radioOutage',
-  };
-
   void _logDevice(String message) => _log.log(
     BlueyLogLevel.info,
-    _context,
+    connectionLogContext,
     message,
     data: {'deviceId': '${_link.device}'},
   );

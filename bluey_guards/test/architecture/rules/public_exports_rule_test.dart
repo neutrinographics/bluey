@@ -27,5 +27,27 @@ void main() {
         'lib/bluey.dart -> testing.dart',
       ]);
     });
+
+    test('a public library does not export a file from inside a context', () {
+      // arrange
+      final files = tree({
+        'lib/bluey.dart':
+            "export 'src/api/connection/connection_events.dart';\n"
+            "export 'src/shared/domain/uuid.dart';\n"
+            "export 'src/features/connection/domain/link_end.dart';\n"
+            "export 'package:bluey/src/features/discovery/domain/a.dart';\n"
+            "export 'src/legacy/old.dart';\n",
+      });
+
+      // act
+      final found = entries(PublicExportsRule(package: 'bluey'), files);
+
+      // assert
+      expect(found, [
+        'lib/bluey.dart -> src/features/connection/domain/link_end.dart',
+        'lib/bluey.dart -> '
+            'package:bluey/src/features/discovery/domain/a.dart',
+      ]);
+    });
   });
 }

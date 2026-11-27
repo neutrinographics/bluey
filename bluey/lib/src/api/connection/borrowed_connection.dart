@@ -1,7 +1,7 @@
 import '../../features/connection/application/borrow_link.dart';
 import '../../shared/domain/device_address.dart';
-import '../failure_translation.dart';
 import 'connection.dart';
+import 'connection_failure_translation.dart';
 import 'connections.dart';
 
 /// A link in use for a short task by code that is not the app, seen through
@@ -47,19 +47,25 @@ typedef BorrowConnection =
 
 /// A [BorrowConnection] over [borrowLink], whose Connections come from
 /// [connections], so a borrower and the app holding one link hold one
-/// object.
+/// object; its exceptions name [platform].
 BorrowConnection borrowingThrough({
   required BorrowLink borrowLink,
   required Connections connections,
+  required String platform,
 }) => (DeviceAddress device, {Duration? timeout}) async {
   final borrowed = valueOrThrow(
     await borrowLink.run(BorrowLinkRequest(device: device, timeout: timeout)),
     device: device,
+    platform: platform,
   );
   return BorrowedConnection(
     connection: connections.of(borrowed.session),
     giveBack:
-        () async => valueOrThrow(await borrowed.giveBack(), device: device),
+        () async => valueOrThrow(
+          await borrowed.giveBack(),
+          device: device,
+          platform: platform,
+        ),
     keep: borrowed.keep,
   );
 };

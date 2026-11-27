@@ -65,3 +65,16 @@ extension EitherFlatMap<L, R> on Either<L, R> {
         Right<L, R>(:final value) => next(value),
       };
 }
+
+/// Chains a step that answers later; an extension for the reason
+/// [EitherFlatMap] is one.
+extension EitherFlatMapAsync<L, R> on Either<L, R> {
+  /// Chains a step that answers later and can itself fail; stops at the
+  /// first failure.
+  Future<Either<L, T>> flatMapAsync<T>(
+    Future<Either<L, T>> Function(R right) next,
+  ) async => switch (this) {
+    Left<L, R>(:final value) => Left<L, T>(value),
+    Right<L, R>(:final value) => await next(value),
+  };
+}

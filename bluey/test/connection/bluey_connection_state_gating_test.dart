@@ -92,7 +92,7 @@ void main() {
 
       await expectLater(
         ctx.connection.android!.requestMtu(
-          Mtu(247, capabilities: platform.Capabilities.android),
+          Mtu(247),
         ),
         throwsA(isA<DisconnectedException>()),
       );
@@ -207,7 +207,7 @@ void main() {
 
         try {
           await ctx.connection.android!.requestMtu(
-            Mtu(247, capabilities: platform.Capabilities.android),
+            Mtu(247),
           );
           fail('expected DisconnectedException');
         } on DisconnectedException catch (e) {
@@ -222,7 +222,7 @@ void main() {
 
       // None of these should throw.
       await ctx.connection.android!.requestMtu(
-        Mtu(247, capabilities: platform.Capabilities.android),
+        Mtu(247),
       );
       await ctx.char.read();
       await ctx.char.write(Uint8List.fromList([0x01]));
