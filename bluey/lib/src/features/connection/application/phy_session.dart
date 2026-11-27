@@ -31,8 +31,8 @@ final class PhySession {
                ? ReportedValue(
                  session: session,
                  initial: _le1mBothWays,
-                 reports: phy.changesOf(session.link.id),
-                 readFirst: () => phy.pairOf(session.link.id),
+                 reports: phy.changesOf(session.id),
+                 readFirst: () => phy.pairOf(session.id),
                  log: log,
                  failedReadLine: 'phy read failed',
                )
@@ -67,7 +67,7 @@ final class PhySession {
   Future<Either<ConnectionFailure, void>> request({Phy? tx, Phy? rx}) =>
       _check(LinkOperation.requestPhy).flatMapAsync(
         (_) => _session.whileUp(
-          () => _phy.request(_session.link.id, tx: tx, rx: rx),
+          () => _phy.request(_session.id, tx: tx, rx: rx),
           orEnd: LinkHadEnded.new,
         ),
       );

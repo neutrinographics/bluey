@@ -124,6 +124,9 @@ class InMemoryLinks implements Links, LinksHarness {
   void report(DeviceAddress device, LinkReport report) =>
       _reports[_linkOf(device)]!.add(report);
 
+  /// Whether anyone listens for radio outages.
+  bool get outagesHeard => _outages.hasListener;
+
   /// How many times an open of [device] was asked for.
   int opensAsked(DeviceAddress device) => _opens[device] ?? 0;
 

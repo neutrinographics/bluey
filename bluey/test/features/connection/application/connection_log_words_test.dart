@@ -1,6 +1,8 @@
 import 'package:bluey/src/features/connection/application/connection_log_words.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
+import 'package:bluey/src/features/connection/domain/link_id.dart';
+import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
 import 'package:bluey/src/features/connection/domain/value_objects/mtu.dart';
@@ -17,9 +19,33 @@ void main() {
     expect(gattLogContext, 'bluey.gatt');
   });
 
+  group('tellsOfStateTransition', () {
+    // (input, whether its step is logged as a state transition)
+    final rows = <(LinkInput, bool)>[
+      (const OpenSucceeded(LinkId('L1')), false),
+      (const OpenFailed(), false),
+      (const ServicesDiscovered(), true),
+      (const RadioReported(LinkReport.disconnecting), true),
+      (const ReportsEnded(), true),
+      (const DisconnectRequested(), true),
+      (const CloseConfirmed(), true),
+      (const CloseFailed(), true),
+      (const RadioOutageBegan(RadioOutage.off), true),
+    ];
+
+    for (final (input, tells) in rows) {
+      test('${input.runtimeType} ${tells ? 'is' : 'is not'} logged', () {
+        // assert
+        expect(tellsOfStateTransition(input), tells);
+      });
+    }
+  });
+
   group('stateWordOf', () {
     // (name, phase, the word logs have always written)
     final rows = <(String, LinkPhase, String)>[
+      ('opening', const Opening(), 'ConnectionState.connecting'),
+      ('never opened', const NeverOpened(), 'ConnectionState.disconnected'),
       ('linked', const Linked(), 'ConnectionState.linked'),
       ('ready', const Ready(), 'ConnectionState.ready'),
       (

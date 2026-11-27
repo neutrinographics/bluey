@@ -1,4 +1,5 @@
 import 'link_end.dart';
+import 'link_id.dart';
 
 /// What the radio says about a link's connection, as a link reads it.
 enum LinkReport { connecting, connected, disconnecting, disconnected }
@@ -7,6 +8,19 @@ enum LinkReport { connecting, connected, disconnecting, disconnected }
 /// that answers each of them answers every event a link can meet.
 sealed class LinkInput {
   const LinkInput();
+}
+
+/// The platform opened the link and gave it [id].
+final class OpenSucceeded extends LinkInput {
+  const OpenSucceeded(this.id);
+
+  /// The platform's handle for the link, from now until it ends.
+  final LinkId id;
+}
+
+/// The platform failed to open the link.
+final class OpenFailed extends LinkInput {
+  const OpenFailed();
 }
 
 /// The link's services were discovered, so GATT operations are now safe.

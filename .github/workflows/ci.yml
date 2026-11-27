@@ -131,15 +131,8 @@ jobs:
             if [ -f "$package/test/known_defects/roster.dart" ]; then
               files="$files test/known_defects/roster.dart"
             fi
-            # bluey's edgeFromBelow list states today's debt for the first
-            # time in an existing file; remove this flag in the first change
-            # after the one that adds it merges.
-            flags=
-            if [ "$package" = bluey ]; then
-              flags=--first-statement=edgeFromBelow
-            fi
             echo "== $package"
-            (cd "$package" && dart run test/architecture/list_growth.dart "$BASE" $files $flags) || status=1
+            (cd "$package" && dart run test/architecture/list_growth.dart "$BASE" $files) || status=1
           done
           exit $status
 

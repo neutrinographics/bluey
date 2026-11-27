@@ -72,7 +72,7 @@ void main() {
     // arrange
     port
       ..holdReads()
-      ..answer(session.link.id, read);
+      ..answer(session.id, read);
 
     // act
     final parameters = parametersOver();
@@ -83,7 +83,7 @@ void main() {
 
   test('the first read sets the parameters', () async {
     // arrange
-    port.answer(session.link.id, read);
+    port.answer(session.id, read);
 
     // act
     final parameters = parametersOver();
@@ -91,14 +91,12 @@ void main() {
 
     // assert
     expectParameters(parameters, read);
-    expect(port.asked, [
-      (LinkOperation.readConnectionParameters, session.link.id),
-    ]);
+    expect(port.asked, [(LinkOperation.readConnectionParameters, session.id)]);
   });
 
   test('a request that succeeds holds what was asked for', () async {
     // arrange
-    port.answer(session.link.id, read);
+    port.answer(session.id, read);
     final parameters = parametersOver();
     await pumpEventQueue();
 
@@ -111,14 +109,14 @@ void main() {
     expect(port.requests, [asked]);
     expect(port.asked.last, (
       LinkOperation.requestConnectionParameters,
-      session.link.id,
+      session.id,
     ));
     expect(log.records, isEmpty);
   });
 
   test('a failed request keeps the parameters it had', () async {
     // arrange
-    port.answer(session.link.id, read);
+    port.answer(session.id, read);
     final parameters = parametersOver();
     await pumpEventQueue();
     port.failNext(
@@ -145,7 +143,7 @@ void main() {
     // arrange
     port
       ..holdReads()
-      ..answer(session.link.id, read);
+      ..answer(session.id, read);
     final parameters = parametersOver();
     await parameters.request(asked);
 
@@ -161,7 +159,7 @@ void main() {
     // arrange
     port
       ..holdReads()
-      ..answer(session.link.id, read);
+      ..answer(session.id, read);
     final parameters = parametersOver();
     links.drop(device);
     await pumpEventQueue();
@@ -262,7 +260,7 @@ void main() {
   test('after a plain disconnect the parameters are still answered, and a '
       'request answers the end', () async {
     // arrange
-    port.answer(session.link.id, read);
+    port.answer(session.id, read);
     final parameters = parametersOver();
     await pumpEventQueue();
     await session.disconnect();

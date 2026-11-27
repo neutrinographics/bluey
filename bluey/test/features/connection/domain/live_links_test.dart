@@ -6,63 +6,86 @@ import 'package:flutter_test/flutter_test.dart';
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 const other = DeviceAddress('AA:BB:CC:DD:EE:02');
 
+/// A link the table holds; it begins opening, so it is not up.
 final class TestLink implements LiveLink {
   @override
-  bool isClosing = false;
+  bool isUp = false;
 }
 
+extension on LiveLinks<TestLink> {
+  /// Admits [user] to [device]'s link, beginning [begun] (a new link when
+  /// null) only if the table says to open.
+  Admission<TestLink> ask(
+    LinkUser user, {
+    DeviceAddress at = device,
+    TestLink? begun,
+  }) => admit(at, user, begin: () => begun ?? TestLink());
+}
+
+/// A table whose device's link [link] was opened by [user] and is up.
 LiveLinks<TestLink> heldBy(LinkUser user, TestLink link) {
-  final links = LiveLinks<TestLink>()..admit(device, user);
-  return links..opened(device, user, link);
+  final links = LiveLinks<TestLink>()..ask(user, begun: link);
+  link.isUp = true;
+  return links;
 }
 
 /// Whether the app holds [link], read as a borrower joining and giving back
 /// without closing it.
 bool appHolds(LiveLinks<TestLink> links, TestLink link) {
-  links.admit(device, LinkUser.borrower);
+  links.ask(LinkUser.borrower);
   return links.givenBack(device, link) == AfterGiveBack.leaveIt;
 }
 
 void main() {
   group('a device with no link', () {
-    test('the app opens a link to a device that has none', () {
-      // arrange
-      final links = LiveLinks<TestLink>();
-
-      // act
-      final admission = links.admit(device, LinkUser.app);
-
-      // assert
-      expect(admission, isA<Open<TestLink>>());
-    });
-
-    test('a borrower opens a link with one borrower', () {
+    test('the first caller is handed the link it must open', () {
       // arrange
       final link = TestLink();
       final links = LiveLinks<TestLink>();
 
       // act
-      final admission = links.admit(device, LinkUser.borrower);
-      links.opened(device, LinkUser.borrower, link);
+      final admission = links.ask(LinkUser.app, begun: link);
 
       // assert
-      expect(admission, isA<Open<TestLink>>());
-      expect(links.givenBack(device, link), AfterGiveBack.closeTheLink);
+      expect(identical((admission as Open<TestLink>).link, link), isTrue);
+    });
+
+    test('the opener uses the link from its beginning', () {
+      // arrange
+      final link = TestLink();
+      final links = LiveLinks<TestLink>()..ask(LinkUser.borrower, begun: link);
+
+      // act
+      link.isUp = true;
+      final answer = links.givenBack(device, link);
+
+      // assert
+      expect(answer, AfterGiveBack.closeTheLink);
     });
   });
 
   group('an open in flight, or a link closing', () {
-    test('a second caller waits while an open is in flight', () {
+    test('a link that is opening makes the next caller wait, and begins '
+        'nothing', () {
       // arrange
       final link = TestLink();
-      final links = LiveLinks<TestLink>()..admit(device, LinkUser.borrower);
+      final links = LiveLinks<TestLink>()..ask(LinkUser.borrower, begun: link);
+      var begun = 0;
 
       // act
-      final admission = links.admit(device, LinkUser.app);
-      links.opened(device, LinkUser.borrower, link);
+      final admission = links.admit(
+        device,
+        LinkUser.app,
+        begin: () {
+          begun++;
+          return TestLink();
+        },
+      );
+      link.isUp = true;
 
       // assert
       expect(admission, isA<Wait<TestLink>>());
+      expect(begun, 0);
       expect(links.givenBack(device, link), AfterGiveBack.closeTheLink);
     });
 
@@ -70,10 +93,10 @@ void main() {
       // arrange
       final link = TestLink();
       final links = heldBy(LinkUser.app, link);
-      link.isClosing = true;
+      link.isUp = false;
 
       // act
-      final admission = links.admit(device, LinkUser.borrower);
+      final admission = links.ask(LinkUser.borrower);
 
       // assert
       expect(admission, isA<Wait<TestLink>>());
@@ -81,27 +104,38 @@ void main() {
 
     test('a caller waits on a link that ended and is not yet forgotten', () {
       // arrange
-      final ended = TestLink()..isClosing = true;
+      final ended = TestLink();
       final links = heldBy(LinkUser.app, ended);
+      ended.isUp = false;
 
       // act
-      final admission = links.admit(device, LinkUser.app);
+      final admission = links.ask(LinkUser.app);
 
       // assert
       expect(admission, isA<Wait<TestLink>>());
     });
 
-    test('the attempt that came up is reused by the next caller', () {
+    test('the attempt that came up is reused by the next caller, which '
+        'begins nothing', () {
       // arrange
       final link = TestLink();
-      final links = LiveLinks<TestLink>()..admit(device, LinkUser.app);
+      final links = LiveLinks<TestLink>()..ask(LinkUser.app, begun: link);
+      var begun = 0;
 
       // act
-      links.opened(device, LinkUser.app, link);
-      final admission = links.admit(device, LinkUser.borrower);
+      link.isUp = true;
+      final admission = links.admit(
+        device,
+        LinkUser.borrower,
+        begin: () {
+          begun++;
+          return TestLink();
+        },
+      );
 
       // assert
-      expect(admission, isA<Reuse<TestLink>>());
+      expect(identical((admission as Reuse<TestLink>).link, link), isTrue);
+      expect(begun, 0);
     });
 
     test('a borrower and the app both arriving while the link closes each '
@@ -109,17 +143,17 @@ void main() {
       // arrange
       final closing = TestLink();
       final links = heldBy(LinkUser.app, closing);
-      closing.isClosing = true;
+      closing.isUp = false;
       final reopened = TestLink();
 
       // act
-      final borrowerFirst = links.admit(device, LinkUser.borrower);
-      final appFirst = links.admit(device, LinkUser.app);
+      final borrowerFirst = links.ask(LinkUser.borrower);
+      final appFirst = links.ask(LinkUser.app);
       links.ended(device, closing);
-      final borrowerAgain = links.admit(device, LinkUser.borrower);
-      final appWhileOpening = links.admit(device, LinkUser.app);
-      links.opened(device, LinkUser.borrower, reopened);
-      final appAgain = links.admit(device, LinkUser.app);
+      final borrowerAgain = links.ask(LinkUser.borrower, begun: reopened);
+      final appWhileOpening = links.ask(LinkUser.app);
+      reopened.isUp = true;
+      final appAgain = links.ask(LinkUser.app);
 
       // assert
       expect(borrowerFirst, isA<Wait<TestLink>>());
@@ -138,7 +172,7 @@ void main() {
       final links = heldBy(LinkUser.borrower, link);
 
       // act
-      final admission = links.admit(device, LinkUser.app);
+      final admission = links.ask(LinkUser.app);
 
       // assert
       expect(identical((admission as Reuse<TestLink>).link, link), isTrue);
@@ -152,7 +186,7 @@ void main() {
       final links = heldBy(LinkUser.app, link);
 
       // act
-      final admission = links.admit(device, LinkUser.borrower);
+      final admission = links.ask(LinkUser.borrower);
 
       // assert
       expect(identical((admission as Reuse<TestLink>).link, link), isTrue);
@@ -177,8 +211,7 @@ void main() {
     test('a give-back leaves a link another borrower still uses', () {
       // arrange
       final link = TestLink();
-      final links = heldBy(LinkUser.borrower, link)
-        ..admit(device, LinkUser.borrower);
+      final links = heldBy(LinkUser.borrower, link)..ask(LinkUser.borrower);
 
       // act
       final first = links.givenBack(device, link);
@@ -192,8 +225,7 @@ void main() {
     test('a give-back after the app took hold leaves the link', () {
       // arrange
       final link = TestLink();
-      final links = heldBy(LinkUser.borrower, link)
-        ..admit(device, LinkUser.app);
+      final links = heldBy(LinkUser.borrower, link)..ask(LinkUser.app);
 
       // act
       final answer = links.givenBack(device, link);
@@ -226,18 +258,17 @@ void main() {
 
       // assert
       expect(answer, AfterGiveBack.leaveIt);
-      expect(links.admit(device, LinkUser.app), isA<Open<TestLink>>());
+      expect(links.ask(LinkUser.app), isA<Open<TestLink>>());
     });
 
     test('an old link\'s give-back or keep leaves its successor alone', () {
       // arrange
       final old = TestLink();
-      final successor = TestLink();
+      final successor = TestLink()..isUp = true;
       final links =
           heldBy(LinkUser.borrower, old)
             ..ended(device, old)
-            ..admit(device, LinkUser.borrower)
-            ..opened(device, LinkUser.borrower, successor);
+            ..ask(LinkUser.borrower, begun: successor);
 
       // act
       final answer = links.givenBack(device, old);
@@ -285,23 +316,21 @@ void main() {
       links.ended(device, link);
 
       // assert
-      expect(links.admit(device, LinkUser.app), isA<Open<TestLink>>());
+      expect(links.ask(LinkUser.app), isA<Open<TestLink>>());
     });
 
     test('ended by an old holder leaves the new entry', () {
       // arrange
       final old = TestLink();
       final links = heldBy(LinkUser.app, old)..ended(device, old);
-      final successor = TestLink();
-      links
-        ..admit(device, LinkUser.app)
-        ..opened(device, LinkUser.app, successor);
+      final successor = TestLink()..isUp = true;
+      links.ask(LinkUser.app, begun: successor);
 
       // act
       links.ended(device, old);
 
       // assert
-      final admission = links.admit(device, LinkUser.borrower);
+      final admission = links.ask(LinkUser.borrower);
       expect(identical((admission as Reuse<TestLink>).link, successor), isTrue);
     });
 
@@ -311,24 +340,28 @@ void main() {
       final links =
           heldBy(LinkUser.app, old)
             ..ended(device, old)
-            ..admit(device, LinkUser.app);
+            ..ask(LinkUser.app);
 
       // act
       links.ended(device, old);
 
       // assert
-      expect(links.admit(device, LinkUser.borrower), isA<Wait<TestLink>>());
+      expect(links.ask(LinkUser.borrower), isA<Wait<TestLink>>());
     });
 
-    test('a failed open is dropped, so the next caller opens', () {
+    test('a failed open drops only the link that failed', () {
       // arrange
-      final links = LiveLinks<TestLink>()..admit(device, LinkUser.app);
+      final failed = TestLink();
+      final links = LiveLinks<TestLink>()..ask(LinkUser.app, begun: failed);
 
       // act
-      links.notOpened(device);
+      links.notOpened(device, TestLink());
+      final whileTheOtherFails = links.ask(LinkUser.app);
+      links.notOpened(device, failed);
 
       // assert
-      expect(links.admit(device, LinkUser.app), isA<Open<TestLink>>());
+      expect(whileTheOtherFails, isA<Wait<TestLink>>());
+      expect(links.ask(LinkUser.app), isA<Open<TestLink>>());
     });
 
     test('devices do not affect each other', () {
@@ -336,11 +369,11 @@ void main() {
       final links = heldBy(LinkUser.app, TestLink());
 
       // act
-      final admission = links.admit(other, LinkUser.app);
+      final admission = links.ask(LinkUser.app, at: other);
 
       // assert
       expect(admission, isA<Open<TestLink>>());
-      expect(links.admit(device, LinkUser.borrower), isA<Reuse<TestLink>>());
+      expect(links.ask(LinkUser.borrower), isA<Reuse<TestLink>>());
     });
   });
 }

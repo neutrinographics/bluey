@@ -8,6 +8,8 @@ void main() {
   group('connectionStateOf', () {
     // (name, phase, the state an app reads)
     final rows = <(String, LinkPhase, ConnectionState)>[
+      ('opening', const Opening(), ConnectionState.connecting),
+      ('that never opened', const NeverOpened(), ConnectionState.disconnected),
       ('linked', const Linked(), ConnectionState.linked),
       ('ready', const Ready(), ConnectionState.ready),
       (

@@ -38,7 +38,7 @@ final class ReadWritePayloadLimit {
         (limit) => 'withResponse=$withResponse, limit=${limit.value}',
     run:
         () => _negotiation.writePayloadLimit(
-          session.link.id,
+          session.id,
           withResponse: withResponse,
         ),
   );

@@ -13,7 +13,10 @@ const _device = DeviceAddress('AA:BB:CC:DD:EE:01');
 final _at = DateTime.utc(2026, 11, 26, 10);
 
 Link _upLink() =>
-    Link.open(id: const LinkId('link-1'), device: _device, at: _at).link;
+    Link.begin(
+      device: _device,
+      at: _at,
+    ).link.on(const OpenSucceeded(LinkId('link-1')), at: _at).link;
 
 void main() {
   test('an up link with the feature answers nothing in the way', () {

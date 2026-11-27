@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A failed connect made for peer discovery logs at debug again.** Each
+  candidate `discoverPeers` and `BlueyPeer.connect` probe logs `connect failed`
+  at debug; an app's own failed connect, `connectAsPeer`'s included, still logs
+  at error.
 - **A link the peer dropped ends like one the app closed (H3, I381).** A
   `Connection` whose link drops now moves to `disconnected`, closes
   `stateChanges` and its other streams, and fails operations in flight with

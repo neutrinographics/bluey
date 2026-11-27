@@ -9,6 +9,8 @@ import 'connection_state.dart';
 /// connection stale rather than closed: the app must build a new one once
 /// the radio is back.
 ConnectionState connectionStateOf(LinkPhase phase) => switch (phase) {
+  Opening() => ConnectionState.connecting,
+  NeverOpened() => ConnectionState.disconnected,
   Linked() => ConnectionState.linked,
   Ready() => ConnectionState.ready,
   Closing() => ConnectionState.disconnecting,

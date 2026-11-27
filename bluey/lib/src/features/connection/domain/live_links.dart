@@ -10,9 +10,12 @@ sealed class Admission<L extends LiveLink> {
   const Admission();
 }
 
-/// Open a link; the caller's attempt is the only one for the device.
+/// Open [link], which the table now holds as the device's only attempt.
 final class Open<L extends LiveLink> extends Admission<L> {
-  const Open();
+  const Open(this.link);
+
+  /// The device's link, begun for the caller and not yet open.
+  final L link;
 }
 
 /// Wait for the open or close in flight to settle, then ask again.
@@ -50,27 +53,30 @@ final class LiveLinks<L extends LiveLink> {
   final Map<DeviceAddress, _Entry<L>> _entries = {};
 
   /// Answers whether [user] opens, waits for or reuses [device]'s link, and
-  /// records the user when it reuses. A waiter is not recorded: it asks again.
-  Admission<L> admit(DeviceAddress device, LinkUser user) {
+  /// records the user when it opens or reuses. A waiter is not recorded: it
+  /// asks again.
+  ///
+  /// Only the opener's [begin] is called, so the table holds the device's
+  /// link from the moment its open begins and no caller can begin a second.
+  Admission<L> admit(
+    DeviceAddress device,
+    LinkUser user, {
+    required L Function() begin,
+  }) {
     final entry = _entries[device];
     if (entry == null) {
-      _entries[device] = _Entry<L>();
-      return Open<L>();
-    }
-    final link = entry.link;
-    if (link == null || link.isClosing) return Wait<L>();
-    entry.joinedBy(user);
-    return Reuse<L>(link);
-  }
-
-  /// The attempt [user] started for [device] came up as [link].
-  void opened(DeviceAddress device, LinkUser user, L link) =>
+      final link = begin();
       _entries[device] = _Entry<L>(link)..joinedBy(user);
-
-  /// The attempt in flight for [device] failed, so the next caller opens.
-  void notOpened(DeviceAddress device) {
-    if (_entries[device]?.link == null) _entries.remove(device);
+      return Open<L>(link);
+    }
+    if (!entry.link.isUp) return Wait<L>();
+    entry.joinedBy(user);
+    return Reuse<L>(entry.link);
   }
+
+  /// [link], begun for [device], did not open, so the next caller opens.
+  /// Matched by identity, as [ended] is.
+  void notOpened(DeviceAddress device, L link) => ended(device, link);
 
   /// One borrower fewer on [device]'s [link], and whether the link must now
   /// close: only when no borrower is left and the app does not hold it.
@@ -111,11 +117,11 @@ final class LiveLinks<L extends LiveLink> {
   }
 }
 
-/// A device's link, null while the open is in flight, and who uses it.
+/// A device's link, from the moment its open begins, and who uses it.
 final class _Entry<L extends LiveLink> {
-  _Entry([this.link]);
+  _Entry(this.link);
 
-  final L? link;
+  final L link;
   bool _appHolds = false;
   int _borrowers = 0;
 

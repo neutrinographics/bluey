@@ -21,8 +21,8 @@ sealed class LinkEvent {
       other.at == at;
 }
 
-/// An open of a link to [device] began; no link exists yet, so it is told
-/// before the radio answers whether the open succeeded.
+/// An open of a link to [device] began, raised as the link begins, before
+/// the radio answers whether the open succeeded.
 final class LinkOpenBegan extends LinkEvent {
   const LinkOpenBegan({required super.device, required super.at});
 

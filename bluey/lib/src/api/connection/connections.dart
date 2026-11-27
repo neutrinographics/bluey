@@ -33,7 +33,7 @@ final class Connections {
 
   Connection _presented(LinkSession session) {
     final connection = _present(session);
-    _linkIds[connection] = session.link.id;
+    _linkIds[connection] = session.id;
     return connection;
   }
 }

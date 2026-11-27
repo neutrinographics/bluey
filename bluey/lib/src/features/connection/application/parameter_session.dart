@@ -34,7 +34,7 @@ final class ParameterSession {
                ? ReportedValue(
                  session: session,
                  initial: _defaults,
-                 readFirst: () => parameters.parametersOf(session.link.id),
+                 readFirst: () => parameters.parametersOf(session.id),
                  log: log,
                  failedReadLine: 'connection parameters read failed',
                )
@@ -64,7 +64,7 @@ final class ParameterSession {
     ConnectionParameters parameters,
   ) => _check(LinkOperation.requestConnectionParameters).flatMapAsync(
     (_) async => (await _session.whileUp(
-      () => _control.request(_session.link.id, parameters),
+      () => _control.request(_session.id, parameters),
       orEnd: LinkHadEnded.new,
     )).map((_) => _held.take(parameters)),
   );

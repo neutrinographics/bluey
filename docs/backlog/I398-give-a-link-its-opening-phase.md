@@ -4,8 +4,8 @@ title: Give a link its opening phase, so the aggregate raises every link event
 category: refactor
 severity: low
 platform: domain
-status: open
-last_verified: 2026-11-26
+status: fixed
+last_verified: 2026-11-27
 related: [I399]
 ---
 

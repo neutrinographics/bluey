@@ -12,18 +12,21 @@ void main() {
       expect(() => Mtu(518), throwsArgumentError);
     });
 
-    test('names the specification maximum when it refuses a value above it', () {
-      expect(
-        () => Mtu(518),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.message,
-            'message',
-            'MTU must be <= 517 (BLE spec maximum): 518',
+    test(
+      'names the specification maximum when it refuses a value above it',
+      () {
+        expect(
+          () => Mtu(518),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              'MTU must be <= 517 (BLE spec maximum): 518',
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('fromPlatform keeps what the platform reported', () {
       expect(Mtu.fromPlatform(600).value, 600);

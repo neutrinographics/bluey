@@ -32,8 +32,8 @@ final class BondingSession {
                ? ReportedValue(
                  session: session,
                  initial: BondState.none,
-                 reports: bonding.changesOf(session.link.id),
-                 readFirst: () => bonding.stateOf(session.link.id),
+                 reports: bonding.changesOf(session.id),
+                 readFirst: () => bonding.stateOf(session.id),
                  log: log,
                  failedReadLine: 'bond state read failed',
                )
@@ -77,7 +77,6 @@ final class BondingSession {
     LinkOperation operation,
     Future<Either<ConnectionFailure, void>> Function(LinkId link) call,
   ) => _check(operation).flatMapAsync(
-    (_) =>
-        _session.whileUp(() => call(_session.link.id), orEnd: LinkHadEnded.new),
+    (_) => _session.whileUp(() => call(_session.id), orEnd: LinkHadEnded.new),
   );
 }

@@ -154,7 +154,9 @@ void main() {
 
     setUp(() {
       connection = MockConnection(
-        deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+        deviceAddress: const DeviceAddress(
+          '00000000-0000-0000-0000-aabbccddeeff',
+        ),
       );
     });
 
@@ -207,7 +209,9 @@ void main() {
 
       test('returns services when available', () async {
         connection = MockConnection(
-          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress(
+            '00000000-0000-0000-0000-aabbccddeeff',
+          ),
           services: [
             MockRemoteServiceMinimal(Services.heartRate),
             MockRemoteServiceMinimal(Services.battery),
@@ -220,7 +224,9 @@ void main() {
 
       test('service() finds by UUID', () {
         connection = MockConnection(
-          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress(
+            '00000000-0000-0000-0000-aabbccddeeff',
+          ),
           services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 
@@ -237,7 +243,9 @@ void main() {
 
       test('hasService() returns true when found', () async {
         connection = MockConnection(
-          deviceAddress: const DeviceAddress('00000000-0000-0000-0000-aabbccddeeff'),
+          deviceAddress: const DeviceAddress(
+            '00000000-0000-0000-0000-aabbccddeeff',
+          ),
           services: [MockRemoteServiceMinimal(Services.heartRate)],
         );
 
@@ -251,17 +259,13 @@ void main() {
 
     group('MTU', () {
       test('requestMtu returns negotiated MTU', () async {
-        final negotiated = await connection.android!.requestMtu(
-          Mtu(256),
-        );
+        final negotiated = await connection.android!.requestMtu(Mtu(256));
         expect(negotiated, equals(Mtu.fromPlatform(256)));
         expect(connection.android?.mtu, equals(Mtu.fromPlatform(256)));
       });
 
       test('requestMtu may return less than requested', () async {
-        final negotiated = await connection.android!.requestMtu(
-          Mtu(517),
-        );
+        final negotiated = await connection.android!.requestMtu(Mtu(517));
         expect(negotiated.value, lessThanOrEqualTo(512));
       });
     });

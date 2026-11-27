@@ -87,7 +87,7 @@ void main() {
     // assert
     expect(answer, Right<ConnectionFailure, Mtu>(Mtu.fromPlatform(185)));
     expect(mtu.mtu, Right<ConnectionFailure, Mtu>(Mtu.fromPlatform(185)));
-    expect(negotiation.requests, [(session.link.id, Mtu(247))]);
+    expect(negotiation.requests, [(session.id, Mtu(247))]);
   });
 
   test('a platform that cannot ask for an MTU answers FeatureUnsupported and '

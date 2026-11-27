@@ -30,6 +30,6 @@ final class ReadRssi {
         session: session,
         operation: LinkOperation.readSignalStrength,
         completeDetail: (rssi) => 'rssi=${rssi}dBm',
-        run: () => _strength.read(session.link.id),
+        run: () => _strength.read(session.id),
       );
 }

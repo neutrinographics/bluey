@@ -161,6 +161,44 @@ void main() {
       await held();
       expect(links.opensAsked(device), 2);
     });
+
+    test(
+      'a borrower\'s failed open logs at error, as the app\'s does',
+      () async {
+        // arrange
+        links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
+
+        // act
+        await registry.borrow(device);
+
+        // assert
+        expect(log.records.last.level, BlueyLogLevel.error);
+      },
+    );
+
+    test('a borrower whose failures are routine logs its failed open at '
+        'debug, the same line otherwise, and its start at info', () async {
+      // arrange
+      links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
+
+      // act
+      await registry.borrow(device, failureIsRoutine: true);
+
+      // assert
+      final [started, failed] = log.records;
+      expect(
+        (started.message, started.level),
+        ('connect started', BlueyLogLevel.info),
+      );
+      expect(failed.message, 'connect failed');
+      expect(failed.level, BlueyLogLevel.debug);
+      expect(failed.context, 'bluey.connection');
+      expect(failed.data, {
+        'address': device.value,
+        'exception': 'ConnectFailed',
+      });
+      expect(failed.errorCode, 'ConnectFailed');
+    });
   });
 
   group('waiting', () {

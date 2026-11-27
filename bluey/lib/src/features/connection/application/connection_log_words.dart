@@ -8,6 +8,7 @@ library;
 
 import '../domain/connection_failure.dart';
 import '../domain/link_end.dart';
+import '../domain/link_input.dart';
 import '../domain/link_operation.dart';
 import '../domain/link_phase.dart';
 
@@ -18,8 +19,24 @@ const connectionLogContext = 'bluey.connection';
 /// the one GATT operations have always shared.
 const gattLogContext = 'bluey.gatt';
 
+/// Whether the phase a step on [input] enters is logged as a `state
+/// transition` line. A link's open never was: its lines are the connect's
+/// own, so the two answers to it log none.
+bool tellsOfStateTransition(LinkInput input) => switch (input) {
+  OpenSucceeded() || OpenFailed() => false,
+  ServicesDiscovered() ||
+  RadioReported() ||
+  ReportsEnded() ||
+  DisconnectRequested() ||
+  CloseConfirmed() ||
+  CloseFailed() ||
+  RadioOutageBegan() => true,
+};
+
 /// The word a `state transition` line names for a link entering [phase].
 String stateWordOf(LinkPhase phase) => switch (phase) {
+  Opening() => 'ConnectionState.connecting',
+  NeverOpened() => 'ConnectionState.disconnected',
   Linked() => 'ConnectionState.linked',
   Ready() => 'ConnectionState.ready',
   Closing() => 'ConnectionState.disconnecting',

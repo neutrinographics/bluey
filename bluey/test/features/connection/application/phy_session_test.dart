@@ -63,7 +63,7 @@ void main() {
 
   test('the first read sets the pair', () async {
     // arrange
-    port.answer(session.link.id, reported);
+    port.answer(session.id, reported);
 
     // act
     final phy = phyOver();
@@ -72,7 +72,7 @@ void main() {
     // assert
     expectPair(phy, reported);
     expect(port.asked.where((asked) => asked.$1 == LinkOperation.readPhy), [
-      (LinkOperation.readPhy, session.link.id),
+      (LinkOperation.readPhy, session.id),
     ]);
   });
 
@@ -84,8 +84,8 @@ void main() {
     rightOf(phy.changes).listen(seen.add);
 
     // act
-    port.report(session.link.id, (tx: Phy.le2m, rx: Phy.le2m));
-    port.report(session.link.id, reported);
+    port.report(session.id, (tx: Phy.le2m, rx: Phy.le2m));
+    port.report(session.id, reported);
     await pumpEventQueue();
 
     // assert
@@ -99,9 +99,9 @@ void main() {
       // arrange
       port
         ..holdReads()
-        ..answer(session.link.id, (tx: Phy.leCoded, rx: Phy.leCoded));
+        ..answer(session.id, (tx: Phy.leCoded, rx: Phy.leCoded));
       final phy = phyOver();
-      port.report(session.link.id, reported);
+      port.report(session.id, reported);
       await pumpEventQueue();
 
       // act
@@ -117,7 +117,7 @@ void main() {
     // arrange
     port
       ..holdReads()
-      ..answer(session.link.id, reported);
+      ..answer(session.id, reported);
     final phy = phyOver();
     links.drop(device);
     await pumpEventQueue();
@@ -223,7 +223,7 @@ void main() {
       'request answers the end', () async {
     // arrange
     final phy = phyOver();
-    port.report(session.link.id, reported);
+    port.report(session.id, reported);
     await pumpEventQueue();
     await session.disconnect();
 
@@ -272,7 +272,7 @@ void main() {
     final early = <PhyPair>[];
     var earlyEnded = false;
     rightOf(phy.changes).listen(early.add, onDone: () => earlyEnded = true);
-    port.report(session.link.id, reported);
+    port.report(session.id, reported);
     await pumpEventQueue();
 
     // act
@@ -301,7 +301,7 @@ void main() {
     expect(requested, const Right<ConnectionFailure, void>(null));
     expect(port.requests, [(tx: Phy.le2m, rx: null)]);
     expect(port.asked.where((asked) => asked.$1 == LinkOperation.requestPhy), [
-      (LinkOperation.requestPhy, session.link.id),
+      (LinkOperation.requestPhy, session.id),
     ]);
     expect(log.records, isEmpty);
   });
@@ -315,7 +315,7 @@ void main() {
     // act
     await phy.request(tx: Phy.le2m, rx: Phy.leCoded);
     final before = (phy.tx, phy.rx);
-    port.report(session.link.id, reported);
+    port.report(session.id, reported);
     await pumpEventQueue();
 
     // assert
@@ -350,7 +350,7 @@ void main() {
   test('a report after the link ended changes nothing', () async {
     // arrange
     final phy = phyOver();
-    final link = session.link.id;
+    final link = session.id;
     links.drop(device);
     await pumpEventQueue();
 

@@ -127,7 +127,7 @@ class LinkGattClient {
   final BlueyLogger _logger;
 
   // Read only while the link is up: an ended link's id may name the next.
-  String get _connectionId => _session.link.id.value;
+  String get _connectionId => _session.id.value;
 
   DeviceAddress get _device => _session.link.device;
 
