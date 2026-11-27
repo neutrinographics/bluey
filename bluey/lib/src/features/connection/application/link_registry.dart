@@ -86,7 +86,7 @@ final class LinkRegistry {
         case Reuse(:final link):
           return Right(link);
         case Open(:final link):
-          return _open(link, budget);
+          return _open(link, by, budget);
         case Wait():
           if (!await _changed(device, deadline)) return const Left(_timedOut);
           budget = _timeLeft(deadline);
@@ -132,6 +132,7 @@ final class LinkRegistry {
   /// of the open finds the device's link live.
   Future<Either<ConnectionFailure, LinkSession>> _open(
     LinkSession session,
+    LinkUser by,
     Duration? timeout,
   ) async {
     final device = session.link.device;
@@ -141,7 +142,7 @@ final class LinkRegistry {
       case Left(:final value):
         session.notOpened();
         _table.notOpened(device, session);
-        _logFailure(device, value);
+        _logFailure(device, by, value);
         _announceChange(device);
         return Left(value);
       case Right(:final value):
@@ -179,10 +180,19 @@ final class LinkRegistry {
 
   Duration? _timeLeft(DateTime? deadline) => deadline?.difference(_now());
 
-  void _logFailure(DeviceAddress device, ConnectionFailure failure) {
+  /// Logs a failed open at error for the app, whose connect failed, and at
+  /// debug for a borrower, whose failed probe is routine and handled.
+  void _logFailure(
+    DeviceAddress device,
+    LinkUser by,
+    ConnectionFailure failure,
+  ) {
     final type = failureCodeOf(failure);
     _log.log(
-      BlueyLogLevel.error,
+      switch (by) {
+        LinkUser.app => BlueyLogLevel.error,
+        LinkUser.borrower => BlueyLogLevel.debug,
+      },
       connectionLogContext,
       'connect failed',
       data: {'address': device.value, 'exception': type},

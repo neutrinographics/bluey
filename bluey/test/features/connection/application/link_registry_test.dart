@@ -161,6 +161,30 @@ void main() {
       await held();
       expect(links.opensAsked(device), 2);
     });
+
+    test('a borrower\'s failed open logs the same line at debug, its start '
+        'at info', () async {
+      // arrange
+      links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
+
+      // act
+      await registry.borrow(device);
+
+      // assert
+      final [started, failed] = log.records;
+      expect(
+        (started.message, started.level),
+        ('connect started', BlueyLogLevel.info),
+      );
+      expect(failed.message, 'connect failed');
+      expect(failed.level, BlueyLogLevel.debug);
+      expect(failed.context, 'bluey.connection');
+      expect(failed.data, {
+        'address': device.value,
+        'exception': 'ConnectFailed',
+      });
+      expect(failed.errorCode, 'ConnectFailed');
+    });
   });
 
   group('waiting', () {
