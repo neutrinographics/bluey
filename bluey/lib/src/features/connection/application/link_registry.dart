@@ -48,15 +48,25 @@ final class LinkRegistry {
   Future<Either<ConnectionFailure, LinkSession>> hold(
     DeviceAddress device, {
     Duration? timeout,
-  }) => _acquire(device, LinkUser.app, timeout);
+  }) => _acquire(device, LinkUser.app, timeout, BlueyLogLevel.error);
 
   /// A borrower's hold on [device]'s link, opened if there is none, whose
   /// give-back closes the link only when nobody else uses it.
+  ///
+  /// A borrower that tries links which often fail, and handles each
+  /// failure, says [failureIsRoutine], so its failed open logs at debug
+  /// rather than at error.
   Future<Either<ConnectionFailure, BorrowedLink>> borrow(
     DeviceAddress device, {
     Duration? timeout,
+    bool failureIsRoutine = false,
   }) async {
-    final answer = await _acquire(device, LinkUser.borrower, timeout);
+    final answer = await _acquire(
+      device,
+      LinkUser.borrower,
+      timeout,
+      failureIsRoutine ? BlueyLogLevel.debug : BlueyLogLevel.error,
+    );
     return answer.map(
       (session) => BorrowedLink(
         session: session,
@@ -68,7 +78,7 @@ final class LinkRegistry {
 
   /// The session of the device's link for [by]. [timeout] is this caller's
   /// whole budget: its wait for another caller's attempt and its own attempt
-  /// share it.
+  /// share it. A failed open of its own logs at [failureLevel].
   ///
   /// A caller that meets an open or a close in flight waits for it to settle
   /// and asks again, so it never inherits another caller's failure or a link
@@ -78,6 +88,7 @@ final class LinkRegistry {
     DeviceAddress device,
     LinkUser by,
     Duration? timeout,
+    BlueyLogLevel failureLevel,
   ) async {
     final deadline = timeout == null ? null : _now().add(timeout);
     var budget = timeout;
@@ -86,7 +97,7 @@ final class LinkRegistry {
         case Reuse(:final link):
           return Right(link);
         case Open(:final link):
-          return _open(link, by, budget);
+          return _open(link, budget, failureLevel);
         case Wait():
           if (!await _changed(device, deadline)) return const Left(_timedOut);
           budget = _timeLeft(deadline);
@@ -132,8 +143,8 @@ final class LinkRegistry {
   /// of the open finds the device's link live.
   Future<Either<ConnectionFailure, LinkSession>> _open(
     LinkSession session,
-    LinkUser by,
     Duration? timeout,
+    BlueyLogLevel failureLevel,
   ) async {
     final device = session.link.device;
     _logDevice(device, 'connect started');
@@ -142,7 +153,7 @@ final class LinkRegistry {
       case Left(:final value):
         session.notOpened();
         _table.notOpened(device, session);
-        _logFailure(device, by, value);
+        _logFailure(device, failureLevel, value);
         _announceChange(device);
         return Left(value);
       case Right(:final value):
@@ -180,19 +191,14 @@ final class LinkRegistry {
 
   Duration? _timeLeft(DateTime? deadline) => deadline?.difference(_now());
 
-  /// Logs a failed open at error for the app, whose connect failed, and at
-  /// debug for a borrower, whose failed probe is routine and handled.
   void _logFailure(
     DeviceAddress device,
-    LinkUser by,
+    BlueyLogLevel level,
     ConnectionFailure failure,
   ) {
     final type = failureCodeOf(failure);
     _log.log(
-      switch (by) {
-        LinkUser.app => BlueyLogLevel.error,
-        LinkUser.borrower => BlueyLogLevel.debug,
-      },
+      level,
       connectionLogContext,
       'connect failed',
       data: {'address': device.value, 'exception': type},

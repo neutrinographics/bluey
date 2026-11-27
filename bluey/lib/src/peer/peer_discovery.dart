@@ -159,9 +159,8 @@ class PeerDiscovery {
       if (completer.isCompleted) return;
       final BorrowedConnection borrowed;
       try {
-        borrowed = await _borrow(DeviceAddress(address), timeout: probeTimeout);
+        borrowed = await _borrowProbe(address, probeTimeout);
       } catch (_) {
-        // Skip candidates that fail to connect.
         return;
       }
       try {
@@ -173,9 +172,7 @@ class PeerDiscovery {
           completer.complete(borrowed.connection);
           return;
         }
-      } catch (_) {
-        // Skip candidates that fail to read.
-      }
+      } catch (_) {}
       await _giveBack(borrowed);
     }
 
@@ -236,16 +233,18 @@ class PeerDiscovery {
   /// Borrows the link to [address], reads its [ServerId] over it and gives
   /// the link back, so a link the app holds stays exactly as it was.
   Future<ServerId> _probeServerId(String address, Duration probeTimeout) async {
-    final borrowed = await _borrow(
-      DeviceAddress(address),
-      timeout: probeTimeout,
-    );
+    final borrowed = await _borrowProbe(address, probeTimeout);
     try {
       return await _readServerId(borrowed.connection);
     } finally {
       await _giveBack(borrowed);
     }
   }
+
+  /// Borrows a candidate's link within [budget]. A candidate that fails to
+  /// connect is routine while peers are looked for, so it logs at debug.
+  Future<BorrowedConnection> _borrowProbe(String address, Duration budget) =>
+      _borrow(DeviceAddress(address), timeout: budget, failureIsRoutine: true);
 
   /// Ends a borrow, logging a close that failed rather than raising it: the
   /// probe's answer does not depend on the link closing, and the link stays

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bluey/bluey.dart';
+import 'package:bluey/src/api/connection/borrowed_connection.dart';
 import 'package:bluey/src/lifecycle.dart' as lifecycle;
 import 'package:bluey/src/peer/bluey_peer.dart';
 import 'package:bluey/src/peer/peer_discovery.dart';
@@ -577,6 +578,67 @@ void main() {
         reason: 'the probe disconnected the link the app was using',
       );
       expect(peer.connection.state, isNot(ConnectionState.disconnected));
+    });
+  });
+
+  group('A probe\'s failed connect is routine', () {
+    /// A borrow through [rig] that records whether each borrower called its
+    /// failures routine.
+    BorrowConnection recording(ConnectionRig rig, List<bool> routine) => (
+      device, {
+      timeout,
+      failureIsRoutine = false,
+    }) {
+      routine.add(failureIsRoutine);
+      return rig.borrow(
+        device,
+        timeout: timeout,
+        failureIsRoutine: failureIsRoutine,
+      );
+    };
+
+    test('discover borrows each candidate as routine', () async {
+      // arrange
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: ServerId.generate(),
+      );
+      final routine = <bool>[];
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        borrow: recording(ConnectionRig(fakePlatform), routine),
+        logger: testLogger(),
+      );
+
+      // act
+      await discovery.discover(timeout: const Duration(milliseconds: 200));
+
+      // assert
+      expect(routine, [true]);
+    });
+
+    test('connectTo borrows each candidate as routine', () async {
+      // arrange
+      final id = ServerId.generate();
+      fakePlatform.simulateBlueyServer(
+        address: 'AA:BB:CC:DD:EE:01',
+        serverId: id,
+      );
+      final routine = <bool>[];
+      final discovery = PeerDiscovery(
+        platformApi: fakePlatform,
+        borrow: recording(ConnectionRig(fakePlatform), routine),
+        logger: testLogger(),
+      );
+
+      // act
+      await discovery.connectTo(
+        id,
+        scanTimeout: const Duration(milliseconds: 200),
+      );
+
+      // assert
+      expect(routine, [true]);
     });
   });
 

@@ -8,7 +8,7 @@ Slice 1 left one place where Connection's application decides an event the domai
 
 Two smaller things ride along, both decided by Joel on 2026-11-27:
 
-- **Ruling 37.** A borrower's failed connect logs at debug again. Failed connects are routine while peers are discovered, and since slice 1 each one logs at error.
+- **Ruling 37.** A probe's failed connect logs at debug again. Failed connects are routine while peers are discovered, and since slice 1 each one logs at error. (Narrowed after the final review, Joel 2026-11-27: `connectAsPeer` also borrows, and its failed connect stays at error, as before slice 1.)
 - **The gate flag.** `--first-statement=edgeFromBelow` has done its job and is removed from `CLAUDE.md` and `.github/workflows/ci.yml`.
 
 M7 of the final review (the example app asking with `Mtu.fromPlatform`) is already fixed on main, so nothing is carried.
@@ -19,7 +19,7 @@ M7 of the final review (the example app asking with `Mtu.fromPlatform`) is alrea
 
 - `Link` raises all three link events. The registry raises none.
 - A `Link`, its `LinkSession` and the `LiveLinks` entry exist from the moment an open begins.
-- A borrower's failed connect logs at debug; the app's stays at error.
+- A probe's failed connect logs at debug; the app's, `connectAsPeer`'s included, stays at error.
 
 **Non-goals**
 
@@ -98,7 +98,7 @@ A failed open raises nothing, so `ConnectingEvent` is still followed by silence 
 
 - It hands the table the way to begin a session. `_open` then logs `connect started`, asks the platform, and tells the session the answer. It names no `LinkEvent`.
 - The order an app can observe is unchanged: `ConnectingEvent`, then `connect started`; on success `ConnectedEvent`, then `connect succeeded`.
-- **Ruling 37.** `connect failed` is logged at the level the link's user gives: error for the app, debug for a borrower. Context, message, data and `errorCode` do not change. `connect started` and `connect succeeded` stay at info for both.
+- **Ruling 37.** `connect failed` is logged at the level the caller gives: error for the app and by default for a borrower, debug for a borrower that passes `failureIsRoutine` (`LinkRegistry.borrow`, `BorrowLinkRequest`, the edge's `BorrowConnection`). `PeerDiscovery` passes it for every candidate it probes, for `discoverPeers` and `BlueyPeer.connect` alike; `connectAsPeer` does not. Context, message, data and `errorCode` do not change. `connect started` and `connect succeeded` stay at info for both.
 
 ### 4.3 Edge
 

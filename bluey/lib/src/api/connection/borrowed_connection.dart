@@ -43,6 +43,7 @@ typedef BorrowConnection =
     Future<BorrowedConnection> Function(
       DeviceAddress device, {
       Duration? timeout,
+      bool failureIsRoutine,
     });
 
 /// A [BorrowConnection] over [borrowLink], whose Connections come from
@@ -52,9 +53,19 @@ BorrowConnection borrowingThrough({
   required BorrowLink borrowLink,
   required Connections connections,
   required String platform,
-}) => (DeviceAddress device, {Duration? timeout}) async {
+}) => (
+  DeviceAddress device, {
+  Duration? timeout,
+  bool failureIsRoutine = false,
+}) async {
   final borrowed = valueOrThrow(
-    await borrowLink.run(BorrowLinkRequest(device: device, timeout: timeout)),
+    await borrowLink.run(
+      BorrowLinkRequest(
+        device: device,
+        timeout: timeout,
+        failureIsRoutine: failureIsRoutine,
+      ),
+    ),
     device: device,
     platform: platform,
   );

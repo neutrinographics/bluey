@@ -162,13 +162,27 @@ void main() {
       expect(links.opensAsked(device), 2);
     });
 
-    test('a borrower\'s failed open logs the same line at debug, its start '
-        'at info', () async {
+    test(
+      'a borrower\'s failed open logs at error, as the app\'s does',
+      () async {
+        // arrange
+        links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
+
+        // act
+        await registry.borrow(device);
+
+        // assert
+        expect(log.records.last.level, BlueyLogLevel.error);
+      },
+    );
+
+    test('a borrower whose failures are routine logs its failed open at '
+        'debug, the same line otherwise, and its start at info', () async {
       // arrange
       links.failNextOpen(device, ConnectFailureReason.deviceNotConnectable);
 
       // act
-      await registry.borrow(device);
+      await registry.borrow(device, failureIsRoutine: true);
 
       // assert
       final [started, failed] = log.records;

@@ -61,6 +61,28 @@ void main() {
       );
     });
 
+    test('connectAsPeer\'s failed connect logs connect failed at error', () async {
+      // arrange
+      fakePlatform.simulateConnectFailure(
+        deviceId,
+        platform.PlatformConnectFailureReason.notConnectable,
+      );
+      final lines = <BlueyLogEvent>[];
+      final listening = bluey.logEvents.listen(lines.add);
+
+      // act
+      await expectLater(
+        bluey.connectAsPeer(deviceFor(deviceId)),
+        throwsA(isA<ConnectionException>()),
+      );
+      await pumpEventQueue();
+      await listening.cancel();
+
+      // assert
+      final failed = lines.where((line) => line.message == 'connect failed');
+      expect(failed.map((line) => line.level), [BlueyLogLevel.error]);
+    });
+
     test('connect failure is one-shot: a retry connects normally', () async {
       fakePlatform.simulateConnectFailure(
         deviceId,
