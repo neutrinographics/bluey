@@ -2,6 +2,7 @@ import 'package:bluey/src/features/discovery/application/open_scan.dart';
 import 'package:bluey/src/features/discovery/application/open_scanner.dart';
 import 'package:bluey/src/features/discovery/domain/scan_event.dart';
 import 'package:bluey/src/features/discovery/domain/scan_failure.dart';
+import 'package:bluey/src/features/discovery/domain/scan_id.dart';
 import 'package:bluey/src/features/discovery/domain/scan_phase.dart';
 import 'package:bluey/src/features/discovery/domain/scanner_phase.dart';
 import 'package:bluey/src/shared/domain/either.dart';
@@ -123,6 +124,16 @@ void main() {
 
         // assert
         expect(end, const EndedByRadioOutage(RadioOutage.off));
+        expect(
+          rig.events.raised,
+          contains(
+            ScanEnded(
+              const ScanId(2),
+              const EndedByRadioOutage(RadioOutage.off),
+              rigInstant,
+            ),
+          ),
+        );
         expect(scanner.phase, const ScannerLost(RadioOutage.off));
         expect(next, isA<Right<ScannerUnusable, OpenScan>>());
         expect(rig.scanning.scansAsked, 2);

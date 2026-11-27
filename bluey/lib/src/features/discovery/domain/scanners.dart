@@ -48,6 +48,14 @@ final class Scanners {
         (_all[scanner] ?? const ScannerScans.none()).asked(id, ask, phase),
       );
 
+  /// These scanners with [id] asked by [scanner], lost, and ended at once by
+  /// the outage; null when [scanner] is not lost or [id] is already held.
+  Scanners? askedWhileLost(ScannerId scanner, ScanId id, ScanAsk ask) {
+    if (find(id) != null) return null;
+    final lost = _all[scanner]?.askedWhileLost(id, ask);
+    return lost == null ? null : withScanner(scanner, lost);
+  }
+
   /// These scanners with the scan named [id] moved to [phase].
   Scanners movedOne(ScanId id, ScanPhase phase) =>
       moved((scan) => scan.id == id ? phase : null);

@@ -74,9 +74,10 @@ final class RadioScan {
   /// scan, and the events that raised.
   ///
   /// A scan already ended when the input comes is forgotten, so the history
-  /// held stays bounded. A [StateError] for an ask from a scanner never
-  /// opened, lost or closed, for a scan already held, and for a scanner
-  /// opened twice: the handles refuse those first.
+  /// held stays bounded. An ask from a lost scanner ends at once with the
+  /// outage. A [StateError] for an ask from a scanner never opened or
+  /// closed, for a scan already held, and for a scanner opened twice: the
+  /// handles refuse those first.
   RadioScanStep on(RadioScanInput input, {required DateTime at}) {
     final kept = RadioScan._(radio, _scanners.withoutEnded());
     final next = kept._decided(input);
@@ -98,8 +99,9 @@ final class RadioScan {
   RadioScanStep _decided(RadioScanInput input) => switch ((radio, input)) {
     (_, ScannerOpened(:final scanner)) => _opened(scanner),
     (_, ScannerDisposed(:final scanner)) => _disposed(scanner),
-    (_, ScanAsked(:final scanner, :final id)) when _refuses(scanner, id) =>
-      throw StateError('Scan ${id.value} may not be asked by that scanner.'),
+    (_, ScanAsked(:final scanner, :final id, :final ask))
+        when _refuses(scanner, id) =>
+      _refused(scanner, id, ask),
     (_, ResultHeard()) => RadioScanStep(this),
     (
       RadioQuiet() || RadioUnsure(),
@@ -183,6 +185,14 @@ final class RadioScan {
       ),
     );
   }
+
+  /// An ask a lost scanner made before it heard of the outage ends at once
+  /// with that outage, so its holder learns why as of any other scan.
+  RadioScanStep _refused(ScannerId scanner, ScanId id, ScanAsk ask) =>
+      switch (_scanners.askedWhileLost(scanner, id, ask)) {
+        final lost? => RadioScanStep(RadioScan._(radio, lost)),
+        null => throw StateError('Scan ${id.value} may not be asked.'),
+      };
 
   bool _refuses(ScannerId scanner, ScanId id) =>
       _scanners[scanner]?.mayAsk != true || _scanners.find(id) != null;

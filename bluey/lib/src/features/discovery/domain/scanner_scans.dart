@@ -65,6 +65,17 @@ final class ScannerScans {
   ScannerScans asked(ScanId id, ScanAsk ask, ScanPhase phase) =>
       ScannerScans._([...scans, HeldScan(id, ask, phase)], _terminal);
 
+  /// This scanner with [id] asked for [ask] and ended at once by the outage
+  /// that lost it, or null when the scanner is not lost.
+  ScannerScans? askedWhileLost(ScanId id, ScanAsk ask) => switch (_terminal) {
+    ScannerLost(:final outage) => asked(
+      id,
+      ask,
+      Ended(EndedByRadioOutage(outage)),
+    ),
+    _ => null,
+  };
+
   /// This scanner with each scan moved to what [change] answers for it,
   /// or left where it is when [change] answers null.
   ScannerScans moved(ScanPhase? Function(HeldScan scan) change) =>

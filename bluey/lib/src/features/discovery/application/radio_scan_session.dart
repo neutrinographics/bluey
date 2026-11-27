@@ -53,7 +53,7 @@ final class RadioScanSession {
   final ScanEvents _events;
   final Log _log;
   final Now _now;
-  late final ScanTurns _turns = ScanTurns(_take);
+  late final ScanTurns _turns = ScanTurns((input) => _carryOut(_step(input)));
   final Map<ScannerId, _Seat> _seats = {};
   final Map<ScanId, OwedScan> _scans = {};
   late final StreamSubscription<ScanReport> _reports;
@@ -96,19 +96,6 @@ final class RadioScanSession {
   void _feed(RadioScanInput input) => _turns.feed(input);
 
   void _decide(void Function() decision) => _turns.decide(decision);
-
-  /// A scan asked behind an outage that lost its scanner ends with that
-  /// outage, since the radio scan refuses an ask from a lost scanner; a
-  /// closed scanner never gets this far, as its seat refuses at once.
-  void _take(RadioScanInput input) {
-    if (input case ScanAsked(:final scanner, :final id)) {
-      if (_radioScan.standingOf(scanner) case ScannerLost(:final outage)) {
-        _scans.remove(id)?.end(EndedByRadioOutage(outage));
-        return;
-      }
-    }
-    _carryOut(_step(input));
-  }
 
   /// Stores what [input] does, then tells of it, so whoever hears of a step
   /// reads the radio scan as the step left it.

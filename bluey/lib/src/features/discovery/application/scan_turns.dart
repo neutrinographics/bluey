@@ -27,6 +27,9 @@ final class ScanTurns {
     _take();
   }
 
+  /// Only a programming error throws here. The turns queued behind it still
+  /// run before it reaches the caller, so one caller's mistake strands
+  /// nobody else's call.
   void _take() {
     if (_taking) return;
     _taking = true;
@@ -40,6 +43,7 @@ final class ScanTurns {
       }
     } finally {
       _taking = false;
+      if (_inputs.isNotEmpty || _decisions.isNotEmpty) _take();
     }
   }
 }

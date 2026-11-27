@@ -104,20 +104,60 @@ void main() {
     });
   });
 
+  group('ScanAsked from a lost scanner', () {
+    test('ends the scan with the outage that lost it', () {
+      // arrange
+      final scan = after([const ScannerOpened(a), const RadioWentAway(outage)]);
+
+      // act
+      final step = scan.on(ScanAsked(a, s1, ask()), at: later);
+
+      // assert
+      expect(step.events, [
+        ScanEnded(s1, const EndedByRadioOutage(outage), later),
+      ]);
+      expect(step.duty, isNull);
+      expect(step.scan.radio, scan.radio);
+      expect(step.scan.phaseOf(s1), const Ended(EndedByRadioOutage(outage)));
+      expect(step.scan.standingOf(a), const ScannerLost(outage));
+    });
+
+    test('holds the scan nowhere after the next step', () {
+      // arrange
+      final scan = after([
+        const ScannerOpened(a),
+        const RadioWentAway(outage),
+        ScanAsked(a, s1, ask()),
+      ]);
+
+      // act
+      final next = scan.on(const ScannerOpened(b), at: later);
+
+      // assert
+      expect(next.scan.phaseOf(s1), isNull);
+      expect(next.scan.heldScanCount, 0);
+    });
+  });
+
   group('ScanAsked is a programming error', () {
     for (final (name, before, scanner) in [
       ('from a scanner never opened', <RadioScanInput>[], a),
-      (
-        'from a lost scanner',
-        [const ScannerOpened(a), const RadioWentAway(outage)],
-        a,
-      ),
       (
         'from a closed scanner',
         [const ScannerOpened(a), const ScannerDisposed(a)],
         a,
       ),
       ('for a scan already held', scanning(), a),
+      (
+        'from a lost scanner, for a scan another scanner holds',
+        [
+          const ScannerOpened(a),
+          const RadioWentAway(outage),
+          const ScannerOpened(b),
+          ScanAsked(b, s1, ask()),
+        ],
+        a,
+      ),
       (
         'for a scan another scanner holds',
         [...scanning(), const ScannerOpened(b)],
