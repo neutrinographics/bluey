@@ -5,7 +5,7 @@ import '../domain/link_features.dart';
 import '../domain/link_id.dart';
 import '../domain/link_operation.dart';
 import '../domain/value_objects/bond_state.dart';
-import 'link_feature_check.dart';
+import 'check_before_asking.dart';
 import 'link_session.dart';
 import 'ports/bonding.dart';
 import 'reported_value.dart';
@@ -67,7 +67,7 @@ final class BondingSession {
       _request(LinkOperation.removeBond, _bonding.removeBond);
 
   Either<ConnectionFailure, void> _check(LinkOperation operation) =>
-      checkLinkFeature(
+      checkBeforeAsking(
         _session.link,
         operation: operation,
         supported: _supported,

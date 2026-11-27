@@ -4,7 +4,7 @@ import '../domain/connection_failure.dart';
 import '../domain/link_features.dart';
 import '../domain/link_operation.dart';
 import '../domain/value_objects/phy.dart';
-import 'link_feature_check.dart';
+import 'check_before_asking.dart';
 import 'link_session.dart';
 import 'ports/phy_control.dart';
 import 'reported_value.dart';
@@ -73,7 +73,7 @@ final class PhySession {
       );
 
   Either<ConnectionFailure, void> _check(LinkOperation operation) =>
-      checkLinkFeature(
+      checkBeforeAsking(
         _session.link,
         operation: operation,
         supported: _supported,

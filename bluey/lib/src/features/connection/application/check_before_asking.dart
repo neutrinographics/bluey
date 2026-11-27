@@ -10,7 +10,7 @@ import '../domain/link_operation.dart';
 ///
 /// Any other end is left to the operation: a value read after a plain
 /// disconnect is still answered, as it always has been.
-Either<ConnectionFailure, void> checkLinkFeature(
+Either<ConnectionFailure, void> checkBeforeAsking(
   Link link, {
   required LinkOperation operation,
   bool supported = true,

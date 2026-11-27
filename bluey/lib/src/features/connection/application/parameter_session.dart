@@ -7,7 +7,7 @@ import '../domain/value_objects/connection_interval.dart';
 import '../domain/value_objects/connection_parameters.dart';
 import '../domain/value_objects/peripheral_latency.dart';
 import '../domain/value_objects/supervision_timeout.dart';
-import 'link_feature_check.dart';
+import 'check_before_asking.dart';
 import 'link_session.dart';
 import 'ports/parameter_control.dart';
 import 'reported_value.dart';
@@ -70,7 +70,7 @@ final class ParameterSession {
   );
 
   Either<ConnectionFailure, void> _check(LinkOperation operation) =>
-      checkLinkFeature(
+      checkBeforeAsking(
         _session.link,
         operation: operation,
         supported: _supported,

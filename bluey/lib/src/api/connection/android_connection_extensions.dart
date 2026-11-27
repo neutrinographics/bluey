@@ -114,6 +114,8 @@ abstract class AndroidConnectionExtensions {
   /// the parameter and the returned future are wrapped as [Mtu] value
   /// objects; the wire-level integer is available via [Mtu.value].
   ///
-  /// Throws [DisconnectedException] if not connected.
+  /// Throws [DisconnectedException] if not connected, and
+  /// [UnsupportedOperationException] when this platform cannot request an
+  /// MTU or [desired] is above the most it can ask for.
   Future<Mtu> requestMtu(Mtu desired);
 }

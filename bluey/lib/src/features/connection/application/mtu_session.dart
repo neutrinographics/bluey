@@ -5,7 +5,7 @@ import '../domain/connection_failure.dart';
 import '../domain/link_features.dart';
 import '../domain/link_operation.dart';
 import '../domain/value_objects/mtu.dart';
-import 'link_feature_check.dart';
+import 'check_before_asking.dart';
 import 'link_operation_log.dart';
 import 'link_session.dart';
 import 'ports/mtu_negotiation.dart';
@@ -55,7 +55,7 @@ final class MtuSession {
   }
 
   Either<ConnectionFailure, void> _check() =>
-      checkLinkFeature(_session.link, operation: LinkOperation.negotiateMtu);
+      checkBeforeAsking(_session.link, operation: LinkOperation.negotiateMtu);
 
   Future<Either<ConnectionFailure, Mtu>> _negotiate(Mtu desired) =>
       loggedWhileUp(

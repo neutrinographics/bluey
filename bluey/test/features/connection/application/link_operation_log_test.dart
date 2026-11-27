@@ -1,4 +1,5 @@
 import 'package:bluey/src/features/connection/application/link_operation_log.dart';
+import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link_operation.dart';
 import 'package:bluey/src/shared/application/log_level.dart';
@@ -6,6 +7,8 @@ import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:bluey/src/shared/domain/either.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../fixtures/features/connection/application/ports/in_memory_links.dart';
+import '../../../fixtures/features/connection/application/up_session.dart';
 import '../../../fixtures/shared/application/recording_log.dart';
 
 const _device = DeviceAddress('AA:BB:CC:DD:EE:01');
@@ -19,16 +22,20 @@ DateTime Function() _ticking(Duration step) {
 
 void main() {
   late RecordingLog log;
+  late LinkSession session;
 
-  setUp(() => log = RecordingLog());
+  setUp(() async {
+    log = RecordingLog();
+    session = await upSession(InMemoryLinks(), _device);
+  });
 
   Future<Either<ConnectionFailure, int>> run(
     Either<ConnectionFailure, int> answer, {
     String startDetail = 'requested=247',
-  }) => loggedLinkOperation<int>(
+  }) => loggedWhileUp<int>(
     log,
     now: _ticking(const Duration(milliseconds: 7)),
-    device: _device,
+    session: session,
     operation: LinkOperation.negotiateMtu,
     startDetail: startDetail,
     completeDetail: (value) => 'requested=247, negotiated=$value',

@@ -1,4 +1,4 @@
-import 'package:bluey/src/features/connection/application/link_feature_check.dart';
+import 'package:bluey/src/features/connection/application/check_before_asking.dart';
 import 'package:bluey/src/features/connection/domain/connection_failure.dart';
 import 'package:bluey/src/features/connection/domain/link.dart';
 import 'package:bluey/src/features/connection/domain/link_end.dart';
@@ -18,7 +18,7 @@ Link _upLink() =>
 void main() {
   test('an up link with the feature answers nothing in the way', () {
     // act
-    final checked = checkLinkFeature(
+    final checked = checkBeforeAsking(
       _upLink(),
       operation: LinkOperation.negotiateMtu,
     );
@@ -29,7 +29,7 @@ void main() {
 
   test('a platform without the feature answers FeatureUnsupported', () {
     // act
-    final checked = checkLinkFeature(
+    final checked = checkBeforeAsking(
       _upLink(),
       operation: LinkOperation.negotiateMtu,
       supported: false,
@@ -51,7 +51,7 @@ void main() {
         _upLink().on(const RadioOutageBegan(RadioOutage.off), at: _at).link;
 
     // act
-    final checked = checkLinkFeature(
+    final checked = checkBeforeAsking(
       ended,
       operation: LinkOperation.negotiateMtu,
       supported: false,
@@ -74,7 +74,7 @@ void main() {
             .link;
 
     // act
-    final checked = checkLinkFeature(
+    final checked = checkBeforeAsking(
       dropped,
       operation: LinkOperation.negotiateMtu,
     );

@@ -13,7 +13,7 @@ import 'link_session.dart';
 ///
 /// [startDetail] is logged with the start and with a failure, and
 /// [completeDetail] words a success; an empty detail is left out.
-Future<Either<ConnectionFailure, T>> loggedLinkOperation<T>(
+Future<Either<ConnectionFailure, T>> _loggedLinkOperation<T>(
   Log log, {
   required Now now,
   required DeviceAddress device,
@@ -83,7 +83,7 @@ Future<Either<ConnectionFailure, T>> loggedWhileUp<T>(
   required Future<Either<ConnectionFailure, T>> Function() run,
 }) async {
   if (session.link.endInSight case final end?) return Left(LinkHadEnded(end));
-  return loggedLinkOperation(
+  return _loggedLinkOperation(
     log,
     now: now,
     device: session.link.device,
