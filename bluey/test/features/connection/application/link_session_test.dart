@@ -85,6 +85,189 @@ void main() {
 
   Iterable<LinkEnded> ends() => events.raised.whereType<LinkEnded>();
 
+  group('beginning', () {
+    const opening = DeviceAddress('AA:BB:CC:DD:EE:03');
+
+    LinkSession begin() => LinkSession.begin(
+      device: opening,
+      links: links,
+      events: events,
+      log: log,
+      now: () => now,
+    );
+
+    test('a session begins by raising that the open began, and listens to '
+        'nothing', () {
+      // act
+      final began = begin();
+
+      // assert
+      expect(events.raised, [LinkOpenBegan(device: opening, at: now)]);
+      expect(began.phase, const Opening());
+      expect(began.isClosing, isTrue);
+      expect(log.records, isEmpty);
+      expect(links.outagesHeard, isTrue, reason: 'the setUp session listens');
+    });
+
+    test('reading the id before the link opened is a StateError naming the '
+        'device', () {
+      // arrange
+      final began = begin();
+
+      // act
+      LinkId read() => began.id;
+
+      // assert
+      expect(
+        read,
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains(opening.value),
+          ),
+        ),
+      );
+    });
+
+    test('opened links the session, raises that it opened and logs no state '
+        'transition', () async {
+      // arrange
+      links.reach(opening);
+      final openedId = (await links.open(
+        opening,
+      )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+      final began = begin();
+      final seen = <LinkPhase>[];
+      began.phases.listen(seen.add);
+
+      // act
+      began.opened(openedId);
+      await pumpEventQueue();
+
+      // assert
+      expect(began.phase, const Linked());
+      expect(began.id, openedId);
+      expect(began.isClosing, isFalse);
+      expect(events.raised.last, LinkOpened(device: opening, at: now));
+      expect(log.records, isEmpty);
+      expect(seen, [const Linked()]);
+    });
+
+    test('notOpened raises nothing more, logs nothing and ends the '
+        'phases', () async {
+      // arrange
+      final began = begin();
+      final seen = <LinkPhase>[];
+      var done = false;
+      began.phases.listen(seen.add, onDone: () => done = true);
+      final releases = <LinkEnd>[];
+      began.onEnd(releases.add);
+
+      // act
+      began.notOpened();
+      await pumpEventQueue();
+
+      // assert
+      expect(began.phase, const NeverOpened());
+      expect(events.raised, [LinkOpenBegan(device: opening, at: now)]);
+      expect(log.records, isEmpty);
+      expect(seen, [const NeverOpened()]);
+      expect(done, isTrue);
+      expect(releases, isEmpty);
+    });
+
+    test('a disconnect on an opening session starts no close and answers '
+        'once the open fails', () async {
+      // arrange
+      final began = begin();
+
+      // act
+      final answer = began.disconnect();
+      began.notOpened();
+
+      // assert
+      expect(await answer, success);
+      expect(links.closesAsked(opening), 0);
+    });
+  });
+
+  group('following', () {
+    Future<LinkId> openedOn(InMemoryLinks quiet) async {
+      quiet.reach(device);
+      return (await quiet.open(
+        device,
+      )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+    }
+
+    test('a session hears no outage until its link opens', () async {
+      // arrange
+      final quiet = InMemoryLinks();
+      final id = await openedOn(quiet);
+      final began = LinkSession.begin(
+        device: device,
+        links: quiet,
+        events: events,
+        log: log,
+        now: () => now,
+      );
+
+      // act
+      final heardWhileOpening = quiet.outagesHeard;
+      began.opened(id);
+
+      // assert
+      expect((heardWhileOpening, quiet.outagesHeard), (false, true));
+    });
+
+    test('an outage while opening is not heard, and the next one ends the '
+        'opened link', () async {
+      // arrange
+      final quiet = InMemoryLinks();
+      final id = await openedOn(quiet);
+      final began = LinkSession.begin(
+        device: device,
+        links: quiet,
+        events: events,
+        log: log,
+        now: () => now,
+      );
+      quiet.outage(RadioOutage.off);
+      await pumpEventQueue();
+      began.opened(id);
+      final linkedAfterOutage = began.phase;
+
+      // act
+      quiet.outage(RadioOutage.unknown);
+      await pumpEventQueue();
+
+      // assert
+      expect(linkedAfterOutage, const Linked());
+      expect(began.link.end, const EndedByRadioOutage(RadioOutage.unknown));
+    });
+
+    test('an opened session hears its link\'s reports', () async {
+      // arrange
+      final id = (await links.open(
+        timed,
+      )).fold((failure) => fail('the open failed: $failure'), (id) => id);
+      final began = LinkSession.begin(
+        device: timed,
+        links: links,
+        events: events,
+        log: log,
+        now: () => now,
+      )..opened(id);
+
+      // act
+      links.drop(timed);
+      await pumpEventQueue();
+
+      // assert
+      expect(began.link.end, const EndedByDrop());
+    });
+  });
+
   group('its id', () {
     test('is the id the platform answered for the link', () async {
       // arrange

@@ -51,10 +51,7 @@ void main() {
         Right<ConnectionFailure, WritePayloadLimit>(WritePayloadLimit(182)),
       ],
     );
-    expect(negotiation.limitReads, [
-      (session.id, true),
-      (session.id, false),
-    ]);
+    expect(negotiation.limitReads, [(session.id, true), (session.id, false)]);
   });
 
   test('answers the end of a link that is not up, and asks nothing', () async {

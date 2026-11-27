@@ -91,9 +91,7 @@ void main() {
 
     // assert
     expectParameters(parameters, read);
-    expect(port.asked, [
-      (LinkOperation.readConnectionParameters, session.id),
-    ]);
+    expect(port.asked, [(LinkOperation.readConnectionParameters, session.id)]);
   });
 
   test('a request that succeeds holds what was asked for', () async {
