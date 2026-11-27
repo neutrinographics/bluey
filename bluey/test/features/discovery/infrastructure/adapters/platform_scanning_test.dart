@@ -171,6 +171,8 @@ void main() {
       expect(log.records, hasLength(1));
       expect(log.records.single.level, BlueyLogLevel.warn);
       expect(log.records.single.data['device'], 'AA:BB:CC:DD:EE:01');
+      expect(log.records.single.errorCode, 'MalformedUuid');
+      expect(log.records.single.data['error'], 'Not a UUID: "not-a-uuid"');
       expect(errors, isEmpty);
     });
 
@@ -197,6 +199,11 @@ void main() {
       expect(heard, hasLength(1));
       expect(log.records, hasLength(1));
       expect(log.records.single.level, BlueyLogLevel.warn);
+      expect(log.records.single.errorCode, 'UnreadableAdvertisement');
+      expect(
+        log.records.single.data['error'],
+        'Manufacturer data came without a company id',
+      );
       expect(errors, isEmpty);
     });
   });

@@ -37,7 +37,7 @@ final class PlatformScanning implements Scanning {
   PlatformScanning(
     platform.BlueyPlatform platform, {
     required Log log,
-    Now now = DateTime.now,
+    required Now now,
   }) : _platform = platform,
        _log = log,
        _now = now;
@@ -67,13 +67,14 @@ final class PlatformScanning implements Scanning {
 
   @override
   Future<Either<ScanFailure, void>> stop() async {
+    final stopping = _listening;
     try {
       await _platform.stopScan();
     } on Object catch (error) {
       return Left(scanFailureFrom(error));
     }
-    unawaited(_listening?.cancel());
-    _listening = null;
+    unawaited(stopping?.cancel());
+    if (identical(_listening, stopping)) _listening = null;
     return const Right(null);
   }
 
@@ -146,9 +147,12 @@ Either<Failure, ScanResult> _resultFrom(
 Either<Failure, List<UUID>> _servicesFrom(List<String> raw) {
   final services = <UUID>[];
   for (final text in raw) {
-    final parsed = uuidFrom(text);
-    if (parsed case Left(:final value)) return Left(value);
-    services.add((parsed as Right<Failure, UUID>).value);
+    switch (uuidFrom(text)) {
+      case Left(:final value):
+        return Left(value);
+      case Right(:final value):
+        services.add(value);
+    }
   }
   return Right(services);
 }

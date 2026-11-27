@@ -1414,8 +1414,10 @@ base class FakeBlueyPlatform extends BlueyPlatform {
 
   @override
   Future<void> stopScan() async {
+    final stopping = _runningScan;
     await _heldStopScan?.future;
     _applyFaultRules(FakeOp.stopScan);
+    if (!identical(_runningScan, stopping)) return;
     _runningScan = null;
     _isScanningPlatform = false;
   }

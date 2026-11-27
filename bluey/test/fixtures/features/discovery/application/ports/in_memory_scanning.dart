@@ -52,6 +52,7 @@ class InMemoryScanning implements Scanning, ScanningHarness {
   @override
   Future<Either<ScanFailure, void>> stop() async {
     _stopsAsked++;
+    final stopping = _scanningFor;
     if (_holdNextStop) {
       _holdNextStop = false;
       final held = _heldStop = Completer<void>();
@@ -63,7 +64,7 @@ class InMemoryScanning implements Scanning, ScanningHarness {
         UnexpectedScanFailure('the radio did not stop', cause: 'in memory'),
       );
     }
-    _scanningFor = null;
+    if (identical(_scanningFor, stopping)) _scanningFor = null;
     return const Right(null);
   }
 

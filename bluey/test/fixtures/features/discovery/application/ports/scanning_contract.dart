@@ -249,6 +249,26 @@ void scanningContract(String name, ScanningHarness Function() create) {
       await subscription.cancel();
     });
 
+    test('a scan asked while a stop is held is still heard after the stop '
+        'settles', () async {
+      // arrange
+      final result = _result('AA:BB:CC:DD:EE:01');
+      final reports = h.scanning.reports;
+      h.scanning.scan(_everything);
+      h.holdNextStop();
+      final stop = h.scanning.stop();
+      await pumpEventQueue();
+      h.scanning.scan(_balanced);
+
+      // act
+      h.releaseStop();
+      await stop;
+      h.hear(result);
+
+      // assert
+      await expectLater(reports, emits(Heard(result)));
+    });
+
     test('a stop after a replaced scan answers success and nothing more is '
         'heard', () async {
       // arrange
