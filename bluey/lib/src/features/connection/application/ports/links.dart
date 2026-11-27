@@ -1,9 +1,9 @@
 import '../../../../shared/domain/device_address.dart';
 import '../../../../shared/domain/either.dart';
 import '../../domain/connection_failure.dart';
-import '../../domain/link_end.dart';
 import '../../domain/link_id.dart';
 import '../../domain/link_input.dart';
+import '../../../../shared/domain/radio_outage.dart';
 
 /// The one way Connection's application layer reaches the radio's links, so
 /// a session and the registry can be run over a double and over the platform

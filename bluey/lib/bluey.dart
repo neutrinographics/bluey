@@ -8,8 +8,8 @@ library bluey;
 export 'src/bluey.dart';
 
 // Shared kernel
-export 'src/shared/uuid.dart';
-export 'src/shared/manufacturer_data.dart';
+export 'src/shared/domain/uuid.dart';
+export 'src/shared/domain/manufacturer_data.dart';
 export 'src/shared/characteristic_properties.dart';
 export 'src/shared/exceptions.dart';
 export 'src/shared/gatt_timeouts.dart';

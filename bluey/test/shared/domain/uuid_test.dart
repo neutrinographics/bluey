@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bluey/src/shared/uuid.dart';
+import 'package:bluey/src/shared/domain/uuid.dart';
 import 'package:bluey/src/gatt_client/well_known_uuids.dart';
 
 void main() {

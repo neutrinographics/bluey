@@ -23,7 +23,7 @@ import '../features/connection/domain/link_end.dart';
 import '../shared/characteristic_properties.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 import 'lifecycle_client.dart';
 import 'value_objects/attribute_handle.dart';
 

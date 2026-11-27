@@ -7,7 +7,6 @@ import 'package:bluey/src/features/connection/application/link_session.dart';
 import 'package:bluey/src/features/connection/application/mtu_session.dart';
 import 'package:bluey/src/features/connection/application/parameter_session.dart';
 import 'package:bluey/src/features/connection/application/phy_session.dart';
-import 'package:bluey/src/features/connection/domain/link_end.dart';
 import 'package:bluey_platform_interface/bluey_platform_interface.dart'
     as platform;
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +21,7 @@ import '../../fixtures/features/connection/application/ports/in_memory_parameter
 import '../../fixtures/features/connection/application/ports/in_memory_phy_control.dart';
 import '../../fixtures/features/connection/application/up_session.dart';
 import '../../fixtures/shared/application/recording_log.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 /// Tests for the [Connection.android] / [Connection.ios] accessors that
 /// gate platform-specific extensions by [Capabilities.platformKind]

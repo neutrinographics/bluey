@@ -1,8 +1,6 @@
 import 'package:meta/meta.dart';
 
-/// What made the radio unusable, which ends every link at once whatever
-/// each link was doing.
-enum RadioOutage { off, unauthorized, unsupported, unknown }
+import '../../../shared/domain/radio_outage.dart';
 
 /// Why a link ended. An ended link always carries one, so whoever reads the
 /// end can tell a disconnect the app asked for from a lost link.

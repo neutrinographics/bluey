@@ -6,6 +6,7 @@ import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../fixtures/shared/application/recording_event_publisher.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');
 final at = DateTime.utc(2026, 11, 26, 10);

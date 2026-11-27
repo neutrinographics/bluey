@@ -15,8 +15,8 @@ import '../peer/server_id.dart';
 import '../platform/bluetooth_state.dart';
 import '../shared/error_translation.dart';
 import '../shared/exceptions.dart';
-import '../shared/manufacturer_data.dart';
-import '../shared/uuid.dart';
+import '../shared/domain/manufacturer_data.dart';
+import '../shared/domain/uuid.dart';
 import 'lifecycle_server.dart';
 import 'server.dart';
 

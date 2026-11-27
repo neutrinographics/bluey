@@ -4,7 +4,7 @@ import 'domain/device_address.dart';
 import '../gatt_server/client_address.dart';
 import '../peer/server_id.dart';
 import '../platform/bluetooth_state.dart';
-import 'uuid.dart';
+import 'domain/uuid.dart';
 
 /// Base class for all Bluey exceptions.
 ///

@@ -1,4 +1,4 @@
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 import 'scan.dart';
 import 'scan_result.dart';
 import 'scan_state.dart';

@@ -10,11 +10,11 @@ import '../../../../shared/domain/either.dart';
 import '../../application/connection_log_words.dart';
 import '../../application/ports/links.dart';
 import '../../domain/connection_failure.dart';
-import '../../domain/link_end.dart';
 import '../../domain/link_id.dart';
 import '../../domain/link_input.dart';
 import '../../domain/link_operation.dart';
 import 'platform_failures.dart';
+import '../../../../shared/domain/radio_outage.dart';
 
 /// Connection's [Links] over [BlueyPlatform], so the lifecycle runs on a
 /// phone exactly as it runs over the in-memory double.

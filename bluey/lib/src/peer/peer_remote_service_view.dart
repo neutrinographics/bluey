@@ -2,7 +2,7 @@ import '../api/connection/connection.dart' show Connection;
 import '../gatt_client/gatt.dart' show RemoteService;
 import '../lifecycle.dart' as lifecycle;
 import '../shared/exceptions.dart' show ServiceNotFoundException;
-import '../shared/uuid.dart';
+import '../shared/domain/uuid.dart';
 
 /// A view of a [Connection]'s service tree with the lifecycle control
 /// service hidden.

@@ -15,6 +15,7 @@ import '../domain/live_link.dart';
 import 'connection_log_words.dart';
 import 'ports/link_events.dart';
 import 'ports/links.dart';
+import '../../../shared/domain/radio_outage.dart';
 
 /// Runs one link: it feeds the [Link] what the radio and the caller say, does
 /// what the link answers, and releases everything tied to the link when it

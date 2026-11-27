@@ -1,7 +1,7 @@
 import 'gatt_server/client_address.dart';
 import 'shared/domain/bluey_event.dart';
 import 'shared/domain/device_address.dart';
-import 'shared/uuid.dart';
+import 'shared/domain/uuid.dart';
 
 /// Scan started.
 final class ScanStartedEvent extends BlueyEvent {

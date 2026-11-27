@@ -2,7 +2,7 @@ import '../../features/connection/domain/value_objects/write_payload_limit.dart'
 import 'connection_state.dart';
 import '../../gatt_client/gatt.dart';
 import '../../shared/domain/device_address.dart';
-import '../../shared/uuid.dart';
+import '../../shared/domain/uuid.dart';
 import 'android_connection_extensions.dart';
 import 'ios_connection_extensions.dart';
 

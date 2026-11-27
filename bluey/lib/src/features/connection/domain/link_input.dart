@@ -1,5 +1,5 @@
-import 'link_end.dart';
 import 'link_id.dart';
+import '../../../shared/domain/radio_outage.dart';
 
 /// What the radio says about a link's connection, as a link reads it.
 enum LinkReport { connecting, connected, disconnecting, disconnected }

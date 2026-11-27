@@ -6,6 +6,7 @@ import 'package:bluey/src/features/connection/domain/link_input.dart';
 import 'package:bluey/src/features/connection/domain/link_phase.dart';
 import 'package:bluey/src/shared/domain/device_address.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bluey/src/shared/domain/radio_outage.dart';
 
 const id = LinkId('L1');
 const device = DeviceAddress('AA:BB:CC:DD:EE:01');

@@ -1,3 +1,5 @@
+import 'uuid_text.dart';
+
 /// A 128-bit Bluetooth UUID with support for short-form notation.
 ///
 /// This is a value object in the Domain layer. UUIDs are immutable and
@@ -73,35 +75,9 @@ class UUID {
   @override
   int get hashCode => _value.hashCode;
 
-  /// Normalizes a UUID string to lowercase with hyphens.
-  ///
-  /// Accepts full 128-bit UUIDs (32 hex chars, with or without hyphens).
   static String _normalize(String value) {
-    if (value.isEmpty) {
-      throw ArgumentError('UUID cannot be empty');
-    }
-
-    // Remove hyphens and convert to lowercase
-    final clean = value.replaceAll('-', '').toLowerCase();
-
-    // Validate length - must be full 128-bit UUID
-    if (clean.length != 32) {
-      throw ArgumentError(
-        'UUID must be 32 hex characters (128 bits). '
-        'Use UUID.short() for 16-bit short UUIDs.',
-      );
-    }
-
-    // Validate hex characters
-    if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(clean)) {
-      throw ArgumentError('UUID must contain only hexadecimal characters');
-    }
-
-    // Add hyphens in standard format
-    return '${clean.substring(0, 8)}-'
-        '${clean.substring(8, 12)}-'
-        '${clean.substring(12, 16)}-'
-        '${clean.substring(16, 20)}-'
-        '${clean.substring(20, 32)}';
+    final violation = uuidTextViolation(value);
+    if (violation != null) throw ArgumentError(violation);
+    return canonicalUuidText(value);
   }
 }

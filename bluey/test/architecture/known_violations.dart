@@ -45,8 +45,6 @@ const unplaced = <String>[
   'lib/src/shared/error_translation.dart -> unplaced',
   'lib/src/shared/exceptions.dart -> unplaced',
   'lib/src/shared/gatt_timeouts.dart -> unplaced',
-  'lib/src/shared/manufacturer_data.dart -> unplaced',
-  'lib/src/shared/uuid.dart -> unplaced',
 ];
 
 /// The dependencies that cross from one context to another, or from the

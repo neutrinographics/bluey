@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import '../peer/peer_client.dart';
 import '../peer/server_id.dart';
-import '../shared/manufacturer_data.dart';
-import '../shared/uuid.dart';
+import '../shared/domain/manufacturer_data.dart';
+import '../shared/domain/uuid.dart';
 import 'advertising_state.dart';
 import 'client_address.dart';
 import 'gatt_request.dart';
